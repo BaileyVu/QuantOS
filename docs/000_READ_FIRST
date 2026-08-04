@@ -1,0 +1,271 @@
+# QuantOS Core  
+## 000_READ_FIRST.md
+Version: 0.1.0-alpha
+Status: Draft V1 (Frozen after approval)
+Last Updated: 2026-08-04
+---
+# 1. Purpose
+This repository defines the engineering specification for **QuantOS Core**, a research-driven quantitative trading engine.
+QuantOS Core is designed to discover, validate, and execute statistically robust trading strategies while maintaining engineering simplicity and strict risk management.
+The objective is **not** to build the smartest AI trading system.
+The objective is to build the smallest system capable of consistently surviving live trading.
+Every engineering decision shall support that objective.
+---
+# 2. Version 1 Objective
+Version 1 has only one mission.
+> Build a production-quality quantitative trading engine capable of trading BTCUSDT and ETHUSDT on Binance Spot using an initial capital of 20 USDT.
+Success is measured by:
+- Surviving live trading  
+- Positive statistical expectancy  
+- Strict capital preservation  
+- Engineering robustness  
+- Ease of maintenance
+Version 1 is NOT intended to become a complete quantitative research platform.
+It is the foundation upon which future versions will be built.
+---
+# 3. Guiding Philosophy
+The following principles are mandatory.
+## Principle 1
+Prefer engineering simplicity over algorithmic sophistication.
+If two solutions produce statistically equivalent out-of-sample performance, always choose the simpler implementation.
+---
+## Principle 2
+Every component must justify its existence.
+Every module, feature, dependency, and model must provide measurable value.
+If its value cannot be demonstrated, it shall not be included.
+---
+## Principle 3
+Never optimize for backtests.
+Optimize for live robustness.
+Backtests are validation tools.
+They are never proof of profitability.
+---
+## Principle 4
+Capital preservation always has priority over profit maximization.
+The system should miss profitable trades rather than participate in low-confidence trades.
+---
+## Principle 5
+Every decision must be reproducible.
+Given identical data and configuration, the platform must produce identical outputs.
+---
+# 4. Version 1 Scope
+The following items define Version 1.
+## Exchange
+Binance Spot
+---
+## Trading Pairs
+BTCUSDT
+ETHUSDT
+---
+## Initial Capital
+20 USDT
+---
+## Timeframe
+Primary timeframe
+1 minute
+Higher timeframes may be used only for contextual features.
+---
+## Trading Style
+Systematic
+Rule-based
+Machine Learning Assisted
+No discretionary trading.
+---
+## Deployment Target
+Local workstation
+Cloud deployment is outside Version 1.
+---
+## Storage
+Parquet
+DuckDB
+---
+## Architecture
+Clean Architecture
+Modular Monolith
+---
+# 5. Success Criteria
+Version 1 is considered complete only when all of the following conditions are satisfied.
+## Functional
+✓ Historical data downloads correctly
+✓ Live market data streams correctly
+✓ Feature engineering pipeline is deterministic
+✓ Model training is reproducible
+✓ Backtesting executes successfully
+✓ Paper trading executes successfully
+✓ Live trading can be enabled through configuration
+---
+## Quantitative
+✓ Positive expected value after fees
+✓ Walk-forward validation passes
+✓ Monte Carlo robustness acceptable
+✓ Maximum drawdown remains within defined limits
+✓ Strategy demonstrates stability across validation windows
+---
+## Engineering
+✓ Every module tested
+✓ Logging implemented
+✓ Configuration documented
+✓ Code reproducible
+✓ Clean architecture maintained
+---
+# 6. Non-Goals
+The following items are explicitly excluded from Version 1.
+- Multi-exchange support  
+- Futures trading  
+- Portfolio optimization  
+- Reinforcement learning  
+- Deep learning  
+- Autonomous agents  
+- News sentiment  
+- Social media analysis  
+- On-chain analytics  
+- Cloud deployment  
+- Kubernetes  
+- Distributed computing  
+- High-frequency trading  
+- Market making  
+- Cross-exchange arbitrage  
+- Multi-strategy portfolio optimization
+These items may be considered in future versions only after Version 1 has proven successful.
+---
+# 7. Core Modules
+Version 1 consists of exactly six modules.
+Market Data
+↓
+Feature Engine
+↓
+Alpha Engine
+↓
+Risk Engine
+↓
+Execution Engine
+↓
+Evaluation Engine
+No additional production modules shall be introduced without updating this specification.
+---
+# 8. Complexity Budget
+Version 1 intentionally limits complexity.
+Maximum production model
+1
+Preferred candidate
+LightGBM
+Alternative models may be benchmarked.
+Only one production model may exist.
+---
+Maximum production features
+20
+Target
+10–15
+---
+Maximum exchanges
+1
+---
+Maximum trading pairs
+2
+---
+Maximum live strategies
+1
+---
+Maximum developer complexity
+Single developer maintainable.
+---
+# 9. Engineering Rules
+Every implementation must satisfy the following requirements.
+## Rule 1
+No hidden state.
+---
+## Rule 2
+Configuration must be externalized.
+---
+## Rule 3
+Business logic must not depend on infrastructure.
+---
+## Rule 4
+Every trade decision must be explainable.
+---
+## Rule 5
+Every experiment must be reproducible.
+---
+## Rule 6
+No duplicated business logic.
+---
+## Rule 7
+No premature optimization.
+---
+## Rule 8
+No feature shall exist because it is popular.
+Only measurable value justifies inclusion.
+---
+# 10. Validation Philosophy
+Every hypothesis follows the same lifecycle.
+Idea
+↓
+Implementation
+↓
+Backtest
+↓
+Walk Forward
+↓
+Monte Carlo
+↓
+Paper Trading
+↓
+Live Trading
+Skipping validation stages is prohibited.
+---
+# 11. Development Philosophy
+Development follows incremental milestones.
+Milestone 1
+Market Data
+---
+Milestone 2
+Feature Engine
+---
+Milestone 3
+Alpha Engine
+---
+Milestone 4
+Backtesting
+---
+Milestone 5
+Paper Trading
+---
+Milestone 6
+Live Trading
+Each milestone must pass review before the next begins.
+---
+# 12. Definition of Done
+A feature is complete only when:
+- Code implemented  
+- Unit tests passing  
+- Integration tests passing  
+- Documentation updated  
+- Configuration documented  
+- Logging implemented  
+- Validation completed  
+- Code reviewed
+Incomplete work shall not be merged.
+---
+# 13. Decision Hierarchy
+When conflicting goals exist, resolve them using the following priority.
+1. Capital Preservation
+2. Correctness
+3. Robustness
+4. Simplicity
+5. Explainability
+6. Performance
+7. Profitability
+---
+# 14. Repository Principles
+The repository shall remain understandable by a single engineer.
+Architecture must remain modular.
+Dependencies shall be minimized.
+Complexity shall be actively removed whenever possible.
+Every future version must build upon this foundation rather than replacing it.
+---
+# 15. Final Statement
+QuantOS Core is not designed to maximize backtest performance.
+It is designed to maximize the probability of long-term survival in live markets through disciplined engineering, rigorous validation, and controlled complexity.
+Whenever uncertainty exists, the implementation that is simpler, safer, and easier to validate shall be preferred.
+This document is the governing specification for Version 1.
+All subsequent specifications and implementations must comply with the principles defined herein.
