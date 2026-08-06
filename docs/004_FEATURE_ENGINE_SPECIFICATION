@@ -1,0 +1,1962 @@
+# 004_FEATURE_ENGINE_SPECIFICATION
+
+# 004_FEATURE_ENGINE_SPECIFICATION.part1.md
+
+**Document ID:** QOS-004
+**Document Type:** Engineering Specification
+**Status:** Version 1.0
+**Applies To:** QuantOS Version 1
+**Audience:** Architecture, Research, Engineering
+
+---
+
+# Part I
+
+---
+
+# 1. Purpose
+
+The Feature Engine is responsible for transforming validated market data into deterministic model inputs suitable for both research and production trading.
+
+Its purpose is to ensure that every feature produced by the platform is:
+
+* deterministic
+* reproducible
+* traceable
+* version controlled
+* mathematically defined
+* free from future information leakage
+* identical between research and live execution
+
+The Feature Engine is the only authorized subsystem responsible for producing model-ready features.
+
+No model may compute its own features independently.
+
+This guarantees that research, backtesting, simulation, paper trading, and live trading consume identical feature definitions.
+
+---
+
+# 2. Scope
+
+Version 1 supports only production features required by the single production trading model.
+
+The scope includes:
+
+* market-derived features
+* derived statistical features
+* rolling window calculations
+* normalization
+* feature validation
+* feature metadata
+* feature registry
+* deterministic feature generation
+
+The Feature Engine does **not** include:
+
+* feature discovery algorithms
+* automated feature generation
+* online feature learning
+* feature marketplaces
+* distributed feature computation
+* cross-strategy feature sharing
+* reinforcement learning features
+
+These capabilities remain outside Version 1.
+
+---
+
+# 3. Objectives
+
+The Feature Engine shall satisfy the following objectives.
+
+## 3.1 Determinism
+
+Every feature generated from identical source data shall always produce identical values.
+
+No randomness is permitted.
+
+---
+
+## 3.2 Reproducibility
+
+Historical experiments shall recreate identical feature datasets regardless of execution date.
+
+---
+
+## 3.3 Consistency
+
+Research and production shall consume the same feature implementation.
+
+Duplicate implementations are prohibited.
+
+---
+
+## 3.4 Traceability
+
+Every feature shall be attributable to:
+
+* its mathematical definition
+* implementation version
+* source datasets
+* configuration
+* creation timestamp
+* owner
+
+---
+
+## 3.5 Simplicity
+
+Version 1 prioritizes a small set of well-understood production features instead of maximizing feature count.
+
+Quality is preferred over quantity.
+
+---
+
+# 4. Engineering Philosophy
+
+The Feature Engine follows six engineering principles.
+
+## Principle 1 — Features Are Products
+
+Features are treated as production assets rather than temporary research artifacts.
+
+Every production feature has:
+
+* documentation
+* owner
+* identifier
+* validation
+* lifecycle
+
+---
+
+## Principle 2 — Single Source of Truth
+
+Every feature shall have exactly one implementation.
+
+Alternative implementations are prohibited.
+
+---
+
+## Principle 3 — Mathematical Transparency
+
+Every production feature shall possess a documented mathematical definition.
+
+Researchers must understand exactly how a feature is calculated.
+
+Black-box feature generation is prohibited.
+
+---
+
+## Principle 4 — Deterministic Computation
+
+Feature computation shall depend only on:
+
+* historical market data
+* approved configuration
+* deterministic mathematical operations
+
+External runtime conditions shall never influence results.
+
+---
+
+## Principle 5 — Research Before Production
+
+New features shall undergo research validation before entering production.
+
+Production features are stable engineering artifacts rather than experimental ideas.
+
+---
+
+## Principle 6 — Minimal Complexity
+
+Version 1 intentionally limits production features to approximately 10–15 carefully validated signals.
+
+Adding additional features requires measurable evidence of improved production performance.
+
+---
+
+# 5. Feature Lifecycle
+
+Every feature progresses through a controlled lifecycle.
+
+```
+Proposal
+
+↓
+
+Research
+
+↓
+
+Validation
+
+↓
+
+Review
+
+↓
+
+Registry Approval
+
+↓
+
+Production
+
+↓
+
+Monitoring
+
+↓
+
+Retirement
+```
+
+Each stage has formal acceptance criteria.
+
+Skipping lifecycle stages is prohibited.
+
+---
+
+# 6. Feature Categories
+
+Version 1 recognizes the following categories.
+
+## 6.1 Market Features
+
+Derived directly from market observations.
+
+Examples include:
+
+* returns
+* price changes
+* volatility
+* volume statistics
+
+---
+
+## 6.2 Technical Features
+
+Deterministic mathematical transformations of historical observations.
+
+Examples include:
+
+* moving averages
+* momentum
+* oscillators
+* trend measurements
+
+---
+
+## 6.3 Statistical Features
+
+Rolling statistical summaries.
+
+Examples include:
+
+* variance
+* standard deviation
+* skewness
+* z-score
+
+---
+
+## 6.4 Time Features
+
+Derived from timestamps.
+
+Examples include:
+
+* hour
+* weekday
+* trading session
+
+Version 1 should minimize reliance on calendar-derived signals unless supported by research.
+
+---
+
+## 6.5 Metadata Features
+
+Context describing the dataset rather than the market itself.
+
+Examples include:
+
+* bar completeness
+* missing-data indicators
+* liquidity flags
+
+---
+
+# 7. Design Principles
+
+The Feature Engine shall satisfy the following design principles.
+
+* immutable inputs
+* immutable outputs
+* deterministic processing
+* explicit dependencies
+* reproducible execution
+* modular implementation
+* version-controlled definitions
+* complete auditability
+
+---
+
+# 8. Formal Engineering Requirements
+
+## REQ-FEAT-001
+
+All production features shall have unique identifiers.
+
+---
+
+## REQ-FEAT-002
+
+Every production feature shall possess a documented mathematical definition.
+
+---
+
+## REQ-FEAT-003
+
+Every production feature shall be deterministic.
+
+---
+
+## REQ-FEAT-004
+
+Features shall produce identical outputs for identical inputs.
+
+---
+
+## REQ-FEAT-005
+
+Feature generation shall not depend upon execution order outside the documented pipeline.
+
+---
+
+## REQ-FEAT-006
+
+Every feature shall declare its required input datasets.
+
+---
+
+## REQ-FEAT-007
+
+Every feature shall declare required historical lookback.
+
+---
+
+## REQ-FEAT-008
+
+All production features shall be registered prior to deployment.
+
+---
+
+## REQ-FEAT-009
+
+Research-only features shall not be visible to production systems.
+
+---
+
+## REQ-FEAT-010
+
+Every feature shall be reproducible using archived datasets.
+
+---
+
+# Part II — Feature Pipeline Architecture
+
+---
+
+# 9. Feature Pipeline Overview
+
+The Feature Pipeline transforms validated market data into production-ready model inputs through a deterministic sequence of stages.
+
+No stage may be skipped, reordered, or modified without formal review.
+
+The pipeline is defined as:
+
+```
+Validated Market Data
+        │
+        ▼
+Input Verification
+        │
+        ▼
+Time Alignment
+        │
+        ▼
+Window Construction
+        │
+        ▼
+Feature Computation
+        │
+        ▼
+Feature Validation
+        │
+        ▼
+Missing Value Handling
+        │
+        ▼
+Metadata Attachment
+        │
+        ▼
+Feature Registry Verification
+        │
+        ▼
+Feature Store
+        │
+        ▼
+Model Consumption
+```
+
+Each stage has clearly defined ownership and deterministic inputs and outputs.
+
+---
+
+# 10. Feature Registry
+
+The Feature Registry is the authoritative catalog of every approved production feature.
+
+The registry exists to prevent duplicate implementations, inconsistent naming, undocumented calculations, and uncontrolled feature growth.
+
+Each production feature shall appear exactly once within the registry.
+
+The registry defines:
+
+* feature identifier
+* canonical name
+* mathematical definition
+* owner
+* implementation version
+* required input datasets
+* required lookback window
+* output type
+* valid value range
+* production status
+* approval history
+
+Only registered features may be consumed by the production model.
+
+Research features remain isolated from the production registry until formally promoted.
+
+---
+
+# 11. Feature Metadata
+
+Every generated feature shall include sufficient metadata to guarantee traceability.
+
+At minimum, metadata shall record:
+
+* Feature ID
+* feature name
+* feature version
+* generation timestamp
+* dataset version
+* source data version
+* configuration version
+* dependency versions
+* window definition
+* validation status
+* integrity checksum
+
+Metadata is considered part of the feature artifact and shall remain immutable after generation.
+
+---
+
+# 12. Feature Versioning
+
+Feature definitions are immutable once released.
+
+Any modification affecting numerical output constitutes a new feature version.
+
+Version changes include, but are not limited to:
+
+* formula revisions
+* parameter changes
+* normalization changes
+* window modifications
+* dependency updates
+* preprocessing changes
+
+Minor documentation updates do not require a new feature version unless they alter computational behavior.
+
+Historic experiments shall always reference the exact feature version originally used.
+
+---
+
+# 13. Feature Dependencies
+
+Every production feature shall explicitly declare its dependencies.
+
+Dependencies may include:
+
+* raw market datasets
+* validated intermediate features
+* symbol metadata
+* approved configuration parameters
+
+Implicit dependencies are prohibited.
+
+Dependency graphs shall remain acyclic to ensure deterministic computation and simplify auditability.
+
+A feature shall not depend on another feature whose production status is experimental or deprecated.
+
+---
+
+# 14. Feature Validation
+
+Feature validation is mandatory before any feature becomes available to downstream consumers.
+
+Validation shall confirm:
+
+* input integrity
+* numerical stability
+* expected output type
+* acceptable value range
+* absence of undefined values unless explicitly permitted
+* deterministic repeatability
+* dependency consistency
+
+Validation failures shall prevent publication to the Feature Store.
+
+No downstream component shall override validation failures.
+---
+
+# Part II
+
+---
+
+# 15. Leakage Prevention
+
+Feature leakage is one of the highest-risk failure modes within quantitative research. The Feature Engine shall enforce strict safeguards to ensure that no feature contains information unavailable at the prediction timestamp.
+
+Production models shall only consume information that would have been observable at the exact decision time.
+
+Future market observations shall never influence current feature values.
+
+The Feature Engine shall reject any computation that violates temporal ordering.
+
+Examples of prohibited leakage include:
+
+* future prices
+* future returns
+* future volume
+* future volatility
+* future order book state
+* labels incorporated into features
+* forward-filled information originating after the prediction timestamp
+
+Researchers shall assume that any undocumented temporal dependency constitutes potential leakage until proven otherwise.
+
+---
+
+## REQ-FEAT-011
+
+Production features shall never depend on future observations.
+
+---
+
+## REQ-FEAT-012
+
+Every feature shall be computed using only information available at or before the prediction timestamp.
+
+---
+
+## REQ-FEAT-013
+
+The Feature Engine shall validate temporal ordering before publishing feature outputs.
+
+---
+
+## REQ-FEAT-014
+
+Feature definitions shall explicitly specify their observation timestamp.
+
+---
+
+# 16. Window Management
+
+Many production features require historical observations over rolling windows.
+
+Window definitions shall be explicit, deterministic, and immutable.
+
+Every rolling feature shall define:
+
+* window length
+* observation frequency
+* minimum observations
+* boundary behavior
+* warm-up requirements
+
+Window sizes shall remain stable across research and production.
+
+Changing a window definition constitutes a new feature version.
+
+Incomplete windows shall not silently produce production feature values unless explicitly approved.
+
+---
+
+## Window Types
+
+Version 1 supports only fixed historical windows.
+
+Supported examples include:
+
+* previous N bars
+* previous N minutes
+* previous N hours
+
+Adaptive or dynamically expanding windows are outside Version 1.
+
+---
+
+## Warm-Up Period
+
+Features requiring historical context shall define a mandatory warm-up period.
+
+During warm-up:
+
+* features may remain unavailable
+* models shall not generate predictions
+* missing windows shall not be approximated
+
+Warm-up completion shall be deterministic for every symbol.
+
+---
+
+## REQ-FEAT-015
+
+Every rolling feature shall declare its required lookback window.
+
+---
+
+## REQ-FEAT-016
+
+Warm-up periods shall be explicitly defined.
+
+---
+
+## REQ-FEAT-017
+
+Incomplete rolling windows shall not be substituted with estimated values.
+
+---
+
+# 17. Time Alignment
+
+All production features shall reference a common prediction timestamp.
+
+Features generated from multiple datasets shall be aligned before computation.
+
+The Feature Engine shall maintain strict temporal consistency across:
+
+* market prices
+* volume
+* derived statistics
+* metadata
+* model inputs
+
+Timestamp normalization shall occur before feature computation.
+
+Timezone conversions shall never occur inside feature calculations.
+
+Time alignment rules shall remain identical across:
+
+* research
+* backtesting
+* paper trading
+* production
+
+---
+
+## Alignment Principles
+
+Every feature row represents a single prediction instant.
+
+All values within that row shall correspond to information known at that instant.
+
+No feature shall be generated using partially completed market intervals.
+
+---
+
+## REQ-FEAT-018
+
+Every feature vector shall correspond to one unique prediction timestamp.
+
+---
+
+## REQ-FEAT-019
+
+All input datasets shall be temporally aligned before feature computation.
+
+---
+
+## REQ-FEAT-020
+
+Timestamp normalization shall occur before any feature calculations.
+
+---
+
+# 18. Missing Value Policy
+
+Missing values shall be treated as data quality events rather than routine conditions.
+
+The Feature Engine shall never silently replace missing values.
+
+Each feature shall define its missing value policy.
+
+Permitted policies include:
+
+* reject computation
+* delay computation until sufficient data exists
+* emit explicitly documented missing values
+* use mathematically justified defaults approved during review
+
+Implicit interpolation is prohibited unless formally documented.
+
+Forward filling shall not be used when it introduces temporal distortion.
+
+Production systems shall record every missing-value event.
+
+---
+
+## REQ-FEAT-021
+
+Every production feature shall define a missing value policy.
+
+---
+
+## REQ-FEAT-022
+
+Silent replacement of missing values is prohibited.
+
+---
+
+## REQ-FEAT-023
+
+Missing-value events shall be logged for audit purposes.
+
+---
+
+# Part III — Production Feature Standards
+
+---
+
+# 19. Production Feature Standards
+
+Version 1 intentionally limits the production feature set to approximately 10–15 high-quality features.
+
+The objective is not maximizing feature count but maximizing robustness, interpretability, and reproducibility.
+
+Every production feature shall satisfy the following characteristics:
+
+* mathematically well-defined
+* deterministic
+* computationally efficient
+* economically justifiable
+* reproducible
+* documented
+* validated
+* monitored
+
+Features failing any of these criteria shall not enter production.
+
+---
+
+## Production Acceptance Criteria
+
+A production feature shall demonstrate:
+
+* measurable predictive contribution
+* stable historical behavior
+* acceptable computational cost
+* deterministic outputs
+* absence of information leakage
+* successful validation
+* complete documentation
+
+Meeting statistical significance alone is insufficient for promotion.
+
+Operational reliability shall carry equal weight.
+
+---
+
+## REQ-FEAT-024
+
+Only approved production features may be consumed by the live trading model.
+
+---
+
+## REQ-FEAT-025
+
+Production features shall satisfy all validation requirements before deployment.
+
+---
+
+## REQ-FEAT-026
+
+Production feature count shall remain intentionally limited unless justified by formal review.
+
+---
+
+# 20. Candidate Feature Workflow
+
+Every new feature begins as a research candidate.
+
+Candidate features are isolated from production infrastructure.
+
+The standard workflow is:
+
+```text
+Idea
+   │
+   ▼
+Mathematical Definition
+   │
+   ▼
+Prototype
+   │
+   ▼
+Research Evaluation
+   │
+   ▼
+Validation
+   │
+   ▼
+Engineering Review
+   │
+   ▼
+Registry Approval
+   │
+   ▼
+Production
+```
+
+Candidate features may be discarded at any stage without affecting production systems.
+
+Experimental features shall never bypass the approval workflow.
+
+---
+
+## REQ-FEAT-027
+
+Candidate features shall remain isolated from production environments.
+
+---
+
+## REQ-FEAT-028
+
+Every candidate feature shall undergo formal review prior to promotion.
+
+---
+
+# 21. Feature Promotion Process
+
+Promotion to production requires both research and engineering approval.
+
+Promotion shall verify:
+
+* deterministic implementation
+* reproducible outputs
+* complete documentation
+* validation success
+* acceptable computational cost
+* compatibility with existing production features
+
+Promotion decisions shall be recorded within the Feature Registry.
+
+Once promoted, production behavior becomes version controlled.
+
+---
+
+## REQ-FEAT-029
+
+Promotion decisions shall be recorded for auditability.
+
+---
+
+## REQ-FEAT-030
+
+Production promotion shall require successful validation.
+
+---
+
+# 22. Feature Store Integration
+
+The Feature Store is the authoritative repository of production-ready feature datasets.
+
+The Feature Engine is the sole publisher to the Feature Store.
+
+The Feature Store shall contain:
+
+* validated feature values
+* metadata
+* feature versions
+* dataset versions
+* integrity information
+
+Consumers shall retrieve features from the Feature Store rather than recomputing them independently.
+
+This guarantees consistency across all execution environments.
+
+---
+
+## REQ-FEAT-031
+
+The Feature Engine shall be the exclusive producer of production feature datasets.
+
+---
+
+## REQ-FEAT-032
+
+Production systems shall consume registered features from the Feature Store.
+
+---
+
+# 23. Research Features
+
+Research features support experimentation and hypothesis testing.
+
+They are intentionally separated from production assets.
+
+Research features:
+
+* may evolve rapidly
+* may be discarded
+* may exist in multiple variants
+* shall not affect production trading
+
+Research outputs shall clearly indicate their experimental status.
+
+Promotion is optional and requires formal approval.
+
+---
+
+## REQ-FEAT-033
+
+Research features shall remain logically separated from production features.
+
+---
+
+# 24. Feature Reproducibility
+
+Feature reproducibility is mandatory.
+
+Given identical:
+
+* source datasets
+* configuration
+* feature versions
+* dependency versions
+
+the Feature Engine shall reproduce identical outputs regardless of execution date or hardware.
+
+Any deviation shall be treated as an engineering defect.
+
+---
+
+## REQ-FEAT-034
+
+Production feature generation shall be reproducible across repeated executions.
+
+---
+
+## REQ-FEAT-035
+
+Numerical reproducibility shall be verified during validation.
+
+---
+
+# 25. Performance Constraints
+
+Feature generation shall support reliable operation on a single local workstation.
+
+Performance optimization shall never compromise correctness or determinism.
+
+The Feature Engine shall prioritize:
+
+1. correctness
+2. reproducibility
+3. maintainability
+4. performance
+
+Only after the first three objectives are satisfied may implementation be optimized.
+
+Premature optimization is prohibited.
+
+---
+
+## REQ-FEAT-036
+
+Correctness shall take precedence over execution speed.
+
+---
+
+## REQ-FEAT-037
+
+Feature computation shall remain suitable for execution on the Version 1 deployment platform.
+
+---
+
+# 26. Feature Documentation Standards
+
+Every production feature shall include standardized documentation.
+
+Documentation shall include:
+
+* feature identifier
+* feature name
+* mathematical definition
+* purpose
+* economic rationale
+* dependencies
+* window definition
+* parameters
+* valid range
+* expected behavior
+* version history
+* owner
+* validation status
+
+Documentation shall remain synchronized with implementation.
+
+Undocumented production features are prohibited.
+
+---
+
+## REQ-FEAT-038
+
+Every production feature shall maintain complete engineering documentation.
+
+---
+
+## REQ-FEAT-039
+
+Documentation shall be updated whenever computational behavior changes.
+
+---
+
+# Part IV — Operations, Governance, and Architecture
+
+---
+
+# 27. Operational Rules
+
+The Feature Engine shall operate predictably under all supported execution modes.
+
+Operational behavior shall remain identical across:
+
+* research
+* backtesting
+* paper trading
+* production
+
+Configuration differences shall not alter feature definitions.
+
+Operational exceptions shall be recorded and investigated.
+
+---
+
+## REQ-FEAT-040
+
+Feature behavior shall remain consistent across all execution environments.
+
+---
+
+## REQ-FEAT-041
+
+Operational failures shall be recorded for later investigation.
+
+---
+
+# 28. Testing Requirements
+
+Every production feature shall undergo automated testing before release.
+
+Testing shall verify:
+
+* deterministic outputs
+* mathematical correctness
+* boundary conditions
+* warm-up behavior
+* missing-value handling
+* timestamp alignment
+* dependency validation
+* reproducibility
+* numerical stability
+
+Regression tests shall prevent unintended behavioral changes.
+
+---
+
+## REQ-FEAT-042
+
+Every production feature shall have automated validation tests.
+
+---
+
+## REQ-FEAT-043
+
+Regression testing shall accompany all feature revisions.
+
+---
+
+# 29. Monitoring
+
+The Feature Engine shall continuously monitor feature generation quality.
+
+Monitoring shall detect:
+
+* validation failures
+* abnormal value distributions
+* unexpected missing values
+* computation failures
+* registry inconsistencies
+* dependency failures
+
+Monitoring identifies operational anomalies only.
+
+Corrective actions remain the responsibility of engineering processes.
+
+---
+
+## REQ-FEAT-044
+
+Feature validation failures shall generate operational alerts.
+
+---
+
+## REQ-FEAT-045
+
+Monitoring shall preserve historical records for audit purposes.
+
+---
+
+# 30. Auditability
+
+Every production feature shall be fully auditable.
+
+Engineering teams shall be able to determine:
+
+* who approved the feature
+* when it was approved
+* which version generated a prediction
+* which datasets were used
+* which dependencies were involved
+* which validation results were obtained
+
+Audit records shall be immutable after publication.
+
+---
+
+## REQ-FEAT-046
+
+Production feature generation shall be fully traceable.
+
+---
+
+## REQ-FEAT-047
+
+Audit records shall remain immutable.
+
+---
+
+# 31. Feature Governance
+
+Feature governance ensures long-term quality and prevents uncontrolled growth of the production feature set.
+
+Engineering review shall evaluate:
+
+* production value
+* maintenance cost
+* computational cost
+* reproducibility
+* operational risk
+* documentation quality
+
+Features demonstrating sustained operational issues may be deprecated following formal review.
+
+Deprecation shall not invalidate historical experiments.
+
+---
+
+## REQ-FEAT-048
+
+Production feature additions shall require engineering approval.
+
+---
+
+## REQ-FEAT-049
+
+Deprecated features shall remain reproducible for historical research.
+
+---
+
+# 32. Future Evolution
+
+The Version 1 Feature Engine intentionally favors stability over extensibility.
+
+Future versions may introduce:
+
+* automated feature discovery
+* cross-asset feature reuse
+* online feature computation
+* distributed feature execution
+* streaming feature pipelines
+* advanced statistical feature libraries
+* feature importance services
+* automated feature pruning
+
+These capabilities are intentionally excluded from Version 1 to preserve simplicity and maintainability.
+
+---
+
+# 33. Architecture Constraints
+
+The Feature Engine shall comply with the architectural principles defined by QuantOS.
+
+Specifically:
+
+* implementation shall remain within the modular monolith architecture
+* feature ownership shall remain centralized
+* duplicate feature implementations are prohibited
+* production and research concerns shall remain logically separated
+* deterministic execution shall take precedence over optimization
+* operational simplicity shall be preferred over architectural abstraction
+
+The Feature Engine shall expose stable interfaces to downstream systems without introducing unnecessary coupling.
+
+---
+
+## REQ-FEAT-050
+
+The Feature Engine shall remain compliant with the QuantOS modular monolith architecture.
+
+---
+
+## REQ-FEAT-051
+
+Feature computation shall remain centrally owned by the Feature Engine.
+
+---
+
+## REQ-FEAT-052
+
+Production feature definitions shall not be duplicated across services.
+
+---
+
+# 34. Final Summary
+
+The Feature Engine is the authoritative subsystem responsible for transforming validated market data into deterministic, production-ready model inputs.
+
+Its responsibilities include:
+
+* deterministic feature computation
+* centralized feature ownership
+* registry management
+* metadata management
+* feature validation
+* version control
+* leakage prevention
+* reproducibility
+* operational monitoring
+* governance
+* auditability
+
+By enforcing a single implementation for every production feature, strict temporal integrity, formal lifecycle management, and comprehensive validation, the Feature Engine ensures that every model input is mathematically defined, reproducible, and identical across research, backtesting, paper trading, and live execution.
+
+These engineering principles establish a reliable foundation for QuantOS Version 1 while preserving the project's core philosophy of simplicity, deterministic behavior, capital preservation, and maintainability by a single developer.
+---
+
+# Part III
+
+---
+
+> **Engineering Appendix — Normative Standards and Traceability**
+> This appendix is normative and forms part of the Feature Engine Specification. All requirements defined herein are mandatory for QuantOS Version 1 unless explicitly superseded by a later approved revision.
+
+---
+
+# 35. Feature Naming Standard
+
+Every production feature shall follow a consistent naming convention to improve discoverability, maintainability, and auditability.
+
+Feature names shall be:
+
+* unique
+* descriptive
+* deterministic
+* stable across versions
+* independent of implementation details
+
+Feature names shall not contain:
+
+* developer initials
+* temporary experiment names
+* implementation-specific terminology
+* ambiguous abbreviations
+* version numbers
+
+Version information shall be maintained exclusively within feature metadata.
+
+---
+
+## Naming Convention
+
+A production feature name should follow the structure:
+
+```text
+<domain>.<category>.<feature_name>
+```
+
+Examples:
+
+```text
+market.return.log_1
+market.volatility.realized_20
+market.volume.relative_20
+technical.trend.ema_50
+statistical.zscore.close_20
+```
+
+The naming convention shall remain stable throughout the lifetime of the feature.
+
+---
+
+## REQ-FEAT-053
+
+Every production feature shall have a globally unique canonical name.
+
+---
+
+## REQ-FEAT-054
+
+Feature names shall remain stable across feature versions.
+
+---
+
+# 36. Feature Dependency Rules
+
+Feature dependencies shall remain explicit and intentionally simple.
+
+Dependencies shall satisfy the following constraints:
+
+* acyclic
+* deterministic
+* documented
+* version controlled
+* independently testable
+
+Deep dependency chains increase operational complexity and reduce maintainability.
+
+Version 1 shall therefore favor shallow dependency graphs.
+
+---
+
+## Dependency Levels
+
+The Feature Engine recognizes three dependency levels.
+
+### Level 0
+
+Raw validated datasets.
+
+Examples:
+
+* OHLCV bars
+* symbol metadata
+
+---
+
+### Level 1
+
+Direct transformations of raw data.
+
+Examples:
+
+* returns
+* moving averages
+* volatility
+
+---
+
+### Level 2
+
+Derived features computed from approved Level 1 features.
+
+Only Level 2 dependencies are permitted in Version 1.
+
+Higher dependency levels are intentionally prohibited.
+
+---
+
+## REQ-FEAT-055
+
+Feature dependency graphs shall remain acyclic.
+
+---
+
+## REQ-FEAT-056
+
+Production features shall not exceed two dependency levels beyond raw market data.
+
+---
+
+# 37. Numerical Stability
+
+Feature calculations shall produce numerically stable outputs across all supported market conditions.
+
+The Feature Engine shall minimize the risk of:
+
+* floating-point overflow
+* floating-point underflow
+* division by zero
+* undefined logarithms
+* invalid normalization
+* unstable rolling statistics
+
+Numerical safeguards shall be deterministic and mathematically documented.
+
+Silently suppressing numerical errors is prohibited.
+
+---
+
+## REQ-FEAT-057
+
+Numerical exceptions shall be detected during feature validation.
+
+---
+
+## REQ-FEAT-058
+
+Undefined numerical operations shall not produce production feature values.
+
+---
+
+# 38. Feature Configuration Management
+
+Production feature behavior shall be governed through approved configuration rather than source code modifications.
+
+Configuration may define:
+
+* rolling window lengths
+* thresholds
+* normalization parameters
+* operational limits
+
+Configuration shall not redefine the mathematical meaning of a production feature.
+
+Changing computational behavior requires a new feature version.
+
+---
+
+## Configuration Principles
+
+Configuration shall be:
+
+* deterministic
+* version controlled
+* immutable during execution
+* reproducible
+
+Runtime modification of production configuration is prohibited.
+
+---
+
+## REQ-FEAT-059
+
+Feature configuration shall be version controlled.
+
+---
+
+## REQ-FEAT-060
+
+Runtime modification of production feature configuration is prohibited.
+
+---
+
+# 39. Failure Handling
+
+Feature generation failures shall be treated as operational failures rather than recoverable computation events.
+
+If a production feature cannot be generated correctly, downstream consumers shall not receive substituted values.
+
+Failure handling shall prioritize correctness over availability.
+
+Permitted responses include:
+
+* fail the feature
+* fail the feature batch
+* suspend model inference
+* generate operational alerts
+
+Automatic approximation is prohibited.
+
+---
+
+## REQ-FEAT-061
+
+Feature computation failures shall prevent publication to the Feature Store.
+
+---
+
+## REQ-FEAT-062
+
+Production systems shall never substitute failed feature values automatically.
+
+---
+
+# 40. Feature Traceability Matrix
+
+Every production feature shall be traceable throughout its lifecycle.
+
+| Artifact                | Required |
+| ----------------------- | -------- |
+| Feature ID              | Yes      |
+| Mathematical Definition | Yes      |
+| Source Dataset          | Yes      |
+| Dataset Version         | Yes      |
+| Feature Version         | Yes      |
+| Configuration Version   | Yes      |
+| Validation Record       | Yes      |
+| Test Coverage           | Yes      |
+| Approval Record         | Yes      |
+| Deployment History      | Yes      |
+| Audit History           | Yes      |
+
+The absence of any mandatory artifact constitutes an incomplete production feature.
+
+---
+
+## REQ-FEAT-063
+
+Every production feature shall maintain complete lifecycle traceability.
+
+---
+
+# 41. Architecture Compliance Checklist
+
+Prior to production deployment, every feature shall satisfy the following checklist.
+
+| Requirement                        | Status Required |
+| ---------------------------------- | --------------- |
+| Mathematical definition documented | Mandatory       |
+| Registry entry approved            | Mandatory       |
+| Validation completed               | Mandatory       |
+| Leakage review passed              | Mandatory       |
+| Dependency review completed        | Mandatory       |
+| Documentation complete             | Mandatory       |
+| Version assigned                   | Mandatory       |
+| Automated tests passing            | Mandatory       |
+| Audit metadata generated           | Mandatory       |
+| Reproducibility verified           | Mandatory       |
+
+No production deployment shall occur until all mandatory checks have passed.
+
+---
+
+## REQ-FEAT-064
+
+All mandatory architecture compliance checks shall be satisfied before deployment.
+
+---
+
+# 42. Conformance Statement
+
+An implementation shall be considered compliant with this specification only if it satisfies all mandatory requirements identified by the **REQ-FEAT** series.
+
+Compliance requires:
+
+* deterministic computation
+* centralized feature ownership
+* registry-controlled lifecycle
+* reproducible outputs
+* complete auditability
+* validated temporal integrity
+* identical behavior across research and production
+
+Partial implementation of these requirements shall not be considered Feature Engine compliance.
+
+---
+
+## REQ-FEAT-065
+
+A production Feature Engine implementation shall satisfy all mandatory requirements defined in this specification.
+
+---
+
+# Part IV
+
+> **Engineering Appendix B — Feature Catalog Standards, Acceptance Criteria, and Verification Framework**
+>
+> This appendix is normative and forms an integral part of the QuantOS Feature Engine Specification. It establishes the engineering rules that every production feature must satisfy before it is permitted to participate in model training or live trading.
+
+---
+
+# 43. Production Feature Catalog
+
+Version 1 intentionally limits the production feature universe to approximately **10–15 carefully validated features**.
+
+The objective is to maximize robustness, interpretability, maintainability, and statistical reliability rather than feature quantity.
+
+Every production feature shall belong to one of the approved categories.
+
+| Category       | Purpose                               |
+| -------------- | ------------------------------------- |
+| Return         | Measure recent price movement         |
+| Trend          | Estimate directional bias             |
+| Volatility     | Measure market uncertainty            |
+| Momentum       | Measure directional persistence       |
+| Volume         | Measure market participation          |
+| Statistical    | Normalize market observations         |
+| Time           | Encode deterministic temporal context |
+| Market Quality | Describe trading conditions           |
+
+No additional production categories shall be introduced without an approved architecture revision.
+
+---
+
+## REQ-FEAT-066
+
+All production features shall belong to an approved feature category.
+
+---
+
+# 44. Production Feature Acceptance Criteria
+
+Promotion from research to production requires successful completion of every acceptance criterion.
+
+A production feature shall demonstrate:
+
+### Engineering
+
+* deterministic implementation
+* documented mathematical definition
+* reproducible computation
+* acceptable computational cost
+* successful validation
+* automated test coverage
+* complete metadata
+
+### Research
+
+* measurable predictive value
+* statistically stable behavior
+* robustness across market regimes
+* acceptable correlation with existing production features
+* economic rationale
+
+### Operational
+
+* acceptable runtime performance
+* monitoring support
+* audit support
+* registry approval
+* lifecycle documentation
+
+Failure of any mandatory criterion shall prevent production deployment.
+
+---
+
+## REQ-FEAT-067
+
+Production promotion requires successful completion of all mandatory acceptance criteria.
+
+---
+
+# 45. Feature Quality Metrics
+
+The Feature Engine shall continuously evaluate production feature quality.
+
+Quality indicators include:
+
+* missing-value frequency
+* numerical stability
+* computation success rate
+* feature variance
+* distribution stability
+* dependency health
+* validation success rate
+* reproducibility status
+
+These indicators support operational monitoring rather than automated trading decisions.
+
+Thresholds for operational alerts shall be defined within system configuration and reviewed during production readiness assessments.
+
+---
+
+## REQ-FEAT-068
+
+Production feature quality metrics shall be continuously collected.
+
+---
+
+## REQ-FEAT-069
+
+Quality metric definitions shall remain version controlled.
+
+---
+
+# 46. Feature Deprecation Policy
+
+Production features may eventually become obsolete due to:
+
+* improved research
+* changing market structure
+* excessive maintenance cost
+* operational instability
+* statistical degradation
+
+Deprecation shall follow a controlled engineering process.
+
+The required lifecycle is:
+
+```text
+Active
+   │
+   ▼
+Deprecation Proposal
+   │
+   ▼
+Engineering Review
+   │
+   ▼
+Research Impact Assessment
+   │
+   ▼
+Approval
+   │
+   ▼
+Deprecated
+   │
+   ▼
+Archived
+```
+
+Historical datasets, experiments, and backtests shall remain reproducible following deprecation.
+
+Deprecated features shall not be reused for new production models without undergoing the complete promotion process.
+
+---
+
+## REQ-FEAT-070
+
+Feature deprecation shall require documented engineering approval.
+
+---
+
+## REQ-FEAT-071
+
+Deprecation shall not invalidate historical reproducibility.
+
+---
+
+# 47. Change Management
+
+Changes to production features shall be managed using formal engineering change control.
+
+Changes requiring review include:
+
+* mathematical definition
+* parameters
+* dependencies
+* preprocessing
+* normalization
+* validation rules
+* metadata schema
+* operational behavior
+
+Every approved change shall include:
+
+* engineering justification
+* research justification
+* impact assessment
+* compatibility assessment
+* updated documentation
+* revised version identifier
+
+Unreviewed production changes are prohibited.
+
+---
+
+## REQ-FEAT-072
+
+Every production feature modification shall undergo formal change review.
+
+---
+
+## REQ-FEAT-073
+
+Every approved modification shall generate a new feature version when computational behavior changes.
+
+---
+
+# 48. Verification Framework
+
+Verification provides objective evidence that Feature Engine requirements have been satisfied.
+
+Verification activities include:
+
+| Verification Activity   | Objective                 |
+| ----------------------- | ------------------------- |
+| Unit Testing            | Mathematical correctness  |
+| Integration Testing     | Pipeline correctness      |
+| Regression Testing      | Behavioral stability      |
+| Reproducibility Testing | Deterministic outputs     |
+| Validation Testing      | Data quality enforcement  |
+| Performance Testing     | Operational suitability   |
+| Audit Verification      | Traceability completeness |
+
+Verification artifacts shall be retained for every production release.
+
+---
+
+## Verification Principles
+
+Verification shall demonstrate:
+
+* the feature computes correctly
+* identical inputs produce identical outputs
+* invalid inputs are rejected
+* metadata is complete
+* dependencies are satisfied
+* operational rules are enforced
+
+Verification shall occur before production deployment.
+
+---
+
+## REQ-FEAT-074
+
+Every production feature shall successfully complete the defined verification framework.
+
+---
+
+# 49. Release Readiness Checklist
+
+A Feature Engine release shall not be considered production ready until the following checklist has been completed.
+
+| Item                      | Requirement |
+| ------------------------- | ----------- |
+| Registry synchronized     | Mandatory   |
+| Feature versions assigned | Mandatory   |
+| Validation completed      | Mandatory   |
+| Automated tests passing   | Mandatory   |
+| Regression tests passing  | Mandatory   |
+| Reproducibility confirmed | Mandatory   |
+| Monitoring configured     | Mandatory   |
+| Documentation approved    | Mandatory   |
+| Audit records generated   | Mandatory   |
+| Configuration versioned   | Mandatory   |
+
+Completion of this checklist represents engineering readiness only.
+
+Deployment authorization remains subject to the overall QuantOS release process.
+
+---
+
+## REQ-FEAT-075
+
+Feature Engine releases shall satisfy all mandatory release readiness requirements.
+
+---
+
+# 50. Engineering Principles Summary
+
+The Feature Engine is designed according to the following enduring engineering principles:
+
+1. Determinism before optimization.
+2. Simplicity before sophistication.
+3. Correctness before performance.
+4. Reproducibility before experimentation.
+5. Centralized ownership before duplication.
+6. Explicit dependencies before implicit behavior.
+7. Immutable history before convenience.
+8. Documentation before deployment.
+9. Validation before publication.
+10. Capital preservation before model performance.
+
+These principles govern all future evolution of the Feature Engine.
+
+---
+
+# 51. Architecture Alignment
+
+This specification aligns directly with the QuantOS engineering architecture defined by preceding documents.
+
+| Specification                    | Relationship                                                                     |
+| -------------------------------- | -------------------------------------------------------------------------------- |
+| 000_READ_FIRST                   | Defines engineering philosophy and project principles                            |
+| 001_PRODUCT_REQUIREMENTS         | Defines functional objectives for Version 1                                      |
+| 002_SYSTEM_ARCHITECTURE          | Defines architectural ownership and system boundaries                            |
+| 003_DATA_ARCHITECTURE            | Defines authoritative data lifecycle and governance                              |
+| 004_FEATURE_ENGINE_SPECIFICATION | Defines deterministic transformation of validated data into model-ready features |
+
+The Feature Engine serves as the bridge between validated data and machine learning inference.
+
+It shall not assume responsibilities belonging to:
+
+* Data Architecture
+* Model Engine
+* Trading Engine
+* Risk Engine
+* Portfolio Engine
+
+System boundaries shall remain explicit to preserve modularity and maintainability.
+
+---
+
+## REQ-FEAT-076
+
+The Feature Engine shall only perform responsibilities defined within this specification.
+
+---
+
+# 52. Specification Completion Statement
+
+This document establishes the complete engineering specification for the QuantOS Version 1 Feature Engine.
+
+The Feature Engine shall provide:
+
+* deterministic feature computation
+* centralized feature ownership
+* standardized feature definitions
+* strict temporal integrity
+* reproducible feature generation
+* formal lifecycle management
+* version-controlled feature evolution
+* comprehensive validation
+* operational monitoring
+* engineering governance
+* complete auditability
+
+The architecture intentionally favors simplicity, deterministic behavior, and maintainability over unnecessary sophistication.
+
+No capability described within this specification shall compromise the Version 1 design philosophy established by QuantOS:
+
+* Modular monolith architecture
+* Single-developer maintainability
+* Deterministic engineering
+* Machine-learning assisted trading
+* Strict reproducibility
+* Capital preservation as the highest operational priority
+
+This specification shall serve as the authoritative engineering reference for all Feature Engine implementation, testing, maintenance, and future evolution within QuantOS Version 1.
+
+---
+
+## Final Requirement Summary
+
+This specification defines the following mandatory engineering requirements:
+
+* **REQ-FEAT-001** through **REQ-FEAT-076**
+
+All requirements are normative unless explicitly identified as informative guidance.
+
+Any implementation claiming compliance with the QuantOS Version 1 Feature Engine Specification shall satisfy every applicable requirement defined within the REQ-FEAT series.
+
+---
+
+**End of Specification**
