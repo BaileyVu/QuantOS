@@ -1,2083 +1,1112 @@
-# QuantOS Core
-## 003_DATA_ARCHITECTURE.md
-### 003_DATA_ARCHITECTURE.md (Part 1)
-> **Document Status:** Frozen
->
-> **Version:** 1.0
->
-> **Depends On:**
->
-> - 000_READ_FIRST.md
-> - 001_PRODUCT_REQUIREMENTS.md
-> - 002_SYSTEM_ARCHITECTURE.md
->
-> **Required By:**
->
-> - 004_FEATURE_ENGINE_SPECIFICATION.md
-> - 005_ALPHA_ENGINE_SPECIFICATION.md
-> - 006_RISK_EXECUTION_SPECIFICATION.md
-> - 007_VALIDATION_BACKTESTING_SPECIFICATION.md
-> - 008_IMPLEMENTATION_GUIDE.md
->
-> This document defines the architecture, lifecycle, ownership, storage, and governance of all data managed by QuantOS Core.
->
-> It establishes the mandatory rules that ensure deterministic research, reproducible experiments, and safe live trading.
->
-> This specification introduces no additional product functionality beyond the approved Product Requirements Document.
+# QuantOS — Data Architecture
 
----
-# Part I — Data Foundations
+## Document Status
+
+**Status:** Frozen V1 Data Architecture
+**Version:** 1.0
+**Depends On:** `000_READ_FIRST.md`, `001_PRODUCT_REQUIREMENTS.md`, `002_SYSTEM_ARCHITECTURE.md`
+
 ---
 
 # 1. Purpose
 
-Data is the foundation of every quantitative trading decision.
+This document defines the V1 data architecture for QuantOS.
 
-Every signal, prediction, validation result, execution decision, and performance metric originates from stored or streamed market data.
+The data architecture must provide a reliable foundation for:
 
-Because incorrect data inevitably produces incorrect trading decisions, data architecture is considered a first-class engineering concern.
+* historical research
+* model training
+* feature generation
+* backtesting
+* walk-forward validation
+* robustness testing
+* paper trading
+* live trading
 
-The objectives of this specification are to ensure:
+The architecture must prioritize:
 
-- deterministic processing
-- reproducible research
-- data integrity
-- traceability
-- long-term maintainability
-- safe live operation
+1. Data correctness
+2. Temporal correctness
+3. Reproducibility
+4. Deterministic processing
+5. Local accessibility
+6. Simple operation
+7. Traceability
 
-Every dataset within QuantOS shall follow the rules defined by this document.
-
----
-
-# 2. Design Philosophy
-
-The architecture follows five mandatory principles.
-
----
-
-## 2.1 Data Is Immutable
-
-Once historical market data has been successfully validated and stored, it shall never be modified in-place.
-
-Corrections must be introduced through controlled replacement procedures rather than silent modification.
-
-Immutable datasets provide:
-
-- reproducibility
-- auditability
-- experiment consistency
+The data architecture must remain consistent with the six-module Modular Monolith defined by `002_SYSTEM_ARCHITECTURE.md`.
 
 ---
 
-## 2.2 One Source of Truth
+# 2. V1 Data Scope
 
-Every business dataset shall have exactly one authoritative owner.
+V1 primarily uses Binance Spot market data.
 
-Examples:
+Required trading pairs:
 
-| Dataset | Owner |
-|----------|-------|
-| Live Market Data | Market Data Service |
-| Historical Candles | Historical Data Service |
-| Trading Signals | Alpha Engine |
-| Portfolio State | Portfolio Manager |
-| Orders | Execution Engine |
-| Risk Decisions | Risk Engine |
+* BTCUSDT
+* ETHUSDT
 
-Duplicate ownership is prohibited.
+Primary timeframe:
 
----
+* 1-minute candles
 
-## 2.3 Deterministic Processing
+The architecture may support derived higher-timeframe data where required by the approved feature specification.
 
-Given identical:
-
-- raw market data
-- configuration
-- feature definitions
-- model version
-
-the platform must generate identical outputs.
-
-Randomness shall never enter the production data pipeline unless explicitly documented and controlled.
+Additional exchanges and asset classes are outside V1.
 
 ---
 
-## 2.4 Separation of Raw and Derived Data
-
-Raw data shall never be overwritten by processed data.
-
-Instead, datasets are organized into layers.
-
-```
-Raw Data
-      │
-      ▼
-Validated Data
-      │
-      ▼
-Feature Data
-      │
-      ▼
-Research Data
-      │
-      ▼
-Model Inputs
-```
-
-Each layer depends only on lower layers.
-
-No layer may modify a previous layer.
-
----
-
-## 2.5 Reproducibility Before Performance
-
-Data architecture shall prioritize reproducibility over storage efficiency.
-
-A slower but deterministic dataset is preferred over a faster but non-reproducible alternative.
-
----
-
-# 3. Data Lifecycle
-
-Every dataset follows the same lifecycle.
-
-```
-Acquire
-    │
-Validate
-    │
-Normalize
-    │
-Persist
-    │
-Version
-    │
-Consume
-    │
-Archive
-```
-
-Skipping lifecycle stages is prohibited.
-
----
-
-## 3.1 Acquisition
-
-Data enters QuantOS only through approved ingestion pipelines.
-
-Examples include:
-
-- Binance REST API
-- Binance WebSocket
-- Local import utilities
-
-No downstream service may directly acquire market data.
-
----
-
-## 3.2 Validation
-
-Incoming datasets shall be validated before permanent storage.
-
-Validation includes:
-
-- schema verification
-- timestamp validation
-- duplicate detection
-- missing interval detection
-- symbol validation
-- numeric sanity checks
-
-Invalid records shall never enter production storage.
-
----
-
-## 3.3 Normalization
-
-Validated datasets shall be converted into the QuantOS internal format.
-
-Normalization includes:
-
-- timestamp normalization
-- field naming
-- numeric precision
-- timezone consistency
-- symbol formatting
-
-Normalization must never alter economic meaning.
-
----
-
-## 3.4 Persistence
-
-Validated datasets shall be written to persistent storage.
-
-Persistence operations must guarantee:
-
-- atomic writes
-- consistency
-- recoverability
-
-Partial writes are prohibited.
-
----
-
-## 3.5 Consumption
-
-Business services consume persisted datasets rather than owning independent copies.
-
-Consumers include:
-
-- Feature Engine
-- Alpha Engine
-- Backtesting
-- Validation
-- Dashboard
-
----
-
-## 3.6 Archival
-
-Archived datasets remain available for future research.
-
-Archival shall preserve:
-
-- original schema
-- timestamps
-- metadata
-- version information
-
----
-
-# 4. Data Domains
-
-The platform organizes information into distinct business domains.
-
----
-
-## 4.1 Market Data
-
-Contains external market information.
-
-Examples:
-
-- OHLCV candles
-- trades
-- order book snapshots
-- ticker updates
-
-Ownership:
-
-Market Data Service
-
----
-
-## 4.2 Historical Data
-
-Persistent record of market history.
-
-Examples:
-
-- minute candles
-- daily candles
-- historical trades
-
-Ownership:
-
-Historical Data Service
-
----
-
-## 4.3 Feature Data
-
-Derived quantitative information generated from market data.
-
-Examples:
-
-- returns
-- volatility
-- moving averages
-- momentum
-- volume statistics
-
-Ownership:
-
+# 3. Data Architecture Overview
+
+The V1 data lifecycle is:
+
+```text
+Binance
+   ↓
+Acquisition
+   ↓
+Raw Validation
+   ↓
+Immutable Raw Storage
+   ↓
+Normalization / Dataset Preparation
+   ↓
+Validated Dataset
+   ↓
 Feature Engine
-
----
-
-## 4.4 Model Data
-
-Prepared datasets used for model training and inference.
-
-Examples:
-
-- feature matrices
-- labels
-- prediction outputs
-- confidence scores
-
-Ownership:
-
-Alpha Engine
-
----
-
-## 4.5 Trading Data
-
-Represents trading activity.
-
-Examples:
-
-- orders
-- fills
-- executions
-- cancellations
-
-Ownership:
-
-Execution Engine
-
----
-
-## 4.6 Portfolio Data
-
-Represents account state.
-
-Examples:
-
-- balances
-- positions
-- realized PnL
-- unrealized PnL
-
-Ownership:
-
-Portfolio Manager
-
----
-
-## 4.7 Risk Data
-
-Represents trading risk.
-
-Examples:
-
-- drawdown
-- exposure
-- position limits
-- daily loss
-- rejection reasons
-
-Ownership:
-
-Risk Engine
-
----
-
-## 4.8 System Data
-
-Operational information generated by QuantOS.
-
-Examples:
-
-- logs
-- metrics
-- configuration
-- health status
-- runtime statistics
-
-Ownership:
-
-Infrastructure Layer
-
----
-
-# 5. Data Ownership
-
-Every dataset shall have exactly one authoritative owner.
-
-Consumers may read data.
-
-Consumers may cache data.
-
-Consumers may not modify authoritative datasets.
-
-Ownership transfer between services is prohibited.
-
----
-
-## Ownership Matrix
-
-| Dataset | Authoritative Service | Consumers |
-|----------|----------------------|-----------|
-| Live Market Data | Market Data Service | Feature Engine, Alpha Engine, Risk Engine |
-| Historical Data | Historical Data Service | Research, Validation |
-| Features | Feature Engine | Alpha Engine |
-| Predictions | Alpha Engine | Risk Engine |
-| Risk Decisions | Risk Engine | Execution Engine |
-| Orders | Execution Engine | Portfolio Manager |
-| Portfolio State | Portfolio Manager | Dashboard |
-| Logs | Infrastructure | Monitoring |
-
----
-
-# 6. Storage Architecture
-
-QuantOS separates storage into logical layers rather than technology-specific implementations.
-
-```
-Application
-      │
-      ▼
-Domain Storage
-      │
-      ▼
-Persistent Storage
-      │
-      ▼
-Physical Storage
+   ↓
+Research / Backtest / Paper / Live
 ```
 
-Business services interact only with domain storage interfaces.
-
-Infrastructure determines physical implementation.
+The same validated data foundation must support research and production wherever practical.
 
 ---
 
-## 6.1 Storage Objectives
+# 4. Storage Foundation
 
-Storage architecture shall provide:
+V1 uses:
 
-- deterministic reads
-- deterministic writes
-- recoverability
-- scalability
-- integrity
-- simplicity
+* Parquet
+* DuckDB
+* Local filesystem
+
+## Parquet
+
+Parquet is the primary durable storage format for historical market data.
+
+It is used because it provides:
+
+* efficient columnar storage
+* efficient analytical access
+* local portability
+* deterministic files
+* compatibility with Python data tooling
+* easy archival
+
+## DuckDB
+
+DuckDB is the primary local analytical/query engine.
+
+It is used for:
+
+* querying historical datasets
+* filtering time ranges
+* joining datasets where required
+* research preparation
+* backtesting
+* validation
+* data inspection
+
+DuckDB is not a distributed database.
 
 ---
 
-## 6.2 Storage Categories
+# 5. No Distributed Data Platform
 
-Persistent storage is divided into independent categories.
+V1 does not require:
 
-| Category | Purpose |
-|-----------|----------|
-| Raw | Immutable market downloads |
-| Validated | Clean market datasets |
-| Features | Engineered features |
-| Models | Training artifacts |
-| Trading | Orders and executions |
-| Portfolio | Account state |
-| Logs | System events |
-| Configuration | Runtime configuration |
+* Kafka
+* distributed streaming platforms
+* cloud data lakes
+* Spark
+* distributed databases
+* data warehouses
+* feature-store infrastructure
+* object-storage infrastructure
+* data orchestration platforms
+* remote data-processing clusters
 
-Each category remains logically independent.
+The data system must operate on one local workstation.
 
 ---
 
-# 7. Repository Directory Layout
+# 6. Data Layers
 
-The repository shall organize datasets using a predictable structure.
+The V1 data architecture uses three conceptual data layers:
+
+```text
+Raw Data
+   ↓
+Validated / Normalized Data
+   ↓
+Research / Derived Data
+```
+
+These layers must remain distinguishable.
+
+---
+
+# 7. Raw Data
+
+Raw data represents data received from Binance or another explicitly approved source.
+
+Raw data must preserve enough information to reconstruct what was received.
+
+Raw data must not be silently overwritten after ingestion.
+
+If the source provides data in a different schema from the internal representation, the original source representation should remain recoverable where practical.
+
+---
+
+# 8. Raw Data Immutability
+
+Once raw historical data has been accepted into the raw-data layer, it must be treated as immutable.
+
+Corrections must not silently rewrite historical raw files.
+
+If a correction is necessary:
+
+1. identify the affected dataset
+2. identify the reason for correction
+3. create a new derived/validated dataset
+4. preserve the original raw source
+5. update the dataset identity/version
+
+This protects research reproducibility.
+
+---
+
+# 9. Normalized Data
+
+The normalized dataset provides a consistent internal representation for QuantOS.
+
+The primary candle representation should contain, at minimum:
+
+* timestamp
+* open
+* high
+* low
+* close
+* volume
+
+Where available and required, additional exchange-provided fields may be retained.
+
+The normalized schema must define:
+
+* field names
+* data types
+* timestamp semantics
+* units
+* symbol representation
+* ordering requirements
+
+---
+
+# 10. Candle Timestamp Semantics
+
+Timestamp handling must be explicit.
+
+QuantOS must define whether candle timestamps represent:
+
+* candle open time
+* candle close time
+
+The internal representation must use one consistent convention.
+
+All modules must use the same convention.
+
+Conversions between exchange timestamps and internal timestamps must be explicit and deterministic.
+
+---
+
+# 11. Time Standard
+
+All persisted market-data timestamps must use:
+
+**UTC**
+
+Local timezone display may be used for human-readable reports, but internal data processing must remain UTC.
+
+The system must not use the local workstation timezone as the source of truth for market-data timestamps.
+
+---
+
+# 12. Ordering
+
+Historical candles must be ordered chronologically.
+
+For a given:
+
+* exchange
+* symbol
+* timeframe
+
+records must not contain unexpected backwards time movement.
+
+The validation process must detect:
+
+* duplicate timestamps
+* backwards timestamps
+* overlapping ranges
+* invalid interval spacing
+
+---
+
+# 13. Data Validation
+
+Data validation is mandatory before data enters research or production workflows.
+
+Validation has four primary categories:
+
+1. Structural validation
+2. Temporal validation
+3. Semantic validation
+4. Completeness validation
+
+---
+
+# 14. Structural Validation
+
+Structural validation verifies that the dataset conforms to the expected schema.
+
+Checks include:
+
+* required columns exist
+* data types are valid
+* timestamps are parseable
+* numeric fields are numeric
+* required identifiers exist
+* no unexpected schema corruption exists
+
+A structurally invalid dataset must be rejected.
+
+---
+
+# 15. Temporal Validation
+
+Temporal validation verifies that the dataset behaves correctly over time.
+
+Checks include:
+
+* chronological ordering
+* duplicate timestamps
+* expected candle interval
+* missing intervals
+* overlapping data
+* invalid timestamp values
+
+For 1-minute data, the expected interval is one minute unless the dataset explicitly records a known interruption.
+
+---
+
+# 16. Completeness Validation
+
+The system must identify missing expected observations.
+
+A missing candle must not automatically be treated as a zero-volume candle.
+
+The system must distinguish between:
+
+* actual zero-volume market activity where legitimately supplied
+* missing data
+* invalid data
+* known exchange downtime or data-source gaps
+
+Missing data must be recorded explicitly.
+
+---
+
+# 17. Semantic Validation
+
+Semantic validation verifies that market values are logically valid.
+
+At minimum:
+
+```text
+high >= max(open, close)
+low  <= min(open, close)
+high >= low
+volume >= 0
+```
+
+Prices must be positive.
+
+Invalid numerical values must be rejected.
+
+NaN and infinite values must not enter validated market-data datasets.
+
+---
+
+# 18. Duplicate Handling
+
+Duplicate observations must be detected using the appropriate dataset identity fields.
+
+For candle data, the primary uniqueness boundary is:
+
+```text
+exchange + symbol + timeframe + timestamp
+```
+
+Duplicate records must not silently produce multiple competing observations for the same candle.
+
+The ingestion process must either:
+
+* reject the duplicate
+* deterministically resolve it according to a documented rule
+* flag it for review
+
+The behavior must be reproducible.
+
+---
+
+# 19. Missing Data Handling
+
+Missing candles must be detected before a dataset is used.
+
+The system must not blindly fill missing candles.
+
+Forward-filling market prices is prohibited when it could create artificial trading information.
+
+If a gap exists:
+
+* record the gap
+* identify its duration
+* identify the affected symbol/timeframe
+* determine whether it is acceptable for the intended research or trading task
+
+A research/backtest run must know whether its input data contains gaps.
+
+---
+
+# 20. Data Acquisition
+
+Historical data acquisition must support:
+
+* configurable date ranges
+* BTCUSDT
+* ETHUSDT
+* 1-minute candles
+* resumable downloads
+* deterministic storage
+* validation after acquisition
+
+The acquisition process should be restartable without unnecessarily downloading already validated data.
+
+---
+
+# 21. Historical Data Recovery
+
+If historical acquisition is interrupted:
+
+1. determine the last successfully stored range
+2. determine the missing range
+3. retrieve only the required data
+4. validate the new data
+5. merge deterministically
+6. revalidate the resulting dataset
+
+The process must not silently create duplicates or gaps.
+
+---
+
+# 22. Data Acquisition Metadata
+
+Each acquisition operation should record:
+
+* exchange
+* symbol
+* timeframe
+* requested time range
+* actual received time range
+* source
+* acquisition timestamp
+* validation status
+* dataset identity/version
+* errors or gaps
+
+This metadata supports reproducibility and operational debugging.
+
+---
+
+# 23. Dataset Identity
+
+Every important validated dataset must have a stable identity.
+
+The identity must represent the dataset contents and relevant preparation parameters.
+
+At minimum, dataset metadata must identify:
+
+* exchange
+* symbol
+* timeframe
+* time range
+* schema version
+* source
+* validation status
+* preparation/version identity
+
+A dataset identity must be recorded in research runs.
+
+---
+
+# 24. Dataset Versioning
+
+Dataset changes must produce distinguishable versions.
+
+Examples of changes requiring a new dataset identity include:
+
+* new source data
+* corrected source data
+* changed normalization
+* changed filtering rules
+* changed schema
+* changed transformation logic
+
+A historical experiment must continue to reference the dataset version it originally used.
+
+---
+
+# 25. Dataset Reproducibility
+
+A dataset used for research must be reconstructable from recorded information.
+
+The system must record enough information to determine:
+
+```text
+Source
++
+Time Range
++
+Symbol
++
+Timeframe
++
+Schema Version
++
+Preparation Version
+=
+Dataset Identity
+```
+
+The exact implementation of dataset identity may use a deterministic hash or equivalent mechanism.
+
+The important requirement is that two materially different datasets must not appear identical.
+
+---
+
+# 26. Dataset Boundaries
+
+A dataset must explicitly define its temporal boundaries.
+
+For example:
+
+```text
+Dataset:
+BTCUSDT
+1-minute
+2024-01-01 00:00 UTC
+through
+2024-12-31 23:59 UTC
+```
+
+Research runs must explicitly identify the time windows used for:
+
+* training
+* validation
+* testing
+
+This prevents accidental mixing of future information.
+
+---
+
+# 27. Train / Validation / Test Separation
+
+The data architecture must support strict temporal separation.
+
+Conceptually:
+
+```text
+Past
+──────────────────────────────────────→ Future
+
+Training | Validation | Final Test
+```
+
+Training data must occur before validation data.
+
+Validation data must occur before final test data.
+
+The final test period must remain protected from repeated strategy tuning.
+
+Randomly shuffling time-series observations must not replace chronological validation.
+
+---
+
+# 28. Walk-Forward Data Preparation
+
+The data architecture must support walk-forward validation.
+
+Each walk-forward period must have explicitly defined:
+
+* training window
+* validation window where used
+* test window
+* feature availability boundary
+
+The preparation process must prevent future data from entering an earlier training period.
+
+---
+
+# 29. Feature Data Boundary
+
+The data architecture ends at validated market/dataset inputs.
+
+The Feature Engine owns feature calculation.
+
+However, the data architecture must provide sufficient metadata to ensure feature generation can determine:
+
+* exact timestamp
+* symbol
+* timeframe
+* dataset version
+* available history
+
+Feature generation must not silently access future datasets.
+
+---
+
+# 30. Research Dataset Boundary
+
+Research datasets are derived from validated market data.
+
+They may contain:
+
+* model inputs
+* labels
+* derived variables
+* training metadata
+
+Research datasets must remain traceable to:
+
+* source dataset
+* feature version
+* label definition
+* time boundaries
+* preparation configuration
+
+---
+
+# 31. Labels
+
+Labels are research-derived information.
+
+Labels must never be treated as live market features.
+
+A label may use future information relative to the prediction timestamp only because it defines the future outcome being predicted.
+
+The label must never leak into:
+
+* live features
+* historical features
+* risk inputs
+* execution decisions
+
+The boundary must be explicit.
+
+---
+
+# 32. Market Data Replay
+
+The data layer must support deterministic historical replay.
+
+A replay must be able to provide market observations in chronological order as though they were arriving over time.
+
+Replay is required for:
+
+* backtesting
+* simulation
+* debugging
+* regression testing
+
+Replay must not expose future observations earlier than their simulated availability time.
+
+---
+
+# 33. Live Market Data
+
+Live market data must enter the same conceptual market-data boundary as historical data.
+
+The system must validate live data before downstream processing where practical.
+
+The live data path must detect:
+
+* stale data
+* missing updates
+* malformed messages
+* timestamp anomalies
+* connection failures
+
+Critical market-data problems must prevent unsafe new trades.
+
+---
+
+# 34. Stale Data
+
+The system must define a staleness condition for live market data.
+
+If market data is older than the allowed threshold:
+
+```text
+No New Trade
+```
+
+The threshold must be configurable and recorded.
+
+Stale data must not be treated as current data.
+
+---
+
+# 35. Data Normalization
+
+Exchange-specific data must be normalized before being consumed by domain/application logic.
+
+Normalization must include, where applicable:
+
+* timestamp normalization
+* symbol normalization
+* numeric type normalization
+* field naming
+* unit normalization
+* ordering
+
+Exchange-specific formats must remain isolated within the infrastructure boundary.
+
+---
+
+# 36. Exchange Adapter Boundary
+
+Binance-specific data acquisition must be isolated behind an adapter.
+
+Conceptually:
+
+```text
+Market Data Module
+       ↓
+Market Data Interface
+       ↓
+Binance Adapter
+       ↓
+Binance API
+```
+
+Business logic must not depend directly on Binance response formats.
+
+V1 does not require a generalized multi-exchange data platform.
+
+The abstraction exists to maintain clean boundaries.
+
+---
+
+# 37. Local Filesystem Layout
+
+The implementation should maintain clear separation between raw, validated, derived, and research data.
+
+A conceptual layout is:
 
 ```text
 data/
-
-    raw/
-
-    validated/
-
-    features/
-
-    research/
-
-    models/
-
-    portfolio/
-
-    trading/
-
-    logs/
-
-    metadata/
-
-config/
-
-artifacts/
-
-backtests/
-
-experiments/
+├── raw/
+│   └── binance/
+│       ├── BTCUSDT/
+│       └── ETHUSDT/
+│
+├── validated/
+│   ├── BTCUSDT/
+│   └── ETHUSDT/
+│
+├── derived/
+│   ├── datasets/
+│   └── research/
+│
+└── metadata/
 ```
 
-Individual implementation details may evolve.
-
-The logical organization defined above shall remain stable.
-
----
-# QuantOS Core
-## 003_DATA_ARCHITECTURE.md (Part 2)
-
----
-# Part II — Market Data Standards
----
-
-# 8. Market Data Architecture
-
-Market data is the primary external input to QuantOS.
-
-Every trading decision ultimately originates from market observations.
-
-For this reason, market data shall satisfy the following objectives:
-
-- completeness
-- correctness
-- determinism
-- consistency
-- auditability
-
-No downstream service may reinterpret raw exchange responses independently.
-
-All normalization occurs within the Market Data Service.
+The exact directory structure may be refined by `003` implementation specifications, but the conceptual separation must remain.
 
 ---
 
-# 8.1 Supported Market Data
+# 38. Parquet Partitioning
 
-Version 1 supports only Binance Spot market data.
+Historical datasets should be partitioned to support efficient local access without creating excessive fragmentation.
 
-Supported trading pairs:
+A practical partitioning scheme may use:
 
-- BTCUSDT
-- ETHUSDT
+```text
+symbol
+timeframe
+date
+```
 
-Additional symbols require an approved specification update.
+The partitioning strategy must avoid creating thousands of unnecessarily small files.
 
----
-
-# 8.2 Supported Data Types
-
-Version 1 recognizes the following market datasets.
-
-| Dataset | Required | Purpose |
-|----------|----------|----------|
-| OHLCV Candles | Mandatory | Primary strategy input |
-| Latest Price | Mandatory | Live valuation |
-| Exchange Metadata | Mandatory | Symbol validation |
-| Trade Stream | Optional | Future research |
-| Order Book | Optional | Future research |
-| Funding Rates | Not Applicable | Spot only |
-
-Version 1 trading decisions shall rely only upon approved datasets.
+The final implementation should prefer predictable, manageable file sizes.
 
 ---
 
-# 8.3 Canonical Candle Definition
+# 39. DuckDB Usage
 
-QuantOS defines one canonical candle format.
+DuckDB should be used for analytical access to local Parquet datasets.
 
-Every ingestion source must normalize into this schema.
+Typical operations include:
 
-| Field | Description |
-|---------|-------------|
-| symbol | Trading pair |
-| interval | Candle interval |
-| open_time | UTC opening timestamp |
-| close_time | UTC closing timestamp |
-| open | Opening price |
-| high | Highest price |
-| low | Lowest price |
-| close | Closing price |
-| volume | Base asset volume |
-| quote_volume | Quote asset volume |
-| trade_count | Number of trades |
+* time-range selection
+* symbol filtering
+* dataset inspection
+* research preparation
+* backtest input preparation
+* validation queries
+* aggregation
 
-Additional provider-specific fields shall not appear in production datasets.
+DuckDB must not become a second source of truth for raw market data.
+
+Parquet remains the durable market-data representation.
 
 ---
 
-# 8.4 Candle Identity
+# 40. Data Integrity and Hashing
 
-Every candle is uniquely identified by:
+Important datasets and artifacts may use deterministic hashes or equivalent integrity identifiers.
 
-(symbol,
-interval,
-open_time)
+Hashing may be used to identify:
 
-Duplicate identities are prohibited.
+* dataset contents
+* configuration
+* feature specification
+* model artifacts
+* research outputs
 
----
+The purpose is to detect unintended changes.
 
-# 8.5 Candle Completeness
-
-Every candle must satisfy:
-
-- valid timestamp
-- valid interval
-- open ≤ high
-- low ≤ high
-- low ≤ open
-- low ≤ close
-- volume ≥ 0
-
-Invalid candles shall be rejected before persistence.
+A hash must never be treated as a replacement for human-readable metadata.
 
 ---
 
-# 8.6 Missing Candles
+# 41. Research Run Integration
 
-Continuous datasets are mandatory.
+The data architecture must integrate with the V1 Research Run concept.
 
-Missing intervals shall be detected during validation.
+Every important research run must reference:
 
-Missing candles shall never be silently ignored.
+```text
+Dataset Identity
+Feature Version
+Model Version
+Configuration Version
+Code Revision
+Time Windows
+```
 
-System responses include:
+The data layer is responsible for providing a stable dataset identity.
 
-- recovery download
-- gap marking
-- ingestion halt
-- operator notification
-
-The chosen action depends upon runtime configuration.
-
----
-
-# 8.7 Duplicate Candles
-
-Duplicate candles represent data corruption.
-
-Duplicate detection occurs before storage.
-
-Resolution policy:
-
-1. identical duplicates
-
-retain one record
-
-2. conflicting duplicates
-
-reject dataset
-
-log validation error
-
-Duplicates must never propagate beyond the validation stage.
+The Evaluation/Research workflow is responsible for recording that identity with the run.
 
 ---
 
-# 9. Historical Data
+# 42. Qlib-Inspired Data Discipline
 
-Historical datasets provide the foundation for:
+QuantOS may adopt selected ideas inspired by Qlib's dataset and experiment workflow.
 
-- feature generation
-- model training
-- backtesting
-- walk-forward validation
-- Monte Carlo analysis
+The useful V1 concepts are:
 
-Historical datasets are immutable after validation.
+* explicit dataset definitions
+* reproducible dataset preparation
+* versioned research inputs
+* deterministic data access
+* clear time boundaries
+* experiment-to-dataset traceability
 
----
+QuantOS does not require Qlib's data infrastructure.
 
-# 9.1 Historical Data Principles
+The following are outside V1:
 
-Historical datasets shall be:
+* Qlib data server
+* distributed data services
+* Qlib-specific production APIs
+* Qlib-specific runtime dependencies
+* Qlib-managed live market data
 
-- complete
-- deterministic
-- reproducible
-- versioned
-
-Historical research shall always reference dataset versions.
-
----
-
-# 9.2 Download Policy
-
-Historical downloads shall occur only through approved ingestion pipelines.
-
-Manual editing of historical datasets is prohibited.
+QuantOS remains responsible for its own production data path.
 
 ---
 
-# 9.3 Incremental Updates
+# 43. Data Lineage
 
-Historical datasets shall support incremental extension.
+Important derived data must maintain lineage.
 
-Example
+Conceptually:
 
-Existing:
-
-2025
-
-↓
-
-Append
-
-2026
-
-↓
-
+```text
+Raw Binance Data
+       ↓
 Validated Dataset
+       ↓
+Research Dataset
+       ↓
+Feature Version
+       ↓
+Model Run
+       ↓
+Evaluation Result
+```
 
-Previously validated records shall not be rewritten.
-
----
-
-# 9.4 Historical Integrity
-
-Validation includes:
-
-- timestamp continuity
-
-- duplicate detection
-
-- interval consistency
-
-- symbol verification
-
-- schema verification
-
-Datasets failing validation shall not enter production storage.
+The system must be able to determine which source dataset contributed to an important research result.
 
 ---
 
-# 10. Live Market Data
+# 44. Data Retention
 
-Live data provides current market conditions.
+V1 should retain raw and important validated historical data locally when storage permits.
 
-Unlike historical data, live data is transient.
+The user environment is expected to have sufficient local storage for substantial historical datasets.
 
-It exists to support:
+Automatic deletion must not remove datasets required to reproduce important experiments.
 
-- signal generation
-
-- portfolio valuation
-
-- execution
-
-- monitoring
-
-Persistent archival remains optional.
+If cleanup is implemented later, deletion must be explicit and must not silently invalidate recorded research runs.
 
 ---
 
-# 10.1 Live Stream Requirements
+# 45. Data Quality Reporting
 
-The Market Data Service shall maintain:
+Validation should produce a clear quality result.
 
-- connection state
+A quality report should identify:
 
-- subscription state
+* dataset identity
+* rows/records
+* time range
+* symbols
+* timeframe
+* missing intervals
+* duplicates
+* invalid values
+* validation status
+* warnings
+* errors
 
-- heartbeat monitoring
-
-- reconnect logic
-
-- latency measurement
-
----
-
-# 10.2 Time Ordering
-
-Incoming messages shall preserve event order whenever possible.
-
-Where provider ordering cannot be guaranteed, timestamps determine processing order.
+A dataset with critical validation errors must not be marked valid.
 
 ---
 
-# 10.3 Reconnection
+# 46. Data Quality States
 
-Temporary network failures are expected.
+A dataset should have an explicit quality state.
 
-Recovery shall include:
+Conceptually:
 
-- reconnect
+```text
+RAW
+  ↓
+VALIDATING
+  ↓
+VALID
+```
 
-- state verification
+Failure states may include:
 
-- stream resubscription
+```text
+INVALID
+INCOMPLETE
+CORRUPTED
+```
 
-- missing data recovery
-
-Silent reconnect failures are unacceptable.
+Only an acceptable validated state may be consumed by research/backtest workflows.
 
 ---
 
-# 10.4 Stream Health
+# 47. No Silent Repair
 
-Market streams expose observable health indicators.
+The data pipeline must not silently repair suspicious market data.
+
+If a transformation or repair is required:
+
+1. record the issue
+2. record the transformation
+3. create a new dataset version
+4. preserve the source dataset
+5. record the resulting dataset identity
+
+This is essential for reproducibility.
+
+---
+
+# 48. Error Handling
+
+Data errors must be classified.
 
 Examples:
 
-CONNECTED
+### Recoverable
 
-CONNECTING
+* temporary network failure
+* interrupted download
+* temporary API rate limitation
 
-DISCONNECTED
+### Data Quality
 
-RECOVERING
+* missing candles
+* duplicates
+* malformed values
+* schema mismatch
 
-FAILED
+### Critical
 
-These states support monitoring without modifying business logic.
+* corrupted dataset
+* impossible timestamps
+* invalid prices
+* unexplained data inconsistency
 
----
+Recoverable errors may be retried safely.
 
-# 11. Symbol Metadata
-
-Symbol metadata defines exchange-specific trading constraints.
-
-Examples include:
-
-- minimum quantity
-
-- maximum quantity
-
-- tick size
-
-- step size
-
-- minimum notional
-
-- trading status
-
-Metadata shall be treated as authoritative exchange information.
+Critical data-quality errors must stop downstream use until resolved.
 
 ---
 
-# 11.1 Metadata Refresh
+# 49. Idempotent Ingestion
 
-Metadata changes occur infrequently.
+Historical ingestion should be idempotent.
 
-Refresh policy shall be configurable.
+Running the same acquisition operation twice should not produce duplicated market observations.
 
-Typical events requiring refresh include:
+The system must detect already-ingested ranges and avoid unnecessary duplication.
 
-- application startup
-
-- scheduled synchronization
-
-- exchange notification
+Dataset results must remain deterministic.
 
 ---
 
-# 11.2 Symbol Validation
-
-Unknown symbols are invalid.
-
-Trading decisions referencing unsupported symbols shall be rejected before strategy evaluation.
-
----
-
-# 12. Time Standards
-
-Time consistency is mandatory.
-
-All internal timestamps shall use UTC.
-
-Local system time shall never influence trading decisions.
-
----
-
-# 12.1 Timestamp Precision
-
-Timestamp precision shall remain consistent throughout the platform.
-
-Mixed precision datasets are prohibited.
-
----
-
-# 12.2 Exchange Time
-
-Exchange timestamps remain authoritative.
-
-Local receive time may be recorded separately for diagnostics.
-
-Business logic shall not substitute local timestamps for exchange timestamps.
-
----
-
-# 12.3 Clock Drift
-
-Runtime components should periodically verify clock synchronization.
-
-Excessive drift shall generate operational warnings.
-
----
-
-# 13. Data Quality
-
-Data quality is evaluated before business consumption.
-
-Quality validation includes:
-
-- completeness
-
-- correctness
-
-- consistency
-
-- uniqueness
-
-- continuity
-
----
-
-# 13.1 Validation Pipeline
-
-Incoming market data follows:
-
-Acquire
-
-↓
-
-Normalize
-
-↓
-
-Validate
-
-↓
-
-Persist
-
-↓
-
-Publish
-
-Only validated datasets become available to downstream services.
-
----
-
-# 13.2 Validation Categories
-
-Validation rules include:
-
-Structural
-
-Semantic
-
-Temporal
-
-Statistical
-
-Business
-
-Each category evaluates different aspects of dataset correctness.
-
----
-
-# 13.3 Validation Failures
-
-Validation failures shall produce:
-
-- explicit error logs
-
-- rejection reason
-
-- affected dataset
-
-- timestamp
-
-Silent failures are prohibited.
-
----
-
-# 13.4 Data Quality Metrics
-
-The platform should expose operational quality metrics including:
-
-- missing candle count
-
-- duplicate count
-
-- validation failures
-
-- stream latency
-
-- reconnect frequency
-
-These metrics support operational monitoring rather than business decision-making.
-
----
-Every downstream component—including the Feature Engine, Alpha Engine, Risk Engine, and Validation framework—shall consume market data exclusively through these standardized definitions.
----
-
-# QuantOS Core
-## 003_DATA_ARCHITECTURE.md (Part 3)
-
----
-# Part III — Dataset Organization & Research Architecture
----
-
-# 14. Dataset Organization
-
-QuantOS organizes persistent data into logical datasets rather than individual files.
-
-A dataset represents a complete, internally consistent collection of information sharing a common purpose, schema, and lifecycle.
-
-Datasets remain the primary unit of:
-
-- validation
-- versioning
-- archival
-- reproducibility
-- recovery
-
-Applications shall consume datasets rather than individual files whenever practical.
-
----
-
-## 14.1 Dataset Characteristics
-
-Every production dataset shall satisfy the following properties:
-
-- uniquely identifiable
-- immutable after publication
-- schema validated
-- version controlled
-- traceable
-- reproducible
-
-Datasets that fail these properties shall not be promoted into production.
-
----
-
-## 14.2 Dataset Metadata
-
-Every dataset shall contain descriptive metadata independent of its business contents.
-
-Minimum metadata includes:
-
-- dataset identifier
-- dataset version
-- creation timestamp
-- source
-- symbol
-- timeframe
-- schema version
-- validation status
-
-Additional metadata may be introduced without affecting business behavior.
-
----
-
-## 14.3 Dataset Scope
-
-Datasets should remain focused on a single business purpose.
-
-Examples:
-
-Market candles
-
-Feature matrix
-
-Training labels
-
-Prediction outputs
-
-Execution history
-
-Portfolio snapshots
-
-Combining unrelated domains into a single dataset is prohibited.
-
----
-
-# 15. Storage Hierarchy
-
-Persistent storage follows a layered hierarchy.
-
+# 50. Data Access Interfaces
+
+Downstream modules should consume market data through clear interfaces rather than directly manipulating storage implementation details.
+
+Conceptually:
+
+```text
+Feature Engine
+      ↓
+Market Data Interface
+      ↓
+Dataset Reader
+      ↓
+Parquet / DuckDB
 ```
 
-Repository
-│
-├── Domain
-│
-├── Dataset
-│
-├── Version
-│
-└── Partitions
+The same principle applies to:
 
+* backtesting
+* research
+* validation
+* replay
+
+This keeps storage details outside business logic.
+
+---
+
+# 51. Performance Requirements
+
+V1 data infrastructure must be performant enough for local research and backtesting.
+
+The system should prioritize:
+
+* columnar reads
+* time-range filtering
+* symbol filtering
+* efficient DuckDB queries
+* avoiding unnecessary data copies
+* manageable Parquet file sizes
+
+Distributed processing is not required.
+
+---
+
+# 52. Data Security
+
+Historical market data is not considered secret.
+
+However:
+
+* API credentials must never be stored with market data
+* credentials must never appear in dataset metadata
+* secrets must never be written into Parquet
+* secrets must never be included in research artifacts
+
+---
+
+# 53. Data Architecture Acceptance Criteria
+
+The V1 data architecture is compliant when:
+
+* Binance Spot is supported.
+* BTCUSDT and ETHUSDT are supported.
+* 1-minute candles are the primary dataset.
+* timestamps use UTC.
+* raw data is immutable.
+* normalized data has a defined schema.
+* duplicate candles are detected.
+* missing candles are detected.
+* invalid OHLCV values are detected.
+* datasets have identifiable versions.
+* research runs reference dataset identities.
+* train/validation/test boundaries are explicit.
+* future data cannot enter earlier research periods.
+* historical replay is deterministic.
+* live data staleness can be detected.
+* Parquet provides durable local storage.
+* DuckDB provides local analytical access.
+* data lineage is traceable.
+* ingestion is idempotent.
+* critical data errors stop downstream processing.
+* no distributed data platform is required.
+* Qlib is not required for production.
+* Qlib is not in the live data path.
+* the entire data architecture can operate on one local workstation.
+
+---
+
+# 54. Final Data Architecture Statement
+
+QuantOS V1 uses a deliberately simple local data architecture:
+
+```text
+Binance
+   ↓
+Validated Market Data
+   ↓
+Parquet
+   ↓
+DuckDB
+   ↓
+Deterministic Research / Feature Inputs
 ```
 
-Each layer provides additional organizational context.
+The data system exists to provide reliable information to the six core QuantOS modules.
 
----
+It is not a general-purpose data platform.
 
-## 15.1 Domains
+Its primary responsibilities are:
 
-Domains represent major business categories.
+**correct data, correct time, correct lineage, and reproducible access.**
 
-Examples include:
+If the data foundation cannot prove what information was available at a given point in time, the trading system cannot reliably prove that its results are valid.
 
-Market
+Therefore:
 
-Features
-
-Models
-
-Trading
-
-Portfolio
-
-Logs
-
-Configuration
-
-Domains remain stable across software versions.
-
----
-
-## 15.2 Datasets
-
-Each domain contains one or more datasets.
-
-Example:
-
-Market Domain
-
-↓
-
-BTCUSDT_1m
-
-↓
-
-Dataset Version
-
-↓
-
-Partitions
-
-The dataset represents the authoritative business object.
-
----
-
-## 15.3 Partitions
-
-Large datasets may be partitioned.
-
-Partitioning improves:
-
-- storage efficiency
-- query performance
-- incremental updates
-
-Partitioning shall never modify business meaning.
-
----
-
-# 16. Dataset Versioning
-
-Every production dataset shall be versioned.
-
-Versioning guarantees that historical experiments remain reproducible regardless of future data updates.
-
----
-
-## 16.1 Version Identity
-
-Dataset versions shall uniquely identify:
-
-dataset
-
-schema
-
-contents
-
-validation state
-
-No two versions may share identical identifiers.
-
----
-
-## 16.2 Publication
-
-A dataset version becomes official only after successful validation.
-
-Publishing includes:
-
-validation completion
-
-metadata generation
-
-integrity verification
-
-registration
-
-Unpublished datasets shall not be consumed by production workflows.
-
----
-
-## 16.3 Superseded Versions
-
-Older dataset versions remain available for historical reproduction.
-
-Deletion of historical versions is prohibited unless explicitly approved through repository maintenance procedures.
-
----
-
-# 17. Feature Store
-
-The Feature Store is the authoritative repository of engineered quantitative features.
-
-It separates deterministic feature generation from model training.
-
----
-
-## 17.1 Objectives
-
-The Feature Store provides:
-
-consistent feature definitions
-
-reproducible feature values
-
-version isolation
-
-shared feature consumption
-
-Every production model shall consume features exclusively through the Feature Store.
-
----
-
-## 17.2 Feature Identity
-
-Every feature shall define:
-
-name
-
-description
-
-owner
-
-formula
-
-required inputs
-
-supported timeframe
-
-supported symbols
-
-undocumented production features are prohibited.
-
----
-
-## 17.3 Feature Immutability
-
-Published feature definitions shall not change retroactively.
-
-Updated feature implementations require a new feature version.
-
----
-
-## 17.4 Feature Lineage
-
-Every feature shall identify its dependencies.
-
-Example:
-
-Close Price
-
-↓
-
-Log Return
-
-↓
-
-Rolling Volatility
-
-↓
-
-Volatility Regime
-
-The dependency graph shall remain acyclic.
-
-Circular feature dependencies are prohibited.
-
----
-
-# 18. Research Datasets
-
-Research datasets support experimentation without affecting production data.
-
-Research data may include:
-
-candidate features
-
-candidate labels
-
-alternative preprocessing
-
-experimental indicators
-
-Experimental datasets remain isolated from production.
-
----
-
-## 18.1 Research Isolation
-
-Research activities shall never modify production datasets.
-
-Promotion requires:
-
-validation
-
-approval
-
-version publication
-
-Isolation protects production reproducibility.
-
----
-
-## 18.2 Temporary Data
-
-Temporary datasets may exist during experimentation.
-
-Examples:
-
-cross-validation folds
-
-parameter search outputs
-
-temporary feature matrices
-
-Temporary datasets shall not become authoritative business data.
-
----
-
-# 19. Experiment Tracking
-
-Every experiment shall be reproducible.
-
-Experiments shall record:
-
-dataset version
-
-feature version
-
-configuration version
-
-model version
-
-random seed
-
-execution timestamp
-
-environment identifier
-
-Experiments lacking sufficient metadata shall be considered invalid.
-
----
-
-## 19.1 Experiment Identity
-
-Every experiment receives a unique identifier.
-
-The identifier enables complete reconstruction of:
-
-inputs
-
-configuration
-
-outputs
-
-validation metrics
-
----
-
-## 19.2 Experiment Outputs
-
-Experiment artifacts may include:
-
-trained models
-
-evaluation reports
-
-feature importance
-
-validation metrics
-
-diagnostic charts
-
-Artifacts remain associated with their originating experiment.
-
----
-
-# 20. Metadata Registry
-
-QuantOS maintains a centralized metadata registry.
-
-The registry describes available datasets without duplicating business contents.
-
-Examples include:
-
-dataset names
-
-available versions
-
-schemas
-
-validation state
-
-ownership
-
-creation timestamps
-
-Consumers query the registry before loading datasets.
-
----
-
-## 20.1 Registry Responsibilities
-
-The registry shall support:
-
-dataset discovery
-
-version lookup
-
-schema lookup
-
-dependency inspection
-
-ownership tracking
-
-The registry shall not store market data itself.
-
----
-
-# 21. Data Lineage
-
-Lineage describes how business data evolves through the platform.
-
-Every derived dataset shall identify its upstream dependencies.
-
-Example:
-
-Raw Candles
-
-↓
-
-Validated Candles
-
-↓
-
-Features
-
-↓
-
-Training Dataset
-
-↓
-
-Model
-
-↓
-
-Predictions
-
-↓
-
-Trades
-
-This lineage enables complete auditability.
-
----
-
-## 21.1 Lineage Rules
-
-Lineage shall remain:
-
-complete
-
-acyclic
-
-traceable
-
-deterministic
-
-Hidden transformations are prohibited.
-
----
-
-# 22. Dataset Integrity
-
-Integrity ensures stored datasets remain trustworthy.
-
-Integrity verification shall occur:
-
-after ingestion
-
-after validation
-
-before publication
-
-during recovery
-
-periodically during maintenance
-
----
-
-## 22.1 Integrity Verification
-
-Verification may include:
-
-record counts
-
-schema validation
-
-timestamp continuity
-
-duplicate detection
-
-checksum verification
-
-Any integrity failure shall invalidate the affected dataset.
-
----
-
-## 22.2 Corrupted Datasets
-
-Corrupted datasets shall never be consumed by business services.
-
-Recovery options include:
-
-re-download
-
-restoration
-
-replacement
-
-manual investigation
-
-The system shall prefer temporary unavailability over corrupted business decisions.
-
----
-# QuantOS Core
-## 003_DATA_ARCHITECTURE.md (Part 4)
-
----
-
-# Part IV — Data Operations, Reliability & Governance
-
----
-
-# 23. Data Validation Framework
-
-Every dataset entering QuantOS shall pass through a standardized validation framework before becoming available to downstream services.
-
-Validation is mandatory for:
-
-- historical data
-- live market data
-- feature datasets
-- model datasets
-- portfolio snapshots
-- trading records
-
-No dataset shall bypass validation.
-
----
-
-## 23.1 Validation Objectives
-
-Validation exists to ensure:
-
-- correctness
-- completeness
-- consistency
-- determinism
-- business integrity
-
-Validation protects downstream components from corrupted inputs.
-
----
-
-## 23.2 Validation Stages
-
-Every dataset follows the same validation pipeline.
-
-```
-
-Acquire
-
-↓
-
-Structural Validation
-
-↓
-
-Semantic Validation
-
-↓
-
-Temporal Validation
-
-↓
-
-Business Validation
-
-↓
-
-Publication
-
-```
-
-Failure at any stage prevents publication.
-
----
-
-## 23.3 Validation Categories
-
-### Structural Validation
-
-Verifies:
-
-- required fields
-- data types
-- schema version
-- null values
-
----
-
-### Semantic Validation
-
-Verifies:
-
-- price relationships
-- numeric ranges
-- symbol validity
-- interval validity
-
----
-
-### Temporal Validation
-
-Verifies:
-
-- timestamp ordering
-- continuity
-- duplicate timestamps
-- missing intervals
-
----
-
-### Business Validation
-
-Verifies:
-
-- supported symbols
-- approved intervals
-- exchange consistency
-- repository policies
-
----
-
-# 24. Data Recovery
-
-Operational failures are expected.
-
-Recovery mechanisms exist to restore trustworthy datasets without compromising reproducibility.
-
----
-
-## 24.1 Recovery Principles
-
-Recovery shall prioritize:
-
-- correctness
-- consistency
-- traceability
-
-Recovery shall never prioritize speed over integrity.
-
----
-
-## 24.2 Recoverable Failures
-
-Typical recoverable failures include:
-
-- interrupted downloads
-- temporary exchange outages
-- network failures
-- incomplete writes
-- temporary storage failures
-
-Recovery procedures shall be deterministic.
-
----
-
-## 24.3 Non-Recoverable Failures
-
-Examples include:
-
-- corrupted datasets
-- unknown schema versions
-- inconsistent timestamps
-- conflicting historical records
-
-These failures require explicit investigation before publication.
-
----
-
-# 25. Backup Strategy
-
-Backups protect against accidental data loss.
-
-Backups support operational continuity rather than experimentation.
-
----
-
-## 25.1 Backup Scope
-
-The following data shall be backed up:
-
-- validated datasets
-- feature datasets
-- trained models
-- experiment metadata
-- configuration
-- trading history
-- portfolio history
-
-Raw exchange data may be regenerated where supported.
-
----
-
-## 25.2 Backup Requirements
-
-Backups shall be:
-
-- versioned
-- timestamped
-- verified
-- recoverable
-
-Unverified backups shall not be considered valid.
-
----
-
-## 25.3 Restore Verification
-
-Every restoration shall verify:
-
-- completeness
-- integrity
-- version compatibility
-- schema compatibility
-
-Restored datasets shall pass standard validation before use.
-
----
-
-# 26. Data Retention
-
-Not every dataset requires permanent retention.
-
-Retention policies balance reproducibility with storage efficiency.
-
----
-
-## 26.1 Permanent Retention
-
-The following data shall be retained indefinitely:
-
-- historical market data
-- production feature versions
-- production model metadata
-- trading history
-- portfolio history
-- audit records
-
----
-
-## 26.2 Temporary Retention
-
-Temporary data may include:
-
-- intermediate feature calculations
-- cache contents
-- temporary experiment outputs
-- runtime diagnostics
-
-Temporary datasets may be removed without affecting reproducibility.
-
----
-
-# 27. Archival
-
-Archival preserves historical datasets that are no longer actively used.
-
-Archived datasets remain:
-
-- readable
-- versioned
-- traceable
-
-Archived datasets shall never be modified.
-
----
-
-## 27.1 Archive Requirements
-
-Archives shall preserve:
-
-- metadata
-- schema
-- timestamps
-- validation status
-- lineage
-
-Archive integrity shall be periodically verified.
-
----
-
-# 28. Performance Objectives
-
-The data platform shall support efficient local research without compromising determinism.
-
-Performance improvements shall never alter business behavior.
-
----
-
-## 28.1 Performance Goals
-
-The platform should minimize:
-
-- dataset loading time
-- validation latency
-- feature retrieval latency
-- experiment startup time
-
-Business correctness always takes priority over throughput.
-
----
-
-## 28.2 Storage Optimization
-
-Storage optimization may include:
-
-- partitioning
-- compression
-- indexing
-- caching
-
-Optimizations shall remain transparent to business services.
-
----
-
-# 29. Security
-
-Data security protects both operational integrity and confidential information.
-
-Security applies to all datasets.
-
----
-
-## 29.1 Security Principles
-
-The platform follows:
-
-- least privilege
-- explicit authorization
-- configuration isolation
-- auditability
-
-Unauthorized dataset modification is prohibited.
-
----
-
-## 29.2 Sensitive Information
-
-Sensitive information includes:
-
-- API credentials
-- authentication secrets
-- private configuration
-- user-specific identifiers
-
-Sensitive information shall never be stored within market datasets.
-
----
-
-## 29.3 Dataset Access
-
-Access permissions should reflect business ownership.
-
-Consumers may read authorized datasets.
-
-Only authoritative services may publish new versions.
-
----
-
-# 30. Auditability
-
-Every published dataset shall remain traceable.
-
-Audit records shall support reconstruction of:
-
-- origin
-- validation
-- publication
-- consumption
-
-Audit information shall not modify business behavior.
-
----
-
-## 30.1 Audit Events
-
-Examples include:
-
-- dataset publication
-- validation completion
-- recovery operations
-- archival
-- restoration
-- schema updates
-
-Audit records support investigation and compliance.
-
----
-
-# 31. Operational Maintenance
-
-Routine maintenance preserves long-term platform reliability.
-
-Maintenance shall be planned, observable, and reproducible.
-
----
-
-## 31.1 Maintenance Activities
-
-Examples include:
-
-- validation audits
-- metadata verification
-- storage cleanup
-- archive verification
-- integrity scanning
-- configuration review
-
-Maintenance activities shall never modify published datasets.
-
----
-
-## 31.2 Health Monitoring
-
-The platform should continuously monitor:
-
-- storage utilization
-- validation failures
-- ingestion success
-- archive status
-- backup health
-- recovery success
-
-Health metrics support operational visibility only.
-
----
-
-# 32. Future Evolution
-
-The architecture intentionally supports future expansion.
-
-Examples include:
-
-- additional exchanges
-- additional asset classes
-- distributed storage
-- cloud deployment
-- feature registries
-- enterprise data catalogs
-
-Future enhancements shall preserve the principles defined throughout this specification.
-
----
-
-# 33. Architectural Constraints
-
-The following constraints are mandatory.
-
-- Raw data is immutable.
-- Every dataset has one authoritative owner.
-- Validation precedes publication.
-- Published datasets are versioned.
-- Derived data maintains complete lineage.
-- Historical reproducibility is mandatory.
-- Hidden transformations are prohibited.
-- Business services consume standardized datasets only.
-- Configuration remains external to business data.
-- Deterministic behavior takes priority over performance.
-
-No implementation may violate these constraints.
-
----
-
-# 34. Data Architecture Summary
-
-QuantOS treats data as a governed engineering asset rather than a collection of files.
-
-Every dataset progresses through a controlled lifecycle:
-
-Acquire
-
-↓
-
-Validate
-
-↓
-
-Normalize
-
-↓
-
-Publish
-
-↓
-
-Consume
-
-↓
-
-Archive
-
-↓
-
-Recover
-
-This lifecycle ensures that every downstream trading decision originates from trusted, reproducible, and traceable information.
-
-The data platform is intentionally designed to support:
-
-- deterministic research
-- reproducible experiments
-- explainable model development
-- safe live trading
-- long-term maintainability
-
-These principles remain mandatory across every future version of QuantOS.
-
----
-
-# Document Completion
-
-This concludes **003_DATA_ARCHITECTURE.md**.
-
-The complete document consists of:
-
-- Part I — Data Foundations
-- Part II — Market Data Standards
-- Part III — Dataset Organization & Research Architecture
-- Part IV — Data Operations, Reliability & Governance
-
-This specification serves as the authoritative reference for all data acquisition, storage, validation, governance, and lifecycle management within QuantOS Core Version 1.
-
-Subsequent specifications—including the Feature Engine, Alpha Engine, Risk & Execution, and Validation frameworks—shall comply with the requirements established in this document.
+> **Data correctness and temporal integrity take priority over data complexity.**
