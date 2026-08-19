@@ -1,7 +1,7 @@
 # QuantOS Core — 000_READ_FIRST.md
 
 Version: 1.0.0-V1
-Status: Replacement baseline — requires approval before implementation
+Status: Frozen V1 Source of Truth
 Last Updated: 2026-08-19
 
 ## 1. Purpose
