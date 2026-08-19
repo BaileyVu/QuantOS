@@ -1,22 +1,30 @@
 # QuantOS Core — 008_IMPLEMENTATION_GUIDE.md
 
 Version: 1.0.0-V1
-Status: Replacement baseline
+Status: Final MVP implementation guide
 Last Updated: 2026-08-19
 
-## 1. Implementation Rule
+## 1. Purpose
 
-Build the smallest system that satisfies documents 000–007.
+Build the first working QuantOS MVP as quickly as possible.
 
-Do not add features, modules, services, providers, strategies, or infrastructure because they appear useful.
+The priority is:
 
-If implementation appears to require a new product capability, stop and update the specification first.
+> Get QuantOS running end-to-end first, then improve it safely.
 
-## 2. Repository Shape
+Do not build the ultimate quant platform before the first complete system works.
 
-Use a single Python application organized by Clean Architecture boundaries.
+## 2. Implementation Rule
 
-Conceptually:
+Implement only what is required by documents `000–007`.
+
+Do not introduce new production modules, exchanges, strategies, models, services, APIs, cloud infrastructure, distributed infrastructure, or speculative abstractions.
+
+If a problem appears to require a new product capability, stop and resolve it against the specifications before adding it.
+
+## 3. Repository Structure
+
+Use one Python application with clear internal boundaries:
 
 ```text
 src/
@@ -31,13 +39,16 @@ src/
   infrastructure/
     binance/
     storage/
+    models/
     configuration/
     logging/
   interfaces/
+
 tests/
   unit/
   integration/
   validation/
+
 configs/
 data/
 models/
@@ -45,192 +56,322 @@ experiments/
 docs/
 ```
 
-The exact package names may be adjusted during implementation only if ownership and boundaries remain unchanged.
+Exact package names may change if ownership boundaries remain unchanged.
 
-## 3. Build Order
+Do not create one deployable application per module.
 
-### Milestone 1 — Market Data
+## 4. Build Order
+
+### Phase 1 — Foundation
+
+Implement:
+
+- Python project setup;
+- configuration;
+- structured logging;
+- domain contracts;
+- test framework;
+- CLI/runtime entry point.
+
+Acceptance: application starts, configuration loads, tests run, logging works.
+
+### Phase 2 — Market Data
 
 Implement:
 
 - Binance historical ingestion;
 - Binance live market data;
-- canonical candle normalization;
+- 1-minute candle normalization;
 - validation;
-- Parquet storage;
+- Parquet persistence;
 - DuckDB querying.
 
-Acceptance: reliable historical and live data.
+Acceptance: BTCUSDT and ETHUSDT history works, data passes validation, live data can be consumed, and local queries work.
 
-### Milestone 2 — Feature Engine
+### Phase 3 — Feature Engine
 
-Implement:
+Implement the small approved feature set.
 
-- versioned feature definitions;
-- deterministic calculations;
-- causal alignment;
-- tests.
+Target 10–15 production features; maximum 20.
 
-Acceptance: identical inputs produce identical feature vectors.
+Implement deterministic calculations, versioning, temporal alignment, missing-data behavior, and tests.
 
-### Milestone 3 — Alpha Engine
+Acceptance: identical inputs produce identical feature vectors and no feature uses future information.
+
+### Phase 4 — Alpha Engine
 
 Implement:
 
 - target definition;
-- training workflow;
-- LightGBM candidate;
-- model artifact;
-- single strategy decision path;
-- explanation metadata.
+- training dataset construction;
+- one production model;
+- preferred initial model: LightGBM;
+- model artifact saving/loading;
+- one production strategy;
+- signal generation;
+- decision metadata.
 
-Acceptance: reproducible predictions and decisions.
+Acceptance: training is reproducible, the model can be loaded, predictions are deterministic for identical inputs/configuration, and the strategy produces BUY/SELL/HOLD.
 
-### Milestone 4 — Evaluation
+### Phase 5 — Evaluation Engine
 
 Implement:
 
-- event-driven backtest;
-- cost model;
+- event-driven backtester;
+- simulated account state;
+- simulated orders/fills;
+- fees;
+- slippage;
 - performance metrics;
-- walk-forward;
-- Monte Carlo;
+- walk-forward validation;
+- Monte Carlo analysis;
 - experiment metadata.
 
-Acceptance: no look-ahead and reproducible validation.
+Acceptance: historical evaluation runs without look-ahead, includes costs, is reproducible, and produces validation reports.
 
-### Milestone 5 — Risk + Paper Execution
-
-Implement:
-
-- risk controls;
-- simulated execution;
-- order-state tracking;
-- continuous paper trading.
-
-Acceptance: safe end-to-end operation with real market data and no real orders.
-
-### Milestone 6 — Live Execution
+### Phase 6 — Risk Engine
 
 Implement:
 
-- Binance Spot live adapter;
-- explicit live configuration;
-- reconciliation;
-- safe failure behavior.
+- position sizing;
+- exposure limits;
+- daily loss limit;
+- drawdown protection;
+- volatility-aware sizing;
+- expected-edge-after-cost check;
+- safe rejection behavior.
 
-Acceptance: live mode is technically capable but remains disabled until validation approval.
+Acceptance: invalid/excessive trades are rejected and risk rejection prevents execution.
 
-## 4. Testing Strategy
+### Phase 7 — Paper Trading
+
+Connect:
+
+```text
+Live Binance Market Data
+        ↓
+Feature Engine
+        ↓
+Alpha Engine
+        ↓
+Risk Engine
+        ↓
+Simulated Execution
+        ↓
+Paper Account
+        ↓
+Evaluation
+```
+
+Acceptance:
+
+- QuantOS runs continuously using live market data;
+- no real order is submitted;
+- signals, decisions, simulated fills, balances, and metrics are recorded.
+
+This is the first major MVP milestone.
+
+## 5. Live Trading Comes Last
+
+Only after the previous phases work should the real Binance execution adapter be enabled.
+
+Live mode requires:
+
+- explicit runtime configuration;
+- valid Binance credentials;
+- successful paper operation;
+- passing validation;
+- explicit live enablement.
+
+Live trading must never be the default.
+
+## 6. Minimum Viable End-to-End Path
+
+The first complete MVP must be able to execute:
+
+```text
+Binance 1m Data
+      ↓
+Canonical Candle
+      ↓
+Feature Vector
+      ↓
+Model Prediction
+      ↓
+BUY / SELL / HOLD
+      ↓
+Risk Check
+      ↓
+Simulated Order
+      ↓
+Position / Balance Update
+      ↓
+Performance Metrics
+```
+
+If this works reliably, QuantOS has achieved its first MVP.
+
+Do not delay this milestone for secondary features.
+
+## 7. Testing Strategy
 
 ### Unit Tests
 
-Test each domain rule independently.
+Test candle validation, feature calculations, signal rules, risk rules, position sizing, cost calculations, and metrics.
 
 ### Integration Tests
 
-Test boundaries between:
+Test Binance adapter, storage, feature pipeline, model artifact loading, risk/execution boundary, and evaluation pipeline.
 
-- data and features;
-- features and alpha;
-- alpha and risk;
-- risk and execution;
-- execution and exchange adapter;
-- evaluation and storage.
+### End-to-End Test
+
+Run:
+
+```text
+data → features → alpha → risk → simulated execution → evaluation
+```
+
+over a small deterministic historical dataset.
 
 ### Deterministic Replay
 
-The same input dataset and configuration must reproduce the same outputs.
+The same dataset and configuration should produce the same research result, except for explicitly documented nondeterminism.
 
-### Failure Tests
+## 8. Failure Tests
 
 Explicitly test:
 
-- missing data;
+- malformed market data;
+- missing candles;
 - stale data;
-- malformed candles;
 - network failure;
+- Binance authentication failure;
 - exchange errors;
-- invalid configuration;
-- model artifact failure;
-- duplicate order prevention;
-- risk-limit breach.
+- missing model artifact;
+- incompatible feature/model versions;
+- risk-limit breach;
+- duplicate order submission;
+- unknown execution state.
 
-## 5. Configuration
+Safety-critical failures must fail closed.
 
-No business rule should require source-code modification to change.
+## 9. Configuration
 
-Use external configuration for:
+Keep outside source code:
 
 - symbols;
+- timeframe;
 - runtime mode;
-- risk limits;
-- costs;
-- model parameters;
 - data paths;
-- validation windows;
+- risk limits;
+- transaction costs;
+- model parameters;
+- validation periods;
 - API credentials.
 
-## 6. Logging
+Secrets must never be committed.
 
-Use structured logs with:
+## 10. Logging
 
-- timestamp;
-- level;
-- component;
-- event type;
-- correlation/run identifier where applicable;
-- relevant symbol/order/model identifiers.
+Structured logs should record:
 
-Do not log secrets.
+- startup/shutdown;
+- data ingestion;
+- data validation;
+- feature generation;
+- model version;
+- alpha decisions;
+- risk decisions;
+- order requests;
+- execution responses;
+- fills;
+- errors;
+- validation runs.
 
-## 7. Research Artifacts
+Never log secrets.
 
-A research run should produce enough metadata to reproduce it:
+## 11. Research Artifacts
+
+Each research/validation run should preserve:
 
 - run ID;
-- configuration;
-- dataset identity;
+- dataset ID;
 - code version;
 - feature version;
 - strategy version;
 - model version;
+- configuration;
+- time windows;
+- random seed where applicable;
 - metrics;
 - validation result.
 
-Persist model artifacts and validation reports.
+Model artifacts and validation reports must be persistable and reloadable.
 
-## 8. Qlib Boundary
+## 12. Qlib Boundary
 
-Qlib may be studied or used as a research reference, but V1 must not depend on Qlib for runtime execution.
+Qlib may be used as a research reference or optionally during experimentation, but it is not a required V1 runtime dependency.
 
-Only its useful discipline is retained:
+Retain only the useful concepts:
 
 - reproducible datasets;
-- experiment tracking;
+- experiment identity;
 - temporal evaluation;
-- standardized evaluation artifacts.
+- artifact tracking;
+- standardized evaluation.
 
-## 9. Definition of Done
+Do not import Qlib's larger architecture into QuantOS.
 
-Do not declare V1 complete until:
+## 13. Definition of Done
 
-- all six production modules operate;
-- unit/integration tests pass;
-- historical ingestion works;
-- live data works;
-- deterministic features work;
-- one model is reproducibly trainable;
-- event-driven backtest works;
-- walk-forward works;
-- Monte Carlo works;
-- paper trading works;
+The first QuantOS MVP is complete when:
+
+- the application runs locally;
+- Binance data can be ingested;
+- BTCUSDT and ETHUSDT 1-minute data works;
+- features are generated deterministically;
+- one model can be trained and loaded;
+- one strategy produces signals;
 - risk controls are enforced;
-- live execution is explicitly gated;
-- documentation matches implementation.
+- event-driven backtesting works;
+- transaction costs are modeled;
+- walk-forward validation works;
+- Monte Carlo analysis works;
+- paper trading works with live data;
+- important decisions are logged;
+- live execution can be enabled without rewriting the core architecture;
+- no unapproved architecture or feature has been added.
 
-## 10. Final Guardrail
+## 14. What Not to Optimize Yet
 
-The implementation is successful when it is boring, deterministic, testable, explainable, and safe.
+Do not spend MVP development time on:
 
-It is not successful merely because it contains more indicators, more models, more strategies, more services, or a higher backtest return.
+- dozens of indicators;
+- model ensembles;
+- deep learning;
+- reinforcement learning;
+- automated strategy discovery;
+- portfolio optimization;
+- multiple exchanges;
+- cloud deployment;
+- distributed computing;
+- UI dashboards;
+- mobile applications;
+- high-frequency execution;
+- elaborate orchestration.
+
+First make the core loop work.
+
+## 15. Final Principle
+
+The first QuantOS should be:
+
+- small;
+- deterministic;
+- understandable;
+- testable;
+- observable;
+- safe;
+- runnable.
+
+A working simple QuantOS is more valuable than an unfinished sophisticated QuantOS.
