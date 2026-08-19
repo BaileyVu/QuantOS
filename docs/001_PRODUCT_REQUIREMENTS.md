@@ -1,460 +1,833 @@
-# QuantOS Core
-## 001_PRODUCT_REQUIREMENTS.md
+# QuantOS — Product Requirements
 
-Version: 0.1.0-alpha
+## Document Status
 
-Status: Draft V1
-
-Last Updated: 2026-08-04
+**Status:** Frozen V1 Product Requirements
+**Version:** 1.0
+**Depends On:** `000_READ_FIRST.md`
 
 ---
 
 # 1. Purpose
 
-This document defines the functional and non-functional requirements for QuantOS Core Version 1.
+This document defines the functional and operational requirements for QuantOS V1.
 
-It specifies **what the system must accomplish**.
+It defines **what the product must accomplish**.
 
-Implementation details are intentionally excluded and are defined in subsequent specification documents.
+It does not define detailed implementation architecture. Those decisions belong in `002_SYSTEM_ARCHITECTURE.md` and the subsequent technical specifications.
 
----
+All requirements in this document must remain consistent with `000_READ_FIRST.md`.
 
-# 2. Product Goal
-
-Build a production-quality quantitative trading engine capable of:
-
-- Downloading historical and live market data from Binance.
-- Generating deterministic trading signals.
-- Managing trading risk.
-- Executing trades safely.
-- Evaluating strategy performance.
-- Operating locally on a single workstation.
-
-The system must prioritize robustness and reproducibility over complexity.
+If a requirement conflicts with `000_READ_FIRST.md`, `000_READ_FIRST.md` takes precedence.
 
 ---
 
-# 3. Target Users
+# 2. Product Objective
 
-Primary User
+QuantOS V1 must provide a complete, reproducible, risk-controlled quantitative trading workflow for Binance Spot.
 
-Single quantitative researcher / developer.
+The system must support the progression:
 
-Characteristics
-
-- Technical background
-- Python development experience
-- Local development workflow
-- Full control over infrastructure
-
-Multi-user support is outside Version 1.
-
----
-
-# 4. Trading Requirements
-
-## Exchange
-
-Mandatory
-
-Binance Spot
-
----
-
-## Assets
-
-Mandatory
-
-BTCUSDT
-
-ETHUSDT
-
----
-
-## Initial Capital
-
-20 USDT
-
-The system shall support larger capital without architectural modification.
-
----
-
-## Trading Style
-
-Systematic
-
-Algorithmic
-
-Machine Learning Assisted
-
-No discretionary execution.
-
----
-
-## Trading Frequency
-
-Intraday
-
-Primary timeframe
-
-1 minute
-
-The system may use higher timeframes for contextual analysis.
-
----
-
-## Order Types
-
-Supported
-
-- Market Order
-- Limit Order
-
-The execution engine must determine which order type is appropriate.
-
-The engine may also reject a trade if execution quality is insufficient.
-
----
-
-# 5. Data Requirements
-
-The platform shall support:
-
-Historical Data
-
-Live Market Data
-
-Incremental Updates
-
-Data Validation
-
-Local Storage
-
-Duplicate Detection
-
-Missing Candle Detection
-
-Timezone Normalization
-
-Raw market data must never be modified after storage.
-
----
-
-# 6. Feature Requirements
-
-The platform shall generate deterministic market features.
-
-Target
-
-10–15 production features.
-
-Maximum
-
-20 production features.
-
-Feature generation must produce identical outputs given identical inputs.
-
-Every feature must have a documented purpose.
-
----
-
-# 7. Model Requirements
-
-Version 1 supports one production model.
-
-The implementation may benchmark multiple candidate models.
-
-Only the highest-performing validated model shall enter production.
-
-Model selection shall prioritize:
-
-- Stability
-- Explainability
-- Reproducibility
-- Out-of-sample performance
-
-Raw predictive accuracy is insufficient.
-
----
-
-# 8. Risk Requirements
-
-The platform shall protect capital before seeking profit.
-
-Mandatory controls include:
-
-Maximum Position Risk
-
-Maximum Daily Loss
-
-Maximum Drawdown
-
-Trade Rejection
-
-Volatility-Aware Position Sizing
-
-The system must be capable of refusing to trade.
-
----
-
-# 9. Execution Requirements
-
-The execution engine shall:
-
-Estimate transaction fees.
-
-Estimate expected slippage.
-
-Estimate execution quality.
-
-Choose Market or Limit order.
-
-Reject trades with non-positive expected edge after costs.
-
-Every execution decision must be logged.
-
----
-
-# 10. Evaluation Requirements
-
-The platform shall evaluate strategy performance using:
-
-Expected Value
-
-Net Profit
-
-Sharpe Ratio
-
-Sortino Ratio
-
-Maximum Drawdown
-
-Profit Factor
-
-Win Rate
-
-Trade Count
-
-Average Trade
-
-Exposure
-
-All metrics shall include transaction costs.
-
----
-
-# 11. Validation Requirements
-
-The platform shall support:
-
-Historical Backtesting
-
+```
+Historical Research
+        ↓
+Backtesting
+        ↓
 Walk-Forward Validation
-
-Monte Carlo Simulation
-
+        ↓
+Robustness Testing
+        ↓
 Paper Trading
+        ↓
+Live Approval
+        ↓
+Controlled Live Trading
+```
 
-Live Trading Approval
-
-Promotion to live trading requires successful completion of all validation stages.
+The product must be capable of completing this workflow without requiring a separate production system for each stage.
 
 ---
 
-# 12. Configuration Requirements
+# 3. V1 Scope
 
-All configurable parameters shall exist outside application code.
+## 3.1 Exchange
+
+V1 supports:
+
+**Binance Spot**
+
+No other exchange is required.
+
+---
+
+## 3.2 Trading Pairs
+
+V1 supports:
+
+* BTCUSDT
+* ETHUSDT
+
+Additional symbols are outside the required V1 scope.
+
+---
+
+## 3.3 Capital
+
+The initial operating target is:
+
+**20 USDT**
+
+The product must correctly operate under small-account constraints.
+
+The system must account for:
+
+* available balance
+* minimum order quantity
+* minimum order notional where applicable
+* price precision
+* quantity precision
+* trading fees
+* insufficient balance
+* order rejection
+
+The product must reject trades that cannot be safely or validly executed.
+
+---
+
+## 3.4 Primary Timeframe
+
+The primary trading timeframe is:
+
+**1-minute candles**
+
+Higher-timeframe information may be derived only when it can be calculated without introducing look-ahead bias.
+
+---
+
+# 4. Product Operating Modes
+
+QuantOS V1 must support four distinct operating modes:
+
+1. Research
+2. Backtest
+3. Paper Trading
+4. Live Trading
+
+The mode must be explicitly identifiable by the system.
+
+Live trading must never be entered accidentally.
+
+Paper trading must be the default safe mode for operational testing.
+
+---
+
+# 5. Market Data Requirements
+
+The system must obtain and maintain historical market data required by V1.
+
+At minimum, the system must support:
+
+* Binance Spot
+* BTCUSDT
+* ETHUSDT
+* 1-minute candles
+
+Historical data must be validated before being used for research or model training.
+
+The system must detect, where applicable:
+
+* malformed records
+* duplicate records
+* missing candles
+* invalid timestamps
+* invalid prices
+* invalid volumes
+* unexpected time ordering
+* inconsistent intervals
+
+Invalid or incomplete data must not silently enter the research or trading pipeline.
+
+---
+
+# 6. Dataset Reproducibility
+
+Every dataset used for an important research or validation run must be identifiable.
+
+A dataset identity must allow the system to determine:
+
+* exchange
+* symbol
+* timeframe
+* covered time range
+* source
+* schema/version
+* validation state
+
+Derived datasets must remain traceable to the source data and transformation configuration that produced them.
+
+Historical datasets must not silently change after they have been used for a recorded experiment.
+
+---
+
+# 7. Feature Requirements
+
+The Feature Engine must generate deterministic features from validated market data.
+
+The production feature set must remain small.
+
+Target:
+
+**10–15 production features**
+
+Absolute maximum:
+
+**20 production features**
+
+Every production feature must have a documented purpose.
+
+Features that provide substantially redundant information should not be included solely because they improve an in-sample result.
+
+---
+
+## 7.1 Feature Integrity
+
+A feature must use only information that would have been available at the prediction timestamp.
+
+The system must prevent:
+
+* future candles
+* future prices
+* future returns
+* future volume
+* future labels
+* future-derived statistics
+* improperly forward-filled future information
+* information from protected validation/test periods
+
+Feature generation must be deterministic.
+
+Given identical inputs and configuration, the resulting feature values must be reproducible.
+
+---
+
+# 8. Alpha Requirements
+
+QuantOS V1 must contain one production trading strategy and one production model.
+
+The Alpha Engine must transform validated market information into a trade proposal.
+
+A trade proposal may contain information such as:
+
+* timestamp
+* symbol
+* predicted direction
+* model output
+* expected edge where applicable
+* proposed action
+* model version
+* feature version
+* relevant decision metadata
+
+The Alpha Engine must not execute orders.
+
+The Alpha Engine must not bypass the Risk Engine.
+
+---
+
+# 9. Model Requirements
+
+Candidate models may be evaluated during research.
+
+However:
+
+**Only one validated model may become the V1 production model.**
+
+The production model must be selected using out-of-sample evidence rather than in-sample performance alone.
+
+Model evaluation must consider:
+
+* predictive performance
+* stability
+* robustness
+* transaction costs
+* trading performance
+* drawdown
+* sensitivity to reasonable parameter changes
+* out-of-sample behavior
+
+The product must prioritize robustness over model complexity.
+
+---
+
+# 10. Risk Requirements
+
+The Risk Engine must be able to reject any proposed trade.
+
+Risk controls must be applied before live order submission.
+
+V1 risk management must include, where applicable:
+
+* position sizing
+* maximum position risk
+* maximum daily loss
+* maximum drawdown
+* available-balance checks
+* volatility-aware sizing
+* transaction-cost awareness
+* exchange constraint checks
+* trade rejection
+
+Risk decisions must be recorded.
+
+A rejected trade must not reach live execution.
+
+---
+
+# 11. Execution Requirements
+
+Only the Execution Engine may submit orders to Binance.
+
+The execution process must support the required Binance Spot order lifecycle.
+
+The system must track, where applicable:
+
+* order creation
+* order submission
+* exchange acknowledgement
+* order status
+* fills
+* cancellations
+* rejections
+* execution price
+* executed quantity
+* fees
+* execution timestamps
+
+Execution failures must be handled safely.
+
+The system must not repeatedly submit orders because of an ambiguous network or API response without first determining the state of the original order.
+
+---
+
+# 12. Transaction Costs and Slippage
+
+Backtesting and validation must include realistic trading costs.
+
+The product must account for:
+
+* trading fees
+* expected slippage
+* execution costs
+
+A strategy must not be considered successful merely because it is profitable before costs.
+
+All important performance results must distinguish between gross and cost-adjusted performance where appropriate.
+
+---
+
+# 13. Backtesting Requirements
+
+The system must support historical backtesting using the same essential production decision path as the live system.
+
+Backtesting must include:
+
+* historical market data
+* deterministic feature generation
+* model inference
+* trading decisions
+* risk rules
+* transaction costs
+* slippage assumptions
+* position/account state
+* trade recording
+* performance evaluation
+
+The backtest must not use information that would not have been available at the simulated decision time.
+
+---
+
+# 14. Walk-Forward Validation
+
+Walk-forward validation is required.
+
+The purpose is to determine whether the trading system remains effective when evaluated on unseen future periods.
+
+The validation process must maintain chronological separation between:
+
+* training data
+* validation data
+* out-of-sample test data
+
+The final out-of-sample period must not be repeatedly used to tune the strategy.
+
+Model and feature decisions must be based on information available before the final evaluation period.
+
+---
+
+# 15. Robustness Testing
+
+QuantOS V1 must perform robustness testing before live approval.
+
+At minimum, robustness testing must evaluate whether results remain acceptable under reasonable changes to assumptions.
+
+This may include:
+
+* trade-order randomization where appropriate
+* cost/slippage variation
+* parameter perturbation
+* return/trade resampling
+* Monte Carlo analysis
+
+The objective is not to prove a precise future return.
+
+The objective is to identify whether the strategy's apparent historical advantage is fragile.
+
+A strategy that fails reasonable robustness checks must not be promoted to live trading.
+
+---
+
+# 16. Paper Trading Requirements
+
+Paper trading is mandatory before live trading.
+
+Paper trading must use the production decision path as closely as practical.
+
+The system must record:
+
+* market inputs
+* generated features
+* model decisions
+* trade proposals
+* risk decisions
+* simulated orders
+* simulated fills
+* simulated fees/costs
+* account state
+* performance
+
+Paper trading must provide evidence that the system behaves correctly under live market conditions before real capital is exposed.
+
+---
+
+# 17. Live Trading Requirements
+
+Live trading must require explicit activation.
+
+The system must verify required preconditions before allowing live execution.
+
+At minimum, live readiness must confirm:
+
+* valid configuration
+* valid Binance credentials
+* correct exchange environment
+* supported symbol
+* valid market data
+* valid model
+* valid feature configuration
+* risk controls enabled
+* sufficient account information
+* system health
+* successful reconciliation where required
+
+If a required condition fails, the system must not trade.
+
+---
+
+# 18. Live Safety Requirements
+
+The system must fail safely.
 
 Examples include:
 
-Exchange
+* stale market data
+* missing market data
+* invalid feature values
+* model failure
+* configuration failure
+* Binance API failure
+* network failure
+* order-state uncertainty
+* risk-engine failure
+* execution failure
+* corrupted local state
 
-Trading Pairs
+The safe default for an unresolved critical condition is:
 
-Risk Limits
-
-Model Parameters
-
-Execution Parameters
-
-Storage Locations
-
-API Credentials
-
-Runtime Modes
-
-Code modification shall never be required to change configuration.
+**Do not place a new trade.**
 
 ---
 
-# 13. Logging Requirements
+# 19. Reconciliation Requirements
 
-The system shall log:
+The system must maintain consistency between its recorded state and Binance account/order state.
 
-Application Events
+Reconciliation must be able to identify discrepancies involving:
 
-Data Updates
+* balances
+* open orders
+* filled orders
+* cancelled orders
+* positions or holdings
+* recorded trades
 
-Feature Generation
-
-Model Predictions
-
-Risk Decisions
-
-Execution Decisions
-
-Orders
-
-Errors
-
-Warnings
-
-System Startup
-
-System Shutdown
-
-Logs shall be timestamped and reproducible.
+A detected critical discrepancy must prevent unsafe new trading until the state is understood or safely recovered.
 
 ---
 
-# 14. Error Handling
+# 20. Evaluation Requirements
 
-The platform shall fail safely.
+The Evaluation Engine must provide consistent evaluation of research, backtest, and paper/live results.
 
-Examples include:
+Core performance measurements must include, where applicable:
 
-Missing Market Data
+* net profit
+* return
+* Sharpe ratio
+* Sortino ratio
+* maximum drawdown
+* profit factor
+* win rate
+* trade count
+* average trade
+* exposure
+* transaction costs
+* slippage impact
 
-Exchange Errors
+Metrics must be calculated consistently across comparable runs.
 
-Network Failures
-
-Invalid Configuration
-
-Corrupted Data
-
-Model Failure
-
-Execution Failure
-
-Unexpected Exceptions
-
-Failures must never result in uncontrolled trading.
-
----
-
-# 15. Performance Requirements
-
-Historical data loading shall support multiple years of 1-minute candles.
-
-Feature generation shall be deterministic.
-
-The system shall support continuous local operation.
-
-The platform shall operate on commodity desktop hardware.
+Performance reports must distinguish between in-sample and out-of-sample results.
 
 ---
 
-# 16. Security Requirements
+# 21. Research Run Requirements
 
-API credentials shall never be hardcoded.
+QuantOS V1 must provide a lightweight reproducible research-run concept.
 
-Secrets shall remain external.
+This requirement is inspired by research workflow practices used by systems such as Microsoft Qlib.
 
-Withdrawal permissions shall not be required.
+Qlib itself is not required as a V1 production dependency.
 
-Paper trading shall be the default operating mode.
+Each important experiment must record enough information to reproduce and identify the result.
 
-Live trading requires explicit configuration.
+A research run must record, at minimum:
+
+* run identity
+* timestamp
+* code revision
+* configuration/version
+* dataset identity/version
+* feature version
+* model/version
+* training period
+* validation period
+* test period
+* random seed where applicable
+* transaction-cost assumptions
+* slippage assumptions
+* evaluation metrics
+* validation result
+* model artifact identity where applicable
+
+The research-run record must be immutable after completion.
+
+The same experiment must be identifiable later without relying on memory or manually reconstructed settings.
 
 ---
 
-# 17. Operational Requirements
+# 22. Research and Production Separation
 
-Supported Modes
+Research experimentation must not automatically modify the production trading system.
+
+A candidate:
+
+* feature
+* model
+* parameter
+* strategy change
+* configuration
+
+must be explicitly validated before it can enter production.
+
+A research experiment must never silently change the live trading configuration.
+
+Production must always reference an explicitly identified model and feature version.
+
+---
+
+# 23. Qlib Integration Boundary
+
+QuantOS may use Qlib-inspired concepts or optional offline tooling during research.
+
+However:
+
+* Qlib is not required for live trading.
+* Qlib is not part of the Binance execution path.
+* Qlib does not become a QuantOS production module.
+* QuantOS remains responsible for its own production data, features, model, risk, execution, and evaluation interfaces.
+* Qlib must not introduce additional V1 features or architecture.
+
+The purpose of adopting Qlib-inspired discipline is reproducibility and research quality, not architectural expansion.
+
+---
+
+# 24. Configuration Requirements
+
+Important runtime behavior must be configurable without modifying application source code.
+
+Configuration must cover, where applicable:
+
+* operating mode
+* exchange
+* symbols
+* timeframes
+* risk limits
+* model configuration
+* feature configuration
+* execution parameters
+* cost assumptions
+* slippage assumptions
+* storage locations
+
+Secrets must not be hardcoded into source code.
+
+---
+
+# 25. Logging and Audit Requirements
+
+The system must record sufficient information to reconstruct important decisions.
+
+The following events must be observable:
+
+* startup
+* shutdown
+* data ingestion
+* data validation
+* feature generation
+* model inference
+* trade proposal
+* risk decision
+* order submission
+* exchange response
+* fills
+* cancellations
+* errors
+* reconciliation
+* system state changes
+
+For every live trade, the system should be able to answer:
+
+1. What market information was available?
+2. What features were generated?
+3. Which model/version made the proposal?
+4. What did the model propose?
+5. Why did Risk approve or reject it?
+6. What order was submitted?
+7. What did Binance return?
+8. What was actually filled?
+9. What fees/costs occurred?
+
+---
+
+# 26. Determinism and Reproducibility
+
+The following must be reproducible:
+
+* dataset preparation
+* feature generation
+* research configuration
+* model training where deterministic behavior is possible
+* backtesting
+* evaluation
+
+Where randomness is unavoidable, the relevant random seed and configuration must be recorded.
+
+A research result must not depend on undocumented local state.
+
+---
+
+# 27. Testing Requirements
+
+V1 must include automated tests for critical functionality.
+
+Testing must cover, at minimum:
+
+### Data
+
+* schema validation
+* timestamp validation
+* duplicate detection
+* missing-data detection
+* deterministic dataset preparation
+
+### Features
+
+* calculation correctness
+* timestamp alignment
+* leakage prevention
+* deterministic output
+
+### Alpha
+
+* model input validation
+* prediction behavior
+* trade proposal generation
+
+### Risk
+
+* position sizing
+* limit enforcement
+* trade rejection
+* insufficient balance
+* invalid proposals
+
+### Execution
+
+* order construction
+* Binance constraint handling
+* order-state handling
+* failure behavior
+* reconciliation
+
+### Evaluation
+
+* metric calculation
+* backtest accounting
+* cost calculation
+* drawdown calculation
+
+---
+
+# 28. Production Promotion Gate
+
+A production strategy/model must pass all required stages before live trading:
 
 Research
-
-Backtest
-
+   ↓
+Historical Backtest
+   ↓
+Walk-Forward Validation
+   ↓
+Robustness Testing
+   ↓
 Paper Trading
+   ↓
+Live Approval
 
-Live Trading
 
-Only one mode may be active during execution.
+Each stage must produce recorded evidence.
 
----
+A failure at any stage blocks promotion.
 
-# 18. Out of Scope
-
-Version 1 excludes:
-
-Multiple Exchanges
-
-Futures
-
-Options
-
-Portfolio Optimization
-
-Cloud Deployment
-
-Distributed Systems
-
-High Frequency Trading
-
-News Analysis
-
-Social Media Analysis
-
-Reinforcement Learning
-
-Deep Learning
-
-AI Agents
-
-Multi-User Support
-
-Automatic Strategy Discovery
-
-These capabilities may be introduced only in future versions.
+A strong historical backtest alone is never sufficient.
 
 ---
 
-# 19. Acceptance Criteria
+# 29. V1 Non-Functional Requirements
 
-Version 1 satisfies product requirements when:
+QuantOS V1 must prioritize:
 
-✓ Historical data downloads successfully.
+## Reliability
 
-✓ Live data operates continuously.
+The system must handle expected failures without uncontrolled trading.
 
-✓ Features generate deterministically.
+## Reproducibility
 
-✓ Model training is reproducible.
+Important results must be traceable to their exact inputs and configuration.
 
-✓ Backtesting passes validation.
+## Determinism
 
-✓ Paper trading completes successfully.
+Identical inputs should produce identical results wherever deterministic behavior is expected.
 
-✓ Live trading executes safely.
+## Safety
 
-✓ Risk controls function correctly.
+Risk controls must take precedence over trading opportunity.
 
-✓ Every trade is logged.
+## Observability
 
-✓ Every trade is explainable.
+Important decisions and failures must be visible through logs and recorded state.
 
-✓ Configuration requires no code modification.
+## Simplicity
 
-✓ The system can be rebuilt from scratch using repository documentation.
+The implementation must remain small enough to understand, test, debug, and operate locally.
 
 ---
 
-# 20. Completion Definition
+# 30. Explicitly Out of Scope
 
-This specification is complete when every requirement in this document is traceable to one or more implementation tasks.
+The following are not V1 product requirements:
 
-No implementation may introduce functionality outside the defined scope without an approved specification update.
+* multiple exchanges
+* futures
+* margin
+* leverage
+* options
+* multiple production strategies
+* strategy ensembles
+* multiple production models
+* portfolio optimization
+* reinforcement learning
+* autonomous trading agents
+* automatic strategy discovery
+* automatic feature discovery
+* deep-learning infrastructure
+* high-frequency trading infrastructure
+* distributed deployment
+* microservices
+* Kubernetes
+* cloud-native infrastructure
+* multi-user functionality
+* social/news trading
+* institutional portfolio management
+
+These must not be introduced indirectly through lower-level specifications.
+
+---
+
+# 31. V1 Success Criteria
+
+QuantOS V1 is successful when it can demonstrate the complete workflow:
+
+Binance Historical Data
+        ↓
+Validated Dataset
+        ↓
+Deterministic Features
+        ↓
+One Production Model
+        ↓
+Backtest
+        ↓
+Walk-Forward Validation
+        ↓
+Robustness Testing
+        ↓
+Paper Trading
+        ↓
+Risk-Controlled Live Approval
+        ↓
+Binance Spot Execution
+        ↓
+Reconciliation
+        ↓
+Evaluation
 
 
+The system must be able to reproduce its important research results, explain its trading decisions, reject unsafe trades, and operate without requiring unnecessary infrastructure.
+
+---
+
+# 32. Final Requirement
+
+QuantOS V1 must favor **a small system that works end-to-end** over a large system containing many partially validated capabilities.
+
+When two approaches satisfy the same requirement, prefer the approach that has:
+
+1. fewer moving parts
+2. fewer parameters
+3. fewer dependencies
+4. lower overfitting risk
+5. easier testing
+6. easier debugging
+7. clearer failure behavior
+
+V1 should prove the trading system before expanding the trading system.
