@@ -1,1040 +1,1253 @@
-# 002_SYSTEM_ARCHITECTURE.md
+# QuantOS — System Architecture
 
-> **Document Status:** Frozen
-> **Version:** 1.0
-> **Depends On:**
->
-> - 000_READ_FIRST.md
-> - 001_PRODUCT_REQUIREMENTS.md
->
-> This document defines the technical architecture required to implement the product requirements. It does **not** introduce new functionality beyond the approved specifications.
+## Document Status
+
+**Status:** Frozen V1 Architecture
+**Version:** 1.0
+**Depends On:** `000_READ_FIRST.md`, `001_PRODUCT_REQUIREMENTS.md`
 
 ---
-
-# System Overview
 
 # 1. Purpose
 
-QuantOS is designed as an AI-native quantitative trading operating system.
+This document defines the system architecture for QuantOS V1.
 
-The architecture prioritizes:
+It describes how the product requirements are organized into a single production system.
 
-- modularity
-- deterministic execution
-- fault isolation
-- observability
-- extensibility
-- production reliability
+The architecture must remain consistent with:
 
-The system separates responsibilities into independent services that communicate through clearly defined interfaces. Every component has one primary responsibility and avoids hidden coupling.
+* `000_READ_FIRST.md`
+* `001_PRODUCT_REQUIREMENTS.md`
 
-This separation enables:
+No lower-level document may introduce architecture that conflicts with this document.
 
-- independent development
-- easier testing
-- simpler maintenance
-- future horizontal scaling
-- safe component replacement
+The purpose of this architecture is to provide the smallest practical system capable of supporting the complete V1 workflow:
 
----
-
-# 2. High-Level Architecture
-
-```
-                +-----------------------+
-                |      User Interface   |
-                |  Dashboard / CLI/API  |
-                +-----------+-----------+
-                            |
-                            |
-                +-----------v-----------+
-                |   API Gateway Layer   |
-                +-----------+-----------+
-                            |
-        +-------------------+--------------------+
-        |                   |                    |
-        |                   |                    |
-+-------v------+   +--------v-------+   +--------v-------+
-| Strategy     |   | Portfolio      |   | Risk Engine    |
-| Engine       |   | Manager        |   |                |
-+-------+------+   +--------+-------+   +--------+-------+
-        |                   |                    |
-        +-------------------+--------------------+
-                            |
-                 +----------v----------+
-                 | Execution Engine    |
-                 +----------+----------+
-                            |
-                 +----------v----------+
-                 | Exchange Adapters   |
-                 +----------+----------+
-                            |
-                 +----------v----------+
-                 | External Exchanges  |
-                 +---------------------+
-
-                Shared Infrastructure
--------------------------------------------------------------
- Market Data
- Historical Data
- AI Services
- Database
- Cache
- Message Queue
- Logging
- Monitoring
- Authentication
- Configuration
+```text
+Research
+    ↓
+Backtest
+    ↓
+Walk-Forward Validation
+    ↓
+Robustness Testing
+    ↓
+Paper Trading
+    ↓
+Live Trading
 ```
 
 ---
 
-# 3. Architectural Principles
+# 2. Architecture Principles
 
-The architecture follows several mandatory principles established by the product requirements.
+QuantOS V1 follows these principles:
 
-## 3.1 Single Responsibility
+1. Clean Architecture
+2. Modular Monolith
+3. Single local deployment
+4. Explicit module boundaries
+5. Dependency inversion
+6. Deterministic processing
+7. Risk-first execution
+8. Reproducible research
+9. Minimal infrastructure
+10. Safe failure
 
-Every service owns exactly one business capability.
+The architecture must optimize for:
+
+* correctness
+* testability
+* maintainability
+* observability
+* reproducibility
+* operational simplicity
+
+Complexity must not be introduced merely for future scalability.
+
+---
+
+# 3. Architectural Style
+
+QuantOS V1 is a:
+
+**Clean Architecture Modular Monolith**
+
+All production modules execute within one application/deployment boundary.
+
+The system is not divided into independently deployed microservices.
+
+The following are explicitly NOT required by V1:
+
+* microservices
+* API gateway
+* service mesh
+* distributed message broker
+* event bus
+* Kubernetes
+* cloud orchestration
+* distributed cache
+* service discovery
+* independently deployed databases
+* independently deployed strategy services
+
+These technologies may be appropriate for a future system at significantly larger scale, but they are not part of V1.
+
+---
+
+# 4. High-Level Architecture
+
+The system consists of six core production modules:
+
+```text
+┌─────────────────────────────────────────────┐
+│                  QuantOS                    │
+│                                             │
+│  ┌───────────────┐                          │
+│  │ Market Data   │                          │
+│  └───────┬───────┘                          │
+│          ↓                                  │
+│  ┌───────────────┐                          │
+│  │ Feature       │                          │
+│  │ Engine        │                          │
+│  └───────┬───────┘                          │
+│          ↓                                  │
+│  ┌───────────────┐                          │
+│  │ Alpha Engine  │                          │
+│  └───────┬───────┘                          │
+│          ↓                                  │
+│  ┌───────────────┐                          │
+│  │ Risk Engine   │                          │
+│  └───────┬───────┘                          │
+│          ↓                                  │
+│  ┌───────────────┐                          │
+│  │ Execution     │                          │
+│  │ Engine        │                          │
+│  └───────┬───────┘                          │
+│          ↓                                  │
+│       Binance                               │
+│                                             │
+│  ┌─────────────────────────────┐            │
+│  │ Evaluation Engine           │            │
+│  └─────────────────────────────┘            │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+The six modules are:
+
+1. Market Data
+2. Feature Engine
+3. Alpha Engine
+4. Risk Engine
+5. Execution Engine
+6. Evaluation Engine
+
+These are the only V1 business modules.
+
+---
+
+# 5. Module Responsibilities
+
+## 5.1 Market Data
+
+The Market Data module is responsible for acquiring, validating, normalizing, storing, and providing market data.
+
+Responsibilities include:
+
+* historical Binance data acquisition
+* live market-data acquisition
+* schema validation
+* timestamp validation
+* duplicate detection
+* missing-data detection
+* data normalization
+* dataset identity
+* data replay for research/backtesting
+
+The Market Data module must not contain trading strategy logic.
+
+---
+
+## 5.2 Feature Engine
+
+The Feature Engine transforms validated market data into deterministic model inputs.
+
+Responsibilities include:
+
+* feature calculation
+* timestamp alignment
+* feature validation
+* feature versioning
+* leakage prevention
+* deterministic feature generation
+
+The Feature Engine must not:
+
+* place orders
+* make risk decisions
+* directly communicate with Binance for execution
+* contain strategy-selection logic
+
+---
+
+## 5.3 Alpha Engine
+
+The Alpha Engine converts validated features into a trade proposal.
+
+Responsibilities include:
+
+* loading the production model
+* generating model predictions
+* applying the production decision rule
+* producing trade proposals
+* recording model/version information
+
+The Alpha Engine must not:
+
+* place live orders
+* bypass Risk
+* manage account balances
+* modify exchange state
+
+The Alpha Engine produces a proposal.
+
+It does not have final authority over whether the proposal is executed.
+
+---
+
+## 5.4 Risk Engine
+
+The Risk Engine determines whether a proposed trade is allowed.
+
+Responsibilities include:
+
+* position sizing
+* risk-limit enforcement
+* available-balance validation
+* maximum-loss checks
+* drawdown checks
+* volatility-aware risk controls
+* transaction-cost awareness
+* exchange constraint checks
+* trade approval
+* trade rejection
+
+The Risk Engine has authority to reject any Alpha proposal.
+
+The Risk Engine must not be bypassable by the Execution Engine.
+
+---
+
+## 5.5 Execution Engine
+
+The Execution Engine is responsible for converting an approved trade decision into a Binance Spot order and tracking its result.
+
+Responsibilities include:
+
+* order construction
+* exchange constraint handling
+* order submission
+* acknowledgement
+* order-state tracking
+* fill tracking
+* cancellation
+* retry handling where safe
+* execution error handling
+* reconciliation support
+
+Only the Execution Engine may submit live orders to Binance.
+
+---
+
+## 5.6 Evaluation Engine
+
+The Evaluation Engine measures system and trading performance.
+
+Responsibilities include:
+
+* backtest evaluation
+* paper-trading evaluation
+* live-trading evaluation
+* performance metrics
+* drawdown analysis
+* cost analysis
+* trade statistics
+* robustness results
+* validation reporting
+
+Evaluation must use consistent calculations across comparable runs.
+
+---
+
+# 6. Supporting Infrastructure
+
+The six core modules operate using shared technical infrastructure.
+
+Supporting infrastructure is not considered additional business modules.
+
+V1 supporting infrastructure includes:
+
+* configuration
+* logging
+* persistence
+* model artifact storage
+* research-run metadata
+* Binance adapters
+* time utilities
+* validation utilities
+* testing infrastructure
+
+These components exist to support the six core modules.
+
+They must not evolve into independent production services.
+
+---
+
+# 7. Clean Architecture
+
+QuantOS follows Clean Architecture principles.
+
+The architecture is divided conceptually into:
+
+```text
+Domain
+  ↑
+Application
+  ↑
+Infrastructure
+```
+
+Dependencies must point inward.
+
+The domain must not depend directly on:
+
+* Binance SDKs
+* HTTP clients
+* databases
+* filesystem implementations
+* external ML frameworks
+* exchange-specific infrastructure
+
+Infrastructure implements interfaces required by the application/domain layers.
+
+---
+
+# 8. Domain Layer
+
+The Domain layer contains business concepts and rules that should remain independent of infrastructure.
+
+Examples include:
+
+* MarketData
+* Candle
+* FeatureVector
+* Prediction
+* TradeProposal
+* RiskDecision
+* Order
+* Fill
+* Position/Balance State
+* Trade
+* Performance Result
+
+Domain objects must represent business meaning rather than external API formats.
+
+Binance-specific response structures must not become domain objects directly.
+
+---
+
+# 9. Application Layer
+
+The Application layer coordinates business workflows.
+
+Examples include:
+
+* ingesting market data
+* generating features
+* generating trade proposals
+* evaluating risk
+* executing approved orders
+* running backtests
+* running validation
+* recording research runs
+* calculating evaluation results
+
+Application workflows coordinate domain rules and infrastructure interfaces.
+
+They must not contain unnecessary framework-specific logic.
+
+---
+
+# 10. Infrastructure Layer
+
+The Infrastructure layer provides concrete implementations of external dependencies.
+
+Examples include:
+
+* Binance REST client
+* Binance market-data client
+* Parquet storage
+* DuckDB access
+* model serialization
+* filesystem access
+* logging implementation
+* configuration loading
+
+Infrastructure may depend on external libraries.
+
+Domain logic must not depend on those libraries.
+
+---
+
+# 11. Dependency Direction
+
+Dependencies must follow:
+
+```text
+Infrastructure
+      ↓
+Application
+      ↓
+Domain
+```
+
+Conceptually:
+
+```text
+Domain
+  ↑
+Application
+  ↑
+Infrastructure
+```
+
+The important rule is:
+
+**Business logic must not depend on infrastructure details.**
+
+For example:
+
+```text
+Risk Rule
+    ↓
+Risk Interface
+    ↓
+Binance / Database / Runtime Implementation
+```
+
+rather than:
+
+```text
+Risk Rule
+    ↓
+Binance SDK
+```
+
+---
+
+# 12. Production Runtime Flow
+
+The production runtime flow is:
+
+```text
+Market Data
+      ↓
+Validated Market State
+      ↓
+Feature Engine
+      ↓
+Feature Vector
+      ↓
+Alpha Engine
+      ↓
+Trade Proposal
+      ↓
+Risk Engine
+      ↓
+Risk Decision
+      ↓
+Execution Engine
+      ↓
+Binance Spot
+      ↓
+Order / Fill Result
+      ↓
+Recorded State
+      ↓
+Evaluation
+```
+
+Every stage must validate its inputs.
+
+Invalid data must not continue through the pipeline.
+
+---
+
+# 13. Alpha-to-Risk Boundary
+
+The Alpha Engine produces a proposal.
+
+Example conceptual flow:
+
+```text
+Prediction
+   ↓
+Decision Rule
+   ↓
+Trade Proposal
+```
+
+The proposal may contain:
+
+* symbol
+* timestamp
+* direction
+* proposed quantity or sizing input
+* model output
+* expected edge where applicable
+* model version
+* feature version
+* decision metadata
+
+The Alpha Engine does not determine final execution authority.
+
+---
+
+# 14. Risk-to-Execution Boundary
+
+The Risk Engine produces a decision:
+
+```text
+Trade Proposal
+      ↓
+Risk Evaluation
+      ↓
+Approved / Rejected
+```
+
+Only an approved decision may be passed to Execution.
+
+A rejected proposal must terminate the live trading path.
+
+Execution must reject attempts to submit an order without valid risk approval.
+
+---
+
+# 15. Execution-to-Binance Boundary
+
+Binance must be isolated behind an exchange adapter.
+
+The production system must not spread Binance-specific API calls throughout business logic.
+
+Conceptually:
+
+```text
+Execution Engine
+       ↓
+Exchange Interface
+       ↓
+Binance Adapter
+       ↓
+Binance
+```
+
+This keeps exchange-specific behavior isolated while still allowing V1 to remain Binance-only.
+
+V1 does not require a multi-exchange abstraction framework.
+
+The abstraction exists to protect the business layer from exchange-specific implementation details.
+
+---
+
+# 16. Market Data Storage
+
+V1 uses local storage.
+
+The intended storage foundation is:
+
+**Parquet + DuckDB**
+
+Parquet provides durable market-data storage.
+
+DuckDB provides local analytical access.
+
+The system does not require a distributed database.
+
+The system does not require a cloud data lake.
+
+Raw market data must remain immutable.
+
+Derived datasets must be traceable to their source data.
+
+---
+
+# 17. Dataset Identity
+
+A dataset used in research or validation must have an identifiable version or identity.
+
+At minimum, the identity must account for:
+
+* exchange
+* symbol
+* timeframe
+* time range
+* source
+* schema/version
+* validation state
+
+Research runs must reference the dataset identity used.
+
+This prevents a historical experiment from becoming ambiguous after the underlying data changes.
+
+---
+
+# 18. Feature Versioning
+
+The Feature Engine must expose a feature specification/version identity.
+
+A research run must be able to answer:
+
+> Exactly which feature definition produced this result?
+
+Changing a production feature definition must create a distinguishable version.
+
+Historical experiment results must not silently change because a feature implementation was modified.
+
+---
+
+# 19. Model Artifact Boundary
+
+The Alpha Engine must load an explicitly identified production model artifact.
+
+The model artifact must have an identifiable version or identity.
+
+A research model must not automatically become the production model.
+
+Promotion requires explicit validation.
+
+Conceptually:
+
+```text
+Research Model
+      ↓
+Validation
+      ↓
+Approved Model Artifact
+      ↓
+Production Model
+```
+
+---
+
+# 20. Research Architecture
+
+Research uses the same fundamental domain concepts as production wherever practical.
+
+The research workflow is:
+
+```text
+Dataset
+   ↓
+Feature Specification
+   ↓
+Model Training
+   ↓
+Model Artifact
+   ↓
+Signal Generation
+   ↓
+Backtest
+   ↓
+Evaluation
+   ↓
+Validation
+```
+
+Research must not create a separate production architecture.
+
+---
+
+# 21. Qlib-Inspired Research Workflow
+
+QuantOS may implement a lightweight research-run workflow inspired by Microsoft Qlib.
+
+The purpose is reproducibility, not architectural dependency.
+
+A research run should record:
+
+* run identity
+* code revision
+* dataset identity
+* feature version
+* model version
+* configuration
+* training period
+* validation period
+* test period
+* random seed where applicable
+* evaluation configuration
+* metrics
+* validation outcome
+* model artifact identity
+
+A completed run must remain identifiable after the experiment has finished.
+
+---
+
+# 22. Qlib Boundary
+
+Qlib is optional for V1 research use.
+
+Qlib must not be required for:
+
+* live trading
+* paper trading
+* risk decisions
+* order execution
+* Binance connectivity
+* production feature generation
+* production account management
+
+If Qlib is used, it must remain isolated to offline research tooling.
+
+QuantOS owns the production interfaces.
+
+The system must remain functional without Qlib installed.
+
+---
+
+# 23. Backtest Architecture
+
+The backtest should reuse the same core decision concepts as live trading.
+
+Conceptually:
+
+```text
+Historical Market Data
+        ↓
+Feature Engine
+        ↓
+Production Model
+        ↓
+Trade Proposal
+        ↓
+Risk Engine
+        ↓
+Simulated Execution
+        ↓
+Account / Trade State
+        ↓
+Evaluation
+```
+
+The main difference is that execution is simulated rather than sent to Binance.
+
+This minimizes the risk of research behavior diverging from production behavior.
+
+---
+
+# 24. Paper Trading Architecture
+
+Paper trading should use the production decision path while replacing real exchange execution with a simulated execution boundary.
+
+Conceptually:
+
+```text
+Live Market Data
+      ↓
+Features
+      ↓
+Production Model
+      ↓
+Risk
+      ↓
+Paper Execution
+      ↓
+Paper Account State
+      ↓
+Evaluation
+```
+
+Paper trading must not submit real orders.
+
+---
+
+# 25. Live Architecture
+
+Live trading uses the same core production path:
+
+```text
+Binance Market Data
+      ↓
+Features
+      ↓
+Production Model
+      ↓
+Risk
+      ↓
+Execution
+      ↓
+Binance
+```
+
+The live path must not contain research-only components.
+
+Qlib, exploratory models, notebooks, experiment search, and candidate strategies must never sit in the live order path.
+
+---
+
+# 26. Operating Mode Isolation
+
+The system must clearly distinguish:
+
+```text
+RESEARCH
+BACKTEST
+PAPER
+LIVE
+```
+
+The selected mode must determine which execution boundary is active.
+
+A research or paper workflow must not accidentally submit a live order.
+
+Live mode must require explicit activation.
+
+---
+
+# 27. State and Persistence
+
+The system must persist important operational state.
+
+Relevant state includes:
+
+* datasets
+* research-run metadata
+* model artifacts
+* configuration identity
+* trades
+* orders
+* fills
+* account state
+* evaluation results
+* validation results
+
+Persistent state must be sufficient to reconstruct important historical decisions.
+
+---
+
+# 28. Reconciliation
+
+The architecture must support reconciliation between local state and Binance state.
+
+The reconciliation boundary includes:
+
+```text
+Local Recorded State
+        ↕
+Binance State
+```
+
+The system must be able to identify discrepancies involving:
+
+* balances
+* orders
+* fills
+* holdings
+* recorded trades
+
+Critical discrepancies must prevent unsafe trading until resolved or safely handled.
+
+---
+
+# 29. Failure Handling
+
+Failures must propagate through explicit error handling.
+
+Critical failures include:
+
+* invalid market data
+* stale data
+* missing data
+* invalid feature values
+* model failure
+* configuration failure
+* Binance API failure
+* network failure
+* execution uncertainty
+* reconciliation failure
+* persistence failure
+* risk-engine failure
+
+The safe response to a critical trading-path failure is:
+
+**Do not place a new order.**
+
+The system must not silently continue with invalid or incomplete information.
+
+---
+
+# 30. Observability Architecture
+
+Logging and audit information should be available across the six core modules.
+
+Important events include:
+
+```text
+Market Data Event
+Feature Event
+Alpha Decision
+Risk Decision
+Execution Event
+Evaluation Result
+System Error
+Reconciliation Event
+```
+
+The architecture must make it possible to trace a live trade across these stages.
+
+A useful conceptual identifier is a trade/decision correlation identity that connects:
+
+```text
+Market Input
+    ↓
+Feature Generation
+    ↓
+Model Decision
+    ↓
+Risk Decision
+    ↓
+Order
+    ↓
+Fill
+    ↓
+Evaluation
+```
+
+---
+
+# 31. Security Boundary
+
+Secrets and exchange credentials belong to infrastructure/configuration.
+
+They must not enter:
+
+* domain objects
+* model features
+* research datasets
+* logs
+* source control
+
+Binance API credentials must use the minimum required permissions.
+
+Withdrawal permissions are not required for V1 trading.
+
+---
+
+# 32. Configuration Boundary
+
+Configuration must be external to core business logic.
+
+The architecture should allow configuration of:
+
+* runtime mode
+* exchange
+* symbols
+* timeframe
+* risk limits
+* feature parameters
+* model parameters
+* execution settings
+* cost assumptions
+* storage paths
+
+Configuration changes must be observable and traceable for research and production runs.
+
+---
+
+# 33. Testing Architecture
+
+Testing must occur at multiple levels.
+
+## Unit Tests
+
+Test domain and application rules independently.
 
 Examples:
 
-- Market Data Service only manages market data.
-- Risk Engine only evaluates risk.
-- Execution Engine only executes orders.
-- Portfolio Manager only manages positions.
+* risk calculations
+* position sizing
+* feature calculations
+* model decision rules
+* evaluation metrics
 
-Business logic must never be duplicated across services.
+## Integration Tests
 
----
+Test boundaries between components.
 
-## 3.2 Loose Coupling
+Examples:
 
-Services communicate through explicit interfaces.
+* Parquet/DuckDB
+* Binance adapters
+* model artifact loading
+* persistence
+* execution lifecycle
 
-No service should directly manipulate another service's internal state.
+## End-to-End Tests
 
-Communication occurs through:
+Verify the complete workflow:
 
-- APIs
-- event messages
-- queues
-- shared contracts
-
-rather than internal implementation knowledge.
-
----
-
-## 3.3 High Cohesion
-
-Each module groups closely related functionality together.
-
-Responsibilities that naturally belong together remain inside one component.
-
-Responsibilities that are unrelated remain separated.
-
----
-
-## 3.4 Deterministic Behavior
-
-Given identical:
-
-- market data
-- configuration
-- portfolio state
-- AI responses (when applicable)
-
-the system should produce identical execution decisions.
-
-Non-deterministic behavior should be isolated and observable.
-
----
-
-## 3.5 Fail Safe
-
-Failures should remain isolated.
-
-Failure of:
-
-- one exchange
-- one AI provider
-- one strategy
-- one notification channel
-
-must not stop the remainder of the system.
-
-Graceful degradation is preferred over complete shutdown whenever possible.
-
----
-
-## 3.6 Observable
-
-Every important event should be observable.
-
-Examples include:
-
-- strategy signals
-- order creation
-- order rejection
-- fills
-- risk violations
-- AI requests
-- API failures
-- reconnect attempts
-
-Observability is treated as a first-class architectural concern rather than an afterthought.
-
----
-
-# 4. Layered Architecture
-
-The platform is organized into logical layers.
-
-```
-+------------------------------------------------+
-| Presentation Layer                             |
-| Dashboard / CLI / API                          |
-+------------------------------------------------+
-| Application Layer                              |
-| Orchestration / Workflows                      |
-+------------------------------------------------+
-| Domain Layer                                   |
-| Trading Logic                                  |
-| Risk Logic                                     |
-| Portfolio Logic                                |
-| Strategy Logic                                 |
-+------------------------------------------------+
-| Infrastructure Layer                           |
-| Database                                       |
-| Exchange APIs                                  |
-| AI APIs                                        |
-| Queue                                          |
-| Logging                                        |
-| Storage                                        |
-+------------------------------------------------+
+```text
+Data
+ ↓
+Features
+ ↓
+Alpha
+ ↓
+Risk
+ ↓
+Execution
+ ↓
+Evaluation
 ```
 
-Each layer depends only on lower layers.
-
-Lower layers never depend on upper layers.
+End-to-end tests must include safe simulated execution before live deployment.
 
 ---
 
-# 5. Core Subsystems
+# 34. No Hidden Production Modules
 
-The architecture consists of several major subsystems.
+The following must not be introduced as separate production modules:
 
-## User Layer
+* Portfolio Manager
+* AI Service
+* Strategy Service
+* Model Service
+* API Gateway
+* Notification Service
+* Market Regime Service
+* Confidence Service
+* Signal Service
+* Data Service
+* Research Service
 
-Responsible for:
+Their required responsibilities must remain inside the six approved modules or supporting infrastructure.
 
-- dashboard
-- CLI
-- REST API
-- authentication
-- user interaction
-
----
-
-## Strategy Layer
-
-Responsible for:
-
-- signal generation
-- AI-assisted analysis
-- strategy lifecycle
-- indicator calculations
-- strategy execution
+This rule prevents accidental architectural expansion.
 
 ---
 
-## Risk Layer
+# 35. No Distributed Infrastructure
 
-Responsible for:
+V1 does not require:
 
-- exposure limits
-- leverage validation
-- stop-loss enforcement
-- account protection
-- position sizing validation
+* message queues
+* event brokers
+* distributed caches
+* service discovery
+* load balancers
+* container orchestration
+* Kubernetes
+* cloud databases
+* distributed object stores
 
-Risk decisions always take precedence over strategy decisions.
-
----
-
-## Portfolio Layer
-
-Responsible for:
-
-- positions
-- balances
-- unrealized PnL
-- realized PnL
-- portfolio state
-
-The Portfolio Manager acts as the authoritative source of account state within the application.
+The system must operate on one local workstation.
 
 ---
 
-## Execution Layer
+# 36. Production Strategy Boundary
 
-Responsible for:
+The architecture supports exactly one production strategy.
 
-- order creation
-- order cancellation
-- retries
-- exchange acknowledgement
-- execution state tracking
+Research may contain candidate experiments.
 
-This subsystem is the only component permitted to submit trading instructions to exchange integrations.
+Only the approved production strategy may enter the live runtime.
+
+The production architecture must not contain a generic strategy orchestration framework unless required by the frozen V1 specification.
 
 ---
 
+# 37. Production Model Boundary
 
-# Core Services & Component Responsibilities
+The architecture supports exactly one production model.
 
-# 6. Core Service Architecture
+Candidate models remain research artifacts until explicitly validated and promoted.
 
-QuantOS is composed of independent services that collectively implement the functionality defined in the Product Requirements Document. Each service owns a clearly defined business responsibility and communicates through stable interfaces.
+The live system must load one explicitly identified production model artifact.
 
-No service may directly assume responsibility that belongs to another service.
-
----
-
-# 6.1 User Interface Layer
-
-## Purpose
-
-The User Interface Layer provides the primary interaction point between users and the platform.
-
-It is responsible only for presentation and user interaction. Business decisions remain within backend services.
-
-### Responsibilities
-
-- Dashboard presentation
-- User authentication workflows
-- Portfolio visualization
-- Strategy management interface
-- Order monitoring
-- Risk status display
-- System status display
-- Configuration management
-- API request submission
-
-### Does Not
-
-- Execute trades
-- Evaluate risk
-- Generate trading signals
-- Calculate portfolio state
-- Communicate directly with exchanges
+The model must not be dynamically replaced during live execution without an explicit controlled deployment/change process.
 
 ---
 
-# 6.2 API Gateway
+# 38. Feature Complexity Boundary
 
-## Purpose
+The architecture must support the V1 feature budget:
 
-The API Gateway acts as the single entry point for all client requests.
+**Target: 10–15**
 
-It validates requests, routes traffic to the appropriate backend service, and provides a stable interface to external clients.
+**Maximum: 20**
 
-### Responsibilities
+The architecture must not encourage automatic generation of large feature sets.
 
-- Request routing
-- Authentication validation
-- Authorization enforcement
-- Input validation
-- Response formatting
-- Rate limiting
-- API version management
-
-### Does Not
-
-- Execute business logic
-- Store trading state
-- Manage portfolio calculations
+Feature engineering must remain deterministic and versioned.
 
 ---
 
-# 6.3 Strategy Engine
+# 39. Data Flow Summary
 
-## Purpose
+The complete architecture can be summarized as:
 
-The Strategy Engine is responsible for generating trading signals according to the approved strategy definitions.
+```text
+                 ┌──────────────────┐
+                 │   Market Data    │
+                 └────────┬─────────┘
+                          ↓
+                 ┌──────────────────┐
+                 │ Feature Engine   │
+                 └────────┬─────────┘
+                          ↓
+                 ┌──────────────────┐
+                 │  Alpha Engine    │
+                 └────────┬─────────┘
+                          ↓
+                 ┌──────────────────┐
+                 │   Risk Engine    │
+                 └────────┬─────────┘
+                          ↓
+                 ┌──────────────────┐
+                 │ Execution Engine │
+                 └────────┬─────────┘
+                          ↓
+                     ┌─────────┐
+                     │ Binance │
+                     └────┬────┘
+                          ↓
+                 ┌──────────────────┐
+                 │   Evaluation     │
+                 │     Engine       │
+                 └──────────────────┘
+```
 
-It evaluates market conditions, technical indicators, and AI-assisted analysis where defined by the product requirements.
+Supporting the entire system:
 
-### Responsibilities
+```text
+Configuration
+Persistence
+Logging
+Model Artifacts
+Research Runs
+Validation
+Testing
+```
 
-- Strategy lifecycle management
-- Signal generation
-- Indicator calculation
-- Strategy scheduling
-- AI-assisted analysis integration
-- Signal publication
-
-### Inputs
-
-- Market data
-- Historical data
-- Configuration
-- AI analysis results (where applicable)
-
-### Outputs
-
-- Buy signals
-- Sell signals
-- Hold decisions
-- Signal metadata
-
-### Does Not
-
-- Execute orders
-- Manage balances
-- Apply risk controls
-- Communicate with exchanges
-
----
-
-# 6.4 Portfolio Manager
-
-## Purpose
-
-The Portfolio Manager maintains the authoritative representation of the user's trading account within the application.
-
-All portfolio-related calculations originate from this service.
-
-### Responsibilities
-
-- Position tracking
-- Balance tracking
-- Realized profit and loss
-- Unrealized profit and loss
-- Portfolio valuation
-- Exposure calculation
-- Asset allocation
-
-### Inputs
-
-- Execution reports
-- Exchange account updates
-- Deposits
-- Withdrawals
-- Configuration
-
-### Outputs
-
-- Portfolio state
-- Position summaries
-- Account metrics
-
-### Does Not
-
-- Generate signals
-- Execute trades
-- Override risk policies
+These are supporting capabilities, not additional business modules.
 
 ---
 
-# 6.5 Risk Engine
+# 40. Deployment Model
 
-## Purpose
+V1 is deployed locally as one application.
 
-The Risk Engine validates every trading decision before execution.
+The intended environment is:
 
-Risk policies always have higher priority than strategy recommendations.
+```text
+Local Workstation
+│
+├── QuantOS Application
+├── Local Configuration
+├── Local Logs
+├── Parquet Data
+├── DuckDB
+├── Model Artifacts
+└── Research Results
+```
 
-If a strategy produces a signal that violates risk policy, execution must be denied.
-
-### Responsibilities
-
-- Position size validation
-- Exposure validation
-- Leverage validation
-- Drawdown protection
-- Stop-loss policy enforcement
-- Risk limit evaluation
-- Order approval or rejection
-
-### Inputs
-
-- Strategy signals
-- Portfolio state
-- Configuration
-- Market prices
-
-### Outputs
-
-- Approved orders
-- Rejected orders
-- Risk violations
-- Risk metrics
-
-### Does Not
-
-- Generate strategies
-- Submit orders
-- Modify market data
+External connectivity is required only where the application interacts with Binance or other explicitly required external resources.
 
 ---
 
-# 6.6 Execution Engine
+# 41. Scaling Philosophy
 
-## Purpose
+V1 is not designed for distributed horizontal scaling.
 
-The Execution Engine is the only component permitted to submit trading instructions to external exchanges.
+The architecture should instead optimize for:
 
-It converts approved trading decisions into executable exchange orders.
+* low operational complexity
+* deterministic execution
+* easy debugging
+* simple deployment
+* local data access
+* clear module ownership
 
-### Responsibilities
+If future scale requirements emerge, the modular boundaries should provide a foundation for later extraction.
 
-- Order creation
-- Order submission
-- Order cancellation
-- Retry handling
-- Order tracking
-- Exchange acknowledgement processing
-- Execution status updates
-
-### Inputs
-
-- Approved orders
-- Exchange responses
-
-### Outputs
-
-- Exchange requests
-- Execution events
-- Order state updates
-
-### Does Not
-
-- Decide whether to trade
-- Evaluate risk
-- Generate signals
+However, future scalability must not complicate V1.
 
 ---
 
-# 6.7 Exchange Adapter Layer
+# 42. Architecture Decision Rules
 
-## Purpose
+When implementing a new component, ask:
 
-Exchange Adapters isolate exchange-specific implementation details from the rest of the system.
+1. Is it required by a frozen V1 requirement?
+2. Does it belong to one of the six approved modules?
+3. Can it remain inside the Modular Monolith?
+4. Does it improve correctness, safety, reproducibility, or testability?
+5. Does it introduce unnecessary complexity?
+6. Does it increase overfitting or operational risk?
 
-Each supported exchange follows a common internal interface while handling provider-specific protocols internally.
-
-### Responsibilities
-
-- API translation
-- Authentication with exchange
-- Request formatting
-- Response normalization
-- WebSocket connectivity
-- REST communication
-- Error translation
-- Reconnection handling
-
-### Does Not
-
-- Implement trading strategies
-- Store portfolio state
-- Evaluate risk
+If a component is not required, it should not be added.
 
 ---
 
-# 6.8 Market Data Service
+# 43. V1 Architecture Acceptance Criteria
 
-## Purpose
+The architecture is considered compliant when:
 
-The Market Data Service provides normalized market information for all downstream services.
-
-It serves as the single source of live market data within the platform.
-
-### Responsibilities
-
-- Market data collection
-- Data normalization
-- Price distribution
-- Candle generation
-- Symbol metadata
-- Timestamp consistency
-- Market stream management
-
-### Consumers
-
-- Strategy Engine
-- Portfolio Manager
-- Risk Engine
-- Dashboard
-
-### Does Not
-
-- Execute trades
-- Generate signals
-- Store historical archives permanently
+* QuantOS runs as a Modular Monolith.
+* Clean Architecture dependency direction is maintained.
+* Exactly six core production modules exist.
+* Binance Spot is the only production exchange.
+* BTCUSDT and ETHUSDT are supported.
+* 1-minute data is the primary trading timeframe.
+* One production strategy exists.
+* One production model exists.
+* Production features remain within the 10–20 feature budget.
+* Risk controls sit between Alpha and Execution.
+* Only Execution can submit Binance orders.
+* Research cannot directly execute live orders.
+* Qlib is not required for production.
+* Qlib is not in the live execution path.
+* Research runs are reproducible.
+* Dataset, feature, model, and configuration versions are traceable.
+* Parquet and DuckDB provide the local data foundation.
+* Backtest and paper execution can reuse the production decision path.
+* Critical failures default to safe behavior.
+* The entire system can run on one local workstation.
+* No unnecessary distributed infrastructure is required.
 
 ---
 
-# 6.9 Historical Data Service
+# 44. Final Architecture Statement
 
-## Purpose
+QuantOS V1 is intentionally a **small Clean Architecture Modular Monolith**.
 
-The Historical Data Service provides persistent access to historical market information required for analysis and strategy evaluation.
+Its architecture is built around six responsibilities:
 
-### Responsibilities
-
-- Historical candle storage
-- Historical trade storage
-- Data retrieval
-- Data integrity validation
-- Historical query support
-
-### Consumers
-
-- Strategy Engine
-- AI Services
-- Analytics
-- Backtesting components (where defined in product requirements)
-
-### Does Not
-
-- Process live trading
-- Submit market orders
-
----
-
-6.10 AI Integration Service
-
-## Purpose
-
-The AI Integration Service provides a standardized interface between QuantOS and approved AI providers.
-
-It abstracts provider-specific implementation details while ensuring consistent request and response handling.
-
-### Responsibilities
-
-- AI request preparation
-- Prompt submission
-- Response normalization
-- Error handling
-- Timeout management
-- Usage tracking
-
-### Does Not
-
-- Execute trades
-- Override risk policies
-- Store portfolio state
-- Replace deterministic trading logic
-
----
-
-7. Service Communication Principles
-
-All core services communicate using explicit interfaces.
-
-The architecture follows these mandatory rules:
-
-- Services remain independently deployable.
-- Internal implementation details are never exposed.
-- Communication contracts remain versioned.
-- Service failures remain isolated.
-- Business logic is never duplicated across services.
-- Each service owns a single authoritative domain.
-
----
-
-8. Service Ownership Matrix
-
-| Service | Primary Responsibility |
-|----------|------------------------|
-| User Interface | User interaction |
-| API Gateway | Request routing |
-| Strategy Engine | Signal generation |
-| Portfolio Manager | Portfolio state |
-| Risk Engine | Risk validation |
-| Execution Engine | Order execution |
-| Exchange Adapter | Exchange communication |
-| Market Data Service | Live market data |
-| Historical Data Service | Historical data |
-| AI Integration Service | AI provider communication |
-
----
-
-# Data Flow & Event Architecture
-9. Data Flow Principles
-QuantOS processes information through deterministic, well-defined data flows. Each stage consumes validated inputs, produces explicit outputs, and avoids hidden side effects.
-Core principles:
-Single authoritative source for each data domain
-Immutable event records once published
-Clear ownership boundaries
-Ordered processing where required
-Observable state transitions
----
-10. High-Level Processing Flow
 ```text
 Market Data
-    │
-    ▼
-Market Data Service
-    │
-    ▼
-Strategy Engine
-    │
-    ▼
+Feature Engine
+Alpha Engine
 Risk Engine
-    │
-Approved Only
-    ▼
 Execution Engine
-    │
-    ▼
-Exchange Adapter
-    │
-    ▼
-External Exchange
-    │
-Execution Reports
-    ▼
-Portfolio Manager
-    │
-    ├── Dashboard/API
-    └── Monitoring & Logging
+Evaluation Engine
 ```
----
-11. Event Lifecycle
-The platform communicates significant business state changes as events.
-Typical lifecycle:
-Market data received.
-Strategy evaluates conditions.
-Signal generated (or no action).
-Risk validation performed.
-Approved order submitted.
-Exchange acknowledgement received.
-Fill or cancellation processed.
-Portfolio state updated.
-User interface reflects latest state.
-Each event represents a completed business action and may be logged for observability.
----
-12. Data Ownership
-Data	Authoritative Service
-Live Market Data	Market Data Service
-Trading Signals	Strategy Engine
-Risk Decisions	Risk Engine
-Orders	Execution Engine
-Portfolio State	Portfolio Manager
-Historical Market Data	Historical Data Service
-AI Requests & Responses	AI Integration Service
-No other service may overwrite another service's authoritative data.
----
-13. Request Flow
-Client requests enter through the API Gateway.
-Processing sequence:
-Authentication
-Authorization
-Validation
-Routing
-Business processing
-Response generation
-Business services never bypass the gateway for external client interactions.
----
-14. State Consistency
-Portfolio updates occur only after validated execution information is processed.
-Risk decisions always use the latest available portfolio state and market data.
-Services avoid maintaining conflicting copies of business state.
----
-15. Error Propagation
-Errors remain localized whenever possible.
-A failure in one subsystem should produce:
-explicit error reporting
-observable logs
-controlled retries where appropriate
-no silent failures
-Errors must not corrupt portfolio state or execution records.
----
-# 16. Event Ordering
-Where business correctness depends on ordering, events are processed sequentially for the affected entity.
-Examples include:
-order status transitions
-execution reports
-portfolio position updates
-Ordering requirements exist to preserve deterministic system behavior.
----
-17. Observability
-Important processing stages should emit observable events, including:
-market data ingestion
-strategy evaluation
-risk approval/rejection
-order submission
-exchange acknowledgement
-execution completion
-portfolio update
-service errors
-These events support monitoring, troubleshooting, and auditing.
----
-# Infrastructure & Technology Stack
-18. Infrastructure Principles
-The infrastructure supports the application architecture without changing business behavior.
-Principles:
-Modular deployment
-Environment consistency
-Configuration-driven behavior
-Service isolation
-Scalability
-Reliability
-Observability
----
-19. Infrastructure Components
-Core infrastructure includes:
-Application services
-Database
-Cache
-Message queue
-Logging
-Monitoring
-Configuration management
-Authentication
-External exchange connectivity
-AI provider connectivity
-Each component serves infrastructure responsibilities only.
----
-20. Configuration Management
-Runtime behavior is controlled through configuration rather than source code changes.
-Configuration includes:
-Environment settings
-Service endpoints
-Risk parameters
-Strategy parameters
-Authentication settings
-Logging configuration
-Configuration should be versioned and validated before use.
----
-21. Data Storage
-Persistent storage supports:
-Portfolio state
-Historical market data
-Order history
-Configuration
-Audit records
-Transient runtime information may be maintained using cache where appropriate.
----
-22. External Integrations
-External integrations include:
-Exchange APIs
-AI providers
-All integrations are accessed through dedicated abstraction layers to isolate provider-specific implementation details.
----
-23. Logging Infrastructure
-Logging supports:
-Operational monitoring
-Error diagnosis
-Auditability
-Performance investigation
-Logs should be structured and timestamped consistently across services.
----
-24. Monitoring
-Monitoring tracks service health and operational status.
-Examples include:
-Service availability
-Processing latency
-Queue health
-Exchange connectivity
-API responsiveness
-Monitoring reports system state without modifying business behavior.
----
-25. Authentication Infrastructure
-Authentication infrastructure verifies identity before protected resources are accessed.
-Authorization decisions remain enforced through the API Gateway and application services.
----
-26. Environment Separation
-Deployment environments remain logically separated.
-Typical environments include:
-Development
-Testing
-Production
-Configuration must remain independent between environments.
----
-27. Infrastructure Boundaries
-Infrastructure components provide platform capabilities only.
-Business rules remain implemented exclusively within domain services.
----
-# Reliability, Security & Fault Tolerance
-28. Reliability Principles
-Reliability ensures the platform continues operating predictably under expected operating conditions.
-Guiding principles:
-Deterministic behavior
-Service isolation
-Graceful degradation
-Recoverable failures
-Observable system state
-Consistent data integrity
-Business correctness takes priority over throughput.
----
-29. Fault Isolation
-Failures within one service should remain contained.
-Examples include:
-Exchange connectivity failures
-AI provider timeouts
-Individual strategy failures
-External API errors
-These failures must not corrupt portfolio state or prevent unrelated services from continuing to operate where possible.
----
-30. Error Handling
-Errors must be:
-Explicit
-Logged
-Traceable
-Recoverable where appropriate
-Silent failures are not acceptable.
-Error responses should provide sufficient context for diagnostics without exposing internal implementation details.
----
-31. Recovery
-Recoverable components should restore normal operation after temporary failures.
-Recovery behavior may include:
-Reconnection
-Controlled retry
-State resynchronization
-Health verification
-Recovery mechanisms must preserve data consistency.
----
-32. Security Principles
-Security applies across every architectural layer.
-Core principles:
-Least privilege
-Authentication before access
-Authorization enforcement
-Secure configuration
-Auditability
-Protection of sensitive information
-Security controls support, but do not replace, application business rules.
----
-33. Authentication & Authorization
-Protected operations require successful authentication.
-Authorization determines which authenticated users may perform specific actions.
-Authentication and authorization remain enforced consistently through the platform.
----
-34. Auditability
-Important business operations should be traceable.
-Examples include:
-Configuration changes
-Order submissions
-Order cancellations
-Risk rejections
-Authentication events
-Portfolio updates
-Audit records support operational review and troubleshooting.
----
-35. Availability
-The platform should continue operating whenever dependencies remain available.
-Temporary degradation of optional external services should not unnecessarily interrupt unrelated platform functions.
----
-36. Operational Health
-Operational health is evaluated through observable indicators such as:
-Service availability
-Connectivity status
-Processing success
-Error rates
-Resource utilization
-Health reporting enables proactive operational monitoring.
----
-37. Reliability Summary
-The architecture prioritizes:
-Predictable execution
-Controlled failure handling
-Secure operation
-Consistent business state
-Observable behavior
-Maintainable service boundaries
-These principles apply uniformly across all core services.
----
-# Deployment Architecture & Design Decisions
-38. Deployment Principles
-The deployment architecture supports reliable operation without altering business behavior.
-Principles include:
-Environment isolation
-Repeatable deployments
-Configuration-driven execution
-Independent service deployment
-Operational observability
----
-39. Runtime Topology
-At runtime, the platform consists of cooperating application services supported by shared infrastructure components.
-Core runtime elements include:
-User Interface
-API Gateway
-Strategy Engine
-Portfolio Manager
-Risk Engine
-Execution Engine
-Exchange Adapter Layer
-Market Data Service
-Historical Data Service
-AI Integration Service
-Shared infrastructure services
-Each component communicates only through defined interfaces.
----
-40. Deployment Environments
-Supported environments include:
-Development
-Testing
-Production
-Each environment maintains independent configuration and operational resources.
-Business logic remains identical across environments.
----
-41. Scalability
-The architecture supports scaling individual services independently where operational requirements demand.
-Scaling does not change business rules, processing order, or service ownership.
----
-42. Configuration Consistency
-Application behaviour is controlled through validated configuration.
-Configuration should remain:
-Version controlled
-Environment-specific
-Consistently applied
-Independently managed from application code
----
-43. Operational Maintenance
-Operational maintenance includes:
-Monitoring
-Logging
-Configuration updates
-Service health verification
-Deployment validation
-Maintenance activities should preserve service availability whenever possible.
----
-44. Architectural Constraints
-The following constraints apply throughout the platform:
-No duplication of business logic
-Single responsibility for each service
-Explicit service interfaces
-Deterministic processing
-Clear ownership of business data
-No direct exchange communication outside the Execution and Exchange Adapter layers
-These constraints are mandatory implementation requirements.
----
-45. Design Decisions
-The architecture intentionally adopts:
-Layered organization
-Modular services
-Explicit boundaries
-Infrastructure abstraction
-Configuration-driven behavior
-Observable operations
-These decisions support maintainability, reliability, and long-term evolution while remaining consistent with the approved product requirements.
----
-46. Architecture Summary
-QuantOS is organized as a modular, service-oriented trading platform.
-The architecture separates presentation, application, domain, and infrastructure responsibilities while maintaining deterministic execution, clear ownership boundaries, and operational observability.
-All components described in this document implement the capabilities defined in the Product Requirements Document without extending functional scope.
----
-Document Completion
-This concludes 002_SYSTEM_ARCHITECTURE.md.
-The complete document consists of:
-Part 1 — System Overview
-Part 2 — Core Services & Component Responsibilities
-Part 3 — Data Flow & Event Architecture
-Part 4 — Infrastructure & Technology Stack
-Part 5 — Reliability, Security & Fault Tolerance
-Part 6 — Deployment Architecture & Design Decisions
-The architecture is considered frozen and serves as the implementation reference for subsequent technical documentation.
+
+The system must be capable of moving from research to live trading without creating separate architectures for each stage.
+
+Research reproducibility is strengthened using Qlib-inspired experiment discipline, but Qlib itself is not part of the production architecture.
+
+The architecture must remain simple enough that the entire V1 system can be understood, tested, debugged, and operated by a small team on a local workstation.
+
+**Do not build infrastructure for a future QuantOS until the V1 trading system has first proven itself.**
