@@ -28,7 +28,7 @@ QuantOS V1 must provide a complete, reproducible, risk-controlled quantitative t
 
 The system must support the progression:
 
-```
+```text
 Historical Research
         ↓
 Backtesting
@@ -701,6 +701,7 @@ Testing must cover, at minimum:
 
 A production strategy/model must pass all required stages before live trading:
 
+```text
 Research
    ↓
 Historical Backtest
@@ -712,7 +713,7 @@ Robustness Testing
 Paper Trading
    ↓
 Live Approval
-
+```
 
 Each stage must produce recorded evidence.
 
@@ -787,6 +788,7 @@ These must not be introduced indirectly through lower-level specifications.
 
 QuantOS V1 is successful when it can demonstrate the complete workflow:
 
+```text
 Binance Historical Data
         ↓
 Validated Dataset
@@ -810,7 +812,7 @@ Binance Spot Execution
 Reconciliation
         ↓
 Evaluation
-
+```
 
 The system must be able to reproduce its important research results, explain its trading decisions, reject unsafe trades, and operate without requiring unnecessary infrastructure.
 
