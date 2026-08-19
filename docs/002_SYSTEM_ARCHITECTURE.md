@@ -1,229 +1,246 @@
 # QuantOS Core — 002_SYSTEM_ARCHITECTURE.md
 
 Version: 1.0.0-V1
-Status: Replacement baseline
+Status: Final MVP architecture
 Last Updated: 2026-08-19
 
-## 1. Architectural Decision
+## 1. Purpose
 
-QuantOS V1 is a Clean Architecture Modular Monolith.
+QuantOS V1 is a **Clean Architecture Modular Monolith** running locally. It is intentionally small and is not a microservice platform.
 
-It is not a microservice system.
+The architecture exists to get the first complete QuantOS MVP running quickly while preserving clean internal boundaries.
 
-The six production modules are:
+## 2. V1 Architecture
 
-`Market Data → Feature Engine → Alpha Engine → Risk Engine → Execution Engine → Evaluation Engine`
+Six production business modules:
 
-Infrastructure implementations sit behind interfaces and include Binance connectivity, Parquet, DuckDB, configuration, logging, and process/runtime concerns.
+1. Market Data
+2. Feature Engine
+3. Alpha Engine
+4. Risk Engine
+5. Execution Engine
+6. Evaluation Engine
 
-## 2. Layering
+Supporting infrastructure provides Binance connectivity, Parquet/DuckDB storage, configuration, logging, model/artifact persistence, and runtime/CLI entry points.
+
+These supporting concerns are not additional business modules.
+
+## 3. High-Level Flow
 
 ```text
-Presentation / CLI
-        |
-Application orchestration
-        |
-Domain modules
-        |
-Infrastructure adapters
+Market Data
+    ↓
+Feature Engine
+    ↓
+Alpha Engine
+    ↓
+Risk Engine
+    ↓
+Execution Engine
+    ↓
+Binance Spot
 ```
 
-The domain must not depend on Binance SDKs, DuckDB, Parquet libraries, network clients, or other infrastructure details.
+The Evaluation Engine exercises the same core logic for backtesting, walk-forward validation, Monte Carlo analysis, paper trading, and reporting.
 
-## 3. Module Responsibilities
+## 4. Clean Architecture
 
-### 3.1 Market Data
+```text
+Interface / CLI
+      ↓
+Application
+      ↓
+Domain
+      ↓
+Infrastructure Adapters
+```
 
-Owns:
+Domain code must not depend on Binance SDKs, HTTP clients, DuckDB, Parquet libraries, filesystem details, environment handling, or provider-specific objects.
 
-- Binance Spot connectivity;
-- historical ingestion;
-- live market streams;
-- candle normalization;
-- timestamp normalization;
-- symbol metadata;
-- data quality checks;
-- delivery of canonical market events.
+Application code coordinates use cases. Infrastructure implements external adapters.
 
-Does not:
+## 5. Module Responsibilities
 
-- generate alpha;
-- decide position size;
-- submit orders.
+### Market Data
+Owns historical/live Binance Spot data, candle normalization, timestamps, validation, symbol validation, and market events.
 
-### 3.2 Feature Engine
+Does not generate signals, size positions, or submit orders.
 
-Owns:
+### Feature Engine
+Owns approved feature definitions, calculations, validation, versioning, and temporal alignment.
 
-- feature definitions;
-- feature calculation;
-- feature validation;
-- feature versioning;
-- causal/temporal enforcement.
+Does not submit orders, make risk decisions, or silently train models during live execution.
 
-Does not:
+### Alpha Engine
+Owns the single approved production strategy, one active production model, prediction, signal generation, strategy state, and decision explanation.
 
-- submit orders;
-- choose risk;
-- train production models implicitly during live execution.
+Does not bypass risk or submit exchange orders.
 
-### 3.3 Alpha Engine
-
-Owns:
-
-- the single approved production strategy;
-- model loading;
-- prediction;
-- signal generation;
-- signal explanation;
-- strategy state.
-
-Does not:
-
-- override risk;
-- submit exchange orders;
-- own account balances.
-
-### 3.4 Risk Engine
-
-Owns:
-
-- position sizing;
-- exposure limits;
-- daily loss limits;
-- drawdown protection;
-- volatility-aware sizing;
-- edge-after-cost checks;
-- approval/rejection.
+### Risk Engine
+Owns position sizing, exposure limits, daily-loss limits, drawdown protection, volatility-aware sizing, expected-edge-after-cost checks, and approval/rejection.
 
 Risk rejection is final.
 
-### 3.5 Execution Engine
+### Execution Engine
+Owns order construction, approved order-type selection, Binance submission, cancellation, retries, order status, fills, and exchange-error normalization.
 
-Owns:
+It is the only module permitted to cause a real exchange order side effect.
 
-- order construction;
-- order type selection within policy;
-- order submission;
-- cancellation;
-- retry handling;
-- fill/order-state tracking;
-- exchange acknowledgement normalization.
+### Evaluation Engine
+Owns event-driven backtesting, simulated execution, metrics, walk-forward validation, Monte Carlo robustness analysis, paper-trading evaluation, and experiment metadata.
 
-It is the only module permitted to send trading instructions to Binance.
+## 6. Runtime Modes
 
-### 3.6 Evaluation Engine
+The same core modules operate in:
 
-Owns:
+1. Research
+2. Backtest
+3. Paper Trading
+4. Live Trading
 
-- backtesting;
-- portfolio accounting for simulation;
-- performance metrics;
-- walk-forward orchestration;
-- Monte Carlo analysis;
-- experiment/run records;
-- validation reports.
+Paper trading is the default. Live mode requires explicit enablement.
 
-## 4. Runtime Flow
+Paper and live modes must not duplicate business logic. The execution side effect is what changes.
+
+## 7. Core Runtime Flow
 
 ```text
-Market event
-   ↓
+Market Event
+     ↓
+Feature Vector
+     ↓
+Alpha Decision
+     ↓
+Risk Decision
+     ↓
+Order Intent
+     ↓
+Execution
+     ↓
+Execution Report
+     ↓
+Account / Position State
+```
+
+A risk rejection terminates the execution path.
+
+## 8. Historical Evaluation Flow
+
+```text
+Historical Data
+     ↓
 Market Data
-   ↓
+     ↓
 Feature Engine
-   ↓
+     ↓
 Alpha Engine
-   ↓
+     ↓
 Risk Engine
-   ↓
-Execution Engine
-   ↓
-Binance
-   ↓
-Execution/fill event
-   ↓
-Portfolio/account state
-   ↓
-Evaluation/observability
-```
-
-A rejected risk decision stops the execution path.
-
-## 5. Historical Flow
-
-```text
-Binance historical data
-        ↓
-Market Data ingestion
-        ↓
-immutable Parquet
-        ↓
-DuckDB query layer
-        ↓
-Feature Engine
-        ↓
-Alpha Engine
-        ↓
+     ↓
+Simulated Execution
+     ↓
 Evaluation Engine
+     ↓
+Metrics / Validation Report
 ```
 
-## 6. State Ownership
+Historical evaluation must exercise the same strategy, feature, and risk logic used by paper trading wherever practical.
 
-- Market state: Market Data
-- Feature state: Feature Engine
-- Strategy/model state: Alpha Engine
-- Risk state: Risk Engine
-- Order/execution state: Execution Engine
-- Evaluation state: Evaluation Engine
-- Persistent datasets: storage infrastructure
+## 9. State Ownership
 
-No module may silently mutate another module's state.
+| State | Owner |
+|---|---|
+| Market/candle state | Market Data |
+| Feature state | Feature Engine |
+| Strategy/model state | Alpha Engine |
+| Risk state | Risk Engine |
+| Order/execution state | Execution Engine |
+| Evaluation state | Evaluation Engine |
+| Persistent datasets/artifacts | Infrastructure |
 
-## 7. Interfaces
+A module must not silently mutate another module's internal state.
 
-Interfaces must use explicit domain contracts rather than provider-specific objects.
+## 10. Core Contracts
 
-Examples:
+Use explicit internal contracts for:
 
-- `MarketEvent`
 - `Candle`
+- `MarketEvent`
 - `FeatureVector`
 - `AlphaDecision`
 - `RiskDecision`
 - `OrderRequest`
 - `ExecutionReport`
-- `PortfolioSnapshot`
+- `Position`
+- `AccountSnapshot`
 - `EvaluationResult`
 
-Exact implementation types belong in the technical implementation, but the ownership and semantics must remain stable.
+Provider-specific objects are translated at infrastructure boundaries.
 
-## 8. Failure Policy
+## 11. Failure Policy
 
-Any uncertainty that could result in uncontrolled trading must fail closed.
+QuantOS must fail closed whenever uncertainty could create uncontrolled trading.
 
-Examples:
+Examples include stale data, invalid candles, missing features, incompatible model artifacts, unavailable risk state, exchange authentication failure, and unknown order state.
 
-- stale market data;
-- invalid symbol metadata;
-- missing features;
-- model artifact failure;
-- risk-state failure;
-- exchange authentication failure;
-- unknown order state.
+The system must never guess through a safety-critical failure.
 
-The system must never compensate for missing safety information by guessing.
+## 12. Execution Reconciliation
 
-## 9. Qlib-Inspired Research Boundary
+When an order result is uncertain:
 
-Research workflows may use Qlib-like concepts:
+1. preserve the request/event record;
+2. reconcile exchange state;
+3. determine authoritative order state;
+4. prevent duplicate exposure;
+5. fail closed if safe reconciliation is impossible.
 
-- dataset identity;
-- temporal dataset partitions;
-- experiment IDs;
-- artifact manifests;
-- reproducible evaluation.
+## 13. Infrastructure Boundaries
 
-These are workflow concepts, not a new architecture.
+Binance is accessed only through an exchange adapter.
 
-Qlib is not required to run QuantOS V1.
+Parquet is the canonical historical-data format and DuckDB is the local analytical query layer.
+
+Configuration is external to business logic and secrets are never hardcoded.
+
+Logging is centralized through structured application logging.
+
+## 14. Explicit V1 Exclusions
+
+Do not add:
+
+- microservices;
+- API gateway;
+- message queues;
+- distributed cache;
+- Kubernetes;
+- cloud deployment;
+- portfolio-management service;
+- AI integration service;
+- strategy marketplace;
+- multiple live strategies;
+- multiple production models;
+- reinforcement learning;
+- autonomous agents;
+- futures;
+- leverage;
+- options;
+- market making;
+- cross-exchange execution.
+
+These are outside V1.
+
+## 15. Architectural Definition of Done
+
+The architecture is correctly implemented when:
+
+- QuantOS runs as one local application;
+- the six production modules are clearly separated;
+- domain code is independent of infrastructure;
+- Binance access is isolated behind an adapter;
+- historical and live data use canonical contracts;
+- the same strategy logic can be evaluated and paper traded;
+- risk can reject a trade before execution;
+- live execution is explicitly gated;
+- critical state transitions are observable;
+- no unapproved service or module architecture is introduced.
