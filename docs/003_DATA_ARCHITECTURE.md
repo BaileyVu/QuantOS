@@ -1,139 +1,220 @@
 # QuantOS Core — 003_DATA_ARCHITECTURE.md
 
 Version: 1.0.0-V1
-Status: Replacement baseline
+Status: Final MVP data architecture
 Last Updated: 2026-08-19
 
-## 1. Data Objective
+## 1. Purpose
 
-Provide reliable, immutable, reproducible market data for research, backtesting, paper trading, and live operation.
+Define the minimum local data architecture required for reliable, reproducible research, backtesting, paper trading, and live operation.
 
 ## 2. V1 Data Scope
 
-Only Binance Spot is supported.
+Exchange: Binance Spot
 
 Symbols:
-
 - BTCUSDT
 - ETHUSDT
 
-Primary dataset:
+Primary timeframe:
+- 1 minute
 
-- 1-minute OHLCV candles
+Primary market dataset:
+- OHLCV candles
 
-Supporting data:
-
-- latest price;
+Supporting runtime data:
 - exchange symbol metadata;
-- execution/fill data;
-- account state required for trading.
+- account balances;
+- positions;
+- orders;
+- fills;
+- execution events.
 
-Trade stream and order-book data are not required inputs to the first production strategy.
+V1 does not require additional market-data vendors or alternative-data pipelines.
 
 ## 3. Canonical Candle
 
-| Field | Meaning |
+| Field | Description |
 |---|---|
 | symbol | Trading pair |
 | interval | `1m` |
-| open_time | UTC opening timestamp |
-| close_time | UTC closing timestamp |
-| open | opening price |
-| high | highest price |
-| low | lowest price |
-| close | closing price |
-| volume | base-asset volume |
-| quote_volume | quote-asset volume |
-| trade_count | number of trades |
+| open_time | UTC candle start |
+| close_time | UTC candle end |
+| open | Open price |
+| high | High price |
+| low | Low price |
+| close | Close price |
+| volume | Base-asset volume |
+| quote_volume | Quote-asset volume |
+| trade_count | Number of trades |
 
-Provider-specific fields are not part of the production canonical schema.
+Provider-specific fields must not leak into the canonical domain contract without explicit approval.
 
-## 4. Data Integrity
+## 4. Data Pipeline
+
+```text
+Binance
+   ↓
+Raw Response
+   ↓
+Normalization
+   ↓
+Validation
+   ↓
+Canonical Dataset
+   ↓
+Parquet
+   ↓
+DuckDB
+   ↓
+Feature Engine
+```
+
+## 5. Storage
+
+Parquet is the canonical storage format for historical market datasets.
+
+DuckDB is the local analytical/query layer over those files. It is not a separate service and is not the authoritative source of market truth.
+
+## 6. Data Immutability
+
+Historical source datasets should be treated as immutable.
+
+Corrections or new downloads create a new ingestion/version rather than silently rewriting research inputs.
+
+## 7. Data Validation
 
 Ingestion must detect:
 
 - duplicate candles;
 - missing timestamps;
-- out-of-order records;
+- out-of-order timestamps;
 - invalid OHLC relationships;
-- invalid volume;
+- invalid/negative volume;
 - unsupported symbols;
 - invalid timestamps;
-- unexpected interval changes.
+- unexpected intervals.
 
 Invalid records must not silently enter the canonical dataset.
 
-## 5. Immutability
+## 8. Timestamp and Causality Rules
 
-Raw downloaded market data is immutable.
+All internal timestamps use UTC.
 
-Corrections are represented as a new ingestion/version rather than destructive modification.
+For a decision at time `t`, only information available by `t` may be used.
 
-Derived datasets may be regenerated from immutable source data.
+The rule applies to features, labels, model inputs, backtests, validation, paper trading, and live trading.
 
-## 6. Storage
+## 9. Completed-Candle Rule
 
-### Parquet
+The V1 strategy operates on completed 1-minute candles.
 
-Parquet is the canonical file format for market datasets.
+A candle must not be treated as final before its close time.
 
-It provides compact local storage and deterministic batch access.
+This keeps live feature generation consistent with historical evaluation.
 
-### DuckDB
+## 10. Historical Data
 
-DuckDB is the local analytical query layer over Parquet.
+Historical ingestion supports:
 
-DuckDB is not the authoritative source of raw market truth; Parquet datasets remain reproducible source artifacts.
+- initial bulk download;
+- incremental updates;
+- duplicate-safe writes;
+- validation;
+- deterministic dataset identification.
 
-## 7. Dataset Identity
+No additional data vendor is required for the first MVP.
 
-Each research dataset must be identifiable by:
+## 11. Live Data
+
+Live market data must be normalized to the same canonical semantics as historical data.
+
+The live path must use the same Feature Engine definitions as the historical path.
+
+## 12. Train / Validation / Test
+
+Splits are chronological.
+
+A research run records:
+
+- dataset identity;
+- training period;
+- validation period;
+- test period;
+- feature version;
+- target definition;
+- model version/configuration.
+
+Random temporal shuffling is prohibited for final evaluation.
+
+The final test period remains untouched during model/parameter selection.
+
+## 13. Dataset Identity
+
+A dataset is identified by:
 
 - symbol;
-- interval;
-- start/end time;
+- timeframe;
+- start time;
+- end time;
 - source;
 - schema version;
 - ingestion version;
-- data quality status.
+- validation status.
 
-## 8. Temporal Rules
+Research runs record the dataset identity they consume.
 
-All timestamps use UTC.
+## 14. Missing Data
 
-For a decision at time `t`, only information available at or before `t` may be used.
+Missing market data must be detected and surfaced.
 
-Feature windows, labels, training sets, validation sets, and backtests must obey this rule.
+Do not silently manufacture candles unless explicitly defined and safe for the strategy.
 
-## 9. Train / Validation / Test
+If required market data is unavailable:
 
-Splits are chronological, never random.
+```text
+No valid data
+      ↓
+No valid feature vector
+      ↓
+HOLD / NO TRADE
+```
 
-A research run must record:
+## 15. Research Reproducibility
 
-- training interval;
-- validation interval;
-- test interval;
+A research result should be reproducible from:
+
+- dataset identity;
+- code version;
 - feature version;
-- target definition;
-- model configuration.
+- strategy version;
+- model version;
+- configuration;
+- random seed where applicable.
 
-The test period is not used for model selection.
+## 16. Data Not Required for V1
 
-## 10. Live Data
+Do not build:
 
-Live market data must be normalized into the same canonical semantics used by historical data.
+- tick-data storage;
+- full historical order-book infrastructure;
+- news feeds;
+- social sentiment;
+- on-chain data;
+- alternative-data pipelines;
+- real-time data warehouses;
+- distributed data processing.
 
-The live feature path must not use a different calculation definition from the backtest path.
+## 17. Data Architecture Definition of Done
 
-## 11. Qlib-Inspired Research Discipline
+The data layer is complete when:
 
-QuantOS adopts reproducible dataset identity, temporal partitioning, and experiment metadata.
-
-It does not adopt Qlib's runtime architecture or require Qlib as a dependency.
-
-## 12. Data Retention
-
-Historical data may be retained for multiple years because the local target environment supports large storage.
-
-V1 should prefer useful, validated history over unnecessary data-source expansion.
+- BTCUSDT and ETHUSDT 1-minute data can be downloaded;
+- data is normalized and validated;
+- canonical datasets are stored in Parquet;
+- DuckDB can query the datasets;
+- duplicate/missing/invalid records are detected;
+- timestamps are consistently UTC;
+- live data uses the same canonical semantics;
+- dataset identity can be recorded;
+- future data cannot leak into features or evaluation.
