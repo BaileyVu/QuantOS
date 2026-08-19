@@ -1,123 +1,77 @@
-# QuantOS — Read First
+# QuantOS Core — 000_READ_FIRST.md
 
-## Document Status
+Version: 1.0.0-V1
+Status: Replacement baseline — requires approval before implementation
+Last Updated: 2026-08-19
 
-**Status:** Frozen V1 Foundation  
-**Version:** 1.0  
-**Purpose:** Highest-level product and architecture boundary for QuantOS V1
+## 1. Purpose
 
----
+This document is the highest-priority specification for QuantOS Version 1.
 
-# 1. What QuantOS Is
+QuantOS is a small, research-driven quantitative trading engine designed to discover, validate, and safely execute one statistically robust trading strategy on Binance Spot.
 
-QuantOS is a local, production-oriented quantitative trading system designed to research, validate, paper trade, and safely execute a small systematic trading strategy on Binance Spot.
+The goal is not maximum model sophistication. The goal is the smallest production-quality system that can survive live trading, remain reproducible, and be maintained by one developer.
 
-Version 1 is intentionally small.
+All other documents in `docs/` must remain consistent with this document.
 
-The objective is not to build a general-purpose quantitative research platform, multi-strategy trading platform, AI platform, or institutional trading infrastructure.
+## 2. V1 Mission
 
-The objective is to build one complete, reproducible, testable trading system that can progress from historical data to validated paper trading and, only after passing all required gates, controlled live trading.
+Build a production-quality engine that can:
 
----
+1. ingest historical and live Binance Spot market data;
+2. create deterministic features;
+3. produce one explainable trading signal;
+4. apply strict risk controls;
+5. execute orders safely;
+6. evaluate and validate the strategy;
+7. progress from research to backtest, walk-forward validation, Monte Carlo, paper trading, and finally explicitly enabled live trading.
 
-# 2. V1 Objective
+Target:
 
-The primary V1 objective is:
+- Exchange: Binance Spot
+- Symbols: BTCUSDT, ETHUSDT
+- Initial capital: 20 USDT
+- Primary timeframe: 1 minute
+- Deployment: local workstation
+- Storage: Parquet + DuckDB
+- Architecture: Clean Architecture + Modular Monolith
+- Production model: exactly one
+- Production strategy: exactly one
+- Production features: target 10–15, hard maximum 20
 
-> Build a reliable end-to-end quantitative trading system that can turn validated market data into a risk-controlled trading decision and execute that decision safely on Binance Spot.
+## 3. Non-Negotiable Principles
 
-The system must prioritize:
+### 3.1 Risk before profit
 
-1. Correctness
-2. Reproducibility
-3. Risk control
-4. Determinism
-5. Testability
-6. Observability
-7. Simplicity
+Capital preservation has priority over profitability.
 
-Complexity must not be introduced unless it is required to satisfy a frozen V1 requirement.
+### 3.2 Simplicity before sophistication
 
----
+Every component must justify its existence with measurable value.
 
-# 3. V1 Trading Scope
+### 3.3 No backtest optimization
 
-## Exchange
+Backtests are validation instruments, not proof of profitability.
 
-Binance Spot only.
+### 3.4 Reproducibility
 
-No other exchange is part of V1.
+Identical data, configuration, model artifact, and execution assumptions must produce identical research and simulation results.
 
----
+### 3.5 No hidden state
 
-## Trading Pairs
+State must be explicit, persisted where required, and observable.
 
-V1 supports:
+### 3.6 No duplicated business logic
 
-- BTCUSDT
-- ETHUSDT
+A rule belongs in exactly one authoritative component.
 
-No additional assets are required for V1.
+### 3.7 No look-ahead
 
----
+No feature, label, model, or simulator may use information unavailable at the decision timestamp.
 
-## Capital
+## 4. Exact V1 Production Modules
 
-Initial target capital:
-
-**20 USDT**
-
-The architecture must not artificially prevent larger capital later, but V1 must be designed and tested around the initial small-account constraint.
-
-The system must correctly handle Binance minimum order quantities, precision, available balance, fees, and other exchange restrictions.
-
-A trade must be rejected when the account cannot safely execute it.
-
----
-
-## Primary Timeframe
-
-The primary trading timeframe is:
-
-**1 minute**
-
-Higher timeframes may be derived for contextual information when required, but they must not introduce look-ahead leakage.
-
----
-
-## Trading Style
-
-QuantOS V1 is:
-
-- systematic
-- algorithmic
-- machine-learning-assisted
-- deterministic where possible
-- risk-controlled
-
-V1 does not support discretionary trading decisions.
-
----
-
-# 4. V1 Architecture Boundary
-
-QuantOS V1 is a:
-
-**Clean Architecture Modular Monolith**
-
-It is NOT a microservice system.
-
-It is NOT a distributed system.
-
-It does NOT require an API gateway, message broker, service mesh, Kubernetes, cloud deployment, or independently deployed services.
-
-The system must run locally on a single workstation.
-
----
-
-# 5. The Six V1 Core Modules
-
-QuantOS V1 contains exactly six core production modules:
+V1 contains exactly six production modules:
 
 1. Market Data
 2. Feature Engine
@@ -126,558 +80,95 @@ QuantOS V1 contains exactly six core production modules:
 5. Execution Engine
 6. Evaluation Engine
 
-These six modules define the primary production boundary.
+Parquet/DuckDB storage, configuration, logging, exchange connectivity, and test tooling are infrastructure supporting these modules. They are not additional production business modules.
 
-Documents 001–008 must not introduce additional production modules.
+No new production module may be introduced without an approved specification change.
 
-Supporting infrastructure such as configuration, logging, persistence, exchange adapters, testing, and research-run recording is implementation infrastructure and does not constitute additional business modules.
+## 5. Research Discipline
 
----
+QuantOS may borrow research-discipline ideas from Qlib, but Qlib is not part of the V1 runtime architecture and is not a required dependency.
 
-# 6. Core Runtime Flow
+Adopt only:
 
-The primary live decision flow is:
+- reproducible datasets;
+- explicit train/validation/test periods;
+- experiment/run metadata;
+- saved model and configuration artifacts;
+- deterministic feature generation;
+- standardized signal and backtest evaluation.
 
-```text
-Market Data
-     ↓
-Feature Engine
-     ↓
-Alpha Engine
-     ↓
-Risk Engine
-     ↓
-Execution Engine
-     ↓
-Binance
-     ↓
-Execution / Account Results
-     ↓
-Evaluation
-````
+Do not adopt:
 
-Risk always has authority over the Alpha Engine.
+- Qlib runtime architecture;
+- distributed infrastructure;
+- model zoo;
+- reinforcement learning;
+- autonomous agents;
+- portfolio optimization;
+- multi-strategy production;
+- multi-exchange infrastructure.
 
-The Alpha Engine may propose a trade.
+## 6. Model Constraint
 
-The Risk Engine may approve or reject it.
+V1 has one production model.
 
-The Execution Engine may execute only an approved decision.
+LightGBM is the preferred candidate because it fits tabular market features, is fast on commodity hardware, and remains comparatively explainable.
 
-No component may bypass Risk to submit a live order.
+Other models may be benchmarked during research only. A benchmark does not become production merely because it has a higher in-sample score.
 
----
+## 7. Validation Gate
 
-# 7. One Production Strategy
+No live trading is permitted until the same strategy passes:
 
-V1 contains:
+`Research → Backtest → Walk-Forward → Monte Carlo → Paper Trading → Live Approval`
 
-**One production strategy.**
+Skipping a stage is prohibited.
 
-Research may contain candidate ideas and experiments, but only one strategy path may become the production trading strategy.
+## 8. V1 Exclusions
 
-QuantOS V1 must not become a framework containing many simultaneously active strategies.
+Excluded from V1:
 
-The following are not required for V1:
+- other exchanges;
+- futures;
+- options;
+- leverage;
+- market making;
+- cross-exchange arbitrage;
+- portfolio optimization;
+- multi-strategy production;
+- deep learning;
+- reinforcement learning;
+- autonomous agents;
+- news or social sentiment;
+- on-chain analytics;
+- cloud deployment;
+- Kubernetes;
+- distributed computing;
+- high-frequency trading;
+- automatic strategy discovery.
 
-* strategy portfolios
-* strategy ensembles
-* automatic strategy discovery
-* strategy marketplaces
-* multi-strategy allocation
-* portfolio optimization
+## 9. Decision Hierarchy
 
-The system should prefer a small, understandable trading decision process over a large collection of loosely justified signals.
+When requirements conflict, use this order:
 
----
+1. Capital preservation
+2. Correctness
+3. Robustness
+4. Simplicity
+5. Explainability
+6. Performance
+7. Profitability
 
-# 8. One Production Model
+## 10. Definition of Done
 
-V1 contains:
+A V1 capability is complete only when:
 
-**One production model.**
-
-Multiple candidate models may be evaluated during research.
-
-However, only one validated model may be promoted to production.
-
-Model selection must prioritize:
-
-* out-of-sample robustness
-* stability
-* reproducibility
-* explainability
-* cost-aware trading performance
-* resistance to overfitting
-
-Raw predictive accuracy is not sufficient.
-
-A model that performs well in-sample but fails out-of-sample must not be promoted.
-
----
-
-# 9. Feature Complexity Budget
-
-The production feature set must remain small.
-
-Target:
-
-**10–15 production features**
-
-Absolute maximum:
-
-**20 production features**
-
-Every production feature must have a documented purpose.
-
-Features that provide substantially overlapping information should not be added simply because they improve a historical backtest.
-
-Feature additions must be evaluated against out-of-sample performance and robustness.
-
-The system must actively discourage feature explosion and parameter proliferation.
-
----
-
-# 10. Overfitting Is a Primary V1 Risk
-
-QuantOS must treat overfitting as a first-class engineering risk.
-
-The system must not optimize the trading strategy against the final test period.
-
-Historical performance alone is not sufficient evidence.
-
-Validation must include:
-
-```text
-Historical Backtest
-        ↓
-Walk-Forward Validation
-        ↓
-Monte Carlo / Robustness Testing
-        ↓
-Paper Trading
-        ↓
-Live Approval
-```
-
-Transaction costs and realistic slippage must be included.
-
-The final out-of-sample period must remain protected from iterative tuning.
-
----
-
-# 11. Reproducibility
-
-The same inputs must produce the same research result whenever deterministic processing is expected.
-
-A reproducible research result must identify the inputs used to produce it.
-
-At minimum, a research run must be traceable to:
-
-* code revision
-* configuration/version
-* dataset identity/version
-* feature version
-* model/version
-* training period
-* validation period
-* test period
-* random seed where applicable
-* evaluation configuration
-* transaction-cost assumptions
-* slippage assumptions
-* resulting metrics
-* generated model artifact
-
-A historical result that cannot be traced back to its inputs is not considered a reliable V1 research result.
-
----
-
-# 12. Qlib-Inspired Research Discipline
-
-QuantOS may adopt selected research-workflow ideas inspired by Microsoft Qlib.
-
-Qlib is NOT a required production dependency for QuantOS V1.
-
-QuantOS must NOT copy Qlib's complete architecture.
-
-The useful concepts for V1 are:
-
-* reproducible research runs
-* explicit dataset identity
-* explicit feature/model versions
-* immutable experiment configuration
-* clear training/validation/test boundaries
-* model artifact tracking
-* recorded evaluation metrics
-* signal evaluation
-* backtest evaluation
-* ability to reproduce a previous experiment
-
-These capabilities should remain lightweight and fit inside the existing QuantOS architecture.
-
-They must not create a seventh production module.
-
-Qlib must never be placed in the live Binance order path.
-
-The production flow remains owned by QuantOS.
-
----
-
-# 13. Data Foundation
-
-V1 primarily uses Binance market data.
-
-Historical market data must be:
-
-* locally stored
-* validated
-* reproducible
-* queryable
-* traceable to its source
-* immutable after raw ingestion
-
-The intended V1 storage foundation is:
-
-* Parquet for durable market-data storage
-* DuckDB for local analytical/query access
-
-Raw data must not be silently overwritten.
-
-Derived datasets must remain traceable to the raw dataset and transformation configuration that produced them.
-
----
-
-# 14. Deterministic Feature Generation
-
-Given identical:
-
-* input market data
-* configuration
-* feature specification
-* timestamp boundaries
-
-the Feature Engine should produce identical outputs.
-
-No future information may enter a feature.
-
-This includes preventing:
-
-* future candles
-* future prices
-* future returns
-* future volume
-* future labels
-* improperly forward-filled values
-* information from the protected validation/test period
-
-Temporal correctness is mandatory.
-
----
-
-# 15. Risk-First Design
-
-QuantOS seeks profit only after protecting capital.
-
-The Risk Engine must be capable of rejecting every trade.
-
-Mandatory risk concepts include:
-
-* maximum position risk
-* maximum daily loss
-* maximum drawdown
-* volatility-aware position sizing
-* available-balance checks
-* exchange constraint checks
-* transaction-cost awareness
-* trade rejection
-
-Risk controls must not be optional in live mode.
-
----
-
-# 16. Execution Boundary
-
-The Execution Engine is the only component allowed to submit trading orders to Binance.
-
-The normal execution path is:
-
-```text
-Alpha Proposal
-      ↓
-Risk Approval
-      ↓
-Execution Decision
-      ↓
-Binance Order
-      ↓
-Exchange Response
-      ↓
-Fill / Rejection / Cancellation
-      ↓
-Recorded Result
-```
-
-Execution must account for:
-
-* Binance trading rules
-* minimum quantities
-* precision
-* available balance
-* fees
-* expected slippage
-* order status
-* acknowledgement
-* fills
-* failures
-* reconciliation
-
-If execution cannot be performed safely, the system must not trade.
-
----
-
-# 17. Paper Trading Before Live Trading
-
-Paper trading is mandatory before live trading.
-
-Live trading must never be the default mode.
-
-The promotion path is:
-
-```text
-Research
-   ↓
-Backtest
-   ↓
-Walk-Forward
-   ↓
-Monte Carlo / Robustness
-   ↓
-Paper Trading
-   ↓
-Live Approval
-   ↓
-Live Trading
-```
-
-Failure at any required stage prevents promotion.
-
----
-
-# 18. Operating Modes
-
-V1 supports:
-
-* Research
-* Backtest
-* Paper Trading
-* Live Trading
-
-Only one execution mode may be active at a time.
-
-Live mode must require explicit configuration.
-
-Paper trading must be the default safe operating mode.
-
----
-
-# 19. Configuration
-
-Configurable values must remain outside application code.
-
-This includes, where applicable:
-
-* exchange configuration
-* trading pairs
-* risk limits
-* model parameters
-* feature configuration
-* execution parameters
-* storage locations
-* runtime mode
-* API credentials
-
-Changing configuration must not require modifying application source code.
-
-Secrets must never be hardcoded.
-
-Binance withdrawal permissions must not be required.
-
----
-
-# 20. Observability
-
-The system must provide enough logging to explain what happened.
-
-Important events include:
-
-* system startup
-* system shutdown
-* market-data updates
-* data validation
-* feature generation
-* model predictions
-* trade proposals
-* risk approvals
-* risk rejections
-* execution decisions
-* submitted orders
-* exchange responses
-* fills
-* cancellations
-* errors
-* warnings
-
-A live trade must be reconstructable from the recorded events.
-
----
-
-# 21. Safe Failure
-
-QuantOS must fail safely.
-
-Examples include:
-
-* missing market data
-* corrupted data
-* stale data
-* network failure
-* Binance API failure
-* invalid configuration
-* model failure
-* risk-engine failure
-* execution failure
-* unexpected application error
-
-Failures must never result in uncontrolled trading.
-
-When required information is unavailable or invalid, the safe default is:
-
-**Do not trade.**
-
----
-
-# 22. V1 Out of Scope
-
-The following are explicitly outside V1:
-
-* multiple exchanges
-* futures
-* margin trading
-* leverage
-* options
-* portfolio optimization
-* multi-strategy production
-* strategy ensembles
-* multiple production models
-* reinforcement learning
-* deep learning
-* autonomous AI agents
-* automatic strategy discovery
-* automatic feature discovery
-* cloud deployment
-* distributed systems
-* microservices
-* Kubernetes
-* high-frequency trading infrastructure
-* multi-user support
-* social-media analysis
-* news-driven trading
-* institutional portfolio management
-
-These may be considered in future versions only after V1 is proven.
-
----
-
-# 23. Complexity Rule
-
-Every future implementation decision must pass this question:
-
-> Is this required to make the V1 trading system reliable, reproducible, testable, and safe?
-
-If the answer is no, it should not be added to V1.
-
-Do not add architecture simply because it may be useful in the future.
-
-Do not add features simply because another quantitative platform provides them.
-
-Do not increase model or feature complexity simply because it improves an in-sample backtest.
-
----
-
-# 24. Documentation Authority
-
-The documentation hierarchy is:
-
-```text
-000_READ_FIRST.md
-        ↓
-001_PRODUCT_REQUIREMENTS.md
-        ↓
-002_SYSTEM_ARCHITECTURE.md
-        ↓
-003–008 Technical Specifications
-```
-
-`000_READ_FIRST.md` establishes the highest-level V1 boundary.
-
-`001_PRODUCT_REQUIREMENTS.md` defines what V1 must accomplish.
-
-`002_SYSTEM_ARCHITECTURE.md` defines how those requirements are organized architecturally.
-
-Documents `003–008` define implementation-level details.
-
-No lower-level document may introduce functionality that conflicts with a higher-level document.
-
-If a lower-level document requires a new feature, module, service, or workflow that is not permitted above, the lower-level document must be corrected.
-
-The solution is NOT to expand V1.
-
----
-
-# 25. Definition of V1
-
-QuantOS V1 is complete when the system can reliably demonstrate the following complete path:
-
-```text
-Binance Historical Data
-        ↓
-Validated Local Dataset
-        ↓
-Deterministic Features
-        ↓
-One Production Model
-        ↓
-Backtest
-        ↓
-Walk-Forward Validation
-        ↓
-Monte Carlo / Robustness
-        ↓
-Paper Trading
-        ↓
-Risk Approval
-        ↓
-Binance Spot Execution
-        ↓
-Trade / Account Recording
-        ↓
-Evaluation
-```
-
-The system must be understandable, reproducible, testable, and safe enough to operate continuously on a local workstation.
-
----
-
-# 26. Final Rule
-
-QuantOS V1 is intentionally small.
-
-The goal is not to build everything a quantitative trading platform could eventually become.
-
-The goal is to build the smallest complete system that can prove the core idea in real operation.
-
-**Build the foundation. Validate it. Remove unnecessary complexity. Prove robustness. Then expand.**
-
-```
-
+- implementation exists;
+- unit tests pass;
+- integration tests pass where applicable;
+- configuration is documented;
+- logging is implemented;
+- deterministic behavior is verified;
+- validation requirements are satisfied;
+- documentation matches the implementation;
+- no unapproved feature has been introduced.
