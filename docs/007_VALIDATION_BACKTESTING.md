@@ -1,7 +1,7 @@
 # QuantOS Core — 007_VALIDATION_BACKTESTING.md
 
 Version: 1.0.0-V1
-Status: Replacement baseline
+Status: Frozen V1
 Last Updated: 2026-08-19
 
 ## 1. Objective
