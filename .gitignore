@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Secrets
+.env
+.env.*
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# QuantOS local data / artifacts
+data/
+models/
+artifacts/
+results/
+logs/
+
+# Local databases
+*.duckdb
+*.db
