@@ -1,99 +1,35 @@
 # QuantOS
 
-**AI-native quantitative trading system.**
+QuantOS V1 is a small, research-driven quantitative trading engine for Binance Spot. Its frozen specification prioritizes reproducibility, capital preservation, and one explainable production strategy.
 
-QuantOS is a modular quantitative trading platform built to take a trading idea from **market data → features → alpha → risk → execution**.
+## Current implementation
 
-The project focuses on simplicity, deterministic engineering, rigorous validation, and controlled execution.
+Phase 1 — Foundation is implemented. It provides a dependency-free Python application skeleton, strict external configuration, structured JSON lifecycle logging, provider-independent domain contracts, and a no-side-effect local CLI. Market data, trading, evaluation, and exchange behavior are intentionally not implemented yet.
 
----
+## Specification
 
-## Architecture
+[000_READ_FIRST.md](./docs/000_READ_FIRST.md) is the highest-priority V1 Source of Truth. Documents [001](./docs/001_PRODUCT_REQUIREMENTS.md) through [007](./docs/007_VALIDATION_BACKTESTING.md) are coequal frozen specifications; [008](./docs/008_IMPLEMENTATION_GUIDE.md) is subordinate implementation guidance.
 
-```text
-Market Data
-     ↓
-Feature Engine
-     ↓
-Alpha Engine
-     ↓
-Risk Engine
-     ↓
-Execution
-     ↓
-Exchange
-```
-
-Supporting the core pipeline:
+## Structure
 
 ```text
-Data
-Backtesting
-Validation
-Portfolio
-Storage
-Monitoring
+src/quantos/
+  domain/          # Six V1 business ownership areas and canonical contracts
+  application/     # Runtime coordination
+  infrastructure/  # Configuration and structured logging
+  interfaces/      # Local CLI
+configs/           # Safe example configuration
+tests/             # Unit, integration, and validation tests
 ```
 
-The system is designed as a **modular monolith** so that the entire platform remains understandable and maintainable without unnecessary infrastructure.
+## Setup and verification
 
----
+QuantOS requires Python 3.11 or later and has no runtime dependencies for Phase 1.
 
-## Core Principles
-
-* **Simplicity over sophistication**
-* **Deterministic and reproducible**
-* **Capital preservation first**
-* **Research and production use the same core definitions**
-* **Risk is independent from alpha**
-* **Fail safely when system state is uncertain**
-* **Build only what provides real value**
-
-QuantOS is intentionally not designed to be a collection of trading strategies or a generic trading-bot framework.
-
----
-
-## Documentation
-
-The engineering specifications live in [`docs/`](./docs):
-
-| Document                                                                | Description                                   |
-| ----------------------------------------------------------------------- | --------------------------------------------- |
-| [`000_READ_FIRST.md`](./docs/000_READ_FIRST.md)                         | Engineering philosophy and project principles |
-| [`001_PRODUCT_REQUIREMENTS.md`](./docs/001_PRODUCT_REQUIREMENTS.md)     | Product requirements                          |
-| [`002_SYSTEM_ARCHITECTURE.md`](./docs/002_SYSTEM_ARCHITECTURE.md)       | System architecture                           |
-| [`003_DATA_ARCHITECTURE.md`](./docs/003_DATA_ARCHITECTURE.md)           | Data architecture                             |
-| [`004_FEATURE_ENGINE.md`](./docs/004_FEATURE_ENGINE.md)                 | Feature engine                                |
-| [`005_ALPHA_ENGINE.md`](./docs/005_ALPHA_ENGINE.md)                     | Alpha engine                                  |
-| [`006_RISK_EXECUTION.md`](./docs/006_RISK_EXECUTION.md)                 | Risk and execution                            |
-| [`007_VALIDATION_BACKTESTING.md`](./docs/007_VALIDATION_BACKTESTING.md) | Validation and backtesting                    |
-| [`008_IMPLEMENTATION_GUIDE.md`](./docs/008_IMPLEMENTATION_GUIDE.md)     | Implementation guide                          |
-
-**Start here:** [`000_READ_FIRST.md`](./docs/000_READ_FIRST.md)
-
----
-
-## Project Structure
-
-```text
-QuantOS/
-├── docs/          # Engineering specifications
-├── src/           # QuantOS implementation
-├── tests/         # Tests
-├── configs/       # Configuration
-├── scripts/       # Utility scripts
-└── README.md
+```bash
+python -m pip install -e .
+python -m unittest discover -s tests -t . -v
+python -m quantos --config configs/default.toml
 ```
 
----
-
-## Philosophy
-
-QuantOS is not trying to compete on complexity.
-
-The goal is simple:
-
-> **Build a small, reliable system that can discover, validate, and execute a real trading edge.**
-
-Everything else is secondary.
-
+The default configuration starts in paper mode, logs startup and shutdown as JSON, and exits without connecting to Binance or performing any trading action.
