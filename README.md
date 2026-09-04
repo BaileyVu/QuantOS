@@ -4,7 +4,7 @@ QuantOS V1 is a small, research-driven quantitative trading engine for Binance S
 
 ## Current implementation
 
-Phase 1 — Foundation is implemented. It provides a dependency-free Python application skeleton, strict external configuration, structured JSON lifecycle logging, provider-independent domain contracts, and a no-side-effect local CLI. Market data, trading, evaluation, and exchange behavior are intentionally not implemented yet.
+Phase 1 — Foundation is implemented. Phase 2A adds provider-independent Market Data dataset identity and deterministic canonical-candle sequence validation. Binance connectivity, storage, trading, and evaluation behavior are intentionally not implemented yet.
 
 ## Specification
 

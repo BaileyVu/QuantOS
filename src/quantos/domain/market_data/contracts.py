@@ -2,16 +2,69 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 
 from quantos.domain.common import (
     V1_INTERVAL,
     require_decimal,
+    require_non_empty,
     require_utc,
     require_v1_symbol,
 )
+
+
+class DatasetValidationStatus(str, Enum):
+    """The recorded validation state of a canonical dataset."""
+
+    UNVALIDATED = "unvalidated"
+    VALIDATED = "validated"
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetIdentity:
+    """Immutable identity metadata for one canonical symbol-specific dataset."""
+
+    symbol: str
+    timeframe: str
+    start_time: datetime
+    end_time: datetime
+    source: str
+    schema_version: str
+    ingestion_version: str
+    validation_status: DatasetValidationStatus = field(
+        default=DatasetValidationStatus.UNVALIDATED, init=False
+    )
+
+    def __post_init__(self) -> None:
+        require_v1_symbol(self.symbol)
+        if self.timeframe != V1_INTERVAL:
+            raise ValueError(f"timeframe must be {V1_INTERVAL!r}")
+        require_utc(self.start_time, "start_time")
+        require_utc(self.end_time, "end_time")
+        if self.end_time < self.start_time:
+            raise ValueError("end_time must not be before start_time")
+        require_non_empty(self.source, "source")
+        require_non_empty(self.schema_version, "schema_version")
+        require_non_empty(self.ingestion_version, "ingestion_version")
+
+    def _validated_copy(self) -> DatasetIdentity:
+        """Return a new identity marked by the canonical validation path."""
+        validated_identity = DatasetIdentity(
+            symbol=self.symbol,
+            timeframe=self.timeframe,
+            start_time=self.start_time,
+            end_time=self.end_time,
+            source=self.source,
+            schema_version=self.schema_version,
+            ingestion_version=self.ingestion_version,
+        )
+        object.__setattr__(
+            validated_identity, "validation_status", DatasetValidationStatus.VALIDATED
+        )
+        return validated_identity
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,4 +121,3 @@ class MarketEvent:
         require_utc(self.timestamp, "timestamp")
         if self.timestamp < self.candle.close_time:
             raise ValueError("a market event must not expose an incomplete candle")
-
