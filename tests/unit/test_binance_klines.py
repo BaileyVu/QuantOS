@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from email.message import Message
 import json
 import socket
 from urllib.error import HTTPError, URLError
@@ -294,3 +295,42 @@ class BinanceSpotHistoricalKlineAdapterTests(unittest.TestCase):
 
                 with self.assertRaisesRegex(BinanceMarketDataError, message):
                     adapter.fetch_klines(symbol="BTCUSDT", interval="1m")
+
+    def test_http_error_preserves_status_and_only_valid_retry_after_seconds(self) -> None:
+        valid_headers = Message()
+        valid_headers["Retry-After"] = "30"
+        adapter, _ = self.adapter(
+            HTTPError(
+                "https://data-api.binance.vision/api/v3/klines",
+                429,
+                "too many requests",
+                valid_headers,
+                None,
+            )
+        )
+
+        with self.assertRaises(BinanceMarketDataError) as captured:
+            adapter.fetch_klines(symbol="BTCUSDT", interval="1m")
+
+        self.assertEqual(captured.exception.http_status, 429)
+        self.assertEqual(captured.exception.retry_after_seconds, 30)
+        for retry_after in (None, "not-a-delay", "-1"):
+            with self.subTest(retry_after=retry_after):
+                headers = Message()
+                if retry_after is not None:
+                    headers["Retry-After"] = retry_after
+                adapter, _ = self.adapter(
+                    HTTPError(
+                        "https://data-api.binance.vision/api/v3/klines",
+                        429,
+                        "too many requests",
+                        headers,
+                        None,
+                    )
+                )
+
+                with self.assertRaises(BinanceMarketDataError) as captured:
+                    adapter.fetch_klines(symbol="BTCUSDT", interval="1m")
+
+                self.assertEqual(captured.exception.http_status, 429)
+                self.assertIsNone(captured.exception.retry_after_seconds)

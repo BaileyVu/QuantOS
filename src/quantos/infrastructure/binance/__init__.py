@@ -4,5 +4,10 @@ from quantos.infrastructure.binance.klines import (
     BinanceMarketDataError,
     BinanceSpotHistoricalKlineAdapter,
 )
+from quantos.infrastructure.binance.range_fetch import BinanceSpotHistoricalRangeFetcher
 
-__all__ = ["BinanceMarketDataError", "BinanceSpotHistoricalKlineAdapter"]
+__all__ = [
+    "BinanceMarketDataError",
+    "BinanceSpotHistoricalKlineAdapter",
+    "BinanceSpotHistoricalRangeFetcher",
+]

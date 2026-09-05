@@ -24,6 +24,33 @@ _HTTP_GET = Callable[[str, float], bytes]
 class BinanceMarketDataError(ValueError):
     """Raised when Binance market-data transport or response data is invalid."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        http_status: int | None = None,
+        retry_after_seconds: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.http_status = http_status
+        self.retry_after_seconds = retry_after_seconds
+
+
+def _retry_after_seconds(headers: object) -> int | None:
+    """Return a valid integer Retry-After delay without inventing a wait value."""
+    if headers is None or not hasattr(headers, "get"):
+        return None
+    value = headers.get("Retry-After")
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value or not all("0" <= character <= "9" for character in value):
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
 
 def _default_http_get(url: str, timeout_seconds: float) -> bytes:
     """Fetch one response body with a finite timeout and no authentication."""
@@ -107,7 +134,11 @@ class BinanceSpotHistoricalKlineAdapter:
         try:
             payload = self._http_get(url, self._timeout_seconds)
         except HTTPError as error:
-            raise BinanceMarketDataError(f"Binance kline HTTP request failed: {error.code}") from error
+            raise BinanceMarketDataError(
+                f"Binance kline HTTP request failed: {error.code}",
+                http_status=error.code,
+                retry_after_seconds=_retry_after_seconds(error.headers),
+            ) from error
         except (socket.timeout, TimeoutError) as error:
             raise BinanceMarketDataError("Binance kline request timed out") from error
         except URLError as error:
