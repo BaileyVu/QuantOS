@@ -4,7 +4,7 @@ QuantOS V1 is a small, research-driven quantitative trading engine for Binance S
 
 ## Current implementation
 
-Phase 1 — Foundation is implemented. Phase 2A adds provider-independent Market Data dataset identity and deterministic canonical-candle sequence validation. Phase 2B adds Binance Spot historical-kline normalization and safe provider-specific range pagination. Storage, validated datasets, trading, evaluation, and live market data are intentionally not implemented yet.
+Phase 1 — Foundation is implemented. Phase 2A adds provider-independent Market Data dataset identity and deterministic canonical-candle sequence validation. Phase 2B adds Binance Spot historical-kline normalization, safe provider-specific range pagination, and orchestration into validated in-memory canonical sequences. Persistence, trading, evaluation, and live market data are intentionally not implemented yet.
 
 ## Specification
 
