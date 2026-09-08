@@ -4,6 +4,9 @@ from quantos.infrastructure.binance.daily_archive import (
     BinanceDailyArchiveError,
     BinanceSpotDailyArchiveAdapter,
 )
+from quantos.infrastructure.binance.daily_archive_range_fetch import (
+    BinanceSpotDailyArchiveRangeFetcher,
+)
 from quantos.infrastructure.binance.klines import (
     BinanceMarketDataError,
     BinanceSpotHistoricalKlineAdapter,
@@ -14,6 +17,7 @@ __all__ = [
     "BinanceDailyArchiveError",
     "BinanceMarketDataError",
     "BinanceSpotDailyArchiveAdapter",
+    "BinanceSpotDailyArchiveRangeFetcher",
     "BinanceSpotHistoricalKlineAdapter",
     "BinanceSpotHistoricalRangeFetcher",
 ]
