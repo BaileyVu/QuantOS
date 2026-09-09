@@ -52,6 +52,10 @@ def _validated_sequence(
             if candle.open_time - previous.open_time != timedelta(minutes=1):
                 raise DatasetValidationError("missing 1m candle timestamp")
         previous = candle
+    if identity.start_time != sequence[0].open_time:
+        raise DatasetValidationError("dataset identity start_time must match first candle open_time")
+    if identity.end_time != sequence[-1].open_time:
+        raise DatasetValidationError("dataset identity end_time must match last candle open_time")
     return sequence
 
 

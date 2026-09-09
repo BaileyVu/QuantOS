@@ -92,11 +92,13 @@ class CandleValidationTests(unittest.TestCase):
     def test_valid_single_symbol_sequence_is_preserved_in_input_order(self) -> None:
         candles = [candle(0), candle(1), candle(2)]
 
-        result = validate_candle_sequence(identity(), candles)
+        result = validate_candle_sequence(identity(end_time=candles[-1].open_time), candles)
 
         self.assertIsInstance(result, ValidatedCandleSequence)
         self.assertEqual(result.candles, tuple(candles))
         self.assertIs(result.identity.validation_status, DatasetValidationStatus.VALIDATED)
+        self.assertEqual(result.identity.start_time, candles[0].open_time)
+        self.assertEqual(result.identity.end_time, candles[-1].open_time)
         self.assertEqual(candles, [candle(0), candle(1), candle(2)])
 
     def test_rejects_conflicting_duplicate_timestamps_without_deduplicating(self) -> None:
@@ -144,16 +146,102 @@ class CandleValidationTests(unittest.TestCase):
         )
 
         self.assertEqual(result.candles, (candle(0, close_offset=timedelta(seconds=30)),))
+        self.assertEqual(result.identity.start_time, result.candles[0].open_time)
+        self.assertEqual(result.identity.end_time, result.candles[0].open_time)
         self.assertIs(result.identity.validation_status, DatasetValidationStatus.VALIDATED)
+        self.assertEqual(ValidatedCandleSequence(result.identity, result.candles), result)
+
+    def test_rejects_start_boundary_before_or_after_first_open_time(self) -> None:
+        candles = [candle(0), candle(1), candle(2)]
+        for start_minute in (-1, 1):
+            with self.subTest(start_minute=start_minute):
+                candidate_identity = identity(
+                    start_time=START + timedelta(minutes=start_minute),
+                    end_time=candles[-1].open_time,
+                )
+
+                with self.assertRaisesRegex(DatasetValidationError, "start_time.*first candle"):
+                    validate_candle_sequence(candidate_identity, candles)
+
+                self.assertIs(
+                    candidate_identity.validation_status, DatasetValidationStatus.UNVALIDATED
+                )
+                self.assertEqual(candles, [candle(0), candle(1), candle(2)])
+
+    def test_rejects_end_boundary_before_or_after_last_open_time(self) -> None:
+        candles = [candle(0), candle(1), candle(2)]
+        for end_minute in (1, 3):
+            with self.subTest(end_minute=end_minute):
+                candidate_identity = identity(end_time=START + timedelta(minutes=end_minute))
+
+                with self.assertRaisesRegex(DatasetValidationError, "end_time.*last candle"):
+                    validate_candle_sequence(candidate_identity, candles)
+
+                self.assertIs(
+                    candidate_identity.validation_status, DatasetValidationStatus.UNVALIDATED
+                )
+                self.assertEqual(candles, [candle(0), candle(1), candle(2)])
+
+    def test_direct_validated_sequence_requires_actual_boundaries(self) -> None:
+        validated_identity = validate_candle_sequence(
+            identity(end_time=START + timedelta(minutes=2)),
+            [candle(0), candle(1), candle(2)],
+        ).identity
+        cases = (
+            ("start_time", [candle(1), candle(2)]),
+            ("start_time", [candle(-1), candle(0), candle(1), candle(2)]),
+            ("end_time", [candle(0), candle(1)]),
+            ("end_time", [candle(0), candle(1), candle(2), candle(3)]),
+        )
+        for field_name, candles in cases:
+            with self.subTest(field=field_name, first=candles[0].open_time, count=len(candles)):
+                original = tuple(candles)
+
+                with self.assertRaisesRegex(DatasetValidationError, field_name):
+                    ValidatedCandleSequence(validated_identity, candles)
+
+                self.assertEqual(tuple(candles), original)
+
+    def test_boundary_mismatch_does_not_mask_sequence_integrity_errors(self) -> None:
+        candidate_identity = identity(start_time=START - timedelta(minutes=1))
+        validated_identity = validate_candle_sequence(
+            candidate_identity, [candle(minute) for minute in range(-1, 4)]
+        ).identity
+        invalid_interval = candle(1)
+        # Exercise sequence-level protection even if construction was bypassed.
+        object.__setattr__(invalid_interval, "interval", "5m")
+        cases = (
+            ("duplicate candle timestamp", [candle(0), candle(1), candle(1)]),
+            ("duplicate candle timestamp", [candle(0), candle(0, volume=Decimal("2"))]),
+            ("missing 1m candle timestamp", [candle(0), candle(2)]),
+            ("out-of-order candle timestamp", [candle(1), candle(0)]),
+            ("candle symbol does not match", [candle(0), candle(1, symbol="ETHUSDT")]),
+            ("candle interval does not match", [candle(0), invalid_interval]),
+        )
+        for message, candles in cases:
+            for direct in (False, True):
+                with self.subTest(message=message, direct=direct):
+                    original = tuple(candles)
+
+                    with self.assertRaisesRegex(DatasetValidationError, message):
+                        if direct:
+                            ValidatedCandleSequence(validated_identity, candles)
+                        else:
+                            validate_candle_sequence(candidate_identity, candles)
+
+                    self.assertEqual(tuple(candles), original)
+                    self.assertIs(
+                        candidate_identity.validation_status, DatasetValidationStatus.UNVALIDATED
+                    )
 
     def test_rejects_revalidation_of_a_validated_identity(self) -> None:
-        result = validate_candle_sequence(identity(), [candle(0)])
+        result = validate_candle_sequence(identity(end_time=START), [candle(0)])
 
         with self.assertRaisesRegex(DatasetValidationError, "must be unvalidated"):
             validate_candle_sequence(result.identity, result.candles)
 
     def test_direct_validated_sequence_rejects_empty_and_unvalidated_inputs(self) -> None:
-        validated_identity = validate_candle_sequence(identity(), [candle(0)]).identity
+        validated_identity = validate_candle_sequence(identity(end_time=START), [candle(0)]).identity
 
         with self.assertRaisesRegex(DatasetValidationError, "must not be empty"):
             ValidatedCandleSequence(validated_identity, [])
@@ -161,7 +249,9 @@ class CandleValidationTests(unittest.TestCase):
             ValidatedCandleSequence(identity(), [candle(0)])
 
     def test_direct_validated_sequence_rejects_invalid_sequence_invariants(self) -> None:
-        validated_identity = validate_candle_sequence(identity(), [candle(0), candle(1)]).identity
+        validated_identity = validate_candle_sequence(
+            identity(end_time=START + timedelta(minutes=1)), [candle(0), candle(1)]
+        ).identity
         invalid_sequences = {
             "duplicate": [candle(0), candle(0, volume=Decimal("2"))],
             "out-of-order": [candle(1), candle(0)],
@@ -176,7 +266,9 @@ class CandleValidationTests(unittest.TestCase):
 
     def test_direct_validated_sequence_copies_mutable_input_to_an_immutable_tuple(self) -> None:
         source_candles = [candle(0), candle(1)]
-        validated_identity = validate_candle_sequence(identity(), source_candles).identity
+        validated_identity = validate_candle_sequence(
+            identity(end_time=source_candles[-1].open_time), source_candles
+        ).identity
 
         result = ValidatedCandleSequence(validated_identity, source_candles)
         source_candles.append(candle(2))
@@ -196,7 +288,7 @@ class CandleValidationTests(unittest.TestCase):
 
     def test_uses_open_time_spacing_not_close_time_for_continuity(self) -> None:
         result = validate_candle_sequence(
-            identity(),
+            identity(end_time=START + timedelta(minutes=1)),
             [
                 candle(0, close_offset=timedelta(seconds=30)),
                 candle(1, close_offset=timedelta(seconds=10)),
