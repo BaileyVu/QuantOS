@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "QuantOS" }]
-dependencies = ["pyarrow==25.0.1"]
+dependencies = ["duckdb==1.5.5", "pyarrow==25.0.1"]
 
 [project.scripts]
 quantos = "quantos.interfaces.cli:main"
