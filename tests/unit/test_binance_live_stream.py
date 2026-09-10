@@ -223,6 +223,91 @@ class LiveStreamTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(connector.peak_active, 1)
         self.assertEqual(connector.urls, [adapter.url, adapter.url])
 
+    async def test_receive_watchdog_reconnects_without_emitting_an_event(self) -> None:
+        connector = FakeConnector([None], [message()])
+        adapter, sleep = self.adapter(connector)
+        with self.assertLogs("quantos.binance.live", level="WARNING") as captured:
+            with patch("quantos.infrastructure.binance.live_stream._RECEIVE_WATCHDOG_SECONDS", 0.001):
+                event = await anext(adapter)
+        self.assertEqual(event.candle.open_time.minute, 0)
+        self.assertEqual(sleep.delays, [1.0])
+        self.assertEqual(len(connector.urls), 2)
+        self.assertTrue(connector.connections[0].closed)
+        reconnect = next(
+            record for record in captured.records
+            if record.getMessage() == "live_market_data_reconnect"
+        )
+        self.assertEqual(reconnect.context["reason"], "receive_watchdog_timeout")
+
+    async def test_completed_state_survives_watchdog_and_next_minute_succeeds(self) -> None:
+        connector = FakeConnector([message(), None], [message(minute=1)])
+        adapter, sleep = self.adapter(connector)
+        first = await anext(adapter)
+        with patch("quantos.infrastructure.binance.live_stream._RECEIVE_WATCHDOG_SECONDS", 0.001):
+            second = await anext(adapter)
+        self.assertEqual([first.candle.open_time.minute, second.candle.open_time.minute], [0, 1])
+        self.assertEqual(sleep.delays, [1.0])
+
+    async def test_duplicate_after_watchdog_is_suppressed(self) -> None:
+        connector = FakeConnector([message(), None], [message(), message(minute=1)])
+        adapter, sleep = self.adapter(connector)
+        first = await anext(adapter)
+        with patch("quantos.infrastructure.binance.live_stream._RECEIVE_WATCHDOG_SECONDS", 0.001):
+            second = await anext(adapter)
+        self.assertEqual([first.candle.open_time.minute, second.candle.open_time.minute], [0, 1])
+        self.assertEqual(sleep.delays, [1.0])
+
+    async def test_gap_after_watchdog_remains_fatal(self) -> None:
+        connector = FakeConnector([message(), None], [message(minute=2)])
+        adapter, sleep = self.adapter(connector)
+        await anext(adapter)
+        with patch("quantos.infrastructure.binance.live_stream._RECEIVE_WATCHDOG_SECONDS", 0.001):
+            with self.assertRaisesRegex(BinanceLiveMarketDataError, "missing"):
+                await anext(adapter)
+        self.assertEqual(sleep.delays, [1.0])
+        self.assertEqual(len(connector.urls), 2)
+
+    async def test_conflicting_duplicate_after_watchdog_remains_fatal(self) -> None:
+        conflicting = combined_kline()
+        conflicting["data"]["k"]["c"] = "103"
+        connector = FakeConnector([message(), None], [encode(conflicting)])
+        adapter, sleep = self.adapter(connector)
+        await anext(adapter)
+        with patch("quantos.infrastructure.binance.live_stream._RECEIVE_WATCHDOG_SECONDS", 0.001):
+            with self.assertRaisesRegex(BinanceLiveMarketDataError, "conflicting"):
+                await anext(adapter)
+        self.assertEqual(sleep.delays, [1.0])
+
+    async def test_older_completion_after_watchdog_remains_fatal(self) -> None:
+        connector = FakeConnector([message(minute=1), None], [message()])
+        adapter, sleep = self.adapter(connector)
+        await anext(adapter)
+        with patch("quantos.infrastructure.binance.live_stream._RECEIVE_WATCHDOG_SECONDS", 0.001):
+            with self.assertRaisesRegex(BinanceLiveMarketDataError, "out-of-order"):
+                await anext(adapter)
+        self.assertEqual(sleep.delays, [1.0])
+
+    async def test_normal_payload_within_watchdog_does_not_reconnect(self) -> None:
+        connector = FakeConnector([message()])
+        adapter, sleep = self.adapter(connector)
+        with patch("quantos.infrastructure.binance.live_stream._RECEIVE_WATCHDOG_SECONDS", 0.1):
+            event = await anext(adapter)
+        self.assertIs(type(event), MarketEvent)
+        self.assertEqual(sleep.delays, [])
+        self.assertEqual(len(connector.urls), 1)
+
+    async def test_partial_payload_resets_watchdog_without_emission_or_state_change(self) -> None:
+        connector = FakeConnector(
+            [message(), message(minute=9, closed=False), None],
+            [message(minute=1)],
+        )
+        adapter, sleep = self.adapter(connector)
+        first = await anext(adapter)
+        with patch("quantos.infrastructure.binance.live_stream._RECEIVE_WATCHDOG_SECONDS", 0.001):
+            second = await anext(adapter)
+        self.assertEqual([first.candle.open_time.minute, second.candle.open_time.minute], [0, 1])
+        self.assertEqual(sleep.delays, [1.0])
+
     async def test_exact_duplicate_after_reconnect_emits_once(self) -> None:
         connector = FakeConnector([message(), ConnectionClosed(None, None)], [message(), message(minute=1)])
         adapter, sleep = self.adapter(connector)
@@ -353,11 +438,12 @@ class LiveStreamTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancellation_during_receive_closes_connection_without_retry(self) -> None:
         connector = FakeConnector([None])
         adapter, sleep = self.adapter(connector)
-        pending = asyncio.create_task(anext(adapter))
-        await asyncio.wait_for(connector.connections[0].receiving.wait(), timeout=1)
-        pending.cancel()
-        with self.assertRaises(asyncio.CancelledError):
-            await pending
+        with patch("quantos.infrastructure.binance.live_stream._RECEIVE_WATCHDOG_SECONDS", 1.0):
+            pending = asyncio.create_task(anext(adapter))
+            await asyncio.wait_for(connector.connections[0].receiving.wait(), timeout=0.1)
+            pending.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await pending
         self.assertTrue(connector.connections[0].closed)
         self.assertEqual(sleep.delays, [])
         self.assertEqual(len(connector.urls), 1)

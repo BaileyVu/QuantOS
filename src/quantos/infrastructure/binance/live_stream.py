@@ -24,11 +24,16 @@ from quantos.infrastructure.binance.live_klines import (
 _ENDPOINT = "wss://data-stream.binance.vision"
 _INITIAL_RECONNECT_DELAY = 1.0
 _MAX_RECONNECT_DELAY = 30.0
+_RECEIVE_WATCHDOG_SECONDS = 30.0
 _LOGGER = logging.getLogger("quantos.binance.live")
 
 
 class _Connection(Protocol):
     async def recv(self) -> str | bytes: ...
+
+
+class _ReceiveWatchdogTimeout(Exception):
+    """No market-data payload arrived within the bounded receive interval."""
 
 
 _Connector = Callable[[str], AbstractAsyncContextManager[_Connection]]
@@ -119,7 +124,11 @@ class BinanceSpotLiveMarketDataAdapter(AsyncIterator[MarketEvent]):
                     async with self._connector(self._url) as connection:
                         _LOGGER.info("live_market_data_connected")
                         while True:
-                            message = await connection.recv()
+                            try:
+                                async with asyncio.timeout(_RECEIVE_WATCHDOG_SECONDS):
+                                    message = await connection.recv()
+                            except TimeoutError as error:
+                                raise _ReceiveWatchdogTimeout from error
                             event = normalize_live_kline(message, expected_streams=self._streams)
                             if event is None:
                                 continue
@@ -154,6 +163,8 @@ class BinanceSpotLiveMarketDataAdapter(AsyncIterator[MarketEvent]):
                             yield event
                 except _ServerShutdown:
                     reason = "server_shutdown"
+                except _ReceiveWatchdogTimeout:
+                    reason = "receive_watchdog_timeout"
                 except (OSError, EOFError, WebSocketException) as error:
                     if not _retryable_transport(error):
                         raise BinanceLiveMarketDataError(
