@@ -31,6 +31,43 @@ def _imported_modules(path: Path) -> tuple[str, ...]:
 
 
 class ArchitectureTests(unittest.TestCase):
+    def test_alpha_training_depends_only_on_allowed_domain_and_standard_library_modules(self) -> None:
+        allowed_standard = {"__future__", "dataclasses", "datetime", "decimal", "enum", "types"}
+        allowed_domain = (
+            "quantos.domain.common", "quantos.domain.alpha", "quantos.domain.features",
+            "quantos.domain.market_data",
+        )
+        for path in (DOMAIN_ROOT / "alpha").rglob("*.py"):
+            with self.subTest(path=path.name):
+                for module in _imported_modules(path):
+                    self.assertTrue(
+                        module.split(".")[0] in allowed_standard
+                        or any(module == prefix or module.startswith(prefix + ".")
+                               for prefix in allowed_domain), module,
+                    )
+
+    def test_alpha_training_has_no_float_clock_io_or_shuffle_calls(self) -> None:
+        forbidden_calls = {"float", "open", "__import__", "eval", "exec"}
+        forbidden_attributes = {
+            "now", "utcnow", "today", "time", "monotonic", "setcontext", "shuffle", "seed",
+        }
+        for path in (DOMAIN_ROOT / "alpha").rglob("*.py"):
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                with self.subTest(path=path.name, line=getattr(node, "lineno", None)):
+                    if isinstance(node, ast.Constant):
+                        self.assertNotIsInstance(node.value, float)
+                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                        self.assertNotIn(node.func.id, forbidden_calls)
+                    if isinstance(node, ast.Attribute):
+                        self.assertNotIn(node.attr, forbidden_attributes)
+
+    def test_phase_4a_does_not_add_model_or_training_libraries(self) -> None:
+        project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        for requirement in project["project"]["dependencies"]:
+            self.assertNotIn(requirement.split("==")[0].lower().replace("_", "-"), {
+                "lightgbm", "scikit-learn", "sklearn", "numpy", "pandas", "joblib",
+            })
+
     def test_feature_engine_has_only_domain_and_pure_standard_library_dependencies(self) -> None:
         allowed_standard = {"__future__", "datetime", "decimal", "dataclasses", "types", "typing"}
         allowed_domain = (

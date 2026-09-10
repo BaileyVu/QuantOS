@@ -4,7 +4,7 @@ QuantOS V1 is a small, research-driven quantitative trading engine for Binance S
 
 ## Current implementation
 
-Phase 1 — Foundation is implemented. **Phase 2 — Market Data COMPLETE**: historical acquisition, immutable persistence, typed queries, and real public live-stream acceptance have passed. Phase 2A adds provider-independent Market Data dataset identity and deterministic canonical-candle sequence validation. Phase 2B adds Binance Spot historical-kline normalization, safe provider-specific range pagination, orchestration into validated in-memory canonical sequences, checksum-verified in-memory normalization of individual daily archives, and whole-day multi-day archive acquisition. Phase 2C1 adds the canonical immutable Parquet persistence primitive. Phase 2C2 adds Application orchestration for persisting acquired history, immutable incremental dataset versions, and typed DuckDB range queries over one explicitly selected canonical Parquet file. Phase 2D adds Binance Spot live BTCUSDT/ETHUSDT 1m kline streaming. Phase 3A adds the deterministic candidate Feature Engine described below. Alpha/model, trading, and evaluation behavior remain unimplemented.
+**Phase 1 — Foundation COMPLETE. Phase 2 — Market Data COMPLETE. Phase 3 — Feature Engine COMPLETE.** Historical acquisition, immutable persistence, typed queries, live public market data, and real-data deterministic feature acceptance have passed. Phase 2A adds provider-independent Market Data dataset identity and deterministic canonical-candle sequence validation. Phase 2B adds Binance Spot historical-kline normalization, safe provider-specific range pagination, orchestration into validated in-memory canonical sequences, checksum-verified in-memory normalization of individual daily archives, and whole-day multi-day archive acquisition. Phase 2C1 adds the canonical immutable Parquet persistence primitive. Phase 2C2 adds Application orchestration for persisting acquired history, immutable incremental dataset versions, and typed DuckDB range queries over one explicitly selected canonical Parquet file. Phase 2D adds Binance Spot live BTCUSDT/ETHUSDT 1m kline streaming. Phase 3A implements the deterministic candidate Feature Engine. Phase 4A adds causal targets and supervised dataset construction. Full Phase 4 remains incomplete: no model has been trained and no strategy thresholds, trading, or evaluation behavior are implemented.
 
 `BinanceSpotLiveMarketDataAdapter(symbols=["BTCUSDT", "ETHUSDT"], interval="1m")` is an async iterator of the existing canonical `MarketEvent` contract. It supports either symbol individually or both through one combined connection. Its deterministic provider-owned URL uses the public market-data-only endpoint `wss://data-stream.binance.vision/stream?streams=btcusdt@kline_1m/ethusdt@kline_1m&timeUnit=MICROSECOND`, with UTC stream names. Construction performs no network I/O; iteration starts the connection.
 
@@ -67,6 +67,31 @@ Insufficient history, absent complete UTC context, or any exactly zero mathemati
 All calculations use Decimal arithmetic in a fresh explicit local context: precision 34, `ROUND_HALF_EVEN`, `Emin=-999999`, `Emax=999999`, `capitals=1`, `clamp=0`, cleared flags, and traps for invalid operations, division by zero, overflow, inexact underflow, and float operations. Other traps are disabled. Ambient and default Decimal settings are neither inherited nor mutated. Arithmetic failures raise `FeatureEngineError`; every ready value is a finite built-in Decimal, without display quantization. Identical canonical inputs, decision time, and version produce identical ordered Decimal values.
 
 These are candidate definitions with **no claim of proven predictive value**. Production promotion and pruning require later temporal/out-of-sample evaluation of incremental usefulness, stability, and redundancy. Removing or replacing features requires a new feature version. Phase 3A includes no labels, targets, training, model, or strategy behavior.
+
+## Phase 4A — Causal targets and supervised datasets
+
+`quantos.domain.alpha.build_training_dataset(sequence)` accepts one actual `ValidatedCandleSequence`. It revalidates the source identity, validation status, every Candle contract, symbol/interval agreement, and exact ascending one-minute continuity. It retains the exact validated source `DatasetIdentity`, including all eight provenance dimensions. No source data is sorted, repaired, filled, or queried from storage.
+
+The immutable Alpha-owned `TargetLabel` is a regression label with `TARGET_VERSION = "gross-next-open-to-close-5m-v1"` and `TARGET_HORIZON_MINUTES = 5`. For decision candle index t:
+
+```text
+value = candle[t+5].close / candle[t+1].open - 1
+decision_time = candle[t].close_time
+entry_reference_time = candle[t+1].open_time
+exit_reference_time = candle[t+5].close_time
+```
+
+The next candle's opening price is the execution reference. The target is gross, with no fee or slippage adjustment, threshold, classification, or trading action. All label timestamps are built-in UTC datetimes. Entry must be strictly after the decision timestamp; input whose decision close reaches or overlaps the next open fails closed. Actual exit close timestamps are preserved without assuming a provider-era precision. Target arithmetic uses a fresh precision-34, `ROUND_HALF_EVEN` Decimal context with the same fixed exponent limits and traps as Phase 3; it does not inherit or mutate ambient/default settings. Targets are finite built-in Decimals, without float conversion or display quantization.
+
+An immutable `TrainingExample` pairs the existing FeatureVector with its separate label. Symbols and decision timestamps must match; feature names/order and versions are checked. Only the final 21 candles ending at t are passed to the existing production Feature Engine, with decision time equal to candle[t].close_time. Future entry/exit values and label metadata never enter features.
+
+Candidates run from **t=20 through t=N-6**, inclusive: `max(0, N-25)` decisions. A 25-candle source has zero candidates; 26 candles has one. For 1,440 candles, there are 1,415 candidates, with decision opens 00:20 through 23:54 for a midnight start. The final label enters at 23:55 and exits at the actual 23:59 candle close. Adjacent labels may overlap; candidates are not spaced five minutes apart. No purging, embargo, splitting, or random shuffling is introduced.
+
+`TrainingDataset` contains the source identity, feature/target versions, horizon, an ordered tuple of examples, and an ordered `unavailable_feature_timestamps` tuple. Its `candidate_decision_count` equals examples plus unavailable decisions. Duplicate, out-of-range, mismatched, or unaccounted candidates are rejected. A valid source shorter than 26 candles returns an empty dataset. Feature Engine `None` results are explicitly recorded and processing continues, without partial or imputed examples.
+
+A zero target entry open raises `TrainingDataError` and aborts construction, even if that candidate's features would be unavailable. Malformed inputs, incompatible/forged contracts, causality violations, and invalid target arithmetic also fail closed. Neither features nor targets are persisted by this Domain builder.
+
+Phase 4A makes **no predictive-value claim**. Candidate features remain candidates pending temporal/out-of-sample evaluation. No model training, model artifact, strategy threshold, or BUY/SELL/HOLD decision is produced. LightGBM comes next; no dependency is added in this phase.
 
 ## Specification
 
