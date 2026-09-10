@@ -13,6 +13,7 @@ DOMAIN_ROOT = PROJECT_ROOT / "src" / "quantos" / "domain"
 APPLICATION_ROOT = PROJECT_ROOT / "src" / "quantos" / "application"
 STORAGE_ROOT = PROJECT_ROOT / "src" / "quantos" / "infrastructure" / "storage"
 BINANCE_ROOT = PRODUCTION_ROOT / "infrastructure" / "binance"
+MODELS_ROOT = PRODUCTION_ROOT / "infrastructure" / "models"
 RISK_CONTRACT = DOMAIN_ROOT / "risk" / "contracts.py"
 EXPECTED_MODULES = {"market_data", "features", "alpha", "risk", "execution", "evaluation"}
 NETWORK_MODULES = {"aiohttp", "http", "httpx", "requests", "socket", "urllib", "websockets"}
@@ -61,12 +62,41 @@ class ArchitectureTests(unittest.TestCase):
                     if isinstance(node, ast.Attribute):
                         self.assertNotIn(node.attr, forbidden_attributes)
 
-    def test_phase_4a_does_not_add_model_or_training_libraries(self) -> None:
+    def test_phase_4b_pins_only_approved_model_dependencies(self) -> None:
         project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-        for requirement in project["project"]["dependencies"]:
-            self.assertNotIn(requirement.split("==")[0].lower().replace("_", "-"), {
-                "lightgbm", "scikit-learn", "sklearn", "numpy", "pandas", "joblib",
-            })
+        self.assertEqual(set(project["project"]["dependencies"]), {
+            "duckdb==1.5.5", "pyarrow==25.0.1", "websockets==17.1",
+            "lightgbm==4.7.0", "numpy==2.4.6", "scipy==1.17.1",
+        })
+        self.assertEqual(project["project"]["requires-python"], ">=3.11")
+
+    def test_model_numeric_libraries_are_confined_to_model_infrastructure(self) -> None:
+        for library in ("lightgbm", "numpy", "scipy"):
+            importers = [path for path in PRODUCTION_ROOT.rglob("*.py")
+                         if any(module.split(".")[0] == library for module in _imported_modules(path))]
+            self.assertTrue(importers, library)
+            for path in importers:
+                self.assertTrue(path.is_relative_to(MODELS_ROOT), str(path))
+
+    def test_no_unapproved_model_framework_or_unsafe_serialization_imports(self) -> None:
+        forbidden = {"pandas", "sklearn", "joblib", "pickle", "xgboost", "catboost", "torch", "tensorflow"}
+        for path in PRODUCTION_ROOT.rglob("*.py"):
+            for module in _imported_modules(path):
+                self.assertNotIn(module.split(".")[0], forbidden, str(path))
+
+    def test_models_have_no_network_git_clock_or_trading_dependencies(self) -> None:
+        forbidden = NETWORK_MODULES | {"subprocess", "time", "random"}
+        for path in MODELS_ROOT.rglob("*.py"):
+            for module in _imported_modules(path):
+                self.assertNotIn(module.split(".")[0], forbidden)
+                if module.startswith("quantos."):
+                    self.assertTrue(module.startswith(("quantos.infrastructure.models", "quantos.domain.alpha",
+                                                       "quantos.domain.features", "quantos.domain.market_data")))
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                if isinstance(node, ast.Attribute):
+                    self.assertNotIn(node.attr, {"now", "utcnow", "today", "shuffle", "system", "popen"})
+                if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                    self.assertNotIn(node.value, {"gpu", "cuda", "BUY", "SELL", "HOLD"})
 
     def test_feature_engine_has_only_domain_and_pure_standard_library_dependencies(self) -> None:
         allowed_standard = {"__future__", "datetime", "decimal", "dataclasses", "types", "typing"}
@@ -101,7 +131,7 @@ class ArchitectureTests(unittest.TestCase):
         project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         for requirement in project["project"]["dependencies"]:
             name = requirement.split("==")[0].lower().replace("_", "-")
-            self.assertNotIn(name, {"ta", "ta-lib", "pandas", "numpy", "pandas-ta", "finta"})
+            self.assertNotIn(name, {"ta", "ta-lib", "pandas", "pandas-ta", "finta"})
 
     def test_exactly_six_production_domain_areas_exist(self) -> None:
         actual_modules = {

@@ -4,7 +4,7 @@ QuantOS V1 is a small, research-driven quantitative trading engine for Binance S
 
 ## Current implementation
 
-**Phase 1 — Foundation COMPLETE. Phase 2 — Market Data COMPLETE. Phase 3 — Feature Engine COMPLETE.** Historical acquisition, immutable persistence, typed queries, live public market data, and real-data deterministic feature acceptance have passed. Phase 2A adds provider-independent Market Data dataset identity and deterministic canonical-candle sequence validation. Phase 2B adds Binance Spot historical-kline normalization, safe provider-specific range pagination, orchestration into validated in-memory canonical sequences, checksum-verified in-memory normalization of individual daily archives, and whole-day multi-day archive acquisition. Phase 2C1 adds the canonical immutable Parquet persistence primitive. Phase 2C2 adds Application orchestration for persisting acquired history, immutable incremental dataset versions, and typed DuckDB range queries over one explicitly selected canonical Parquet file. Phase 2D adds Binance Spot live BTCUSDT/ETHUSDT 1m kline streaming. Phase 3A implements the deterministic candidate Feature Engine. Phase 4A adds causal targets and supervised dataset construction. Full Phase 4 remains incomplete: no model has been trained and no strategy thresholds, trading, or evaluation behavior are implemented.
+**Phase 1 — Foundation COMPLETE. Phase 2 — Market Data COMPLETE. Phase 3 — Feature Engine COMPLETE. Phase 4A — Targets and training datasets COMPLETE.** Historical acquisition, immutable persistence, typed queries, live public market data, deterministic features, and real-data target/training-dataset acceptance have passed. Phase 2A adds provider-independent Market Data dataset identity and deterministic canonical-candle sequence validation. Phase 2B adds Binance Spot historical-kline normalization, safe provider-specific range pagination, orchestration into validated in-memory canonical sequences, checksum-verified in-memory normalization of individual daily archives, and whole-day multi-day archive acquisition. Phase 2C1 adds the canonical immutable Parquet persistence primitive. Phase 2C2 adds Application orchestration for persisting acquired history, immutable incremental dataset versions, and typed DuckDB range queries over one explicitly selected canonical Parquet file. Phase 2D adds Binance Spot live BTCUSDT/ETHUSDT 1m kline streaming. Phase 3A implements the deterministic candidate Feature Engine. Phase 4A adds causal targets and supervised dataset construction. Phase 4B implements candidate model infrastructure. Full Phase 4 remains incomplete until strategy decision logic is added.
 
 `BinanceSpotLiveMarketDataAdapter(symbols=["BTCUSDT", "ETHUSDT"], interval="1m")` is an async iterator of the existing canonical `MarketEvent` contract. It supports either symbol individually or both through one combined connection. Its deterministic provider-owned URL uses the public market-data-only endpoint `wss://data-stream.binance.vision/stream?streams=btcusdt@kline_1m/ethusdt@kline_1m&timeUnit=MICROSECOND`, with UTC stream names. Construction performs no network I/O; iteration starts the connection.
 
@@ -91,7 +91,31 @@ Candidates run from **t=20 through t=N-6**, inclusive: `max(0, N-25)` decisions.
 
 A zero target entry open raises `TrainingDataError` and aborts construction, even if that candidate's features would be unavailable. Malformed inputs, incompatible/forged contracts, causality violations, and invalid target arithmetic also fail closed. Neither features nor targets are persisted by this Domain builder.
 
-Phase 4A makes **no predictive-value claim**. Candidate features remain candidates pending temporal/out-of-sample evaluation. No model training, model artifact, strategy threshold, or BUY/SELL/HOLD decision is produced. LightGBM comes next; no dependency is added in this phase.
+Phase 4A makes **no predictive-value claim**. Candidate features remain candidates pending temporal/out-of-sample evaluation. Its Domain builder produces no model artifact, strategy threshold, or BUY/SELL/HOLD decision. Phase 4B consumes these unchanged contracts.
+
+## Phase 4B — Candidate model infrastructure
+
+`build_purged_temporal_split(datasets, *, train_start, validation_start, validation_end_exclusive)` in Domain Alpha requires exactly one BTCUSDT and one ETHUSDT TrainingDataset and built-in UTC boundaries. It revalidates and snapshots both contracts, canonicalizes source order by symbol, and orders actual rows by `(feature.timestamp, symbol)`. The split retains source snapshots for revalidation; only its actual training and validation rows enter model matrices. Reversing source input order produces identical model inputs and artifacts.
+
+Training decisions lie in `[train_start, validation_start)` and are retained only when the label exits **strictly before validation_start**. Otherwise their symbol/timestamp is recorded in `purged_training_boundary`. Validation decisions lie in `[validation_start, validation_end_exclusive)` and are retained only when the label exits **strictly before validation_end_exclusive**; crossing rows go into `purged_validation_tail`. No additional embargo is imposed. Historical feature lookback remains available. Unavailable features are recorded separately for each decision window without imputation. Both symbols must contribute actual rows to both matrices. Rows at or after validation end supply no training, validation metric, early stopping, or artifact input values.
+
+`quantos.infrastructure.models` owns LightGBM, NumPy conversion, training, artifacts, and prediction. The model family is `lightgbm-gross-return-regressor-v1`: one shared BTC/ETH regression model predicting the unchanged five-minute gross next-open-to-close target. The matrix has exactly ten float64 columns in explicit `FEATURE_NAMES` order. Labels are a separate float64 vector; symbol is metadata. Nonfinite conversion fails closed. There is no fitted preprocessing, scaling, feature pruning, or extra symbol feature.
+
+`LightGBMConfig` requires caller-supplied Decimal learning rate and L2 penalty, integer leaf/depth/minimum-row limits, boosting-round and early-stopping limits, and a random seed. Rates must be in `(0, 1]`, the L2 penalty nonnegative, leaves in `[2, 131072]`, other limits positive signed 32-bit integers, and the seed in `[0, 2147483647]`. Early stopping cannot exceed the boosting limit. The initial candidate configuration is `learning_rate=Decimal("0.05"), num_leaves=15, max_depth=5, min_data_in_leaf=50, lambda_l2=Decimal("1"), num_boost_round=200, early_stopping_rounds=20, random_seed=20260911`; it is not an optimal-parameter claim.
+
+`train_model(split, config, *, code_version)` uses native `lightgbm.Dataset` and `lightgbm.train`, regression/RMSE/GBDT, CPU, one thread, deterministic column-wise histograms, full feature and bagging fractions, zero bagging frequency, L1=0, and max_bin=255. The caller seed explicitly controls seed, feature-fraction seed, bagging seed, and data seed. Validation is used only for RMSE and early stopping. The serialized model contains only the best iteration. The caller supplies code provenance; production code does not invoke Git. Training, publication, loading, and debug-level predictions use the existing structured logging path.
+
+The returned immutable `ModelArtifact` holds native UTF-8 model bytes and canonical JSON metadata. Metadata records both complete source identities, windows, per-symbol row/exclusion counts and timestamps, feature/target versions, ordered feature names, caller configuration, resolved parameters, seed, best iteration, RMSE, code version, and Python/LightGBM/NumPy/SciPy versions. It contains no creation clock, host/user identity, or automatic repository path. RMSE uses the canonical round-trip float text representation.
+
+`MODEL_ARTIFACT_SCHEMA_VERSION = "lightgbm-artifact-v1"`. The full SHA-256 artifact ID hashes canonical UTF-8 metadata (sorted keys, compact separators, ASCII escapes, UTC timestamps with six fractional digits), including the exact model-byte SHA-256. Both derived fields `artifact_id` and `model_version` are excluded from that hash to avoid circularity. `model_version` is `lightgbm-gross-return-regressor-v1:<full-artifact-id>`.
+
+`ModelArtifactStore(root: Path).write(artifact)` requires a caller-selected root outside source control. It writes `<root>/models/lightgbm-artifact-v1/<full-artifact-id>/model.txt` and `metadata.json`. Each file is flushed and fsynced inside a unique temporary sibling directory; both are read and verified before atomic publication. On Windows, no-overwrite directory rename publishes the pair. Platforms without the implemented no-overwrite primitive fail closed. Existing identical artifacts succeed without rewriting or changing file mtimes; corrupt/different artifacts are never replaced. Temporary directories are cleaned on failure when possible.
+
+`load_model(path)` verifies exactly the two expected regular files, rejects linked/reparse artifact paths, checks canonical metadata and directory identity, recomputes both hashes, validates versions/configuration/provenance/accounting, and verifies the native Booster's feature order, regression objective, and exact best-iteration tree count. There is no fallback model, global singleton, registry, pickle, or joblib. `artifact.load()` provides the same verification before persistence.
+
+The resulting `VerifiedModel.predict(feature)` requires an actual, compatible FeatureVector with all ten finite Decimal values. One row crosses to float64 inside Infrastructure. A single finite raw regression output crosses back using `Decimal(repr(float(score)))`, without quantization. Repeated identical inputs produce exactly equal Decimal tuples. Same-software CPU training is tested for identical model bytes, metadata, identities, and predictions; cross-version, compiler, OS, or CPU-architecture artifact-hash equality is not promised.
+
+This remains a **candidate model**. Validation RMSE is model-development metadata, not profitability or predictive-value evidence. No final test has been consumed, no model has been promoted, and no BUY/SELL/HOLD thresholds or after-cost strategy decisions exist. Phase 5 retains final-test, walk-forward, after-cost evaluation, and promotion evidence ownership.
 
 ## Specification
 
@@ -103,7 +127,7 @@ Phase 4A makes **no predictive-value claim**. Candidate features remain candidat
 src/quantos/
   domain/          # Six V1 business ownership areas and canonical contracts
   application/     # Runtime coordination
-  infrastructure/  # Binance adapters, Parquet storage, DuckDB queries, configuration, and logging
+  infrastructure/  # Binance, storage/query, model artifacts, configuration, and logging
   interfaces/      # Local CLI
 configs/           # Safe example configuration
 tests/             # Unit, integration, and validation tests
@@ -111,7 +135,7 @@ tests/             # Unit, integration, and validation tests
 
 ## Setup and verification
 
-QuantOS requires Python 3.11 or later. Runtime dependencies are pinned to `pyarrow==25.0.1`, `duckdb==1.5.5`, and `websockets==17.1`.
+QuantOS requires Python 3.11 or later. Direct runtime dependencies are pinned to `pyarrow==25.0.1`, `duckdb==1.5.5`, `websockets==17.1`, `lightgbm==4.7.0`, `numpy==2.4.6`, and `scipy==1.17.1`. LightGBM also installs its required transitive `narwhals` dependency; no dataframe/sklearn extras are requested.
 
 ```bash
 python -m pip install -e .

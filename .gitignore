@@ -18,7 +18,7 @@ build/
 
 # QuantOS local data / artifacts
 data/
-models/
+/models/
 artifacts/
 results/
 logs/
