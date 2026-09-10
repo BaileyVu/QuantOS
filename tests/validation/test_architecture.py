@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+import tomllib
 import unittest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -30,6 +31,41 @@ def _imported_modules(path: Path) -> tuple[str, ...]:
 
 
 class ArchitectureTests(unittest.TestCase):
+    def test_feature_engine_has_only_domain_and_pure_standard_library_dependencies(self) -> None:
+        allowed_standard = {"__future__", "datetime", "decimal", "dataclasses", "types", "typing"}
+        allowed_domain = (
+            "quantos.domain.common", "quantos.domain.features", "quantos.domain.market_data",
+        )
+        for path in (DOMAIN_ROOT / "features").rglob("*.py"):
+            with self.subTest(path=path.name):
+                for module in _imported_modules(path):
+                    self.assertTrue(
+                        module.split(".")[0] in allowed_standard
+                        or any(module == prefix or module.startswith(prefix + ".")
+                               for prefix in allowed_domain),
+                        module,
+                    )
+
+    def test_features_have_no_float_clock_or_io_calls(self) -> None:
+        forbidden_calls = {"float", "open", "__import__", "eval", "exec", "getattr"}
+        forbidden_attributes = {"now", "utcnow", "today", "time", "monotonic", "setcontext"}
+        for path in (DOMAIN_ROOT / "features").rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                with self.subTest(path=path.name, line=getattr(node, "lineno", None)):
+                    if isinstance(node, ast.Constant):
+                        self.assertNotIsInstance(node.value, float)
+                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                        self.assertNotIn(node.func.id, forbidden_calls)
+                    if isinstance(node, ast.Attribute):
+                        self.assertNotIn(node.attr, forbidden_attributes)
+
+    def test_project_has_no_third_party_technical_analysis_dependency(self) -> None:
+        project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        for requirement in project["project"]["dependencies"]:
+            name = requirement.split("==")[0].lower().replace("_", "-")
+            self.assertNotIn(name, {"ta", "ta-lib", "pandas", "numpy", "pandas-ta", "finta"})
+
     def test_exactly_six_production_domain_areas_exist(self) -> None:
         actual_modules = {
             path.name for path in DOMAIN_ROOT.iterdir() if path.is_dir() and not path.name.startswith("__")
