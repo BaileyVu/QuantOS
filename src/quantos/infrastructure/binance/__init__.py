@@ -12,12 +12,16 @@ from quantos.infrastructure.binance.klines import (
     BinanceSpotHistoricalKlineAdapter,
 )
 from quantos.infrastructure.binance.range_fetch import BinanceSpotHistoricalRangeFetcher
+from quantos.infrastructure.binance.live_klines import BinanceLiveMarketDataError
+from quantos.infrastructure.binance.live_stream import BinanceSpotLiveMarketDataAdapter
 
 __all__ = [
     "BinanceDailyArchiveError",
     "BinanceMarketDataError",
+    "BinanceLiveMarketDataError",
     "BinanceSpotDailyArchiveAdapter",
     "BinanceSpotDailyArchiveRangeFetcher",
     "BinanceSpotHistoricalKlineAdapter",
     "BinanceSpotHistoricalRangeFetcher",
+    "BinanceSpotLiveMarketDataAdapter",
 ]

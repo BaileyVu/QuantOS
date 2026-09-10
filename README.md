@@ -4,7 +4,28 @@ QuantOS V1 is a small, research-driven quantitative trading engine for Binance S
 
 ## Current implementation
 
-Phase 1 — Foundation is implemented. Phase 2A adds provider-independent Market Data dataset identity and deterministic canonical-candle sequence validation. Phase 2B adds Binance Spot historical-kline normalization, safe provider-specific range pagination, orchestration into validated in-memory canonical sequences, checksum-verified in-memory normalization of individual daily archives, and whole-day multi-day archive acquisition. Phase 2C1 adds the canonical immutable Parquet persistence primitive. Phase 2C2 adds Application orchestration for persisting acquired history, immutable incremental dataset versions, and typed DuckDB range queries over one explicitly selected canonical Parquet file. Trading, evaluation, and live market data are not implemented yet; Phase 2 is not complete.
+Phase 1 — Foundation is implemented. Phase 2A adds provider-independent Market Data dataset identity and deterministic canonical-candle sequence validation. Phase 2B adds Binance Spot historical-kline normalization, safe provider-specific range pagination, orchestration into validated in-memory canonical sequences, checksum-verified in-memory normalization of individual daily archives, and whole-day multi-day archive acquisition. Phase 2C1 adds the canonical immutable Parquet persistence primitive. Phase 2C2 adds Application orchestration for persisting acquired history, immutable incremental dataset versions, and typed DuckDB range queries over one explicitly selected canonical Parquet file. Phase 2D adds Binance Spot live BTCUSDT/ETHUSDT 1m kline streaming. Feature Engine, trading, and evaluation behavior are not implemented yet. Phase 2D real live-network acceptance remains pending; Phase 2 is not yet accepted.
+
+`BinanceSpotLiveMarketDataAdapter(symbols=["BTCUSDT", "ETHUSDT"], interval="1m")` is an async iterator of the existing canonical `MarketEvent` contract. It supports either symbol individually or both through one combined connection. Its deterministic provider-owned URL uses the public market-data-only endpoint `wss://data-stream.binance.vision/stream?streams=btcusdt@kline_1m/ethusdt@kline_1m&timeUnit=MICROSECOND`, with UTC stream names. Construction performs no network I/O; iteration starts the connection.
+
+Only an explicit Binance closed flag (`k.x == true`) can produce a canonical Candle and MarketEvent. Partial/open candles are never exposed downstream, even if a local clock or the event timestamp appears to be past close. The combined envelope, subscription, event type, symbols, interval, and required JSON field types are checked strictly. Prices/volumes are converted directly from decimal strings; E/t/T are converted from integer Unix microseconds without floats. Candle validation enforces canonical OHLCV rules, open times must be exact UTC minutes, supplied close times are preserved, and each MarketEvent timestamp is the provider E timestamp at or after candle close.
+
+Live continuity is independent per symbol. After the first valid completion, each new candle must start exactly one minute after the previous one. An identical canonical Candle at the same open time is a transport duplicate and emits nothing, even if its provider event time changed. Conflicting duplicates, older completions, missing minutes, or invalid payloads fail closed and terminate the session. Partial updates do not change completed-candle state. No sorting, candle synthesis, historical backfill, or automatic gap repair occurs.
+
+Transport disconnects, normal connection expiry, and the documented combined `!serverShutdown` event reconnect with delays of 1, 2, 4, 8, 16, then at most 30 seconds. New completed candles reset the delay; merely opening a connection or receiving duplicates/partials does not. The same session preserves continuity state across reconnects and keeps at most one active connection. Protocol/payload failures and fatal handshake failures are surfaced as `BinanceLiveMarketDataError`. Cancellation propagates and closes the connection. Client keepalive pings are disabled while library responses to server Ping frames remain active. Lifecycle, completions, reconnects, and integrity failures use the existing structured logging path.
+
+Use `contextlib.aclosing` when consuming a bounded number of events so early exit closes the connection:
+
+```python
+from contextlib import aclosing
+from quantos.infrastructure.binance import BinanceSpotLiveMarketDataAdapter
+
+async def first_completed_event():
+    async with aclosing(BinanceSpotLiveMarketDataAdapter(symbols=["BTCUSDT"])) as events:
+        return await anext(events)
+```
+
+The live adapter is public market data only: it uses no credentials, account streams, or order functionality, and does not persist live candles. Historical Parquet/DuckDB behavior is unchanged. Offline tests use injected fake connections; real Binance network acceptance is separate.
 
 `BinanceSpotDailyArchiveRangeFetcher` accepts BTCUSDT or ETHUSDT, interval `1m`, and an increasing range of UTC midnight bounds with an exclusive end. It calls the single-day archive adapter once per date in ascending order and concatenates its rows unchanged, including duplicates, gaps, and provider ordering. Empty days contribute no rows; an archive failure stops acquisition immediately. The existing single-day adapter owns checksum verification and timestamp-era normalization. Pass the range fetcher to `ingest_historical_range` with explicit source, schema version, and ingestion version for dataset identity, canonical validation, and range completeness checks. The range fetcher itself adds no persistence, repairs, retries, or REST fallback.
 
@@ -36,7 +57,7 @@ tests/             # Unit, integration, and validation tests
 
 ## Setup and verification
 
-QuantOS requires Python 3.11 or later. Its storage dependencies are pinned to `pyarrow==25.0.1` and `duckdb==1.5.5`.
+QuantOS requires Python 3.11 or later. Runtime dependencies are pinned to `pyarrow==25.0.1`, `duckdb==1.5.5`, and `websockets==17.1`.
 
 ```bash
 python -m pip install -e .

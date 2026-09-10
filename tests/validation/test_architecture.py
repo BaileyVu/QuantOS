@@ -11,9 +11,10 @@ PRODUCTION_ROOT = PROJECT_ROOT / "src" / "quantos"
 DOMAIN_ROOT = PROJECT_ROOT / "src" / "quantos" / "domain"
 APPLICATION_ROOT = PROJECT_ROOT / "src" / "quantos" / "application"
 STORAGE_ROOT = PROJECT_ROOT / "src" / "quantos" / "infrastructure" / "storage"
+BINANCE_ROOT = PRODUCTION_ROOT / "infrastructure" / "binance"
 RISK_CONTRACT = DOMAIN_ROOT / "risk" / "contracts.py"
 EXPECTED_MODULES = {"market_data", "features", "alpha", "risk", "execution", "evaluation"}
-NETWORK_MODULES = {"aiohttp", "http", "httpx", "requests", "socket", "urllib"}
+NETWORK_MODULES = {"aiohttp", "http", "httpx", "requests", "socket", "urllib", "websockets"}
 
 
 def _imported_modules(path: Path) -> tuple[str, ...]:
@@ -44,6 +45,7 @@ class ArchitectureTests(unittest.TestCase):
         self.assertNotIn("duckdb", source.lower())
         self.assertNotIn("parquet", source.lower())
         self.assertNotIn("pyarrow", source.lower())
+        self.assertNotIn("websockets", source.lower())
 
     def test_application_does_not_depend_on_infrastructure(self) -> None:
         for path in APPLICATION_ROOT.rglob("*.py"):
@@ -57,7 +59,7 @@ class ArchitectureTests(unittest.TestCase):
                     )
                 )
                 self.assertFalse(
-                    any(module.split(".")[0] in {"duckdb", "pyarrow"} for module in modules)
+                    any(module.split(".")[0] in {"duckdb", "pyarrow", "websockets"} for module in modules)
                 )
 
     def test_duckdb_imports_are_confined_to_infrastructure_storage(self) -> None:
@@ -100,4 +102,29 @@ class ArchitectureTests(unittest.TestCase):
         source = RISK_CONTRACT.read_text(encoding="utf-8")
 
         self.assertNotIn("quantos.domain.execution", source)
+
+    def test_websockets_imports_are_confined_to_binance_infrastructure(self) -> None:
+        importers = tuple(
+            path for path in PRODUCTION_ROOT.rglob("*.py")
+            if any(module.split(".")[0] == "websockets" for module in _imported_modules(path))
+        )
+        self.assertTrue(importers)
+        for path in importers:
+            with self.subTest(path=path.relative_to(PROJECT_ROOT)):
+                self.assertTrue(path.is_relative_to(BINANCE_ROOT))
+
+    def test_live_adapter_has_no_persistence_or_trading_dependencies(self) -> None:
+        for name in ("live_klines.py", "live_stream.py"):
+            path = BINANCE_ROOT / name
+            with self.subTest(path=name):
+                for module in _imported_modules(path):
+                    if module.startswith("quantos."):
+                        self.assertTrue(module.startswith((
+                            "quantos.domain.common", "quantos.domain.market_data",
+                            "quantos.infrastructure.binance.live_klines",
+                        )), module)
+                    self.assertNotIn(module.split(".")[0], {"duckdb", "pyarrow", "pathlib", "os"})
+                source = path.read_text(encoding="utf-8")
+                for forbidden in ("api_key", "api_secret", "listenKey", "/api/v3/order", "fapi.binance"):
+                    self.assertNotIn(forbidden, source)
 
