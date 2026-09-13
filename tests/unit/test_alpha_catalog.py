@@ -47,7 +47,12 @@ from quantos.domain.evaluation.alpha_catalog import (
     simple_return,
     wick_fractions,
 )
-from quantos.domain.evaluation.alpha_funnel import af1_decimal_context, canonical_json_bytes
+from quantos.domain.evaluation.alpha_funnel import (
+    Direction,
+    HypothesisMetadata,
+    af1_decimal_context,
+    canonical_json_bytes,
+)
 from quantos.domain.features import FEATURE_NAMES
 from quantos.domain.market_data.contracts import Candle
 
@@ -111,7 +116,7 @@ class AlphaCatalogTests(unittest.TestCase):
         actual = catalog()
         self.assertEqual(
             actual.catalog_id,
-            "8292efbe030f3dff7a542efc6d4e841c73ec93b7c2116b363de688cc483290b9",
+            "060147848ab0d3aa3deb4a77fe0cf5af6bdd10a374587c24e5ff7a640a0a5d74",
         )
         self.assertEqual(tuple(item.stable_id for item in actual.entries), EXPECTED_IDS)
         self.assertEqual(len(set(EXPECTED_IDS)), 36)
@@ -123,6 +128,95 @@ class AlphaCatalogTests(unittest.TestCase):
             },
             {family: 6 for family in HypothesisFamily},
         )
+
+    def test_interface_repair_changed_only_three_input_declarations(self) -> None:
+        current = json.loads((ARTIFACT_ROOT / "catalog.json").read_bytes())
+        self.assertEqual(
+            current["catalog_id"],
+            "060147848ab0d3aa3deb4a77fe0cf5af6bdd10a374587c24e5ff7a640a0a5d74",
+        )
+        previous_inputs = {
+            "af2a.c4.positive-shock-high-volatility-reversal-down": [
+                "close", "feature:realized_volatility_20m"
+            ],
+            "af2a.c5.negative-shock-high-volatility-reversal-up": [
+                "close", "feature:realized_volatility_20m"
+            ],
+            "af2a.f1.one-minute-opposed-fifteen-minute-state": [
+                "feature:return_1m", "feature:return_15m"
+            ],
+        }
+        reconstructed_previous = json.loads(json.dumps(current))
+        for entry in reconstructed_previous["hypotheses"]:
+            if entry["stable_id"] in previous_inputs:
+                self.assertEqual(entry["causal_inputs"], ["close"])
+                entry["causal_inputs"] = previous_inputs[entry["stable_id"]]
+        identity = dict(reconstructed_previous)
+        identity.pop("catalog_id")
+        self.assertEqual(
+            sha256(canonical_json_bytes(identity)).hexdigest(),
+            "8292efbe030f3dff7a542efc6d4e841c73ec93b7c2116b363de688cc483290b9",
+        )
+
+    def test_retained_inputs_are_af1_candle_contract_compatible(self) -> None:
+        actual = catalog()
+        by_id = {entry.stable_id: entry for entry in actual.entries}
+        for stable_id in (
+            "af2a.c4.positive-shock-high-volatility-reversal-down",
+            "af2a.c5.negative-shock-high-volatility-reversal-up",
+            "af2a.f1.one-minute-opposed-fifteen-minute-state",
+        ):
+            self.assertEqual(by_id[stable_id].causal_inputs, ("close",))
+
+        retained = actual.af3_entries()
+        self.assertEqual(len(retained), 15)
+        self.assertFalse(
+            any(value.startswith("feature:") for entry in retained for value in entry.causal_inputs)
+        )
+        plan = derive_fdr_plan(actual)
+        self.assertEqual(plan["planned_definition_count"], 44)
+        self.assertEqual(plan["planned_registered_test_count"], 616)
+        self.assertFalse(
+            any(
+                value.startswith("feature:")
+                for row in plan["planned_definitions"]
+                for value in row["required_inputs"]
+            )
+        )
+        for index, row in enumerate(plan["planned_definitions"]):
+            with self.subTest(index=index, definition=row["planned_definition_sha256"]):
+                direction = (
+                    Direction.UP if row["direction"].endswith("_up") else Direction.DOWN
+                )
+                metadata = HypothesisMetadata(
+                    stable_id=f"af3.input-contract-probe.{index}",
+                    implementation_id="af3-input-contract-probe-v1",
+                    family=row["family"],
+                    description="AF2A to AF1 required-input compatibility probe.",
+                    direction=direction,
+                    interpretation="Validates only the AF1 Candle input contract.",
+                    required_inputs=tuple(row["required_inputs"]),
+                    parameters={},
+                    causal_lookback=row["causal_lookback"],
+                )
+                self.assertEqual(metadata.required_inputs, tuple(row["required_inputs"]))
+
+    def test_retained_feature_inputs_fail_closed_but_nonretained_remain_supported(self) -> None:
+        actual = catalog()
+        retained = actual.af3_entries()[0]
+        with self.assertRaisesRegex(
+            CatalogError, "retained AF3 causal_inputs must be canonical Candle fields"
+        ):
+            replace(retained, causal_inputs=("feature:return_1m",))
+
+        nonretained = next(
+            entry
+            for entry in actual.entries
+            if entry.status is not CatalogStatus.RETAIN_AF3
+            and any(value.startswith("feature:") for value in entry.causal_inputs)
+        )
+        rebuilt = replace(nonretained)
+        self.assertTrue(any(value.startswith("feature:") for value in rebuilt.causal_inputs))
 
     def test_cost_model_and_predeclared_parameter_sets_are_fixed(self) -> None:
         actual = catalog()
@@ -509,7 +603,7 @@ class AlphaCatalogTests(unittest.TestCase):
         self.assertEqual(len(fdr["planned_registered_tests"]), 616)
         self.assertEqual(
             fdr["fdr_plan_id"],
-            "18030191129f5f8060de09d88c08806a64f20e8ca440576ef0b02917ea346498",
+            "32a6a1e1e916a0b012bd5ac22d747b3b57afa53a99e5153d0fb1a0685511a6ae",
         )
         verified = load_and_verify_fdr_plan(
             (ARTIFACT_ROOT / "catalog.json").read_bytes(),

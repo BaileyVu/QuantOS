@@ -1,6 +1,6 @@
 # AF2A Math and Economic Pre-Screen
 
-Catalog revision: `8292efbe030f3dff7a542efc6d4e841c73ec93b7c2116b363de688cc483290b9`. This document describes exactly this canonical AF2A catalog revision.
+Catalog revision: `060147848ab0d3aa3deb4a77fe0cf5af6bdd10a374587c24e5ff7a640a0a5d74`. This document describes exactly this canonical AF2A catalog revision.
 
 No AF1 empirical screen, threshold optimization, model training, future-return inspection, or sealed-OOS access was performed.
 

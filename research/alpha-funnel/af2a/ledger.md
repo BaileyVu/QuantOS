@@ -1,6 +1,6 @@
 # AF2A Human-Directed Hypothesis Ledger
 
-Catalog ID: `8292efbe030f3dff7a542efc6d4e841c73ec93b7c2116b363de688cc483290b9`
+Catalog ID: `060147848ab0d3aa3deb4a77fe0cf5af6bdd10a374587c24e5ff7a640a0a5d74`
 
 Status: research metadata only. AF1 broad empirical screening has not run. No future return, AF3 result, or sealed OOS data was inspected.
 
@@ -312,7 +312,7 @@ A quiet regime followed by an accepted directional expansion may concentrate new
 A positive shock during an already volatile regime may be more likely to exhaust than a shock in normal conditions.
 
 - **Direction:** `reversal_down`
-- **Causal inputs:** `close`, `feature:realized_volatility_20m`
+- **Causal inputs:** `close`
 - **Formula:** `simple_return_j=close[j]/close[j-1]-1; rv_20=sqrt(mean(simple_return_j^2 over rv_lookback_returns)); rv_estimator=rms_simple_returns; calibration_scope=per_symbol; calibration_mode=rolling_prior_only uses the preceding calibration_lookback_minutes valid rv_20 observations for the same symbol; exclude_current_observation=true; require at least minimum_calibration_observations; update every calibration_update_minutes; threshold=sorted(prior_rv)[ceil(rv_state_quantile*N)-1] under quantile_rule=nearest_rank_ceil; zero_volatility_behavior=valid_zero_current_undefined_zero_baseline means current zero rv is valid but a zero/absent calibration baseline cannot create an event; r_5=close[t]/close[t-5]-1; event=r_5>=shock and rv_20>=threshold`
 - **Lookback:** 43221 completed 1-minute candles
 - **Predeclared settings:** high_vol {"calibration_lookback_minutes": 43200, "calibration_mode": "rolling_prior_only", "calibration_scope": "per_symbol", "calibration_update_minutes": 1, "exclude_current_observation": true, "minimum_calibration_observations": 2000, "quantile_rule": "nearest_rank_ceil", "rv_estimator": "rms_simple_returns", "rv_lookback_returns": 20, "rv_state_quantile": "0.80", "shock": "0.0075", "zero_volatility_behavior": "valid_zero_current_undefined_zero_baseline"}
@@ -331,7 +331,7 @@ A positive shock during an already volatile regime may be more likely to exhaust
 A negative shock in an already volatile regime may exhaust forced selling and reverse upward.
 
 - **Direction:** `reversal_up`
-- **Causal inputs:** `close`, `feature:realized_volatility_20m`
+- **Causal inputs:** `close`
 - **Formula:** `simple_return_j=close[j]/close[j-1]-1; rv_20=sqrt(mean(simple_return_j^2 over rv_lookback_returns)); rv_estimator=rms_simple_returns; calibration_scope=per_symbol; calibration_mode=rolling_prior_only uses the preceding calibration_lookback_minutes valid rv_20 observations for the same symbol; exclude_current_observation=true; require at least minimum_calibration_observations; update every calibration_update_minutes; threshold=sorted(prior_rv)[ceil(rv_state_quantile*N)-1] under quantile_rule=nearest_rank_ceil; zero_volatility_behavior=valid_zero_current_undefined_zero_baseline means current zero rv is valid but a zero/absent calibration baseline cannot create an event; r_5=close[t]/close[t-5]-1; event=r_5<=-shock and rv_20>=threshold`
 - **Lookback:** 43221 completed 1-minute candles
 - **Predeclared settings:** high_vol {"calibration_lookback_minutes": 43200, "calibration_mode": "rolling_prior_only", "calibration_scope": "per_symbol", "calibration_update_minutes": 1, "exclude_current_observation": true, "minimum_calibration_observations": 2000, "quantile_rule": "nearest_rank_ceil", "rv_estimator": "rms_simple_returns", "rv_lookback_returns": 20, "rv_state_quantile": "0.80", "shock": "0.0075", "zero_volatility_behavior": "valid_zero_current_undefined_zero_baseline"}
@@ -603,7 +603,7 @@ A large move confirmed by high quote activity and trade count may reflect broad 
 A short counter-move inside a larger state may be a temporary pullback whose resolution follows the 15-minute direction.
 
 - **Direction:** `direction_neutral_state_conditioning`
-- **Causal inputs:** `feature:return_1m`, `feature:return_15m`
+- **Causal inputs:** `close`
 - **Formula:** `sign(return_1m)=-sign(return_15m) and abs(return_15m)>=state_min and abs(return_1m)>=pullback_min; continue sign(return_15m)`
 - **Lookback:** 21 completed 1-minute candles
 - **Predeclared settings:** pullback {"pullback_min": "0.0015", "state_min": "0.005"}; deep_pullback {"pullback_min": "0.003", "state_min": "0.0075"}

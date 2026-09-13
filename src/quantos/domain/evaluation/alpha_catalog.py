@@ -254,6 +254,10 @@ class CatalogEntry:
         if type(self.explainability_score) is not int or not 0 <= self.explainability_score <= 4:
             raise CatalogError("explainability_score must be an integer from zero to four")
         if self.status is CatalogStatus.RETAIN_AF3:
+            if any(value not in CANONICAL_CANDLE_INPUTS for value in self.causal_inputs):
+                raise CatalogError(
+                    "retained AF3 causal_inputs must be canonical Candle fields"
+                )
             if self.research_viability is ResearchViability.LOW:
                 raise CatalogError("LOW-viability hypotheses cannot enter AF3")
             if self.af1_feasibility is Af1Feasibility.CONDITION_ONLY:
