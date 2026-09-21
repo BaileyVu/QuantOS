@@ -1,5 +1,21 @@
 """Local canonical historical dataset persistence."""
 
+from quantos.infrastructure.storage.aggregate_trade_duckdb import (
+    DuckDBAggregateTradeArchiveQuery,
+    DuckDBAggregateTradeQueryError,
+)
+from quantos.infrastructure.storage.aggregate_trade_parquet import (
+    AGGREGATE_TRADE_SCHEMA,
+    AGGREGATE_TRADE_STORAGE_SCHEMA_VERSION,
+    AggregateTradeArchivePublication,
+    AggregateTradeDatasetCollisionError,
+    AggregateTradeParquetStorageError,
+    ParquetAggregateTradeArchiveStore,
+)
+from quantos.infrastructure.storage.duckdb_query import (
+    DuckDBCandleDatasetQuery,
+    DuckDBQueryError,
+)
 from quantos.infrastructure.storage.parquet import (
     CANDLE_SCHEMA,
     STORAGE_SCHEMA_VERSION,
@@ -8,18 +24,22 @@ from quantos.infrastructure.storage.parquet import (
     ParquetStorageError,
     dataset_id,
 )
-from quantos.infrastructure.storage.duckdb_query import (
-    DuckDBCandleDatasetQuery,
-    DuckDBQueryError,
-)
 
 __all__ = [
+    "AGGREGATE_TRADE_SCHEMA",
+    "AGGREGATE_TRADE_STORAGE_SCHEMA_VERSION",
+    "AggregateTradeArchivePublication",
+    "AggregateTradeDatasetCollisionError",
+    "AggregateTradeParquetStorageError",
     "CANDLE_SCHEMA",
-    "STORAGE_SCHEMA_VERSION",
     "DatasetCollisionError",
+    "DuckDBAggregateTradeArchiveQuery",
+    "DuckDBAggregateTradeQueryError",
     "DuckDBCandleDatasetQuery",
     "DuckDBQueryError",
+    "ParquetAggregateTradeArchiveStore",
     "ParquetCandleDatasetStore",
     "ParquetStorageError",
+    "STORAGE_SCHEMA_VERSION",
     "dataset_id",
 ]
