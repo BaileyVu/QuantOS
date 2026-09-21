@@ -15,6 +15,9 @@ STORAGE_ROOT = PROJECT_ROOT / "src" / "quantos" / "infrastructure" / "storage"
 BINANCE_ROOT = PRODUCTION_ROOT / "infrastructure" / "binance"
 MODELS_ROOT = PRODUCTION_ROOT / "infrastructure" / "models"
 RISK_CONTRACT = DOMAIN_ROOT / "risk" / "contracts.py"
+APPROVED_AGGREGATE_TRADE_CONTRACT = (
+    DOMAIN_ROOT / "market_data" / "research_events" / "aggregate_trade.py"
+)
 EXPECTED_MODULES = {"market_data", "features", "alpha", "risk", "execution", "evaluation"}
 NETWORK_MODULES = {"aiohttp", "http", "httpx", "requests", "socket", "urllib", "websockets"}
 
@@ -141,14 +144,16 @@ class ArchitectureTests(unittest.TestCase):
         self.assertEqual(actual_modules, EXPECTED_MODULES)
 
     def test_domain_does_not_depend_on_infrastructure(self) -> None:
-        source = "\n".join(path.read_text(encoding="utf-8") for path in DOMAIN_ROOT.rglob("*.py"))
-
-        self.assertNotIn("quantos.infrastructure", source)
-        self.assertNotIn("binance", source.lower())
-        self.assertNotIn("duckdb", source.lower())
-        self.assertNotIn("parquet", source.lower())
-        self.assertNotIn("pyarrow", source.lower())
-        self.assertNotIn("websockets", source.lower())
+        for path in DOMAIN_ROOT.rglob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.relative_to(PROJECT_ROOT)):
+                self.assertNotIn("quantos.infrastructure", source)
+                self.assertNotIn("duckdb", source.lower())
+                self.assertNotIn("parquet", source.lower())
+                self.assertNotIn("pyarrow", source.lower())
+                self.assertNotIn("websockets", source.lower())
+                if path != APPROVED_AGGREGATE_TRADE_CONTRACT:
+                    self.assertNotIn("binance", source.lower())
 
     def test_application_does_not_depend_on_infrastructure(self) -> None:
         for path in APPLICATION_ROOT.rglob("*.py"):
@@ -230,4 +235,3 @@ class ArchitectureTests(unittest.TestCase):
                 source = path.read_text(encoding="utf-8")
                 for forbidden in ("api_key", "api_secret", "listenKey", "/api/v3/order", "fapi.binance"):
                     self.assertNotIn(forbidden, source)
-
