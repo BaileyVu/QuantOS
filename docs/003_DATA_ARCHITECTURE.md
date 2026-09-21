@@ -1,8 +1,10 @@
 # QuantOS Core — 003_DATA_ARCHITECTURE.md
 
-Version: 1.0.0-V1
+Version: 1.1.0-V1
 Status: Final MVP data architecture
-Last Updated: 2026-08-19
+Last Updated: 2026-09-21
+
+Amendment: 2026-09-21 — Human-approved DE1A research-only aggregate-trade scope; production semantics unchanged.
 
 ## 1. Purpose
 
@@ -31,6 +33,91 @@ Supporting runtime data:
 - execution events.
 
 V1 does not require additional market-data vendors or alternative-data pipelines.
+
+## 2.1 Approved research-only market-event data
+
+QuantOS may implement storage and processing of explicitly approved research-only
+market-event information without changing the V1 production decision cadence.
+The sole information family permitted by this subsection is Binance Spot
+aggregate trades (`aggTrades`) for BTCUSDT and ETHUSDT. Historical archives and
+live-collected observations are eligible research sources only within separately
+authorized phases.
+
+This permission does not include individual-trade ingestion, order-book/L2
+infrastructure, derivatives data or trading, additional instruments or exchanges,
+unrelated alternative data, sub-minute strategy decisions, high-frequency trading
+(HFT), or market making. Those exclusions remain in force. Approval of this
+subsection does not itself authorize implementation, acquisition, collection,
+experiment execution, feature admission, paper trading, production usage, or
+access to any research interval or data role.
+
+Raw provider records, normalized canonical research events, derived
+completed-minute state, and production feature eligibility are distinct layers.
+Canonical research event contracts belong to the existing Market Data ownership
+boundary and must remain separate from `Candle` and its completed-candle
+`MarketEvent`. Existing candle `DatasetIdentity` semantics remain unchanged.
+Provider payloads remain outside domain contracts. Exact event fields and
+normalization rules require separate contract approval and provider conformance
+evidence.
+
+Event datasets must identify their event granularity explicitly and must not
+masquerade as `1m` candle datasets. Their manifests must bind provider and market,
+symbol, event family, requested and observed coverage, timestamp units, schema
+and adapter versions, source provenance, validation state, and content hashes.
+Raw-content and canonical-content identities must be independently identifiable.
+Corrections, changed normalization, or source revisions create explicit successor
+identities/versions; existing source datasets and previously published canonical
+versions must never be silently rewritten. Canonical historical event datasets
+remain subject to the Parquet storage and DuckDB query architecture.
+
+Temporal contracts must distinguish event occurrence time, provider
+message/emission time where supplied, and local observation or ingestion time
+where applicable. Preserve source timestamp units and sufficient precision for
+lossless UTC normalization. Missing availability timestamps remain explicitly
+unknown; neither an event timestamp nor an archive ingestion timestamp may be
+substituted as proof of availability at an earlier decision.
+
+Before canonical publication, the approved contract must define source-scoped
+aggregate-trade identity and a deterministic total ordering with deterministic
+equal-timestamp resolution. It must establish through provider evidence and
+conformance fixtures how event time, aggregate ID, underlying trade-ID ranges and
+source order relate. No claim of ID continuity or timestamp monotonicity may be
+assumed without that evidence. Canonical sorting must not conceal source
+timestamp regressions or other integrity failures.
+
+Duplicate IDs, conflicting records for an ID, missing ranges, timestamp
+regressions and malformed maker/aggressor semantics must be detected as applicable.
+Identical duplicates may be handled only under an explicitly approved,
+deterministic and recorded idempotency policy. Conflicting or unresolved records
+must fail canonical acceptance or be retained in an explicitly invalid or
+incomplete research dataset. Such a dataset must not be represented as complete
+or silently converted into valid derived state. Absence of events is not by
+itself proof of a valid zero-activity interval.
+
+Derived state must use explicit UTC intervals `[minute_start, minute_end)`, with
+inclusive starts and exclusive ends. State for minute `t` may become eligible
+for a decision only after that minute has completed and its required completeness
+and point-in-time availability conditions are satisfied. The mapping to existing
+completed-candle decision and close-time semantics must be explicit and validated.
+Events outside the interval, events occurring after a decision boundary, and
+information unavailable at the decision time must not influence that decision.
+Late arrivals and corrections must not retrospectively rewrite the information
+attributed to a past decision.
+
+SourceHealthManifest and provider-conformance work required by document 010 remain
+prerequisites before predictive use. Source health must record applicable
+provenance, coverage, watermarks, counts, duplicates, gaps, checksum status,
+validation state and freshness against an explicit recorded as-of time. Unknown
+health fields remain explicitly unknown. Final contract, completeness, ordering
+and availability policies must be reviewed before acquisition or evaluation.
+
+Production decisions remain based on completed one-minute information. Event
+arrivals do not trigger production decisions. Research evidence does not establish
+historical/live parity or production eligibility. Before any event-derived
+feature can be proposed for production, equivalent live inputs, compatible
+normalization, deterministic aggregation, completion semantics and point-in-time
+availability must be demonstrated. Production admission still requires separate
+approval and the full existing promotion lifecycle.
 
 ## 3. Canonical Candle
 
@@ -196,12 +283,12 @@ A research result should be reproducible from:
 
 Do not build:
 
-- tick-data storage;
+- tick-data storage, except for the specifically authorized research-only aggregate-trade scope in §2.1;
 - full historical order-book infrastructure;
 - news feeds;
 - social sentiment;
 - on-chain data;
-- alternative-data pipelines;
+- alternative-data pipelines, except for the specifically authorized research-only aggregate-trade scope in §2.1;
 - real-time data warehouses;
 - distributed data processing.
 
