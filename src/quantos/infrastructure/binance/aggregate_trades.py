@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 from hashlib import sha256
-import json
 import re
 
 from quantos.domain.common import require_v1_symbol
 from quantos.domain.market_data.research_events import (
     AggregateTrade,
+    AggregateTradeContentIdentityError,
     SourceTimestampUnit,
     ValidatedAggregateTradeSequence,
+    canonical_aggregate_trade_sequence_bytes as _canonical_sequence_bytes,
+    canonical_aggregate_trade_sequence_sha256 as _canonical_sequence_sha256,
     normalize_source_timestamp,
 )
 
@@ -310,63 +312,17 @@ def raw_content_sha256(content: bytes) -> str:
     return sha256(content).hexdigest()
 
 
-def _utc_text(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace(
-        "+00:00", "Z"
-    )
-
-
-def _decimal_identity(value: Decimal) -> dict[str, int | str]:
-    decimal_tuple = value.as_tuple()
-    return {
-        "digits": "".join(str(digit) for digit in decimal_tuple.digits),
-        "exponent": decimal_tuple.exponent,
-        "sign": decimal_tuple.sign,
-    }
-
-
 def canonical_aggregate_trade_sequence_bytes(
     sequence: ValidatedAggregateTradeSequence,
 ) -> bytes:
-    """Serialize one validated sequence, including normalizer identity."""
+    """Return domain-owned canonical bytes through the provider boundary."""
 
-    if type(sequence) is not ValidatedAggregateTradeSequence:
-        raise TypeError("sequence must be a ValidatedAggregateTradeSequence")
     try:
-        checked = ValidatedAggregateTradeSequence(sequence.identity, sequence.events)
-    except (AttributeError, OverflowError, TypeError, ValueError) as error:
+        return _canonical_sequence_bytes(sequence)
+    except AggregateTradeContentIdentityError as error:
         raise BinanceAggregateTradeNormalizationError(
-            f"invalid canonical aggregate-trade sequence: {error}"
+            str(error)
         ) from error
-    payload = {
-        "dataset_identity": checked.identity.as_canonical_dict(),
-        "events": [
-            {
-                "aggregate_trade_id": event.aggregate_trade_id,
-                "best_price_match": event.best_price_match,
-                "buyer_is_maker": event.buyer_is_maker,
-                "event_time": _utc_text(event.event_time),
-                "first_trade_id": event.first_trade_id,
-                "last_trade_id": event.last_trade_id,
-                "price": _decimal_identity(event.price),
-                "quantity": _decimal_identity(event.quantity),
-                "source_timestamp": event.source_timestamp,
-                "source_timestamp_unit": event.source_timestamp_unit.value,
-                "symbol": event.symbol,
-            }
-            for event in checked.events
-        ],
-    }
-    return (
-        json.dumps(
-            payload,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=True,
-            allow_nan=False,
-        )
-        + "\n"
-    ).encode("utf-8")
 
 
 def canonical_aggregate_trade_sequence_sha256(
@@ -374,4 +330,7 @@ def canonical_aggregate_trade_sequence_sha256(
 ) -> str:
     """Hash deterministic validated canonical sequence bytes."""
 
-    return sha256(canonical_aggregate_trade_sequence_bytes(sequence)).hexdigest()
+    try:
+        return _canonical_sequence_sha256(sequence)
+    except AggregateTradeContentIdentityError as error:
+        raise BinanceAggregateTradeNormalizationError(str(error)) from error
