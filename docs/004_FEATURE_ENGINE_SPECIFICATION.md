@@ -1,8 +1,10 @@
 # QuantOS Core — 004_FEATURE_ENGINE_SPECIFICATION.md
 
-Version: 1.0.0-V1
+Version: 1.1.0-V1
 Status: Frozen V1
-Last Updated: 2026-08-19
+Last Updated: 2026-09-21
+
+Amendment: 2026-09-21 — Human-approved DE1A completed-minute research inputs and deterministic dependencies; production semantics unchanged.
 
 ## 1. Objective
 
@@ -61,7 +63,18 @@ A feature at timestamp `t` may use:
 
 - current completed candle information;
 - prior candles;
-- approved higher-timeframe information whose close was already available.
+- approved higher-timeframe information whose close was already available;
+- for separately authorized research only, versioned completed-minute state
+  derived from the market-event scope permitted by 003 §2.1, after the applicable
+  minute is complete and the required completeness and point-in-time availability
+  conditions are satisfied.
+
+This research input permission does not approve any feature formula, change the
+existing production feature set, or permit raw-event-driven decisions. Production
+eligibility requires a separate approved feature specification, demonstrated
+historical/live parity and the existing validation lifecycle. Unknown availability,
+incomplete or missing state, or missing source coverage must not be silently
+treated as valid information.
 
 It may not use:
 
@@ -95,12 +108,18 @@ A model must not run against an incompatible feature schema.
 
 Given identical:
 
-- candle data;
-- timestamps;
+- canonical candle inputs;
+- explicitly authorized completed-minute research state;
+- input dataset versions and content identities;
+- decision timestamps;
+- applicable completion and availability policies;
 - feature configuration;
 - feature version;
 
-the Feature Engine must produce identical outputs.
+the Feature Engine must produce identical outputs. Research features must declare
+all data dependencies required for deterministic reproduction. Event-derived input
+must not be introduced through undeclared callback state or provider-specific
+runtime objects.
 
 ## 10. Testing
 
