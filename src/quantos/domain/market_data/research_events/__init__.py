@@ -62,6 +62,20 @@ from quantos.domain.market_data.research_events.minute_state import (
     aggregate_trade_minute_state_content_bytes,
     canonical_decimal_text,
 )
+from quantos.domain.market_data.research_events.minute_primitives import (
+    AggregateTradeMinutePrimitives,
+    aggregate_trade_minute_primitives,
+)
+from quantos.domain.market_data.research_events.live_observation import (
+    LiveAggregateTradeAvailabilityState,
+    LiveAggregateTradeConnectionEvent,
+    LiveAggregateTradeConnectionKind,
+    LiveAggregateTradeHealthStatus,
+    LiveAggregateTradeMinuteState,
+    LiveAggregateTradeMinuteStatus,
+    LiveAggregateTradeSourceHealth,
+    ObservedAggregateTrade,
+)
 
 __all__ = [
     "AggregateTrade",
@@ -114,4 +128,14 @@ __all__ = [
     "aggregate_trade_minute_dataset_manifest_from_bytes",
     "aggregate_trade_minute_state_content_bytes",
     "canonical_decimal_text",
+    "AggregateTradeMinutePrimitives",
+    "aggregate_trade_minute_primitives",
+    "LiveAggregateTradeAvailabilityState",
+    "LiveAggregateTradeConnectionEvent",
+    "LiveAggregateTradeConnectionKind",
+    "LiveAggregateTradeHealthStatus",
+    "LiveAggregateTradeMinuteState",
+    "LiveAggregateTradeMinuteStatus",
+    "LiveAggregateTradeSourceHealth",
+    "ObservedAggregateTrade",
 ]

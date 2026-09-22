@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta, timezone
-from decimal import Decimal
 from typing import Iterator
 
 from quantos.application.aggregate_trade_ranges import (
@@ -24,70 +23,13 @@ from quantos.domain.market_data.research_events import (
     AggregateTradeRangeManifest,
     ResearchEventValidationStatus,
     ValidatedAggregateTradeMinuteDataset,
+    aggregate_trade_minute_primitives,
     aggregate_trade_archive_manifest_id,
 )
 
 
 class AggregateTradeMinuteAggregationError(ValueError):
     """A pinned source range cannot produce trustworthy minute state."""
-
-
-class _ExactDecimalAccumulator:
-    """Add Decimal values and products using base-ten integer coefficients."""
-
-    __slots__ = ("_coefficient", "_scale")
-
-    def __init__(self) -> None:
-        self._coefficient = 0
-        self._scale = 0
-
-    @staticmethod
-    def _component(value: Decimal) -> tuple[int, int]:
-        if type(value) is not Decimal or not value.is_finite():
-            raise AggregateTradeMinuteAggregationError(
-                "canonical event totals require finite exact Decimal values"
-            )
-        sign, digits, exponent = value.as_tuple()
-        coefficient = 0
-        for digit in digits:
-            coefficient = coefficient * 10 + digit
-        if sign:
-            coefficient = -coefficient
-        return coefficient, exponent
-
-    def _add_component(self, coefficient: int, exponent: int) -> None:
-        component_scale = max(0, -exponent)
-        if exponent > 0:
-            coefficient *= 10 ** exponent
-        target_scale = max(self._scale, component_scale)
-        self._coefficient = (
-            self._coefficient * 10 ** (target_scale - self._scale)
-            + coefficient * 10 ** (target_scale - component_scale)
-        )
-        self._scale = target_scale
-
-    def add(self, value: Decimal) -> None:
-        self._add_component(*self._component(value))
-
-    def add_product(self, left: Decimal, right: Decimal) -> None:
-        left_coefficient, left_exponent = self._component(left)
-        right_coefficient, right_exponent = self._component(right)
-        self._add_component(
-            left_coefficient * right_coefficient,
-            left_exponent + right_exponent,
-        )
-
-    def value(self) -> Decimal:
-        if self._coefficient == 0:
-            return Decimal(0)
-        absolute = str(abs(self._coefficient))
-        return Decimal(
-            (
-                1 if self._coefficient < 0 else 0,
-                tuple(int(character) for character in absolute),
-                -self._scale,
-            )
-        )
 
 
 def _iter_exact_range_events(
@@ -173,17 +115,7 @@ def aggregate_trade_minute_states(
     while minute_start < end:
         minute_end = minute_start + timedelta(minutes=1)
         reference = references_by_date[minute_start.date()]
-        event_count = 0
-        buy_count = 0
-        sell_count = 0
-        total_base = _ExactDecimalAccumulator()
-        total_quote = _ExactDecimalAccumulator()
-        buy_base = _ExactDecimalAccumulator()
-        sell_base = _ExactDecimalAccumulator()
-        buy_quote = _ExactDecimalAccumulator()
-        sell_quote = _ExactDecimalAccumulator()
-        first_event: AggregateTrade | None = None
-        last_event: AggregateTrade | None = None
+        minute_events: list[AggregateTrade] = []
         while event is not None and event.event_time < minute_end:
             if event.event_time < minute_start:
                 raise AggregateTradeMinuteAggregationError(
@@ -196,22 +128,14 @@ def aggregate_trade_minute_states(
                 raise AggregateTradeMinuteAggregationError(
                     "source event lineage differs from its daily partition"
                 )
-            if first_event is None:
-                first_event = event
-            last_event = event
-            event_count += 1
+            minute_events.append(event)
             observed_event_count += 1
-            total_base.add(event.quantity)
-            total_quote.add_product(event.price, event.quantity)
-            if event.buyer_is_maker:
-                sell_count += 1
-                sell_base.add(event.quantity)
-                sell_quote.add_product(event.price, event.quantity)
-            else:
-                buy_count += 1
-                buy_base.add(event.quantity)
-                buy_quote.add_product(event.price, event.quantity)
             event = next(events, None)
+        primitives = aggregate_trade_minute_primitives(
+            symbol=replayed.symbol,
+            minute_start_time=minute_start,
+            events=minute_events,
+        )
         state = AggregateTradeMinuteState(
             symbol=replayed.symbol,
             minute_start_time=minute_start,
@@ -221,23 +145,27 @@ def aggregate_trade_minute_states(
             source_revision_id=reference.source_revision_id,
             source_dataset_id=reference.dataset_id,
             source_timestamp_unit=reference.source_timestamp_unit,
-            event_count=event_count,
-            aggressive_buy_event_count=buy_count,
-            aggressive_sell_event_count=sell_count,
-            total_base_quantity=total_base.value(),
-            total_quote_notional=total_quote.value(),
-            aggressive_buy_base_quantity=buy_base.value(),
-            aggressive_sell_base_quantity=sell_base.value(),
-            aggressive_buy_quote_notional=buy_quote.value(),
-            aggressive_sell_quote_notional=sell_quote.value(),
-            first_aggregate_trade_id=(
-                None if first_event is None else first_event.aggregate_trade_id
+            event_count=primitives.event_count,
+            aggressive_buy_event_count=primitives.aggressive_buy_event_count,
+            aggressive_sell_event_count=primitives.aggressive_sell_event_count,
+            total_base_quantity=primitives.total_base_quantity,
+            total_quote_notional=primitives.total_quote_notional,
+            aggressive_buy_base_quantity=(
+                primitives.aggressive_buy_base_quantity
             ),
-            last_aggregate_trade_id=(
-                None if last_event is None else last_event.aggregate_trade_id
+            aggressive_sell_base_quantity=(
+                primitives.aggressive_sell_base_quantity
             ),
-            first_event_time=(None if first_event is None else first_event.event_time),
-            last_event_time=(None if last_event is None else last_event.event_time),
+            aggressive_buy_quote_notional=(
+                primitives.aggressive_buy_quote_notional
+            ),
+            aggressive_sell_quote_notional=(
+                primitives.aggressive_sell_quote_notional
+            ),
+            first_aggregate_trade_id=primitives.first_aggregate_trade_id,
+            last_aggregate_trade_id=primitives.last_aggregate_trade_id,
+            first_event_time=primitives.first_event_time,
+            last_event_time=primitives.last_event_time,
             completeness_state=(
                 AggregateTradeMinuteCompletenessState.VALIDATED_SOURCE_COMPLETE
             ),
