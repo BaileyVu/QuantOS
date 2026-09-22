@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import replace
-from datetime import date, timedelta
+from dataclasses import dataclass, replace
+from datetime import date, datetime, timedelta
 from typing import Protocol
 
 from quantos.domain.market_data.research_events import (
@@ -23,7 +23,31 @@ from quantos.domain.market_data.research_events import (
     ValidatedAggregateTradeArchive,
     aggregate_trade_archive_manifest_id,
     aggregate_trade_range_manifest_bytes,
+    canonical_aggregate_trade_event_bytes,
 )
+
+
+DEFAULT_AGGREGATE_TRADE_BATCH_SIZE = 16_384
+
+
+@dataclass(frozen=True, slots=True)
+class AggregateTradeRangeStreamReport:
+    """Compact evidence produced only after a complete range stream."""
+
+    total_event_count: int
+    first_event_time: datetime
+    last_event_time: datetime
+    boundaries: tuple[AggregateTradeBoundaryValidation, ...]
+    max_batch_event_count: int
+
+
+class AggregateTradeRangeBatchStream(Protocol):
+    """Single-use exact range stream whose report appears after exhaustion."""
+
+    def __iter__(self) -> Iterator[tuple[AggregateTrade, ...]]: ...
+
+    @property
+    def report(self) -> AggregateTradeRangeStreamReport: ...
 
 
 class AggregateTradePartitionCatalog(Protocol):
@@ -38,6 +62,14 @@ class AggregateTradePartitionCatalog(Protocol):
         self, manifest: AggregateTradeArchiveManifest
     ) -> ValidatedAggregateTradeArchive:
         """Load and reverify one exact catalog manifest."""
+
+    def stream_range(
+        self,
+        manifests: tuple[AggregateTradeArchiveManifest, ...],
+        *,
+        batch_size: int,
+    ) -> AggregateTradeRangeBatchStream:
+        """Open one verified ordered bounded-batch range stream."""
 
 
 class AggregateTradeRangeCompositionError(ValueError):
@@ -185,9 +217,136 @@ def validate_aggregate_trade_partition_boundary(
     )
 
 
+def _batch_size(value: int) -> int:
+    if type(value) is not int or not 1 <= value <= 1_000_000:
+        raise AggregateTradeRangeCompositionError(
+            "batch_size must be between 1 and 1000000"
+        )
+    return value
+
+
+class _MaterializedCompatibilityRangeStream:
+    """Compatibility fallback for catalogs without the DE1H streaming port."""
+
+    def __init__(
+        self,
+        catalog: AggregateTradePartitionCatalog,
+        manifests: tuple[AggregateTradeArchiveManifest, ...],
+        *,
+        batch_size: int,
+    ) -> None:
+        self._catalog = catalog
+        self._manifests = manifests
+        self._batch_size = _batch_size(batch_size)
+        self._report: AggregateTradeRangeStreamReport | None = None
+        self._started = False
+
+    @property
+    def report(self) -> AggregateTradeRangeStreamReport:
+        if self._report is None:
+            raise AggregateTradeRangeCompositionError(
+                "range stream report is unavailable before complete exhaustion"
+            )
+        return self._report
+
+    def __iter__(self) -> Iterator[tuple[AggregateTrade, ...]]:
+        if self._started:
+            raise AggregateTradeRangeCompositionError(
+                "range stream is single-use"
+            )
+        self._started = True
+        seen: dict[int, bytes] = {}
+        boundaries: list[AggregateTradeBoundaryValidation] = []
+        previous_events: tuple[AggregateTrade, ...] | None = None
+        previous_source_date: date | None = None
+        first_event_time: datetime | None = None
+        last_event_time: datetime | None = None
+        event_count = 0
+        max_batch = 0
+        for manifest in self._manifests:
+            archive = self._catalog.load(manifest)
+            if archive.manifest != manifest:
+                raise AggregateTradeRangeCompositionError(
+                    "loaded archive differs from selected catalog manifest"
+                )
+            events = archive.sequence.events
+            if previous_events is not None and previous_source_date is not None:
+                boundaries.append(
+                    validate_aggregate_trade_partition_boundary(
+                        previous_events,
+                        events,
+                        left_source_date=previous_source_date,
+                        right_source_date=manifest.source_date,
+                    )
+                )
+            for event in events:
+                encoded = canonical_aggregate_trade_event_bytes(event)
+                prior = seen.get(event.aggregate_trade_id)
+                if prior is not None:
+                    label = "duplicate" if prior == encoded else "conflicting"
+                    raise AggregateTradeRangeCompositionError(
+                        f"{label} aggregate trade ID across composed range "
+                        f"{event.aggregate_trade_id}"
+                    )
+                seen[event.aggregate_trade_id] = encoded
+            if first_event_time is None:
+                first_event_time = events[0].event_time
+            last_event_time = events[-1].event_time
+            event_count += len(events)
+            for offset in range(0, len(events), self._batch_size):
+                batch = events[offset : offset + self._batch_size]
+                max_batch = max(max_batch, len(batch))
+                yield batch
+            previous_events = events
+            previous_source_date = manifest.source_date
+        if first_event_time is None or last_event_time is None:
+            raise AggregateTradeRangeCompositionError(
+                "range stream contains no events"
+            )
+        self._report = AggregateTradeRangeStreamReport(
+            total_event_count=event_count,
+            first_event_time=first_event_time,
+            last_event_time=last_event_time,
+            boundaries=tuple(boundaries),
+            max_batch_event_count=max_batch,
+        )
+
+
+def _open_exact_range_batch_stream(
+    catalog: AggregateTradePartitionCatalog,
+    manifests: tuple[AggregateTradeArchiveManifest, ...],
+    *,
+    batch_size: int,
+) -> AggregateTradeRangeBatchStream:
+    size = _batch_size(batch_size)
+    factory = getattr(catalog, "stream_range", None)
+    if callable(factory):
+        return factory(manifests, batch_size=size)
+    return _MaterializedCompatibilityRangeStream(
+        catalog, manifests, batch_size=size
+    )
+
+
+def _require_stream_matches_manifest(
+    report: AggregateTradeRangeStreamReport,
+    manifest: AggregateTradeRangeManifest,
+) -> None:
+    if (
+        report.total_event_count != manifest.total_accepted_event_count
+        or report.first_event_time != manifest.observed_first_event_time
+        or report.last_event_time != manifest.observed_last_event_time
+        or report.boundaries != manifest.boundaries
+    ):
+        raise AggregateTradeRangeCompositionError(
+            "streamed range evidence differs from pinned manifest"
+        )
+
+
 def compose_aggregate_trade_range(
     catalog: AggregateTradePartitionCatalog,
     request: AggregateTradeRangeRequest,
+    *,
+    batch_size: int = DEFAULT_AGGREGATE_TRADE_BATCH_SIZE,
 ) -> AggregateTradeRangeManifest:
     """Select, verify, and bind one complete UTC daily range."""
 
@@ -198,10 +357,6 @@ def compose_aggregate_trade_range(
         item.source_date: item for item in request.exact_revisions
     }
     selected_manifests: list[AggregateTradeArchiveManifest] = []
-    boundaries: list[AggregateTradeBoundaryValidation] = []
-    seen_ids: set[int] = set()
-    previous_events: tuple[AggregateTrade, ...] | None = None
-    previous_source_date: date | None = None
     source_date = request.start_date
     while source_date < request.end_date_exclusive:
         manifest = _select_manifest(
@@ -210,53 +365,42 @@ def compose_aggregate_trade_range(
             source_date=source_date,
             exact=exact_by_date.get(source_date),
         )
-        try:
-            archive = catalog.load(manifest)
-            archive = ValidatedAggregateTradeArchive(
-                archive.sequence, archive.manifest
-            )
-        except (TypeError, ValueError) as error:
+        if manifest.symbol != request.symbol or manifest.source_date != source_date:
             raise AggregateTradeRangeCompositionError(
-                f"partition {source_date.isoformat()} failed content "
-                f"verification: {error}"
-            ) from error
-        if archive.manifest != manifest:
-            raise AggregateTradeRangeCompositionError(
-                "loaded archive differs from selected catalog manifest"
+                "selected manifest differs from requested logical partition"
             )
-        if (
-            archive.manifest.symbol != request.symbol
-            or archive.manifest.source_date != source_date
-        ):
-            raise AggregateTradeRangeCompositionError(
-                "loaded archive differs from requested logical partition"
-            )
-        current_events = archive.sequence.events
-        if previous_events is not None and previous_source_date is not None:
-            boundaries.append(
-                validate_aggregate_trade_partition_boundary(
-                    previous_events,
-                    current_events,
-                    left_source_date=previous_source_date,
-                    right_source_date=source_date,
-                )
-            )
-        for event in current_events:
-            if event.aggregate_trade_id in seen_ids:
-                raise AggregateTradeRangeCompositionError(
-                    "conflicting aggregate trade ID across composed range "
-                    f"{event.aggregate_trade_id}"
-                )
-            seen_ids.add(event.aggregate_trade_id)
         selected_manifests.append(manifest)
-        previous_events = current_events
-        previous_source_date = source_date
         source_date += timedelta(days=1)
+
+    stream = _open_exact_range_batch_stream(
+        catalog,
+        tuple(selected_manifests),
+        batch_size=batch_size,
+    )
+    try:
+        for _batch in stream:
+            pass
+        report = stream.report
+    except (TypeError, ValueError) as error:
+        raise AggregateTradeRangeCompositionError(
+            f"selected range failed streamed content verification: {error}"
+        ) from error
 
     references = tuple(
         AggregateTradePartitionReference.from_manifest(manifest)
         for manifest in selected_manifests
     )
+    expected_event_count = sum(
+        item.accepted_row_count for item in references
+    )
+    if (
+        report.total_event_count != expected_event_count
+        or report.first_event_time != references[0].observed_first_event_time
+        or report.last_event_time != references[-1].observed_last_event_time
+    ):
+        raise AggregateTradeRangeCompositionError(
+            "streamed range summary differs from selected manifests"
+        )
     return AggregateTradeRangeManifest(
         symbol=request.symbol,
         requested_start_date=request.start_date,
@@ -271,16 +415,10 @@ def compose_aggregate_trade_range(
         ).days,
         selected_partition_count=len(references),
         partitions=references,
-        total_accepted_event_count=sum(
-            item.accepted_row_count for item in references
-        ),
-        observed_first_event_time=(
-            references[0].observed_first_event_time
-        ),
-        observed_last_event_time=(
-            references[-1].observed_last_event_time
-        ),
-        boundaries=tuple(boundaries),
+        total_accepted_event_count=report.total_event_count,
+        observed_first_event_time=report.first_event_time,
+        observed_last_event_time=report.last_event_time,
+        boundaries=report.boundaries,
         completeness_state=RangeCompletenessState.COMPLETE,
         validation_status=ResearchEventValidationStatus.VALIDATED,
     )
@@ -289,6 +427,8 @@ def compose_aggregate_trade_range(
 def replay_aggregate_trade_range(
     catalog: AggregateTradePartitionCatalog,
     manifest: AggregateTradeRangeManifest,
+    *,
+    batch_size: int = DEFAULT_AGGREGATE_TRADE_BATCH_SIZE,
 ) -> AggregateTradeRangeManifest:
     """Recompose an existing manifest using exact pinned revisions."""
 
@@ -312,6 +452,7 @@ def replay_aggregate_trade_range(
             selection_policy=RevisionSelectionPolicy.EXACT,
             exact_revisions=exact,
         ),
+        batch_size=batch_size,
     )
     reproduced = replace(
         reproduced, selection_policy=manifest.selection_policy
@@ -336,10 +477,15 @@ def replay_aggregate_trade_range(
 def iter_aggregate_trade_range(
     catalog: AggregateTradePartitionCatalog,
     manifest: AggregateTradeRangeManifest,
+    *,
+    batch_size: int = DEFAULT_AGGREGATE_TRADE_BATCH_SIZE,
 ) -> Iterator[AggregateTrade]:
     """Yield exact events by partition after complete pinned-range replay."""
 
-    replayed = replay_aggregate_trade_range(catalog, manifest)
+    replayed = replay_aggregate_trade_range(
+        catalog, manifest, batch_size=batch_size
+    )
+    manifests: list[AggregateTradeArchiveManifest] = []
     for reference in replayed.partitions:
         revisions = catalog.revisions(
             symbol=replayed.symbol,
@@ -356,9 +502,14 @@ def iter_aggregate_trade_range(
             raise AggregateTradeRangeCompositionError(
                 "pinned partition became unavailable during range read"
             )
-        archive = catalog.load(matches[0])
-        for event in archive.sequence.events:
+        manifests.append(matches[0])
+    stream = _open_exact_range_batch_stream(
+        catalog, tuple(manifests), batch_size=batch_size
+    )
+    for batch in stream:
+        for event in batch:
             yield event
+    _require_stream_matches_manifest(stream.report, replayed)
 
 
 def canonical_range_manifest_bytes(

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
-from typing import Iterator
 
 from quantos.application.aggregate_trade_ranges import (
     AggregateTradePartitionCatalog,
-    replay_aggregate_trade_range,
+    DEFAULT_AGGREGATE_TRADE_BATCH_SIZE,
+    _open_exact_range_batch_stream,
+    _require_stream_matches_manifest,
 )
 from quantos.domain.market_data.research_events import (
     AGGREGATE_TRADE_MINUTE_AGGREGATION_VERSION,
@@ -32,10 +34,21 @@ class AggregateTradeMinuteAggregationError(ValueError):
     """A pinned source range cannot produce trustworthy minute state."""
 
 
-def _iter_exact_range_events(
+@dataclass(slots=True)
+class AggregateTradeStreamingDiagnostics:
+    """Deterministic raw-event buffer bounds from one aggregation."""
+
+    batch_size: int = 0
+    max_batch_event_count: int = 0
+    max_minute_event_count: int = 0
+    max_raw_events_buffered: int = 0
+
+
+def _exact_range_manifests(
     catalog: AggregateTradePartitionCatalog,
     manifest: AggregateTradeRangeManifest,
-) -> Iterator[AggregateTrade]:
+) -> tuple:
+    selected = []
     for reference in manifest.partitions:
         revisions = catalog.revisions(
             symbol=manifest.symbol,
@@ -51,28 +64,46 @@ def _iter_exact_range_events(
             raise AggregateTradeMinuteAggregationError(
                 "pinned source revision became unavailable during aggregation"
             )
-        archive = catalog.load(matches[0])
-        if archive.manifest.dataset_id != reference.dataset_id:
+        selected_manifest = matches[0]
+        if selected_manifest.dataset_id != reference.dataset_id:
             raise AggregateTradeMinuteAggregationError(
-                "loaded source dataset differs from pinned range"
+                "selected source dataset differs from pinned range"
             )
-        yield from archive.sequence.events
+        selected.append(selected_manifest)
+    return tuple(selected)
 
 
 def aggregate_trade_minute_states(
     catalog: AggregateTradePartitionCatalog,
     source_range: AggregateTradeRangeManifest,
+    *,
+    batch_size: int = DEFAULT_AGGREGATE_TRADE_BATCH_SIZE,
+    diagnostics: AggregateTradeStreamingDiagnostics | None = None,
 ) -> ValidatedAggregateTradeMinuteDataset:
     """Aggregate one fully replayed exact daily range into a complete UTC grid."""
 
     if type(source_range) is not AggregateTradeRangeManifest:
         raise TypeError("source_range must be an AggregateTradeRangeManifest")
+    AggregateTradeRangeManifest.__post_init__(source_range)
+    replayed = source_range
     try:
-        replayed = replay_aggregate_trade_range(catalog, source_range)
+        manifests = _exact_range_manifests(catalog, replayed)
+        stream = _open_exact_range_batch_stream(
+            catalog, manifests, batch_size=batch_size
+        )
     except (TypeError, ValueError) as error:
         raise AggregateTradeMinuteAggregationError(
             f"source range failed exact replay: {error}"
         ) from error
+    if diagnostics is not None:
+        if type(diagnostics) is not AggregateTradeStreamingDiagnostics:
+            raise TypeError(
+                "diagnostics must be AggregateTradeStreamingDiagnostics"
+            )
+        diagnostics.batch_size = batch_size
+        diagnostics.max_batch_event_count = 0
+        diagnostics.max_minute_event_count = 0
+        diagnostics.max_raw_events_buffered = 0
     first_partition = replayed.partitions[0].logical_partition
     source_references = tuple(
         AggregateTradeMinuteSourceReference.from_partition_reference(item)
@@ -107,15 +138,38 @@ def aggregate_trade_minute_states(
     references_by_date = {
         item.source_date: item for item in source_references
     }
-    events = iter(_iter_exact_range_events(catalog, replayed))
-    event = next(events, None)
     states: list[AggregateTradeMinuteState] = []
     observed_event_count = 0
+    minute_events: list[AggregateTrade] = []
+
+    def streamed_events():
+        for batch in stream:
+            if diagnostics is not None:
+                diagnostics.max_batch_event_count = max(
+                    diagnostics.max_batch_event_count, len(batch)
+                )
+                diagnostics.max_raw_events_buffered = max(
+                    diagnostics.max_raw_events_buffered,
+                    len(batch) + len(minute_events),
+                )
+            yield from batch
+
+    events = iter(streamed_events())
+
+    def next_event() -> AggregateTrade | None:
+        try:
+            return next(events, None)
+        except (TypeError, ValueError) as error:
+            raise AggregateTradeMinuteAggregationError(
+                f"source range failed exact replay: {error}"
+            ) from error
+
+    event = next_event()
     minute_start = start
     while minute_start < end:
         minute_end = minute_start + timedelta(minutes=1)
         reference = references_by_date[minute_start.date()]
-        minute_events: list[AggregateTrade] = []
+        minute_events.clear()
         while event is not None and event.event_time < minute_end:
             if event.event_time < minute_start:
                 raise AggregateTradeMinuteAggregationError(
@@ -129,8 +183,13 @@ def aggregate_trade_minute_states(
                     "source event lineage differs from its daily partition"
                 )
             minute_events.append(event)
+            if diagnostics is not None:
+                diagnostics.max_minute_event_count = max(
+                    diagnostics.max_minute_event_count,
+                    len(minute_events),
+                )
             observed_event_count += 1
-            event = next(events, None)
+            event = next_event()
         primitives = aggregate_trade_minute_primitives(
             symbol=replayed.symbol,
             minute_start_time=minute_start,
@@ -184,6 +243,12 @@ def aggregate_trade_minute_states(
         raise AggregateTradeMinuteAggregationError(
             "minute aggregation did not consume every pinned source event"
         )
+    try:
+        _require_stream_matches_manifest(stream.report, replayed)
+    except (TypeError, ValueError) as error:
+        raise AggregateTradeMinuteAggregationError(
+            f"source range failed exact replay: {error}"
+        ) from error
     return ValidatedAggregateTradeMinuteDataset(identity, tuple(states))
 
 
@@ -191,13 +256,17 @@ def replay_aggregate_trade_minute_states(
     catalog: AggregateTradePartitionCatalog,
     source_range: AggregateTradeRangeManifest,
     expected: ValidatedAggregateTradeMinuteDataset,
+    *,
+    batch_size: int = DEFAULT_AGGREGATE_TRADE_BATCH_SIZE,
 ) -> ValidatedAggregateTradeMinuteDataset:
     """Recompute and require exact state identity and canonical content."""
 
     if type(expected) is not ValidatedAggregateTradeMinuteDataset:
         raise TypeError("expected must be a ValidatedAggregateTradeMinuteDataset")
     ValidatedAggregateTradeMinuteDataset.__post_init__(expected)
-    reproduced = aggregate_trade_minute_states(catalog, source_range)
+    reproduced = aggregate_trade_minute_states(
+        catalog, source_range, batch_size=batch_size
+    )
     if (
         reproduced.identity != expected.identity
         or reproduced.content_sha256 != expected.content_sha256
