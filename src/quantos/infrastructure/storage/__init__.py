@@ -18,6 +18,14 @@ from quantos.infrastructure.storage.aggregate_trade_parquet import (
     AggregateTradeParquetStorageError,
     ParquetAggregateTradeArchiveStore,
 )
+from quantos.infrastructure.storage.aggregate_trade_minute_parquet import (
+    AGGREGATE_TRADE_MINUTE_SCHEMA,
+    AGGREGATE_TRADE_MINUTE_STORAGE_SCHEMA_VERSION,
+    AggregateTradeMinuteDatasetCollisionError,
+    AggregateTradeMinutePublication,
+    AggregateTradeMinuteStorageError,
+    ParquetAggregateTradeMinuteStateStore,
+)
 from quantos.infrastructure.storage.duckdb_query import (
     DuckDBCandleDatasetQuery,
     DuckDBQueryError,
@@ -52,4 +60,10 @@ __all__ = [
     "ParquetStorageError",
     "STORAGE_SCHEMA_VERSION",
     "dataset_id",
+    "AGGREGATE_TRADE_MINUTE_SCHEMA",
+    "AGGREGATE_TRADE_MINUTE_STORAGE_SCHEMA_VERSION",
+    "AggregateTradeMinuteDatasetCollisionError",
+    "AggregateTradeMinutePublication",
+    "AggregateTradeMinuteStorageError",
+    "ParquetAggregateTradeMinuteStateStore",
 ]

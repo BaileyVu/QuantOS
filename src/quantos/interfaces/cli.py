@@ -11,7 +11,9 @@ import sys
 import tempfile
 
 from quantos.application import (
+    AggregateTradeMinuteAggregationError,
     AggregateTradeRangeCompositionError,
+    aggregate_trade_minute_states,
     canonical_range_manifest_bytes,
     compose_aggregate_trade_range,
     run,
@@ -21,13 +23,16 @@ from quantos.domain.market_data.research_events import (
     ExactAggregateTradeRevision,
     RevisionSelectionPolicy,
     aggregate_trade_archive_manifest_id,
+    aggregate_trade_range_manifest_from_bytes,
 )
 from quantos.domain.common import require_v1_symbol
 from quantos.infrastructure.configuration import ConfigurationError, load_config
 from quantos.infrastructure.logging import configure_logging
 from quantos.infrastructure.storage import (
     AggregateTradeCatalogError,
+    AggregateTradeMinuteStorageError,
     LocalAggregateTradeArchiveCatalog,
+    ParquetAggregateTradeMinuteStateStore,
 )
 
 
@@ -96,6 +101,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="DATE:MANIFEST_ID:SOURCE_REVISION_ID; repeat once per UTC date.",
     )
     compose.add_argument("--output", type=Path)
+    aggregate_minutes = operations.add_parser("aggregate-minutes")
+    aggregate_minutes.add_argument("symbol")
+    aggregate_minutes.add_argument("start_date", type=_date)
+    aggregate_minutes.add_argument("end_date_exclusive", type=_date)
+    aggregate_minutes.add_argument(
+        "--source-range-manifest",
+        type=Path,
+        required=True,
+    )
+    aggregate_minutes.add_argument(
+        "--publish",
+        action="store_true",
+        help="Immutably publish under the configured data_dir.",
+    )
     return parser
 
 
@@ -221,6 +240,64 @@ def _aggregate_trade_command(args: argparse.Namespace, data_dir: Path) -> int:
             _write_immutable(args.output, payload)
         sys.stdout.buffer.write(payload)
         return 0
+    if operation == "aggregate-minutes":
+        try:
+            source_payload = args.source_range_manifest.read_bytes()
+        except OSError as error:
+            raise AggregateTradeMinuteAggregationError(
+                f"cannot read source range manifest: {error}"
+            ) from error
+        try:
+            source_range = aggregate_trade_range_manifest_from_bytes(
+                source_payload
+            )
+        except (TypeError, ValueError) as error:
+            raise AggregateTradeMinuteAggregationError(
+                f"invalid source range manifest: {error}"
+            ) from error
+        if (
+            source_range.symbol != args.symbol
+            or source_range.requested_start_date != args.start_date
+            or source_range.requested_end_date_exclusive
+            != args.end_date_exclusive
+        ):
+            raise AggregateTradeMinuteAggregationError(
+                "explicit CLI range differs from source range manifest"
+            )
+        dataset = aggregate_trade_minute_states(catalog, source_range)
+        publication_path: str | None = None
+        if args.publish:
+            publication = ParquetAggregateTradeMinuteStateStore(
+                data_dir
+            ).write(dataset)
+            publication_path = str(publication.canonical_parquet_path)
+        print(
+            _json(
+                {
+                    "availability_state": (
+                        dataset.identity.availability_state.value
+                    ),
+                    "content_sha256": dataset.content_sha256,
+                    "dataset_id": dataset.dataset_id,
+                    "event": "aggregate_trade_minute_state",
+                    "input_event_count": dataset.input_event_count,
+                    "publication_path": publication_path,
+                    "requested_end_time_exclusive": (
+                        dataset.identity.requested_end_time_exclusive.isoformat()
+                    ),
+                    "requested_start_time": (
+                        dataset.identity.requested_start_time.isoformat()
+                    ),
+                    "source_range_id": dataset.identity.source_range_id,
+                    "state_count": len(dataset.states),
+                    "symbol": dataset.identity.symbol,
+                    "zero_event_minute_count": (
+                        dataset.zero_event_minute_count
+                    ),
+                }
+            )
+        )
+        return 0
     raise AggregateTradeRangeCompositionError("unknown aggregate-trade operation")
 
 
@@ -237,7 +314,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "aggregate-trades":
             return _aggregate_trade_command(args, config.data_dir)
-    except (AggregateTradeCatalogError, AggregateTradeRangeCompositionError, TypeError, ValueError) as error:
+    except (
+        AggregateTradeCatalogError,
+        AggregateTradeMinuteAggregationError,
+        AggregateTradeMinuteStorageError,
+        AggregateTradeRangeCompositionError,
+        TypeError,
+        ValueError,
+    ) as error:
         print(
             _json({"event": "operator_error", "error": str(error)}),
             file=sys.stderr,

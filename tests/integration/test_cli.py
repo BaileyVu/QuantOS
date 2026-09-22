@@ -12,9 +12,16 @@ import tempfile
 import unittest
 
 from quantos.domain.market_data.research_events import (
+    AggregateTradeRangeRequest,
+    RevisionSelectionPolicy,
     aggregate_trade_archive_manifest_id,
+    aggregate_trade_range_manifest_bytes,
 )
-from tests.aggregate_trade_range_fixtures import publish_partition
+from quantos.application import compose_aggregate_trade_range
+from quantos.infrastructure.storage import (
+    ParquetAggregateTradeMinuteStateStore,
+)
+from tests.aggregate_trade_range_fixtures import local_catalog, publish_partition
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -188,3 +195,76 @@ class CliSmokeTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2)
                 self.assertNotIn("Traceback", result.stderr)
                 self.assertEqual(json.loads(result.stderr)["event"], "operator_error")
+
+    def test_aggregate_trade_minute_state_command_requires_pinned_range(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data_root = root / "data"
+            publish_partition(
+                data_root,
+                symbol="BTCUSDT",
+                source_date=date(2025, 1, 1),
+                first_id=10,
+            )
+            catalog = local_catalog(data_root)
+            catalog.rebuild()
+            source_range = compose_aggregate_trade_range(
+                catalog,
+                AggregateTradeRangeRequest(
+                    symbol="BTCUSDT",
+                    start_date=date(2025, 1, 1),
+                    end_date_exclusive=date(2025, 1, 2),
+                    selection_policy=RevisionSelectionPolicy.UNIQUE,
+                ),
+            )
+            range_path = root / "source-range.json"
+            range_path.write_bytes(
+                aggregate_trade_range_manifest_bytes(source_range)
+            )
+            config = self.write_research_config(root, data_root)
+            arguments = (
+                "--config",
+                str(config),
+                "aggregate-trades",
+                "aggregate-minutes",
+                "BTCUSDT",
+                "2025-01-01",
+                "2025-01-02",
+                "--source-range-manifest",
+                str(range_path),
+            )
+
+            inspected = self.run_cli(*arguments)
+            published = self.run_cli(*arguments, "--publish")
+
+            self.assertEqual(inspected.returncode, 0, inspected.stderr)
+            self.assertEqual(published.returncode, 0, published.stderr)
+            inspected_payload = json.loads(inspected.stdout)
+            published_payload = json.loads(published.stdout)
+            self.assertEqual(inspected_payload["state_count"], 1440)
+            self.assertEqual(inspected_payload["input_event_count"], 2)
+            self.assertIsNone(inspected_payload["publication_path"])
+            self.assertEqual(
+                inspected_payload["dataset_id"],
+                published_payload["dataset_id"],
+            )
+            published_path = Path(published_payload["publication_path"])
+            self.assertTrue(published_path.is_file())
+            restored = ParquetAggregateTradeMinuteStateStore(data_root).read(
+                published_path
+            )
+            self.assertEqual(restored.dataset_id, inspected_payload["dataset_id"])
+
+            mismatch = self.run_cli(
+                "--config",
+                str(config),
+                "aggregate-trades",
+                "aggregate-minutes",
+                "ETHUSDT",
+                "2025-01-01",
+                "2025-01-02",
+                "--source-range-manifest",
+                str(range_path),
+            )
+            self.assertEqual(mismatch.returncode, 2)
+            self.assertIn("explicit CLI range differs", mismatch.stderr)
