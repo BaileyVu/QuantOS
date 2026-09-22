@@ -24,6 +24,10 @@ from quantos.application.aggregate_trade_minute_states import (
     aggregate_trade_minute_states,
     replay_aggregate_trade_minute_states,
 )
+from quantos.application.live_aggregate_trade_minutes import (
+    LiveAggregateTradeMinuteEngine,
+    LiveAggregateTradeMinuteEngineError,
+)
 
 __all__ = [
     "CanonicalCandleDatasetWriter",
@@ -44,4 +48,6 @@ __all__ = [
     "AggregateTradeMinuteAggregationError",
     "aggregate_trade_minute_states",
     "replay_aggregate_trade_minute_states",
+    "LiveAggregateTradeMinuteEngine",
+    "LiveAggregateTradeMinuteEngineError",
 ]

@@ -36,6 +36,13 @@ from quantos.infrastructure.binance.klines import (
     BinanceSpotHistoricalKlineAdapter,
 )
 from quantos.infrastructure.binance.live_klines import BinanceLiveMarketDataError
+from quantos.infrastructure.binance.live_aggregate_trades import (
+    BINANCE_AGGREGATE_TRADE_LIVE_ENDPOINT,
+    BINANCE_AGGREGATE_TRADE_LIVE_SOURCE_VERSION,
+    BinanceLiveAggregateTradeError,
+    BinanceSpotLiveAggregateTradeAdapter,
+    normalize_live_aggregate_trade_message,
+)
 from quantos.infrastructure.binance.live_stream import BinanceSpotLiveMarketDataAdapter
 from quantos.infrastructure.binance.range_fetch import BinanceSpotHistoricalRangeFetcher
 
@@ -59,6 +66,11 @@ __all__ = [
     "BinanceSpotHistoricalKlineAdapter",
     "BinanceSpotHistoricalRangeFetcher",
     "BinanceSpotLiveMarketDataAdapter",
+    "BINANCE_AGGREGATE_TRADE_LIVE_ENDPOINT",
+    "BINANCE_AGGREGATE_TRADE_LIVE_SOURCE_VERSION",
+    "BinanceLiveAggregateTradeError",
+    "BinanceSpotLiveAggregateTradeAdapter",
+    "normalize_live_aggregate_trade_message",
     "FetchedAggregateTradeArchive",
     "aggregate_trade_archive_resource_urls",
     "archive_timestamp_unit",
