@@ -13,11 +13,16 @@ from quantos.domain.market_data.research_events.aggregate_trade import (
 )
 from quantos.domain.market_data.research_events.validation import (
     AggregateTradeValidationError,
+    ExactAggregateTradeIdRegistry,
+    IncrementalAggregateTradeSequenceValidator,
+    IncrementalAggregateTradeValidationResult,
     ValidatedAggregateTradeSequence,
     validate_aggregate_trade_sequence,
 )
 from quantos.domain.market_data.research_events.content_identity import (
     AggregateTradeContentIdentityError,
+    IncrementalAggregateTradeSequenceHasher,
+    canonical_aggregate_trade_event_bytes,
     canonical_aggregate_trade_sequence_bytes,
     canonical_aggregate_trade_sequence_sha256,
 )
@@ -89,6 +94,10 @@ __all__ = [
     "AggregateTradeRangeManifest",
     "AggregateTradeRangeRequest",
     "AggregateTradeValidationError",
+    "ExactAggregateTradeIdRegistry",
+    "IncrementalAggregateTradeSequenceHasher",
+    "IncrementalAggregateTradeSequenceValidator",
+    "IncrementalAggregateTradeValidationResult",
     "AggressorSide",
     "ArchiveChecksumStatus",
     "ExactAggregateTradeRevision",
@@ -108,6 +117,7 @@ __all__ = [
     "aggregate_trade_dataset_identity_bytes",
     "canonical_aggregate_trade_sequence_bytes",
     "canonical_aggregate_trade_sequence_sha256",
+    "canonical_aggregate_trade_event_bytes",
     "normalize_source_timestamp",
     "validate_aggregate_trade_sequence",
     "AGGREGATE_TRADE_RANGE_SCHEMA_VERSION",

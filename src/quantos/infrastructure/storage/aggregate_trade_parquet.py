@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
@@ -321,6 +322,71 @@ def _archive_from_table(
     return archive
 
 
+def _events_from_record_batch(
+    batch: pa.RecordBatch, *, row_offset: int
+) -> tuple[AggregateTrade, ...]:
+    if not batch.schema.equals(AGGREGATE_TRADE_SCHEMA, check_metadata=False):
+        raise AggregateTradeParquetStorageError(
+            "decoded record-batch schema does not match"
+        )
+    batch.validate(full=True)
+    for field, column in zip(AGGREGATE_TRADE_SCHEMA, batch.columns, strict=True):
+        if not field.nullable and column.null_count:
+            raise AggregateTradeParquetStorageError(
+                f"canonical aggregate-trade column {field.name} contains nulls"
+            )
+    columns: dict[str, list[object]] = {
+        field.name: (
+            [
+                _utc_datetime(value)
+                for value in batch.column(index).cast(
+                    pa.int64(), safe=True
+                ).to_pylist()
+            ]
+            if field.name == "event_time"
+            else batch.column(index).to_pylist()
+        )
+        for index, field in enumerate(AGGREGATE_TRADE_SCHEMA)
+    }
+    events: list[AggregateTrade] = []
+    for index in range(batch.num_rows):
+        try:
+            unit_value = columns["source_timestamp_unit"][index]
+            if type(unit_value) is not str:
+                raise TypeError("source timestamp unit must be a string")
+            events.append(
+                AggregateTrade(
+                    symbol=columns["symbol"][index],  # type: ignore[arg-type]
+                    aggregate_trade_id=columns["aggregate_trade_id"][index],  # type: ignore[arg-type]
+                    price=_decimal_from_columns(
+                        columns["price"][index],
+                        columns["price_text"][index],
+                        "price",
+                    ),
+                    quantity=_decimal_from_columns(
+                        columns["quantity"][index],
+                        columns["quantity_text"][index],
+                        "quantity",
+                    ),
+                    first_trade_id=columns["first_trade_id"][index],  # type: ignore[arg-type]
+                    last_trade_id=columns["last_trade_id"][index],  # type: ignore[arg-type]
+                    event_time=columns["event_time"][index],  # type: ignore[arg-type]
+                    source_timestamp=columns["source_timestamp"][index],  # type: ignore[arg-type]
+                    source_timestamp_unit=SourceTimestampUnit(unit_value),
+                    buyer_is_maker=columns["buyer_is_maker"][index],  # type: ignore[arg-type]
+                    best_price_match=columns["best_price_match"][index],  # type: ignore[arg-type]
+                )
+            )
+        except AggregateTradeParquetStorageError:
+            raise
+        except (TypeError, ValueError, OverflowError) as error:
+            raise AggregateTradeParquetStorageError(
+                f"stored aggregate-trade row {row_offset + index} is invalid: "
+                f"{error}"
+            ) from error
+    return tuple(events)
+
+
 class ParquetAggregateTradeArchiveStore:
     """Publish raw and canonical event archives without replacing existing files."""
 
@@ -367,6 +433,125 @@ class ParquetAggregateTradeArchiveStore:
                 "immutable raw archive SHA-256 does not match manifest"
             )
         return content
+
+    def verify_raw(
+        self,
+        manifest: AggregateTradeArchiveManifest,
+        *,
+        chunk_size: int = 1_048_576,
+    ) -> Path:
+        """Verify immutable raw bytes without retaining the ZIP in memory."""
+
+        if type(chunk_size) is not int or not 1 <= chunk_size <= 16_777_216:
+            raise AggregateTradeParquetStorageError(
+                "raw verification chunk_size must be between 1 and 16777216"
+            )
+        path = self.raw_archive_path(manifest)
+        digest = sha256()
+        try:
+            with path.open("rb") as source:
+                while True:
+                    chunk = source.read(chunk_size)
+                    if not chunk:
+                        break
+                    digest.update(chunk)
+        except OSError as error:
+            raise AggregateTradeParquetStorageError(
+                f"cannot read immutable raw archive {path}: {error}"
+            ) from error
+        if digest.hexdigest() != manifest.raw_zip_sha256:
+            raise AggregateTradeParquetStorageError(
+                "immutable raw archive SHA-256 does not match manifest"
+            )
+        return path
+
+    def read_manifest(self, path: Path) -> AggregateTradeArchiveManifest:
+        """Read and validate only trusted Parquet schema/footer metadata."""
+
+        try:
+            with Path(path).open("rb") as source:
+                with pq.ParquetFile(
+                    source, page_checksum_verification=True
+                ) as parquet:
+                    _require_schema(parquet)
+                    manifest = _parse_manifest(
+                        parquet.metadata.metadata or {}
+                    )
+                    if parquet.metadata.num_rows != manifest.accepted_row_count:
+                        raise AggregateTradeParquetStorageError(
+                            "Parquet row count differs from archive manifest"
+                        )
+                    return manifest
+        except AggregateTradeParquetStorageError:
+            raise
+        except (OSError, pa.ArrowException, TypeError, ValueError) as error:
+            raise AggregateTradeParquetStorageError(
+                f"cannot read aggregate-trade Parquet manifest {path}: {error}"
+            ) from error
+
+    def iter_event_batches(
+        self,
+        path: Path,
+        *,
+        expected_manifest: AggregateTradeArchiveManifest,
+        batch_size: int,
+    ) -> Iterator[tuple[AggregateTrade, ...]]:
+        """Decode one immutable partition in deterministic bounded batches."""
+
+        if type(expected_manifest) is not AggregateTradeArchiveManifest:
+            raise AggregateTradeParquetStorageError(
+                "expected_manifest must be authoritative"
+            )
+        AggregateTradeArchiveManifest.__post_init__(expected_manifest)
+        if type(batch_size) is not int or not 1 <= batch_size <= 1_000_000:
+            raise AggregateTradeParquetStorageError(
+                "batch_size must be between 1 and 1000000"
+            )
+        row_offset = 0
+        try:
+            with Path(path).open("rb") as source:
+                with pq.ParquetFile(
+                    source, page_checksum_verification=True
+                ) as parquet:
+                    _require_schema(parquet)
+                    stored_metadata = parquet.metadata.metadata or {}
+                    manifest = _parse_manifest(stored_metadata)
+                    if manifest != expected_manifest:
+                        raise AggregateTradeParquetStorageError(
+                            "stored archive manifest differs from expected manifest"
+                        )
+                    if parquet.metadata.num_rows != manifest.accepted_row_count:
+                        raise AggregateTradeParquetStorageError(
+                            "Parquet row count differs from archive manifest"
+                        )
+                    if any(
+                        stored_metadata.get(key) != value
+                        for key, value in _metadata(manifest).items()
+                    ):
+                        raise AggregateTradeParquetStorageError(
+                            "archive metadata differs from canonical manifest"
+                        )
+                    for batch in parquet.iter_batches(
+                        batch_size=batch_size,
+                        use_threads=False,
+                        use_pandas_metadata=False,
+                    ):
+                        events = _events_from_record_batch(
+                            batch, row_offset=row_offset
+                        )
+                        row_offset += len(events)
+                        yield events
+            if row_offset != expected_manifest.accepted_row_count:
+                raise AggregateTradeParquetStorageError(
+                    "decoded event count differs from archive manifest"
+                )
+        except AggregateTradeParquetStorageError:
+            raise
+        except (OSError, pa.ArrowException, TypeError, ValueError, OverflowError) as error:
+            raise AggregateTradeParquetStorageError(
+                f"cannot stream canonical aggregate-trade Parquet dataset "
+                f"{path}: {error}"
+            ) from error
 
     def read(self, path: Path) -> ValidatedAggregateTradeArchive:
         try:
