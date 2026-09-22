@@ -19,6 +19,11 @@ from quantos.application.aggregate_trade_ranges import (
     replay_aggregate_trade_range,
     validate_aggregate_trade_partition_boundary,
 )
+from quantos.application.aggregate_trade_minute_states import (
+    AggregateTradeMinuteAggregationError,
+    aggregate_trade_minute_states,
+    replay_aggregate_trade_minute_states,
+)
 
 __all__ = [
     "CanonicalCandleDatasetWriter",
@@ -36,4 +41,7 @@ __all__ = [
     "replay_aggregate_trade_range",
     "run",
     "validate_aggregate_trade_partition_boundary",
+    "AggregateTradeMinuteAggregationError",
+    "aggregate_trade_minute_states",
+    "replay_aggregate_trade_minute_states",
 ]

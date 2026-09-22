@@ -90,6 +90,23 @@ def publish_partition(
     stored: bool = False,
 ):
     rows = partition_rows(source_date, first_id=first_id)
+    return publish_rows(
+        root,
+        symbol=symbol,
+        source_date=source_date,
+        rows=rows,
+        stored=stored,
+    )
+
+
+def publish_rows(
+    root: Path,
+    *,
+    symbol: str,
+    source_date: date,
+    rows: list[list[str]],
+    stored: bool = False,
+):
     content = source_zip(
         rows, symbol=symbol, source_date=source_date, stored=stored
     )
