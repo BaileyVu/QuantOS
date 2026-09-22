@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import date
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
+
+from quantos.domain.market_data.research_events import (
+    aggregate_trade_archive_manifest_id,
+)
+from tests.aggregate_trade_range_fixtures import publish_partition
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -46,3 +53,138 @@ class CliSmokeTests(unittest.TestCase):
         self.assertEqual(payload["event"], "configuration_error")
         self.assertIn("not found", payload["error"])
 
+    def write_research_config(self, directory: Path, data_root: Path) -> Path:
+        path = directory / "research.toml"
+        path.write_text(
+            "\n".join(
+                (
+                    "[quantos]",
+                    'runtime_mode = "research"',
+                    'symbols = ["BTCUSDT", "ETHUSDT"]',
+                    'timeframe = "1m"',
+                    f'data_dir = "{data_root.as_posix()}"',
+                    'log_level = "INFO"',
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+        return path
+
+    def test_aggregate_trade_catalog_and_compose_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data_root = root / "data"
+            december, _ = publish_partition(
+                data_root,
+                symbol="BTCUSDT",
+                source_date=date(2024, 12, 31),
+                first_id=10,
+            )
+            january, _ = publish_partition(
+                data_root,
+                symbol="BTCUSDT",
+                source_date=date(2025, 1, 1),
+                first_id=20,
+            )
+            config = self.write_research_config(root, data_root)
+            listed = self.run_cli(
+                "--config", str(config), "aggregate-trades", "list", "--symbol", "BTCUSDT"
+            )
+            revisions = self.run_cli(
+                "--config",
+                str(config),
+                "aggregate-trades",
+                "revisions",
+                "BTCUSDT",
+                "2024-12-31",
+            )
+            inspected = self.run_cli(
+                "--config",
+                str(config),
+                "aggregate-trades",
+                "inspect",
+                aggregate_trade_archive_manifest_id(december.archive.manifest),
+            )
+            output = root / "range.json"
+            composed = self.run_cli(
+                "--config",
+                str(config),
+                "aggregate-trades",
+                "compose",
+                "BTCUSDT",
+                "2024-12-31",
+                "2025-01-02",
+                "--output",
+                str(output),
+            )
+            repeated = self.run_cli(
+                "--config",
+                str(config),
+                "aggregate-trades",
+                "compose",
+                "BTCUSDT",
+                "2024-12-31",
+                "2025-01-02",
+                "--output",
+                str(output),
+            )
+
+            for result in (listed, revisions, inspected, composed, repeated):
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stderr, "")
+            self.assertEqual(json.loads(listed.stdout)["event"], "aggregate_trade_catalog")
+            self.assertEqual(len(json.loads(revisions.stdout)["revisions"]), 1)
+            self.assertEqual(
+                json.loads(inspected.stdout)["entry"]["manifest_id"],
+                aggregate_trade_archive_manifest_id(december.archive.manifest),
+            )
+            manifest = json.loads(composed.stdout)
+            self.assertEqual(manifest["total_accepted_event_count"], 4)
+            self.assertEqual(output.read_text(encoding="utf-8"), composed.stdout)
+            self.assertEqual(repeated.stdout, composed.stdout)
+            self.assertEqual(
+                [item["manifest_id"] for item in manifest["partitions"]],
+                [
+                    aggregate_trade_archive_manifest_id(december.archive.manifest),
+                    aggregate_trade_archive_manifest_id(january.archive.manifest),
+                ],
+            )
+
+            collision = root / "collision.json"
+            collision.write_text("different", encoding="utf-8")
+            rejected = self.run_cli(
+                "--config",
+                str(config),
+                "aggregate-trades",
+                "compose",
+                "BTCUSDT",
+                "2024-12-31",
+                "2025-01-02",
+                "--output",
+                str(collision),
+            )
+            self.assertEqual(rejected.returncode, 2)
+            self.assertEqual(collision.read_text(encoding="utf-8"), "different")
+
+    def test_aggregate_trade_cli_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = self.write_research_config(root, root / "data")
+            unsupported = self.run_cli(
+                "--config", str(config), "aggregate-trades", "list", "--symbol", "SOLUSDT"
+            )
+            missing = self.run_cli(
+                "--config",
+                str(config),
+                "aggregate-trades",
+                "compose",
+                "BTCUSDT",
+                "2025-01-01",
+                "2025-01-02",
+            )
+
+            for result in (unsupported, missing):
+                self.assertEqual(result.returncode, 2)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertEqual(json.loads(result.stderr)["event"], "operator_error")

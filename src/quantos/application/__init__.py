@@ -10,14 +10,30 @@ from quantos.application.historical_ingestion import (
     ingest_historical_range,
 )
 from quantos.application.runtime import run
+from quantos.application.aggregate_trade_ranges import (
+    AggregateTradePartitionCatalog,
+    AggregateTradeRangeCompositionError,
+    canonical_range_manifest_bytes,
+    compose_aggregate_trade_range,
+    iter_aggregate_trade_range,
+    replay_aggregate_trade_range,
+    validate_aggregate_trade_partition_boundary,
+)
 
 __all__ = [
     "CanonicalCandleDatasetWriter",
+    "AggregateTradePartitionCatalog",
+    "AggregateTradeRangeCompositionError",
     "HistoricalCandleRangeFetcher",
     "HistoricalIngestionError",
     "PersistedHistoricalDataset",
     "extend_and_persist_historical_range",
     "ingest_and_persist_historical_range",
     "ingest_historical_range",
+    "canonical_range_manifest_bytes",
+    "compose_aggregate_trade_range",
+    "iter_aggregate_trade_range",
+    "replay_aggregate_trade_range",
     "run",
+    "validate_aggregate_trade_partition_boundary",
 ]

@@ -139,6 +139,15 @@ class AggregateTradeArchiveManifest:
             raise ValueError("observed coverage must be within the requested day")
         if type(self.source_timestamp_unit) is not SourceTimestampUnit:
             raise TypeError("source_timestamp_unit must be explicit")
+        expected_unit = (
+            SourceTimestampUnit.MILLISECOND
+            if self.source_date < date(2025, 1, 1)
+            else SourceTimestampUnit.MICROSECOND
+        )
+        if self.source_timestamp_unit is not expected_unit:
+            raise ValueError(
+                "source timestamp unit does not match source-date policy"
+            )
         for name in (
             "schema_fingerprint",
             "published_checksum",
