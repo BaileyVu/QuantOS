@@ -4,6 +4,12 @@ from quantos.infrastructure.storage.aggregate_trade_duckdb import (
     DuckDBAggregateTradeArchiveQuery,
     DuckDBAggregateTradeQueryError,
 )
+from quantos.infrastructure.storage.aggregate_trade_catalog import (
+    AggregateTradeArchiveCatalogView,
+    AggregateTradeCatalogError,
+    CatalogedAggregateTradeRevision,
+    LocalAggregateTradeArchiveCatalog,
+)
 from quantos.infrastructure.storage.aggregate_trade_parquet import (
     AGGREGATE_TRADE_SCHEMA,
     AGGREGATE_TRADE_STORAGE_SCHEMA_VERSION,
@@ -29,6 +35,9 @@ __all__ = [
     "AGGREGATE_TRADE_SCHEMA",
     "AGGREGATE_TRADE_STORAGE_SCHEMA_VERSION",
     "AggregateTradeArchivePublication",
+    "AggregateTradeArchiveCatalogView",
+    "AggregateTradeCatalogError",
+    "CatalogedAggregateTradeRevision",
     "AggregateTradeDatasetCollisionError",
     "AggregateTradeParquetStorageError",
     "CANDLE_SCHEMA",
@@ -38,6 +47,7 @@ __all__ = [
     "DuckDBCandleDatasetQuery",
     "DuckDBQueryError",
     "ParquetAggregateTradeArchiveStore",
+    "LocalAggregateTradeArchiveCatalog",
     "ParquetCandleDatasetStore",
     "ParquetStorageError",
     "STORAGE_SCHEMA_VERSION",
