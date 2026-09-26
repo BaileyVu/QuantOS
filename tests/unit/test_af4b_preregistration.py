@@ -375,11 +375,20 @@ class AF4BPreregistrationTests(unittest.TestCase):
 
     def test_32_docs_000_through_010_unchanged(self):
         root = Path(af.__file__).resolve().parents[1]
-        actual = {
-            path: af.digest((root / path).read_bytes())
-            for path in af.SPEC_HASHES
-        }
-        self.assertEqual(actual, af.SPEC_HASHES)
+        doc_009 = "docs/009_ALPHA_DISCOVERY_FUNNEL_AF1.md"
+        doc_009_lf_hash = "ad7803207d6939fd1c60e509fa7fcd6d7edc705a6280add43ec752e5b5c58644"
+        actual = {}
+        for path, frozen_hash in af.SPEC_HASHES.items():
+            contents = (root / path).read_bytes()
+            if path == doc_009:
+                # The historical pin used CRLF bytes, while Git committed the same text as LF.
+                self.assertEqual(af.digest(contents), doc_009_lf_hash)
+                self.assertNotIn(b"\r\n", contents)
+                self.assertEqual(af.digest(contents.replace(b"\n", b"\r\n")), frozen_hash)
+            else:
+                actual[path] = af.digest(contents)
+        expected = {path: value for path, value in af.SPEC_HASHES.items() if path != doc_009}
+        self.assertEqual(actual, expected)
 
     def test_33_production_code_and_feature_engine_unchanged(self):
         root = Path(af.__file__).resolve().parents[1]

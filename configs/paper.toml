@@ -1,0 +1,23 @@
+# V1-T1 simulation fixtures/configuration, not a strategy promotion approval.
+[paper]
+mode = "paper"
+initial_capital = "20"
+# Relative to the invoking working directory; artifacts/ is ignored by Git.
+ledger_path = "artifacts/paper/execution.jsonl"
+fee_rate = "0.001"
+slippage_rate = "0.002"
+
+[risk]
+order_notional = "10"
+quantity_step = "0.00001"
+sell_fraction = "1"
+max_position_quantity = "1"
+max_position_notional = "18"
+max_exposure_fraction = "0.9"
+daily_loss_fraction = "0.1"
+drawdown_fraction = "0.2"
+stale_seconds = 60
+safety_margin_rate = "0"
+
+# Optional only when the approved strategy requires volatility scaling.
+# volatility_target = "0.01"

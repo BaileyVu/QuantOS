@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from types import MappingProxyType
-from typing import Mapping
+
+from quantos.domain.runtime_contracts import AccountSnapshot, Position
 
 from quantos.domain.common import require_decimal, require_non_empty, require_utc, require_v1_symbol
 
@@ -115,52 +115,3 @@ class ExecutionReport:
                 raise ValueError("canceled reports must not be fully filled")
         elif self.status is ExecutionStatus.UNKNOWN and self.reason is None:
             raise ValueError("unknown reports require reason")
-
-
-@dataclass(frozen=True, slots=True)
-class Position:
-    """A V1 spot position snapshot maintained with execution state."""
-
-    symbol: str
-    quantity: Decimal
-    average_entry_price: Decimal | None
-    timestamp: datetime
-
-    def __post_init__(self) -> None:
-        require_v1_symbol(self.symbol)
-        require_decimal(self.quantity, "quantity", non_negative=True)
-        require_utc(self.timestamp, "timestamp")
-        if self.quantity == Decimal("0") and self.average_entry_price is not None:
-            raise ValueError("a flat position must not have an average_entry_price")
-        if self.quantity > Decimal("0"):
-            if self.average_entry_price is None:
-                raise ValueError("an open position requires an average_entry_price")
-            require_decimal(self.average_entry_price, "average_entry_price")
-            if self.average_entry_price <= Decimal("0"):
-                raise ValueError("average_entry_price must be positive")
-
-
-@dataclass(frozen=True, slots=True)
-class AccountSnapshot:
-    """A timestamped account state used by Risk and Execution."""
-
-    timestamp: datetime
-    balances: Mapping[str, Decimal]
-    positions: tuple[Position, ...]
-
-    def __post_init__(self) -> None:
-        require_utc(self.timestamp, "timestamp")
-        copied_balances: dict[str, Decimal] = {}
-        for asset, value in self.balances.items():
-            require_non_empty(asset, "asset")
-            copied_balances[asset] = require_decimal(value, f"balance {asset}", non_negative=True)
-        object.__setattr__(self, "balances", MappingProxyType(copied_balances))
-        try:
-            positions = tuple(self.positions)
-        except TypeError as error:
-            raise ValueError("positions must be an iterable of Position values") from error
-        if not all(isinstance(position, Position) for position in positions):
-            raise ValueError("positions must contain only Position values")
-        if len({position.symbol for position in positions}) != len(positions):
-            raise ValueError("positions must not contain duplicate symbols")
-        object.__setattr__(self, "positions", positions)
