@@ -18,10 +18,19 @@ class RiskDecision:
     approved: bool
     approved_quantity: Decimal | None = None
     rejection_reason: str | None = None
+    alpha_id: str | None = None
+    context_id: str | None = None
+    decision_id: str | None = None
+    net_edge_rate: Decimal | None = None
 
     def __post_init__(self) -> None:
         require_utc(self.timestamp, "timestamp")
         require_v1_symbol(self.symbol)
+        for name in ('alpha_id', 'context_id', 'decision_id'):
+            if getattr(self, name) is not None:
+                require_non_empty(getattr(self, name), name)
+        if self.net_edge_rate is not None:
+            require_decimal(self.net_edge_rate, 'net_edge_rate')
         if not isinstance(self.approved, bool):
             raise ValueError("approved must be a boolean")
         if self.approved:
