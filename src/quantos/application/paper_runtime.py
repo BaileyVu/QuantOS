@@ -32,6 +32,7 @@ class PaperRuntimePolicy:
     risk: RiskPolicy
     synchronization_timeout_ms: int
     alpha_implementation_id: str
+    event_clock_skew_tolerance_ms: int
     mode: str = "paper"
 
     def __post_init__(self):
@@ -48,6 +49,9 @@ class PaperRuntimePolicy:
         self.risk.__post_init__()
         if type(self.synchronization_timeout_ms) is not int or self.synchronization_timeout_ms <= 0:
             raise ValueError("synchronization_timeout_ms must be a positive integer")
+        if (type(self.event_clock_skew_tolerance_ms) is not int
+                or not 0 <= self.event_clock_skew_tolerance_ms <= 1000):
+            raise ValueError("event_clock_skew_tolerance_ms must be an integer from 0 to 1000")
         require_non_empty(self.alpha_implementation_id, "alpha_implementation_id")
 
 
@@ -280,7 +284,8 @@ class PaperRuntime:
             if candle.close_time - previous[-1].close_time != timedelta(minutes=1):
                 raise PaperRuntimeError("inconsistent completion grid")
         self._fresh((candle,))
-        if event.timestamp > self.last_observation:
+        # Provider clock disagreement never changes local observation or candle freshness.
+        if event.timestamp - self.last_observation > timedelta(milliseconds=self.policy.event_clock_skew_tolerance_ms):
             raise PaperRuntimeError("future event observation timestamp")
         return candle
 

@@ -20,6 +20,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         config = load_paper_runtime_config("configs/paper_runtime.toml", alpha_implementation_id="test")
         self.assertEqual(config.policy.symbols, ("BTCUSDT", "ETHUSDT"))
         self.assertEqual(config.policy.mode, "paper")
+        self.assertEqual(config.policy.event_clock_skew_tolerance_ms, 1000)
 
     def test_invalid_runtime_configuration_fails_closed(self):
         source = Path("configs/paper_runtime.toml").read_text()
@@ -32,6 +33,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
                 source.replace('interval = "1m"', 'interval = "5m"'),
                 source.replace('["BTCUSDT", "ETHUSDT"]', '["BTCUSDT", "BTCUSDT"]'),
                 source.replace("5000", "true"),
+                source.replace("event_clock_skew_tolerance_ms = 1000\n", ""),
+                *(source.replace("event_clock_skew_tolerance_ms = 1000",
+                                 f"event_clock_skew_tolerance_ms = {value}")
+                  for value in ("-1", "true", "1000.0", "1001")),
                 source.replace("artifacts/paper/runtime.json", "artifacts/paper/execution.jsonl"),
                 source.replace("artifacts/paper/minutes.jsonl", "artifacts/paper/runtime.json.tmp"),
             ]

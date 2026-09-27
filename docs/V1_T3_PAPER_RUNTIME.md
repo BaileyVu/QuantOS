@@ -17,8 +17,15 @@ symbol needs no partner. Exact last-committed duplicates are ignored on restart.
 The Feature Engine's 21-candle causal window is retained per symbol. Warm-up calls
 no Alpha. Insufficient feature inputs continue to produce no decision. The injected
 UTC clock checks actual observation freshness against Risk's stale_seconds before
-Alpha and again before Risk/Execution. Future candles/events and backward clocks
-fail closed.
+Alpha and again before Risk/Execution. Candle close time, provider MarketEvent time,
+and local observation time remain distinct. Required integer runtime configuration
+`event_clock_skew_tolerance_ms = 1000` permits provider event time up to that many
+milliseconds ahead of local observation (inclusive); allowed settings are 0-1000 ms.
+Larger event-time skew fails closed. This tolerance never applies to candle close
+time or Risk's stale_seconds: future and stale candles still fail `_fresh()`.
+Provider time never advances local last_observation or the monotonic clock;
+backward local clocks still fail closed. The tolerance is part of runtime identity,
+so changing it (or using a checkpoint from before this setting) blocks restart.
 
 ## Composition and operation
 
