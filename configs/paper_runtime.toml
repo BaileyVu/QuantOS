@@ -1,0 +1,10 @@
+# Explicit non-trading smoke or caller-supplied approved Alpha composition.
+[runtime]
+mode = "paper"
+symbols = ["BTCUSDT", "ETHUSDT"]
+interval = "1m"
+# Referenced relative to this file; persistence paths follow existing cwd convention.
+paper_config = "paper.toml"
+state_path = "artifacts/paper/runtime.json"
+evidence_path = "artifacts/paper/minutes.jsonl"
+synchronization_timeout_ms = 5000
