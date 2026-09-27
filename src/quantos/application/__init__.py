@@ -31,6 +31,7 @@ from quantos.application.live_aggregate_trade_minutes import (
     LiveAggregateTradeMinuteEngine,
     LiveAggregateTradeMinuteEngineError,
 )
+from quantos.application.evaluation import EvaluationError, run_backtest, run_walk_forward
 
 __all__ = [
     "CanonicalCandleDatasetWriter",
@@ -56,4 +57,7 @@ __all__ = [
     "replay_aggregate_trade_minute_states",
     "LiveAggregateTradeMinuteEngine",
     "LiveAggregateTradeMinuteEngineError",
+    "EvaluationError",
+    "run_backtest",
+    "run_walk_forward",
 ]
