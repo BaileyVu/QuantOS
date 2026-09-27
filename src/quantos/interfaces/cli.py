@@ -71,6 +71,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to a QuantOS TOML configuration file.",
     )
     commands = parser.add_subparsers(dest="command")
+    paper = commands.add_parser("paper", help="Continuous paper runtime; selected Alpha required.")
+    paper.add_argument("--runtime-config", type=Path, default=Path("configs/paper_runtime.toml"))
+    paper.add_argument("--non-trading-smoke", action="store_true",
+                       help="Explicit public-feed HOLD-only smoke; no selected production Alpha.")
     aggregate_trades = commands.add_parser(
         "aggregate-trades", help="Inspect immutable research event archives."
     )
@@ -303,6 +307,13 @@ def _aggregate_trade_command(args: argparse.Namespace, data_dir: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "paper":
+        from quantos.interfaces.paper_runtime import paper_command
+        try:
+            return paper_command(args, configure_logging("INFO"))
+        except (ValueError, OSError) as error:
+            print(_json({"event": "paper_runtime_error", "error": str(error)}), file=sys.stderr)
+            return 2
     try:
         config = load_config(args.config)
     except ConfigurationError as error:

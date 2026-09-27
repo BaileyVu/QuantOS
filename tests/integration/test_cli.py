@@ -40,14 +40,14 @@ class CliSmokeTests(unittest.TestCase):
             text=True,
         )
 
-    def test_cli_starts_and_stops_in_paper_mode(self) -> None:
+    def test_cli_fails_safely_without_selected_paper_alpha(self) -> None:
         result = self.run_cli("--config", "configs/default.toml")
 
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 2, result.stderr)
         events = [json.loads(line) for line in result.stderr.splitlines()]
         self.assertEqual(
             [event["event"] for event in events],
-            ["application_started", "application_ready", "application_stopped"],
+            ["application_started", "paper_alpha_required", "application_stopped"],
         )
         self.assertTrue(all(event["context"]["runtime_mode"] == "paper" for event in events))
 
