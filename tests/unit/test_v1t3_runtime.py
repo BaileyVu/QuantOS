@@ -1,7 +1,7 @@
 """Offline safety tests; deterministic Alpha fixtures are test-only."""
 import asyncio
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal as D
 import json
 from pathlib import Path
@@ -64,7 +64,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.clock = Clock()
-        self.policy = PaperRuntimePolicy(("BTCUSDT", "ETHUSDT"), D("20"), POLICY, 50, "test-only-v1")
+        self.policy = PaperRuntimePolicy(("BTCUSDT", "ETHUSDT"), D("20"), POLICY, 50, "test-only-v1", event_clock_skew_tolerance_ms=1000)
 
     def make(self, *, alpha=None, policy=None, stop=None, store=None, root=None):
         root = root or self.root
@@ -154,6 +154,89 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             await runtime.run(Feed(events(), self.clock))
         self.assertEqual(len(runtime.ledger.read()), 1)
 
+    async def test_provider_clock_skew_boundaries_preserve_local_observation(self):
+        for tolerance_ms, ahead_us in ((1000, 0), (1000, 424), (1000, 1000000),
+                                       (250, 250000), (0, 0)):
+            with self.subTest(tolerance_ms=tolerance_ms, ahead_us=ahead_us):
+                self.clock = Clock()
+                local_now = self.clock.now
+                policy = replace(self.policy, event_clock_skew_tolerance_ms=tolerance_ms)
+                runtime = self.make(policy=policy, root=self.root/f"{tolerance_ms}-{ahead_us}")
+                sequence = [replace(e, timestamp=local_now+timedelta(microseconds=ahead_us))
+                            for e in events(1)]
+                feed = Feed(sequence, self.clock,
+                            on_event=lambda e: setattr(self.clock, "now", local_now))
+                await runtime.run(feed)
+                self.assertEqual(runtime.evidence_count, 1)
+                self.assertEqual(runtime.last_observation, local_now)
+                self.assertEqual(len(runtime.ledger.read()), 1)
+                self.assertTrue(feed.closed)
+
+    async def test_real_public_smoke_provider_skew_regression(self):
+        local_now = datetime(2026, 9, 27, 16, 29, 0, 20953, tzinfo=timezone.utc)
+        provider_time = datetime(2026, 9, 27, 16, 29, 0, 21377, tzinfo=timezone.utc)
+        self.clock.now = local_now
+        sequence = [replace(e, timestamp=provider_time) for e in
+                    events(1, start=local_now.replace(minute=28, microsecond=0))]
+        runtime = self.make()
+        await runtime.run(Feed(sequence, self.clock,
+                               on_event=lambda e: setattr(self.clock, "now", local_now)))
+        self.assertEqual(runtime.evidence_count, 1)
+        self.assertEqual(runtime.last_observation, local_now)
+        self.assertEqual(self.state()["last_observation"], local_now.isoformat())
+        self.assertEqual(len(runtime.ledger.read()), 1)
+
+    async def test_provider_skew_beyond_configured_tolerance_fails_closed(self):
+        for tolerance_ms in (0, 250, 1000):
+            with self.subTest(tolerance_ms=tolerance_ms):
+                self.clock = Clock()
+                local_now = self.clock.now
+                policy = replace(self.policy, event_clock_skew_tolerance_ms=tolerance_ms)
+                runtime = self.make(policy=policy, root=self.root/str(tolerance_ms))
+                event = replace(events(1)[0], timestamp=local_now+
+                                timedelta(milliseconds=tolerance_ms, microseconds=1))
+                feed = Feed([event], self.clock,
+                            on_event=lambda e: setattr(self.clock, "now", local_now))
+                with self.assertRaisesRegex(PaperRuntimeError, "future event"):
+                    await runtime.run(feed)
+                self.assertEqual(runtime.evidence_count, 0)
+                self.assertEqual(len(runtime.ledger.read()), 1)
+                runtime.store.acquire()
+                try:
+                    self.assertEqual(runtime.store.load()["status"], "blocked")
+                finally:
+                    runtime.store.release()
+                self.assertTrue(feed.closed)
+
+    async def test_event_tolerance_never_relaxes_candle_or_local_clock_guards(self):
+        for case, message in (("future", "future live candle"),
+                              ("stale", "stale"), ("backward", "clock moved backwards")):
+            with self.subTest(case=case):
+                self.clock = Clock()
+                candle = events(1)[0].candle
+                local_now = candle.close_time
+                if case == "future":
+                    local_now -= timedelta(microseconds=1)
+                elif case == "stale":
+                    local_now += timedelta(seconds=self.policy.risk.stale_seconds, microseconds=1)
+                self.clock.now = local_now
+                if case == "backward":
+                    self.clock.now += timedelta(microseconds=1)
+                event = MarketEvent(local_now+timedelta(milliseconds=1), candle)
+                runtime = self.make(root=self.root/case)
+                feed = Feed([event], self.clock,
+                            on_event=lambda e: setattr(self.clock, "now", local_now))
+                with self.assertRaisesRegex(PaperRuntimeError, message):
+                    await runtime.run(feed)
+                self.assertEqual(runtime.evidence_count, 0)
+                self.assertEqual(len(runtime.ledger.read()), 1)
+                runtime.store.acquire()
+                try:
+                    self.assertEqual(runtime.store.load()["status"], "blocked")
+                finally:
+                    runtime.store.release()
+                self.assertTrue(feed.closed)
+
     async def test_future_event_timestamp_rejected(self):
         event = events(1)[0]
         feed = Feed([replace(event, timestamp=event.timestamp+timedelta(seconds=5))], self.clock,
@@ -230,6 +313,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_changed_config_or_alpha_identity_fails(self):
         await self.make().run(Feed(events(1), self.clock))
         for policy in (replace(self.policy, alpha_implementation_id="changed"),
+                       replace(self.policy, event_clock_skew_tolerance_ms=999),
                        replace(self.policy, risk=replace(POLICY, order_notional=D("6")))):
             with self.assertRaisesRegex(PaperRuntimeError, "incompatible"):
                 await self.make(policy=policy).run(Feed([], self.clock))
