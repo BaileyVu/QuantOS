@@ -58,7 +58,7 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
             await runtime.run(Feed(events(1), self.clock))
 
     async def test_utc_clock_anomalies_never_reach_alpha(self):
-        for name in ("backward", "naive", "offset", "negative_age"):
+        for name in ("backward", "naive", "offset", "beyond_provider_tolerance"):
             with self.subTest(name=name):
                 self.clock = Clock()
                 runtime = self.make(root=self.root/name)
@@ -70,7 +70,7 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
                     elif name == "offset":
                         self.clock.now = self.clock.now.replace(tzinfo=timezone(timedelta(hours=1)))
                     else:
-                        self.clock.now = event.candle.close_time-timedelta(microseconds=1)
+                        self.clock.now = event.candle.close_time-timedelta(milliseconds=self.policy.provider_clock_skew_tolerance_ms, microseconds=1)
                         runtime.last_observation = None
                 with self.assertRaises(PaperRuntimeError):
                     await runtime.run(Feed(events(1), self.clock, on_event=alter))

@@ -19,13 +19,22 @@ no Alpha. Insufficient feature inputs continue to produce no decision. The injec
 UTC clock checks actual observation freshness against Risk's stale_seconds before
 Alpha and again before Risk/Execution. Candle close time, provider MarketEvent time,
 and local observation time remain distinct. Required integer runtime configuration
-`event_clock_skew_tolerance_ms = 1000` permits provider event time up to that many
-milliseconds ahead of local observation (inclusive); allowed settings are 0-1000 ms.
-Larger event-time skew fails closed. This tolerance never applies to candle close
-time or Risk's stale_seconds: future and stale candles still fail `_fresh()`.
-Provider time never advances local last_observation or the monotonic clock;
-backward local clocks still fail closed. The tolerance is part of runtime identity,
-so changing it (or using a checkpoint from before this setting) blocks restart.
+`provider_clock_skew_tolerance_ms = 1000` permits both provider event time and
+provider-defined completed-candle close time up to that many milliseconds ahead of
+local observation (inclusive); allowed settings are 0-1000 ms. With
+`age = local_now - candle.close_time`, `_fresh()` accepts only
+`-tolerance <= age <= Risk.stale_seconds`. The stale upper bound is not extended.
+Exceeding either provider-time tolerance fails closed. Incomplete Binance klines
+remain suppressed: the adapter still requires x=true and canonical minute boundaries.
+
+This validation tolerance introduces no sleep, buffering or intentional execution
+delay: completed events are processed immediately on arrival. Provider time never
+advances local last_observation or the monotonic clock, and never changes system
+time. Backward local clocks still fail closed. No server-time polling or NTP is used.
+RiskContext continues to use candle close time; Risk safety checks are unchanged.
+The tolerance is part of runtime identity, so changing it blocks restart. The old
+`event_clock_skew_tolerance_ms` key is rejected, without an alias; configurations
+must use the new required key, and prior checkpoint identities are incompatible.
 
 ## Composition and operation
 

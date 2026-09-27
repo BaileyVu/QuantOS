@@ -20,7 +20,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         config = load_paper_runtime_config("configs/paper_runtime.toml", alpha_implementation_id="test")
         self.assertEqual(config.policy.symbols, ("BTCUSDT", "ETHUSDT"))
         self.assertEqual(config.policy.mode, "paper")
-        self.assertEqual(config.policy.event_clock_skew_tolerance_ms, 1000)
+        self.assertEqual(config.policy.provider_clock_skew_tolerance_ms, 1000)
 
     def test_invalid_runtime_configuration_fails_closed(self):
         source = Path("configs/paper_runtime.toml").read_text()
@@ -33,9 +33,11 @@ class RuntimeConfigurationTests(unittest.TestCase):
                 source.replace('interval = "1m"', 'interval = "5m"'),
                 source.replace('["BTCUSDT", "ETHUSDT"]', '["BTCUSDT", "BTCUSDT"]'),
                 source.replace("5000", "true"),
-                source.replace("event_clock_skew_tolerance_ms = 1000\n", ""),
-                *(source.replace("event_clock_skew_tolerance_ms = 1000",
-                                 f"event_clock_skew_tolerance_ms = {value}")
+                source.replace("provider_clock_skew_tolerance_ms", "event_clock_skew_tolerance_ms"),
+                source+'event_clock_skew_tolerance_ms = 1000\n',
+                source.replace("provider_clock_skew_tolerance_ms = 1000\n", ""),
+                *(source.replace("provider_clock_skew_tolerance_ms = 1000",
+                                 f"provider_clock_skew_tolerance_ms = {value}")
                   for value in ("-1", "true", "1000.0", "1001")),
                 source.replace("artifacts/paper/runtime.json", "artifacts/paper/execution.jsonl"),
                 source.replace("artifacts/paper/minutes.jsonl", "artifacts/paper/runtime.json.tmp"),
@@ -46,6 +48,16 @@ class RuntimeConfigurationTests(unittest.TestCase):
                     path.write_text(text)
                     with self.assertRaises(ConfigurationError):
                         load_paper_runtime_config(path, alpha_implementation_id="test")
+
+    def test_zero_provider_tolerance_is_valid(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root/"paper.toml").write_text(Path("configs/paper.toml").read_text())
+            path = root/"runtime.toml"
+            path.write_text(Path("configs/paper_runtime.toml").read_text().replace(
+                "provider_clock_skew_tolerance_ms = 1000", "provider_clock_skew_tolerance_ms = 0"))
+            config = load_paper_runtime_config(path, alpha_implementation_id="test")
+            self.assertEqual(config.policy.provider_clock_skew_tolerance_ms, 0)
 
     def test_missing_alpha_fails_before_feed_composition(self):
         with patch("quantos.interfaces.paper_runtime.run_paper", side_effect=AssertionError("feed created")):
