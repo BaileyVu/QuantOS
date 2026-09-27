@@ -64,7 +64,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.clock = Clock()
-        self.policy = PaperRuntimePolicy(("BTCUSDT", "ETHUSDT"), D("20"), POLICY, 50, "test-only-v1", event_clock_skew_tolerance_ms=1000)
+        self.policy = PaperRuntimePolicy(("BTCUSDT", "ETHUSDT"), D("20"), POLICY, 50, "test-only-v1", provider_clock_skew_tolerance_ms=1000)
 
     def make(self, *, alpha=None, policy=None, stop=None, store=None, root=None):
         root = root or self.root
@@ -160,7 +160,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(tolerance_ms=tolerance_ms, ahead_us=ahead_us):
                 self.clock = Clock()
                 local_now = self.clock.now
-                policy = replace(self.policy, event_clock_skew_tolerance_ms=tolerance_ms)
+                policy = replace(self.policy, provider_clock_skew_tolerance_ms=tolerance_ms)
                 runtime = self.make(policy=policy, root=self.root/f"{tolerance_ms}-{ahead_us}")
                 sequence = [replace(e, timestamp=local_now+timedelta(microseconds=ahead_us))
                             for e in events(1)]
@@ -191,7 +191,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(tolerance_ms=tolerance_ms):
                 self.clock = Clock()
                 local_now = self.clock.now
-                policy = replace(self.policy, event_clock_skew_tolerance_ms=tolerance_ms)
+                policy = replace(self.policy, provider_clock_skew_tolerance_ms=tolerance_ms)
                 runtime = self.make(policy=policy, root=self.root/str(tolerance_ms))
                 event = replace(events(1)[0], timestamp=local_now+
                                 timedelta(milliseconds=tolerance_ms, microseconds=1))
@@ -208,7 +208,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                     runtime.store.release()
                 self.assertTrue(feed.closed)
 
-    async def test_event_tolerance_never_relaxes_candle_or_local_clock_guards(self):
+    async def test_provider_tolerance_preserves_future_stale_and_local_clock_guards(self):
         for case, message in (("future", "future live candle"),
                               ("stale", "stale"), ("backward", "clock moved backwards")):
             with self.subTest(case=case):
@@ -216,13 +216,13 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                 candle = events(1)[0].candle
                 local_now = candle.close_time
                 if case == "future":
-                    local_now -= timedelta(microseconds=1)
+                    local_now -= timedelta(milliseconds=self.policy.provider_clock_skew_tolerance_ms, microseconds=1)
                 elif case == "stale":
                     local_now += timedelta(seconds=self.policy.risk.stale_seconds, microseconds=1)
                 self.clock.now = local_now
                 if case == "backward":
                     self.clock.now += timedelta(microseconds=1)
-                event = MarketEvent(local_now+timedelta(milliseconds=1), candle)
+                event = MarketEvent(max(candle.close_time, local_now+timedelta(milliseconds=1)), candle)
                 runtime = self.make(root=self.root/case)
                 feed = Feed([event], self.clock,
                             on_event=lambda e: setattr(self.clock, "now", local_now))
@@ -236,6 +236,72 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                 finally:
                     runtime.store.release()
                 self.assertTrue(feed.closed)
+
+    async def test_completed_candle_provider_skew_and_stale_boundaries(self):
+        stale_us = self.policy.risk.stale_seconds * 1000000
+        for tolerance_ms, age_us, accepted in (
+                (1000, 0, True), (1000, -1405, True),
+                (1000, -1000000, True), (1000, -1000001, False),
+                (1000, stale_us, True), (1000, stale_us+1, False),
+                (250, -250000, True), (250, -250001, False),
+                (0, 0, True), (0, -1, False)):
+            with self.subTest(tolerance_ms=tolerance_ms, age_us=age_us):
+                self.clock = Clock()
+                sequence = events(1)
+                local_now = sequence[0].candle.close_time+timedelta(microseconds=age_us)
+                self.clock.now = local_now
+                policy = replace(self.policy, provider_clock_skew_tolerance_ms=tolerance_ms)
+                runtime = self.make(policy=policy, root=self.root/f"{tolerance_ms}-{age_us}")
+                feed = Feed(sequence, self.clock,
+                            on_event=lambda e: setattr(self.clock, "now", local_now))
+                if accepted:
+                    await runtime.run(feed)
+                    self.assertEqual(runtime.evidence_count, 1)
+                else:
+                    with self.assertRaisesRegex(PaperRuntimeError, "stale or future live candle"):
+                        await runtime.run(feed)
+                    self.assertEqual(runtime.evidence_count, 0)
+                self.assertEqual(runtime.last_observation, local_now)
+                self.assertEqual(len(runtime.ledger.read()), 1)
+                self.assertTrue(feed.closed)
+
+    async def test_real_second_smoke_sequence_commits_without_clock_or_account_mutation(self):
+        local_now = datetime(2026, 9, 27, 18, 21, 59, 998594, tzinfo=timezone.utc)
+        close_time = datetime(2026, 9, 27, 18, 21, 59, 999999, tzinfo=timezone.utc)
+        provider_time = datetime(2026, 9, 27, 18, 22, 0, 14546, tzinfo=timezone.utc)
+        start = datetime(2026, 9, 27, 18, 0, tzinfo=timezone.utc)
+        sequence = []
+        for event in events(22, start=start):
+            candle = replace(event.candle, close_time=event.candle.close_time-timedelta(microseconds=1))
+            sequence.append(MarketEvent(provider_time if candle.close_time == close_time
+                                       else candle.close_time, candle))
+        self.clock.now = sequence[0].candle.close_time
+        alpha = FixtureAlpha()
+        runtime = self.make(alpha=alpha)
+        contexts = []
+        original = RiskEngine.evaluate
+        def observe(engine, decision, context):
+            contexts.append(context)
+            return original(engine, decision, context)
+        def receive(event):
+            self.clock.now = local_now if event.candle.close_time == close_time else event.timestamp
+        with patch.object(RiskEngine, "evaluate", observe):
+            await runtime.run(Feed(sequence, self.clock, on_event=receive))
+        self.assertEqual(runtime.evidence_count, 22)
+        self.assertEqual(len(alpha.seen), 4)
+        self.assertEqual(runtime.last_observation, local_now)
+        self.assertEqual(self.state()["last_observation"], local_now.isoformat())
+        self.assertEqual(self.state()["status"], "ready")
+        self.assertEqual(len(runtime.ledger.read()), 1)
+        self.assertEqual(runtime.execution.snapshot, runtime.initial)
+        self.assertEqual(len(contexts), 4)
+        self.assertTrue(all(c.timestamp == close_time for c in contexts[-2:]))
+        self.assertTrue(all(m.candle.close_time == c.timestamp for c in contexts for m in c.markets))
+        self.assertTrue(all(d["execution"] is None for d in self.evidence()[-1]["decisions"]))
+        restart = self.make()
+        await restart.run(Feed([], self.clock))
+        self.assertEqual(restart.evidence_count, 22)
+        self.assertEqual(restart.execution.snapshot, runtime.execution.snapshot)
 
     async def test_future_event_timestamp_rejected(self):
         event = events(1)[0]
@@ -313,7 +379,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_changed_config_or_alpha_identity_fails(self):
         await self.make().run(Feed(events(1), self.clock))
         for policy in (replace(self.policy, alpha_implementation_id="changed"),
-                       replace(self.policy, event_clock_skew_tolerance_ms=999),
+                       replace(self.policy, provider_clock_skew_tolerance_ms=999),
                        replace(self.policy, risk=replace(POLICY, order_notional=D("6")))):
             with self.assertRaisesRegex(PaperRuntimeError, "incompatible"):
                 await self.make(policy=policy).run(Feed([], self.clock))

@@ -32,7 +32,7 @@ class PaperRuntimePolicy:
     risk: RiskPolicy
     synchronization_timeout_ms: int
     alpha_implementation_id: str
-    event_clock_skew_tolerance_ms: int
+    provider_clock_skew_tolerance_ms: int
     mode: str = "paper"
 
     def __post_init__(self):
@@ -49,9 +49,9 @@ class PaperRuntimePolicy:
         self.risk.__post_init__()
         if type(self.synchronization_timeout_ms) is not int or self.synchronization_timeout_ms <= 0:
             raise ValueError("synchronization_timeout_ms must be a positive integer")
-        if (type(self.event_clock_skew_tolerance_ms) is not int
-                or not 0 <= self.event_clock_skew_tolerance_ms <= 1000):
-            raise ValueError("event_clock_skew_tolerance_ms must be an integer from 0 to 1000")
+        if (type(self.provider_clock_skew_tolerance_ms) is not int
+                or not 0 <= self.provider_clock_skew_tolerance_ms <= 1000):
+            raise ValueError("provider_clock_skew_tolerance_ms must be an integer from 0 to 1000")
         require_non_empty(self.alpha_implementation_id, "alpha_implementation_id")
 
 
@@ -139,7 +139,8 @@ class PaperRuntime:
         now = self._now()
         for candle in candles:
             age = now - candle.close_time
-            if age < timedelta(0) or age > timedelta(seconds=self.policy.risk.stale_seconds):
+            if (age < -timedelta(milliseconds=self.policy.provider_clock_skew_tolerance_ms)
+                    or age > timedelta(seconds=self.policy.risk.stale_seconds)):
                 raise PaperRuntimeError("stale or future live candle at actual observation time")
 
     def _tick(self):
@@ -284,8 +285,8 @@ class PaperRuntime:
             if candle.close_time - previous[-1].close_time != timedelta(minutes=1):
                 raise PaperRuntimeError("inconsistent completion grid")
         self._fresh((candle,))
-        # Provider clock disagreement never changes local observation or candle freshness.
-        if event.timestamp - self.last_observation > timedelta(milliseconds=self.policy.event_clock_skew_tolerance_ms):
+        # Provider clock disagreement never changes the local observation clock.
+        if event.timestamp - self.last_observation > timedelta(milliseconds=self.policy.provider_clock_skew_tolerance_ms):
             raise PaperRuntimeError("future event observation timestamp")
         return candle
 

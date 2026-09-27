@@ -8,4 +8,4 @@ paper_config = "paper.toml"
 state_path = "artifacts/paper/runtime.json"
 evidence_path = "artifacts/paper/minutes.jsonl"
 synchronization_timeout_ms = 5000
-event_clock_skew_tolerance_ms = 1000
+provider_clock_skew_tolerance_ms = 1000

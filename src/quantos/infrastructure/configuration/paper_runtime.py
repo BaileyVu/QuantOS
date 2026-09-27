@@ -21,7 +21,7 @@ def load_paper_runtime_config(path: str | Path, *, alpha_implementation_id: str)
         source = Path(path)
         with source.open("rb") as stream:
             document = tomllib.load(stream)
-        keys = {"mode", "symbols", "interval", "paper_config", "state_path", "evidence_path", "synchronization_timeout_ms", "event_clock_skew_tolerance_ms"}
+        keys = {"mode", "symbols", "interval", "paper_config", "state_path", "evidence_path", "synchronization_timeout_ms", "provider_clock_skew_tolerance_ms"}
         if set(document) != {"runtime"} or set(document["runtime"]) != keys:
             raise ValueError("expected exact [runtime] keys")
         value = document["runtime"]
@@ -35,7 +35,7 @@ def load_paper_runtime_config(path: str | Path, *, alpha_implementation_id: str)
         paper = load_paper_config(source.parent / value["paper_config"])
         policy = PaperRuntimePolicy(tuple(value["symbols"]), paper.initial_capital, paper.risk,
                                    value["synchronization_timeout_ms"], alpha_implementation_id,
-                                   event_clock_skew_tolerance_ms=value["event_clock_skew_tolerance_ms"])
+                                   provider_clock_skew_tolerance_ms=value["provider_clock_skew_tolerance_ms"])
         state, evidence, ledger = Path(value["state_path"]), Path(value["evidence_path"]), paper.ledger_path
         paths = [state, evidence, state.with_name(state.name+".lock"), state.with_name(state.name+".tmp"),
                  ledger, *(ledger.with_name(ledger.name+suffix) for suffix in (".head", ".head.tmp", ".lock", ".runtime.lock"))]
