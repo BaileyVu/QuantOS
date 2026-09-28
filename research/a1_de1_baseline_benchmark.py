@@ -1,4 +1,4 @@
-"""Offline A1 Step 3A baseline; no accelerated implementation.
+"""Offline deterministic A1 baseline and optional O2 cold/warm measurement.
 
 Run with the repository venv, for example::
 
@@ -16,12 +16,17 @@ an additional minute-state Parquet export. Total timing covers the four phases
 and their orchestration, excluding argument/root validation and result formatting.
 Timings and throughput are observational; only scientific identities are stable.
 This is a warm sequential pipeline, not a controlled cold-cache experiment.
+Add --minute-cache to publish sources/rebuild/compose once, then time a cold
+primitive-cache build and a warm reuse against those same publications. The
+existing minute_materialization timing denotes the cold run in this mode;
+minute_cache_cold/warm timings and raw-event diagnostics are also emitted.
+Total time then includes both runs and their exact scientific parity checks.
 """
 
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 from io import BytesIO
 import json
@@ -42,6 +47,7 @@ import duckdb
 import pyarrow
 
 from quantos.application import (
+    AggregateTradeStreamingDiagnostics,
     aggregate_trade_minute_states,
     compose_aggregate_trade_range,
 )
@@ -55,6 +61,9 @@ from quantos.infrastructure.binance import (
     aggregate_trade_archive_resource_urls,
 )
 from quantos.infrastructure.storage import ParquetAggregateTradeArchiveStore
+from quantos.infrastructure.storage.aggregate_trade_minute_primitive_cache import (
+    ParquetAggregateTradeMinutePrimitiveCache,
+)
 from tests.aggregate_trade_range_fixtures import local_catalog
 from tests.unit.test_binance_aggregate_trade_archive import (
     RecordingHttpGet,
@@ -200,9 +209,11 @@ def publish_day(root: Path, parameters: Parameters, day_index: int):
     return fetched, publication
 
 
-def run_benchmark(root: Path, parameters: Parameters) -> dict:
+def run_benchmark(root: Path, parameters: Parameters, *, minute_cache: bool = False) -> dict:
     if type(parameters) is not Parameters:
         raise ValueError("parameters must be Parameters")
+    if type(minute_cache) is not bool:
+        raise ValueError("minute_cache must be a boolean")
     parameters.__post_init__()
     root = validate_root(root)
     root.mkdir()  # Exclusive creation: never reuse an existing benchmark run.
@@ -232,9 +243,35 @@ def run_benchmark(root: Path, parameters: Parameters) -> dict:
     selected = measured("range_compose", lambda: compose_aggregate_trade_range(
         catalog, request, batch_size=parameters.batch_size
     ))
+    cold_diagnostics = AggregateTradeStreamingDiagnostics()
+    cache = ParquetAggregateTradeMinutePrimitiveCache(root) if minute_cache else None
     minutes = measured("minute_materialization", lambda: aggregate_trade_minute_states(
-        catalog, selected, batch_size=parameters.batch_size
+        catalog, selected, batch_size=parameters.batch_size,
+        primitive_cache=cache, diagnostics=cold_diagnostics,
     ))
+    if minute_cache:
+        for clock in ("cpu", "wall"):
+            result[f"minute_cache_cold_{clock}_seconds"] = result[f"minute_materialization_{clock}_seconds"]
+        warm_diagnostics = AggregateTradeStreamingDiagnostics()
+        warm = measured("minute_cache_warm", lambda: aggregate_trade_minute_states(
+            catalog, selected, batch_size=parameters.batch_size,
+            primitive_cache=ParquetAggregateTradeMinutePrimitiveCache(root),
+            diagnostics=warm_diagnostics,
+        ))
+        if (
+            warm != minutes or warm.dataset_id != minutes.dataset_id
+            or warm.content_sha256 != minutes.content_sha256
+            or warm_diagnostics.raw_events_consumed != 0
+            or warm_diagnostics.cache_hit_partition_count != parameters.days
+        ):
+            raise ValueError("cold/warm minute-cache parity or zero-replay proof failed")
+        result["minute_cache_cold_diagnostics"] = asdict(cold_diagnostics)
+        result["minute_cache_warm_diagnostics"] = asdict(warm_diagnostics)
+        result["minute_cache_exact_parity"] = True
+        result["warm_post_acquisition_wall_seconds"] = (
+            result["catalog_rebuild_wall_seconds"] + result["range_compose_wall_seconds"]
+            + result["minute_cache_warm_wall_seconds"]
+        )
     result["total_cpu_seconds"] = time.process_time() - total_cpu
     result["total_wall_seconds"] = time.perf_counter() - total_wall
     expected_minutes = parameters.days * MINUTES_PER_DAY
@@ -292,12 +329,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--events-per-minute", type=int, default=25)
     parser.add_argument("--batch-size", type=int, default=16384)
     parser.add_argument("--symbol", default="BTCUSDT", choices=("BTCUSDT", "ETHUSDT"))
+    parser.add_argument("--minute-cache", action="store_true", help="measure O2 cold build and warm reuse")
     args = parser.parse_args(argv)
     try:
         result = run_benchmark(args.root, Parameters(
             days=args.days, events_per_minute=args.events_per_minute,
             batch_size=args.batch_size, symbol=args.symbol,
-        ))
+        ), minute_cache=args.minute_cache)
     except (ValueError, OSError) as error:
         parser.exit(2, f"benchmark failed: {error}\n")
     print(f"{SCHEMA_VERSION}: {result['symbol']}, {result['day_count']} day(s), "
@@ -308,6 +346,11 @@ def main(argv: list[str] | None = None) -> int:
                   "minute_materialization", "total"):
         print(f"  {phase}: wall={result[f'{phase}_wall_seconds']:.6f}s "
               f"CPU={result[f'{phase}_cpu_seconds']:.6f}s", file=sys.stderr)
+    if args.minute_cache:
+        print(f"  minute_cache_warm: wall={result['minute_cache_warm_wall_seconds']:.6f}s "
+              f"CPU={result['minute_cache_warm_cpu_seconds']:.6f}s; "
+              f"raw_events_consumed={result['minute_cache_warm_diagnostics']['raw_events_consumed']}",
+              file=sys.stderr)
     print(json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False))
     return 0
 

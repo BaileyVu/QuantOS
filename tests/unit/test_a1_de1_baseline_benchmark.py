@@ -19,6 +19,26 @@ from quantos.domain.market_data.research_events import AggressorSide
 
 
 class BaselineBenchmarkTests(unittest.TestCase):
+    def test_optional_cold_warm_benchmark_publishes_once_and_consumes_zero_warm_events(self):
+        with TemporaryDirectory(prefix="quantos-a1-o2-test-") as directory:
+            with patch("socket.socket", side_effect=AssertionError("network forbidden")), \
+                 patch.object(benchmark, "publish_day", wraps=benchmark.publish_day) as publication:
+                stdout, stderr = StringIO(), StringIO()
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    self.assertEqual(benchmark.main([
+                        "--root", str(Path(directory) / "cache-run"),
+                        "--events-per-minute", "1", "--minute-cache",
+                    ]), 0)
+                result = json.loads(stdout.getvalue())
+            publication.assert_called_once()
+            self.assertTrue(result["minute_cache_exact_parity"])
+            self.assertEqual(result["minute_cache_cold_diagnostics"]["raw_events_consumed"], 1440)
+            self.assertEqual(result["minute_cache_warm_diagnostics"]["raw_events_consumed"], 0)
+            self.assertEqual(result["minute_cache_warm_diagnostics"]["cache_hit_partition_count"], 1)
+            self.assertGreater(result["minute_cache_cold_wall_seconds"], 0)
+            self.assertGreater(result["minute_cache_warm_wall_seconds"], 0)
+            self.assertIn("minute_cache_warm", stderr.getvalue())
+
     def test_independent_runs_have_identical_scientific_evidence_and_cli(self):
         with TemporaryDirectory(prefix="quantos-a1-test-") as directory:
             root = Path(directory)
