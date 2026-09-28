@@ -211,6 +211,10 @@ class VerifiedRangeTests(unittest.TestCase):
 
     def test_rebuild_rejects_byte_changes_during_verification_and_clears_evidence(self):
         catalog, _ = self.setup_catalog()
+        # O3 may reuse persisted certificates; force the cold semantic path
+        # so this still tests mutation across the complete verification stream.
+        for entry in catalog.view.entries:
+            catalog._certificates.path_for(entry.manifest).unlink()
         real_hash = catalog_module._parquet_byte_sha256
         calls = 0
 

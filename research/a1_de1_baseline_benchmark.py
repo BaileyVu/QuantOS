@@ -1,4 +1,4 @@
-"""Offline deterministic A1 baseline and optional O2 cold/warm measurement.
+"""Offline deterministic A1 baseline and optional O2/O3 cold/warm measurement.
 
 Run with the repository venv, for example::
 
@@ -21,6 +21,12 @@ primitive-cache build and a warm reuse against those same publications. The
 existing minute_materialization timing denotes the cold run in this mode;
 minute_cache_cold/warm timings and raw-event diagnostics are also emitted.
 Total time then includes both runs and their exact scientific parity checks.
+Add --partition-certificates for O3 (implies --minute-cache): after cold rebuild
+and minute-cache construction, discard the catalog, create a fresh instance,
+then measure warm certificate rebuild, range composition and minute reuse.
+Warm timings include required source/certificate/cache verification. Existing
+catalog_rebuild/range_compose fields retain their cold-run meanings; O3 emits
+separate warm_catalog_rebuild/warm_range_compose fields and a fully warm sum.
 """
 
 from __future__ import annotations
@@ -61,6 +67,7 @@ from quantos.infrastructure.binance import (
     aggregate_trade_archive_resource_urls,
 )
 from quantos.infrastructure.storage import ParquetAggregateTradeArchiveStore
+from quantos.infrastructure.storage.aggregate_trade_catalog import AggregateTradeCatalogRebuildDiagnostics
 from quantos.infrastructure.storage.aggregate_trade_minute_primitive_cache import (
     ParquetAggregateTradeMinutePrimitiveCache,
 )
@@ -209,11 +216,17 @@ def publish_day(root: Path, parameters: Parameters, day_index: int):
     return fetched, publication
 
 
-def run_benchmark(root: Path, parameters: Parameters, *, minute_cache: bool = False) -> dict:
+def run_benchmark(
+    root: Path, parameters: Parameters, *, minute_cache: bool = False,
+    partition_certificates: bool = False,
+) -> dict:
     if type(parameters) is not Parameters:
         raise ValueError("parameters must be Parameters")
     if type(minute_cache) is not bool:
         raise ValueError("minute_cache must be a boolean")
+    if type(partition_certificates) is not bool:
+        raise ValueError("partition_certificates must be a boolean")
+    minute_cache = minute_cache or partition_certificates
     parameters.__post_init__()
     root = validate_root(root)
     root.mkdir()  # Exclusive creation: never reuse an existing benchmark run.
@@ -233,7 +246,8 @@ def run_benchmark(root: Path, parameters: Parameters, *, minute_cache: bool = Fa
     total_wall, total_cpu = time.perf_counter(), time.process_time()
     measured("publication", publish)
     catalog = local_catalog(root)
-    measured("catalog_rebuild", catalog.rebuild)
+    cold_catalog_diagnostics = AggregateTradeCatalogRebuildDiagnostics()
+    measured("catalog_rebuild", lambda: catalog.rebuild(diagnostics=cold_catalog_diagnostics))
     request = AggregateTradeRangeRequest(
         symbol=parameters.symbol,
         start_date=START_DATE,
@@ -252,6 +266,28 @@ def run_benchmark(root: Path, parameters: Parameters, *, minute_cache: bool = Fa
     if minute_cache:
         for clock in ("cpu", "wall"):
             result[f"minute_cache_cold_{clock}_seconds"] = result[f"minute_materialization_{clock}_seconds"]
+        if partition_certificates:
+            for clock in ("cpu", "wall"):
+                result[f"cold_catalog_rebuild_{clock}_seconds"] = result[f"catalog_rebuild_{clock}_seconds"]
+            result["cold_catalog_rebuild_diagnostics"] = asdict(cold_catalog_diagnostics)
+            cold_catalog_id = catalog.view.catalog_id
+            del catalog
+            catalog = local_catalog(root)
+            warm_catalog_diagnostics = AggregateTradeCatalogRebuildDiagnostics()
+            measured("warm_catalog_rebuild", lambda: catalog.rebuild(diagnostics=warm_catalog_diagnostics))
+            result["warm_catalog_rebuild_diagnostics"] = asdict(warm_catalog_diagnostics)
+            if (
+                catalog.view.catalog_id != cold_catalog_id
+                or warm_catalog_diagnostics.canonical_events_replayed != 0
+                or warm_catalog_diagnostics.certificate_hit_partition_count != parameters.days
+            ):
+                raise ValueError("warm catalog identity or zero-replay proof failed")
+            warm_selected = measured("warm_range_compose", lambda: compose_aggregate_trade_range(
+                catalog, request, batch_size=parameters.batch_size
+            ))
+            if warm_selected != selected:
+                raise ValueError("cold/warm range manifests differ")
+            selected = warm_selected
         warm_diagnostics = AggregateTradeStreamingDiagnostics()
         warm = measured("minute_cache_warm", lambda: aggregate_trade_minute_states(
             catalog, selected, batch_size=parameters.batch_size,
@@ -269,9 +305,12 @@ def run_benchmark(root: Path, parameters: Parameters, *, minute_cache: bool = Fa
         result["minute_cache_warm_diagnostics"] = asdict(warm_diagnostics)
         result["minute_cache_exact_parity"] = True
         result["warm_post_acquisition_wall_seconds"] = (
-            result["catalog_rebuild_wall_seconds"] + result["range_compose_wall_seconds"]
+            result["warm_catalog_rebuild_wall_seconds" if partition_certificates else "catalog_rebuild_wall_seconds"]
+            + result["warm_range_compose_wall_seconds" if partition_certificates else "range_compose_wall_seconds"]
             + result["minute_cache_warm_wall_seconds"]
         )
+        if partition_certificates:
+            result["fully_warm_post_acquisition_wall_seconds"] = result["warm_post_acquisition_wall_seconds"]
     result["total_cpu_seconds"] = time.process_time() - total_cpu
     result["total_wall_seconds"] = time.perf_counter() - total_wall
     expected_minutes = parameters.days * MINUTES_PER_DAY
@@ -330,12 +369,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--batch-size", type=int, default=16384)
     parser.add_argument("--symbol", default="BTCUSDT", choices=("BTCUSDT", "ETHUSDT"))
     parser.add_argument("--minute-cache", action="store_true", help="measure O2 cold build and warm reuse")
+    parser.add_argument("--partition-certificates", action="store_true",
+                        help="measure O3 fresh-instance warm startup (implies --minute-cache)")
     args = parser.parse_args(argv)
     try:
         result = run_benchmark(args.root, Parameters(
             days=args.days, events_per_minute=args.events_per_minute,
             batch_size=args.batch_size, symbol=args.symbol,
-        ), minute_cache=args.minute_cache)
+        ), minute_cache=args.minute_cache, partition_certificates=args.partition_certificates)
     except (ValueError, OSError) as error:
         parser.exit(2, f"benchmark failed: {error}\n")
     print(f"{SCHEMA_VERSION}: {result['symbol']}, {result['day_count']} day(s), "
@@ -346,7 +387,13 @@ def main(argv: list[str] | None = None) -> int:
                   "minute_materialization", "total"):
         print(f"  {phase}: wall={result[f'{phase}_wall_seconds']:.6f}s "
               f"CPU={result[f'{phase}_cpu_seconds']:.6f}s", file=sys.stderr)
-    if args.minute_cache:
+    if args.partition_certificates:
+        for phase in ("cold_catalog_rebuild", "warm_catalog_rebuild", "warm_range_compose"):
+            print(f"  {phase}: wall={result[f'{phase}_wall_seconds']:.6f}s "
+                  f"CPU={result[f'{phase}_cpu_seconds']:.6f}s", file=sys.stderr)
+        print(f"  warm catalog events replayed="
+              f"{result['warm_catalog_rebuild_diagnostics']['canonical_events_replayed']}", file=sys.stderr)
+    if args.minute_cache or args.partition_certificates:
         print(f"  minute_cache_warm: wall={result['minute_cache_warm_wall_seconds']:.6f}s "
               f"CPU={result['minute_cache_warm_cpu_seconds']:.6f}s; "
               f"raw_events_consumed={result['minute_cache_warm_diagnostics']['raw_events_consumed']}",

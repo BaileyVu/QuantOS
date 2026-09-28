@@ -19,6 +19,54 @@ from quantos.domain.market_data.research_events import AggressorSide
 
 
 class BaselineBenchmarkTests(unittest.TestCase):
+    def test_certificate_benchmark_uses_fresh_catalog_and_zero_replay(self):
+        with TemporaryDirectory(prefix="quantos-a1-o3-test-") as directory:
+            catalogs = []
+            real_factory = benchmark.local_catalog
+
+            def catalog_factory(root):
+                catalog = real_factory(root)
+                catalogs.append(catalog)
+                if len(catalogs) == 2:
+                    # Enforce zero event decoding in the complete fresh warm
+                    # lifecycle, including rebuild, O1 composition and O2 reuse.
+                    def forbid(*args, **kwargs):
+                        raise AssertionError("warm lifecycle replayed source events")
+                    catalog._store.iter_event_batches = forbid
+                return catalog
+
+            with patch("socket.socket", side_effect=AssertionError("network forbidden")), \
+                 patch.object(benchmark, "publish_day", wraps=benchmark.publish_day) as publication, \
+                 patch.object(benchmark, "local_catalog", side_effect=catalog_factory):
+                stdout, stderr = StringIO(), StringIO()
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    self.assertEqual(benchmark.main([
+                        "--root", str(Path(directory) / "certificate-run"),
+                        "--events-per-minute", "1", "--partition-certificates",
+                    ]), 0)
+                result = json.loads(stdout.getvalue())
+            publication.assert_called_once()
+            self.assertEqual(len(catalogs), 2)
+            self.assertIsNot(catalogs[0], catalogs[1])
+            self.assertEqual(catalogs[0].view, catalogs[1].view)
+            self.assertEqual(result["cold_catalog_rebuild_diagnostics"]["canonical_events_replayed"], 1440)
+            self.assertEqual(result["cold_catalog_rebuild_diagnostics"]["certificate_built_partition_count"], 1)
+            warm = result["warm_catalog_rebuild_diagnostics"]
+            self.assertEqual(warm["canonical_events_replayed"], 0)
+            self.assertEqual(warm["certificate_hit_partition_count"], 1)
+            self.assertEqual(warm["certificate_miss_partition_count"], 0)
+            self.assertEqual(warm["certificate_built_partition_count"], 0)
+            self.assertEqual(result["minute_cache_warm_diagnostics"]["raw_events_consumed"], 0)
+            self.assertTrue(result["minute_cache_exact_parity"])
+            self.assertEqual(result["fully_warm_post_acquisition_wall_seconds"],
+                             result["warm_catalog_rebuild_wall_seconds"]
+                             + result["warm_range_compose_wall_seconds"]
+                             + result["minute_cache_warm_wall_seconds"])
+            for phase in ("cold_catalog_rebuild", "warm_catalog_rebuild", "warm_range_compose"):
+                self.assertGreater(result[f"{phase}_wall_seconds"], 0)
+                self.assertGreaterEqual(result[f"{phase}_cpu_seconds"], 0)
+                self.assertIn(phase, stderr.getvalue())
+
     def test_optional_cold_warm_benchmark_publishes_once_and_consumes_zero_warm_events(self):
         with TemporaryDirectory(prefix="quantos-a1-o2-test-") as directory:
             with patch("socket.socket", side_effect=AssertionError("network forbidden")), \

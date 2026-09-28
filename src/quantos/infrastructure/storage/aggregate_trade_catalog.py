@@ -20,7 +20,6 @@ from quantos.application.aggregate_trade_ranges import (
 
 from quantos.domain.common import require_v1_symbol
 from quantos.domain.market_data.research_events import (
-    AggregateTrade,
     AggregateTradeBoundaryValidation,
     AggregateTradeArchiveManifest,
     AggregateTradeDatasetIdentity,
@@ -39,6 +38,11 @@ from quantos.infrastructure.storage.aggregate_trade_parquet import (
     AggregateTradeParquetStorageError,
     ParquetAggregateTradeArchiveStore,
 )
+from quantos.infrastructure.storage.aggregate_trade_verification_certificate import (
+    AggregateTradeCertificateError,
+    AggregateTradeVerificationCertificateStore,
+    _VerifiedPartitionEvidence,
+)
 
 
 class AggregateTradeCatalogError(ValueError):
@@ -54,18 +58,15 @@ def _parquet_byte_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-@dataclass(frozen=True, slots=True)
-class _VerifiedPartitionEvidence:
-    """Private rebuild evidence; excluded from every scientific/catalog identity."""
+@dataclass(slots=True)
+class AggregateTradeCatalogRebuildDiagnostics:
+    """Operational counts only; fast_path_used means at least one verified hit."""
 
-    manifest_id: str
-    first_event: AggregateTrade
-    last_event: AggregateTrade
-    min_aggregate_trade_id: int
-    max_aggregate_trade_id: int
-    accepted_event_count: int
-    canonical_sequence_sha256: str
-    parquet_byte_sha256: str
+    certificate_hit_partition_count: int = 0
+    certificate_miss_partition_count: int = 0
+    certificate_built_partition_count: int = 0
+    canonical_events_replayed: int = 0
+    certificate_fast_path_used: bool = False
 
 
 class _SqliteExactAggregateTradeIdRegistry:
@@ -576,6 +577,7 @@ class LocalAggregateTradeArchiveCatalog:
         self._market = market
         self._event_family = event_family
         self._store = ParquetAggregateTradeArchiveStore(root)
+        self._certificates = AggregateTradeVerificationCertificateStore(root)
         self._view = AggregateTradeArchiveCatalogView(())
         self._verified_partitions: dict[str, _VerifiedPartitionEvidence] = {}
 
@@ -604,9 +606,27 @@ class LocalAggregateTradeArchiveCatalog:
                 f"cannot enumerate aggregate-trade catalog: {error}"
             ) from error
 
-    def rebuild(self) -> AggregateTradeArchiveCatalogView:
+    def rebuild(
+        self, *, diagnostics: AggregateTradeCatalogRebuildDiagnostics | None = None
+    ) -> AggregateTradeArchiveCatalogView:
+        """Verify source files, reusing persisted semantic proof only for exact bytes.
+
+        Absent/invalid/stale certificates trigger the original per-partition
+        replay. Cold issuance is bracketed by byte hashes. Warm verification is
+        an observation of immutable sources, not a lock against later external
+        writes. Certificates remain derived data, never scientific identity.
+        """
         self._view = AggregateTradeArchiveCatalogView(())
         self._verified_partitions = {}
+        if diagnostics is None:
+            diagnostics = AggregateTradeCatalogRebuildDiagnostics()
+        elif type(diagnostics) is not AggregateTradeCatalogRebuildDiagnostics:
+            raise TypeError("diagnostics must be AggregateTradeCatalogRebuildDiagnostics")
+        diagnostics.certificate_hit_partition_count = 0
+        diagnostics.certificate_miss_partition_count = 0
+        diagnostics.certificate_built_partition_count = 0
+        diagnostics.canonical_events_replayed = 0
+        diagnostics.certificate_fast_path_used = False
         evidence: dict[str, _VerifiedPartitionEvidence] = {}
         entries: list[CatalogedAggregateTradeRevision] = []
         try:
@@ -638,6 +658,23 @@ class LocalAggregateTradeArchiveCatalog:
                     canonical_parquet_path=canonical_path,
                     raw_archive_path=raw_path,
                 )
+                try:
+                    certified = self._certificates.load(manifest)
+                except (AggregateTradeCertificateError, OSError):
+                    certified = None
+                if certified is not None and certified.parquet_byte_sha256 == byte_sha256:
+                    try:
+                        self._store.verify_raw(manifest)
+                    except AggregateTradeParquetStorageError:
+                        # Preserve the original exact verifier's source rejection.
+                        certified = None
+                    if certified is not None:
+                        evidence[entry.manifest_id] = certified
+                        entries.append(entry)
+                        diagnostics.certificate_hit_partition_count += 1
+                        diagnostics.certificate_fast_path_used = True
+                        continue
+                diagnostics.certificate_miss_partition_count += 1
                 verification = _LocalAggregateTradeRangeStream(
                     self._store,
                     (entry,),
@@ -646,6 +683,7 @@ class LocalAggregateTradeArchiveCatalog:
                 first_event = last_event = None
                 minimum_id = maximum_id = None
                 for batch in verification:
+                    diagnostics.canonical_events_replayed += len(batch)
                     if first_event is None:
                         first_event = batch[0]
                     last_event = batch[-1]
@@ -672,10 +710,12 @@ class LocalAggregateTradeArchiveCatalog:
                     canonical_sequence_sha256=manifest.canonical_sequence_sha256,
                     parquet_byte_sha256=byte_sha256,
                 )
+                self._certificates.write(manifest, evidence[entry.manifest_id])
+                diagnostics.certificate_built_partition_count += 1
                 entries.append(entry)
         except AggregateTradeCatalogError:
             raise
-        except (AggregateTradeParquetStorageError, OSError) as error:
+        except (AggregateTradeParquetStorageError, AggregateTradeCertificateError, OSError) as error:
             raise AggregateTradeCatalogError(
                 f"catalog rebuild failed source verification: {error}"
             ) from error
