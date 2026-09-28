@@ -35,7 +35,7 @@ Target:
 - Deployment: local workstation
 - Storage: Parquet + DuckDB
 - Architecture: Clean Architecture + Modular Monolith
-- Production model: exactly one
+- Production model: exactly one, except the authorized no-ML V1-T4 strategy in §6
 - Production strategy: exactly one
 - Production features: target 10–15, hard maximum 20
 
@@ -110,9 +110,24 @@ Do not adopt:
 
 ## 6. Model Constraint
 
-V1 has one production model.
+V1 has one production model except for the V1-T4 exception below.
 
-LightGBM is the preferred candidate because it fits tabular market features, is fast on commodity hardware, and remains comparatively explainable.
+Amendment: 2026-09-29 — Human-authorized V1-T4 deterministic Alpha exception.
+`published-tsmom-v1` is the sole authorized production-strategy family for this
+phase, limited to preregistered 7/14/30 completed-UTC-day lookbacks and exactly one
+selected production strategy. It requires no trained ML model. This exception
+removes the ML prerequisite for the constrained momentum baseline; it permits no
+additional lookbacks, indicators, thresholds, feature searches or strategy families.
+Future introduction of ML requires separate authorization. Stable `model_version`
+metadata remains `deterministic-tsmom-no-ml-v1`; this does not represent a trained
+model. Reproducible pre-holdout entry-edge calibration remains mandatory; momentum
+is not expected edge. Insufficient evidence of positive edge after realistic costs
+means `NO_GO_FOR_LIVE`. All safety, six-module ownership, canonical-data and
+promotion requirements remain in force, including Backtest, Walk-Forward, Monte
+Carlo, Paper, Binance Testnet and explicit Mainnet approval. This amendment grants
+none of those approvals and makes no profitability claim.
+
+Outside V1-T4, and only with separate authorization to introduce ML, LightGBM is the preferred candidate because it fits tabular market features, is fast on commodity hardware, and remains comparatively explainable.
 
 Other models may be benchmarked during research only. A benchmark does not become production merely because it has a higher in-sample score.
 

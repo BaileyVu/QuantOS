@@ -14,7 +14,22 @@ The system must not operate multiple independent live strategies or fuse a colle
 
 ## 2. Strategy Shape
 
-The production strategy is a compact, rule-controlled ML-assisted strategy:
+Amendment: 2026-09-29 — Human-authorized V1-T4 deterministic Alpha exception.
+`published-tsmom-v1` is the sole authorized production-strategy family for this
+phase, limited to preregistered 7/14/30 completed-UTC-day lookbacks and exactly one
+selected production strategy. It requires no trained ML model. This exception
+removes the ML prerequisite for the constrained momentum baseline; it permits no
+additional lookbacks, indicators, thresholds, feature searches or strategy families.
+Future introduction of ML requires separate authorization. Stable `model_version`
+metadata remains `deterministic-tsmom-no-ml-v1`; this does not represent a trained
+model. Reproducible pre-holdout entry-edge calibration remains mandatory; momentum
+is not expected edge. Insufficient evidence of positive edge after realistic costs
+means `NO_GO_FOR_LIVE`. All safety, six-module ownership, canonical-data and
+promotion requirements remain in force, including Backtest, Walk-Forward, Monte
+Carlo, Paper, Binance Testnet and explicit Mainnet approval. This amendment grants
+none of those approvals and makes no profitability claim.
+
+Outside that exception, the production strategy is a compact, rule-controlled ML-assisted strategy:
 
 ```text
 Market state
@@ -38,11 +53,13 @@ Preferred model:
 
 - LightGBM
 
-Only one model artifact is active in production.
+Only one model artifact is active in production when ML is separately authorized. V1-T4 has no trained model artifact; it persists strategy and entry-edge calibration artifacts with explicit deterministic version metadata.
 
 Candidate models may be benchmarked in research, but research candidates never affect live execution until explicitly selected, validated, versioned, and promoted.
 
 ## 4. Target Definition
+
+The model-target requirements in this section apply when a trained model is authorized. V1-T4 instead calibrates completed-trade gross entry returns using permitted chronological training data only.
 
 The model target must represent a future trading outcome that can be defined without ambiguity.
 
@@ -62,7 +79,7 @@ The Alpha Engine produces:
 - `SELL/EXIT`
 - `HOLD`
 
-The exact action must be derived from the approved strategy configuration and model output.
+The exact action must be derived from the approved strategy configuration and model output, or the authorized V1-T4 deterministic momentum score and immutable account context.
 
 A low-confidence or ambiguous prediction must resolve to `HOLD`, not forced trading.
 
@@ -102,7 +119,7 @@ The purpose is to prevent the production model from acting under clearly unsuita
 
 ## 9. Training Discipline
 
-Training must be chronological.
+Training must be chronological. For V1-T4 this applies to entry-edge calibration; it does not authorize ML training.
 
 No random shuffling across time for the final evaluation workflow.
 

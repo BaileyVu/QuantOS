@@ -15,7 +15,7 @@ Deployment	Local workstation
 Storage	Parquet + DuckDB
 Architecture	Clean Architecture, Modular Monolith
 Production strategies	1
-Production models	1
+Production models	1, except zero trained ML models for V1-T4 under 000 §6
 Production features	10–15 target, 20 maximum
 Default mode	Paper trading
 3. Operating Modes
@@ -62,7 +62,7 @@ confidence or score where defined;
 strategy state;
 reason for rejection or action.
 7. Model Requirements
-Only one model may be active in production.
+Only one model may be active in production. V1-T4 instead uses the deterministic no-ML exception in 000 §6; model requirements below apply only when a trained model is separately authorized.
 The preferred candidate is LightGBM.
 Training must be reproducible from:
 dataset version;
@@ -156,7 +156,7 @@ V1 is acceptable only when:
 historical data loads correctly;
 live data operates continuously;
 features are deterministic;
-model training is reproducible;
+model training is reproducible when applicable; V1-T4 entry-edge calibration is reproducible;
 backtests execute without leakage;
 walk-forward validation passes defined gates;
 Monte Carlo robustness is acceptable;

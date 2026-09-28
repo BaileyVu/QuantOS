@@ -100,6 +100,8 @@ Acceptance: identical inputs produce identical feature vectors and no feature us
 
 ### Phase 4 — Alpha Engine
 
+For the authorized V1-T4 exception in 000 §6 and 005 §2, replace the trained-model steps and acceptance below with deterministic TSMOM scoring and reproducible entry-edge calibration artifacts. No ML training or model artifact is required. All other ownership and promotion checks remain mandatory.
+
 Implement:
 
 - target definition;
@@ -196,7 +198,7 @@ Canonical Candle
       ↓
 Feature Vector
       ↓
-Model Prediction
+Model Prediction / authorized deterministic TSMOM score
       ↓
 BUY / SELL / HOLD
       ↓
@@ -330,7 +332,7 @@ The first QuantOS MVP is complete when:
 - Binance data can be ingested;
 - BTCUSDT and ETHUSDT 1-minute data works;
 - features are generated deterministically;
-- one model can be trained and loaded;
+- one model can be trained and loaded when authorized, or V1-T4 deterministic strategy/calibration artifacts can be reproduced and loaded;
 - one strategy produces signals;
 - risk controls are enforced;
 - event-driven backtesting works;

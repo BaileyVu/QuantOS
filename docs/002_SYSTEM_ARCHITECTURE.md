@@ -72,7 +72,7 @@ Owns approved feature definitions, calculations, validation, versioning, and tem
 Does not submit orders, make risk decisions, or silently train models during live execution.
 
 ### Alpha Engine
-Owns the single approved production strategy, one active production model, prediction, signal generation, strategy state, and decision explanation.
+Owns the single approved production strategy, one active production model when applicable (V1-T4 uses the no-ML exception in 000 §6), prediction or deterministic scoring, signal generation, strategy state, and decision explanation.
 
 Does not bypass risk or submit exchange orders.
 
