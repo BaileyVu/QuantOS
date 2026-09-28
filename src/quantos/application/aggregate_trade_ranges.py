@@ -32,7 +32,10 @@ DEFAULT_AGGREGATE_TRADE_BATCH_SIZE = 16_384
 
 @dataclass(frozen=True, slots=True)
 class AggregateTradeRangeStreamReport:
-    """Compact evidence produced only after a complete range stream."""
+    """Evidence from exact verification (streamed or byte-pinned reusable proof).
+
+    max_batch_event_count is zero when verification did not decode event batches.
+    """
 
     total_event_count: int
     first_event_time: datetime
@@ -74,6 +77,20 @@ class AggregateTradePartitionCatalog(Protocol):
 
 class AggregateTradeRangeCompositionError(ValueError):
     """A requested immutable event range cannot be composed safely."""
+
+
+class VerifiedAggregateTradeRangeCatalog(Protocol):
+    """Optional provider-neutral capability; absence/None requires exact replay.
+
+    A report certifies current raw and canonical byte integrity, complete semantic
+    verification of the selected manifests, exact range-wide ID uniqueness and
+    chronological boundary validation. Cached paths/stat metadata alone do not
+    establish this contract. Evidence is operational, never scientific identity.
+    """
+
+    def verified_range_report(
+        self, manifests: tuple[AggregateTradeArchiveManifest, ...]
+    ) -> AggregateTradeRangeStreamReport | None: ...
 
 
 def _select_manifest(
@@ -372,19 +389,26 @@ def compose_aggregate_trade_range(
         selected_manifests.append(manifest)
         source_date += timedelta(days=1)
 
-    stream = _open_exact_range_batch_stream(
-        catalog,
-        tuple(selected_manifests),
-        batch_size=batch_size,
+    _batch_size(batch_size)
+    verified_report = getattr(catalog, "verified_range_report", None)
+    report = (
+        verified_report(tuple(selected_manifests))
+        if callable(verified_report) else None
     )
-    try:
-        for _batch in stream:
-            pass
-        report = stream.report
-    except (TypeError, ValueError) as error:
-        raise AggregateTradeRangeCompositionError(
-            f"selected range failed streamed content verification: {error}"
-        ) from error
+    if report is None:
+        stream = _open_exact_range_batch_stream(
+            catalog,
+            tuple(selected_manifests),
+            batch_size=batch_size,
+        )
+        try:
+            for _batch in stream:
+                pass
+            report = stream.report
+        except (TypeError, ValueError) as error:
+            raise AggregateTradeRangeCompositionError(
+                f"selected range failed streamed content verification: {error}"
+            ) from error
 
     references = tuple(
         AggregateTradePartitionReference.from_manifest(manifest)

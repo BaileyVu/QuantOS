@@ -15,10 +15,12 @@ from quantos.application.aggregate_trade_ranges import (
     AggregateTradeRangeBatchStream,
     AggregateTradeRangeStreamReport,
     DEFAULT_AGGREGATE_TRADE_BATCH_SIZE,
+    validate_aggregate_trade_partition_boundary,
 )
 
 from quantos.domain.common import require_v1_symbol
 from quantos.domain.market_data.research_events import (
+    AggregateTrade,
     AggregateTradeBoundaryValidation,
     AggregateTradeArchiveManifest,
     AggregateTradeDatasetIdentity,
@@ -41,6 +43,29 @@ from quantos.infrastructure.storage.aggregate_trade_parquet import (
 
 class AggregateTradeCatalogError(ValueError):
     """The local immutable archive catalog cannot be trusted."""
+
+
+def _parquet_byte_sha256(path: Path) -> str:
+    """Hash file contents, never infer immutability from size or timestamps."""
+    digest = sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class _VerifiedPartitionEvidence:
+    """Private rebuild evidence; excluded from every scientific/catalog identity."""
+
+    manifest_id: str
+    first_event: AggregateTrade
+    last_event: AggregateTrade
+    min_aggregate_trade_id: int
+    max_aggregate_trade_id: int
+    accepted_event_count: int
+    canonical_sequence_sha256: str
+    parquet_byte_sha256: str
 
 
 class _SqliteExactAggregateTradeIdRegistry:
@@ -552,6 +577,7 @@ class LocalAggregateTradeArchiveCatalog:
         self._event_family = event_family
         self._store = ParquetAggregateTradeArchiveStore(root)
         self._view = AggregateTradeArchiveCatalogView(())
+        self._verified_partitions: dict[str, _VerifiedPartitionEvidence] = {}
 
     @property
     def view(self) -> AggregateTradeArchiveCatalogView:
@@ -580,12 +606,17 @@ class LocalAggregateTradeArchiveCatalog:
 
     def rebuild(self) -> AggregateTradeArchiveCatalogView:
         self._view = AggregateTradeArchiveCatalogView(())
+        self._verified_partitions = {}
+        evidence: dict[str, _VerifiedPartitionEvidence] = {}
         entries: list[CatalogedAggregateTradeRevision] = []
         try:
             candidates = sorted(
                 self._candidate_paths(), key=lambda path: path.as_posix()
             )
             for path in candidates:
+                # Bracket the existing complete semantic verification with byte
+                # hashes so a rewrite during rebuild cannot seed stale evidence.
+                byte_sha256 = _parquet_byte_sha256(path)
                 manifest = self._store.read_manifest(path)
                 key = AggregateTradeLogicalPartitionKey.from_manifest(manifest)
                 if (
@@ -612,18 +643,105 @@ class LocalAggregateTradeArchiveCatalog:
                     (entry,),
                     batch_size=DEFAULT_AGGREGATE_TRADE_BATCH_SIZE,
                 )
-                for _batch in verification:
-                    pass
+                first_event = last_event = None
+                minimum_id = maximum_id = None
+                for batch in verification:
+                    if first_event is None:
+                        first_event = batch[0]
+                    last_event = batch[-1]
+                    batch_min = min(event.aggregate_trade_id for event in batch)
+                    batch_max = max(event.aggregate_trade_id for event in batch)
+                    minimum_id = batch_min if minimum_id is None else min(minimum_id, batch_min)
+                    maximum_id = batch_max if maximum_id is None else max(maximum_id, batch_max)
                 verification.report
+                if (
+                    first_event is None or last_event is None
+                    or minimum_id is None or maximum_id is None
+                    or _parquet_byte_sha256(path) != byte_sha256
+                ):
+                    raise AggregateTradeCatalogError(
+                        "canonical bytes changed during catalog rebuild or no events verified"
+                    )
+                evidence[entry.manifest_id] = _VerifiedPartitionEvidence(
+                    manifest_id=entry.manifest_id,
+                    first_event=first_event,
+                    last_event=last_event,
+                    min_aggregate_trade_id=minimum_id,
+                    max_aggregate_trade_id=maximum_id,
+                    accepted_event_count=verification.report.total_event_count,
+                    canonical_sequence_sha256=manifest.canonical_sequence_sha256,
+                    parquet_byte_sha256=byte_sha256,
+                )
                 entries.append(entry)
         except AggregateTradeCatalogError:
             raise
-        except AggregateTradeParquetStorageError as error:
+        except (AggregateTradeParquetStorageError, OSError) as error:
             raise AggregateTradeCatalogError(
                 f"catalog rebuild failed source verification: {error}"
             ) from error
         self._view = AggregateTradeArchiveCatalogView(tuple(entries))
+        self._verified_partitions = evidence
         return self._view
+
+    def verified_range_report(
+        self, manifests: tuple[AggregateTradeArchiveManifest, ...]
+    ) -> AggregateTradeRangeStreamReport | None:
+        """Reuse verified semantics only with exact current byte/ID proofs.
+
+        Overlapping closed ID intervals are inconclusive, not corruption. Any
+        unavailable proof defers to stream_range, including changed-but-valid
+        Parquet encodings. Raw ZIPs are always reverified before returning proof.
+        Like the existing stream, this verifies an observation of immutable
+        publications; it does not lock files against later external writes.
+        """
+        if type(manifests) is not tuple or not manifests:
+            return None
+        selected: list[tuple[CatalogedAggregateTradeRevision, _VerifiedPartitionEvidence]] = []
+        try:
+            for manifest in manifests:
+                manifest_id = aggregate_trade_archive_manifest_id(manifest)
+                entry = self._view.entry_for_manifest_id(manifest_id)
+                proof = self._verified_partitions.get(manifest_id)
+                if (
+                    proof is None or proof.manifest_id != manifest_id
+                    or entry.manifest != manifest
+                    or proof.accepted_event_count != manifest.accepted_row_count
+                    or proof.canonical_sequence_sha256 != manifest.canonical_sequence_sha256
+                ):
+                    return None
+                selected.append((entry, proof))
+
+            intervals = sorted(
+                (proof.min_aggregate_trade_id, proof.max_aggregate_trade_id)
+                for _, proof in selected
+            )
+            if any(left[1] >= right[0] for left, right in zip(intervals, intervals[1:])):
+                return None
+
+            for entry, proof in selected:
+                if _parquet_byte_sha256(entry.canonical_parquet_path) != proof.parquet_byte_sha256:
+                    return None
+                self._store.verify_raw(entry.manifest)
+
+            boundaries = tuple(
+                validate_aggregate_trade_partition_boundary(
+                    (left.last_event,), (right.first_event,),
+                    left_source_date=left_entry.manifest.source_date,
+                    right_source_date=right_entry.manifest.source_date,
+                )
+                for (left_entry, left), (right_entry, right)
+                in zip(selected, selected[1:])
+            )
+        except (OSError, TypeError, ValueError):
+            # Let the existing exact path preserve acceptance/error semantics.
+            return None
+        return AggregateTradeRangeStreamReport(
+            total_event_count=sum(proof.accepted_event_count for _, proof in selected),
+            first_event_time=selected[0][1].first_event.event_time,
+            last_event_time=selected[-1][1].last_event.event_time,
+            boundaries=boundaries,
+            max_batch_event_count=0,
+        )
 
     def revisions(
         self, *, symbol: str, source_date: date
