@@ -6,6 +6,15 @@ Last Updated: 2026-09-21
 
 Amendment: 2026-09-21 — Human-approved DE1A completed-minute research inputs and deterministic dependencies; production semantics unchanged.
 
+V1-F1 amendment (2026-09-30): in addition to the causal families below, 000 §0
+authorizes perp/index basis level/change/momentum, realized historical funding
+and change/state, relative perp/index returns, quote volume/change, taker
+imbalance, trustworthy OI change, liquidity, realized volatility and
+cross-sectional ranks for the single basis family. Freeze exact formulas and
+dependencies before PnL; optional inputs require reliable historical availability.
+Future funding, incomplete candles, future constituents and global scaling are
+forbidden. Keep the maximum of 20 features and shared historical/runtime semantics.
+
 ## 1. Objective
 
 The Feature Engine transforms canonical market data into a small, deterministic feature vector for the single V1 strategy.

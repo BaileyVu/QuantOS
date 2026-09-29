@@ -4,6 +4,16 @@ Version: 1.0.0-V1
 Status: Final MVP implementation guide
 Last Updated: 2026-08-19
 
+V1-F1 amendment (2026-09-30): 000 §0 supersedes legacy Spot and prior-strategy
+sequencing below. First establish authoritative usable derivatives data, freeze
+the basis-family preregistration, then evaluate 1x chronological Alpha and cost/
+funding stress. Only after qualification implement leverage/liquidation/Risk
+surfaces and Monte Carlo, earn pre-final/final access and minimally adapt the
+existing Execution architecture. Offline safety tests precede Futures Testnet
+with appropriate local credentials. Do not build a large futures subsystem
+before Alpha qualifies. Preserve six modules, shared core logic, Paper default,
+test coverage and all safety gates. No Mainnet economic orders are authorized.
+
 ## 1. Purpose
 
 Build the first working QuantOS MVP as quickly as possible.

@@ -2,6 +2,14 @@ QuantOS Core — 001_PRODUCT_REQUIREMENTS.md
 Version: 1.0.0-V1
 Status: Replacement baseline
 Last Updated: 2026-08-19
+V1-F1 amendment (2026-09-30): 000 §0 governs the current production target:
+Binance USD-M USDT perpetuals, point-in-time multi-symbol LONG/SHORT/FLAT,
+isolated one-way margin, and Risk-owned dynamic leverage. It supersedes the
+Spot/BTC-ETH/action/model restrictions below. Exactly one selected basis-family
+strategy, zero or one trained model, six modules, Paper default, 20 USDT equity,
+and all safety and promotion gates remain mandatory. This is authorization to
+research, not evidence of readiness; Mainnet remains LOCKED / NOT_APPROVED.
+
 1. Product Goal
 QuantOS V1 shall provide one production-quality quantitative trading workflow for Binance Spot, from historical data through validated paper trading and explicitly enabled live trading.
 The system is designed for one quantitative developer running locally.

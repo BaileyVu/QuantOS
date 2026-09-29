@@ -4,6 +4,16 @@ Version: 1.0.0-V1
 Status: Final MVP architecture
 Last Updated: 2026-08-19
 
+V1-F1 amendment (2026-09-30): apply 000 §0 before the legacy venue/exclusion
+clauses below. The exchange target is Binance USD-M USDT perpetuals. Preserve
+exactly the same six modules and dependency direction. Market Data owns canonical
+derivatives inputs; Alpha owns ranking/expected return/uncertainty; Risk owns
+direction, notional, leverage, margin, collateral and liquidation buffers;
+Execution exclusively owns exchange effects and authoritative account/position
+state, including coordinated-leg recovery. No new business module is authorized.
+The same causal features, strategy and Risk logic serve historical/Paper/live
+paths. Futures Execution adaptation is conditional on Alpha and risk qualification.
+
 ## 1. Purpose
 
 QuantOS V1 is a **Clean Architecture Modular Monolith** running locally. It is intentionally small and is not a microservice platform.

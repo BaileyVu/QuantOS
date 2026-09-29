@@ -4,6 +4,19 @@ Version: 1.0.0-V1
 Status: Frozen V1
 Last Updated: 2026-08-19
 
+V1-F1 amendment (2026-09-30): apply 000 §0 without weakening this lifecycle.
+Preregister/hash exact data, universe, costs, funding, features, model/search,
+chronology, seeds, gates, leverage/liquidation/Risk/Monte Carlo surfaces and
+holdout access before economic inspection. Qualify 1x OOS baseline and stress
+expectancy before leverage. Report price, long/short, funding, fees and slippage
+separately, plus fold stability/concentration, CVaR, drawdown and tail survival.
+Only qualified Alpha proceeds to leverage 1/2/3/5/8/10/15/20x and deterministic
+block/stationary Monte Carlo. Preserve untouched pre-final and final holdout;
+each test period is evaluated once. Failed Alpha stops economic development;
+leverage cannot rescue it. After final qualification require Futures Testnet,
+Futures Paper and separate explicit Mainnet approval. Current filters cannot
+prove historical 20 USDT executability. Unevaluated gates are never passes.
+
 ## 1. Objective
 
 Validation determines whether the single QuantOS V1 strategy is robust enough to progress toward live trading.

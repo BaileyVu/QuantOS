@@ -4,6 +4,18 @@ Version: 1.0.0-V1
 Status: Frozen V1
 Last Updated: 2026-08-19
 
+V1-F1 amendment (2026-09-30): 000 §0 supersedes prior sole-family and no-ML
+restrictions below. The only newly eligible family is
+`perp-cross-sectional-basis-v1`, comparing pure basis and its nested price/volume
+composite at exactly 8h/24h and 1x1/2x2. Basis is `(index - perp) / perp` or log
+equivalent; long high ranks, short low ranks. Factor scores, regularized linear
+ranking or gradient boosting are permitted inside that family. Select at most
+one final strategy and zero or one trained model. Alpha emits ranking, expected
+relative return and uncertainty; Risk alone approves direction and sizing.
+The dated-futures motivation does not establish a perpetual edge. Require
+independent 1x OOS after-cost/funding qualification before leverage study. Do not
+reopen earlier failed experiments. This amendment grants no trading approval.
+
 ## 1. Objective
 
 The Alpha Engine converts the approved feature vector into one production trading decision.

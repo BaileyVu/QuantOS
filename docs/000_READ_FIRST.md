@@ -4,6 +4,107 @@ Version: 1.0.0-V1
 Status: Frozen V1 Source of Truth
 Last Updated: 2026-08-19
 
+## 0. V1-F1 amendment — 2026-09-30
+
+Explicit human authorization changes the V1 production target to **Binance
+USD-M USDT perpetual futures**, LONG / SHORT / FLAT, isolated margin, one-way
+position mode, a point-in-time multi-symbol universe, and Risk-controlled dynamic
+leverage. This section supersedes conflicting Spot-only, BTC/ETH-only,
+long/cash-only, no-derivatives, no-leverage, and earlier sole-family/model
+restrictions throughout documents 000–008. Earlier phase descriptions below are
+retained as historical context; they do not authorize reopening those experiments.
+The amendment authorizes research and conditional implementation, not promotion.
+
+### Scope and ownership
+
+- The sole eligible family is `perp-cross-sectional-basis-v1`: pure basis and
+  nested basis-plus-price/volume composite. Basis is `(index - perp) / perp`
+  (or its log equivalent); long the highest ranks and short the lowest.
+- The complete structural search is 8h / 24h horizons and 1x1 / 2x2 equal-weight
+  long/short portfolios. Select at most one final configuration.
+- Within this family, explicit factor scores, regularized linear ranking, and
+  XGBoost/gradient boosting are authorized research choices. Prefer simplicity
+  unless complexity earns chronological OOS improvement. Production uses zero
+  trained models for a deterministic score or exactly one selected trained model;
+  no ensembles or additional strategy families are authorized.
+- Use approximately the top 15–30 liquid eligible contracts at each decision,
+  with historical listing/tradability, trailing-history/liquidity requirements,
+  executable filters/notional, and no stablecoin/stablecoin instruments. Freeze
+  the exact rule before outcomes. Current listings and future volume must not
+  determine past eligibility.
+- Preserve local operation, exactly six business modules, Clean Architecture,
+  Parquet + DuckDB, UTC, immutable versioned history, completed 1-minute inputs,
+  causal higher-timeframe aggregation, the 20-feature ceiling, Paper default,
+  and initial reference equity of **20 USDT**.
+- Alpha owns ranking, expected relative return, and uncertainty. Risk owns
+  direction approval, notional, leverage, isolated margin, collateral reserves,
+  and liquidation buffers. Model confidence alone must not set leverage.
+- Execution alone submits orders and owns authoritative account/position state.
+  Risk precedes Execution; a rejection is final. Preserve stable identities,
+  duplicate suppression, UNKNOWN reconciliation, restart recovery, credential
+  security, and fail-closed behavior. Coordinate both portfolio legs; partial-leg
+  failure requires deterministic recovery/flattening rather than uncontrolled
+  naked leveraged exposure.
+
+### Evidence and promotion
+
+- Before economic results, commit this amendment separately and freeze/hash
+  `V1_F1_PERP_ALPHA_PREREGISTRATION.md` plus machine-readable configuration and
+  exact evaluated source identity. Determine usable data coverage before freezing
+  periods. Prefer development 2020–2024, untouched pre-final 2025, and final 2026
+  through an explicit completed date only where data supports those periods.
+- Use authoritative Binance historical sources with provenance and checksums
+  where available: perp/index/mark/premium klines, funding, trades, volume,
+  metadata, and optional historically trustworthy open interest. No invented
+  observations or silent outage filling; quarantine invalid partitions.
+- Derivatives-native causal basis, realized funding, relative momentum,
+  price/volume structure, liquidity, and volatility features are authorized.
+  Future funding is never a feature. Account for actual historical funding
+  timestamp, position notional, and long/short sign separately from price PnL.
+- Total return is price PnL + funding PnL - fees - slippage. Verify the ordinary
+  USD-M taker fee before outcomes; initial assumptions are 5 bps fee and 2 bps
+  slippage per fill, stress 5 + 10 bps, plus fee-only reporting. No VIP, BNB, or
+  unsupported maker-fill benefits.
+- Qualify credible positive OOS expectancy at **1x effective gross exposure**
+  after baseline costs/funding with stress resilience first. Failed Alpha means
+  `NO_GO_ALPHA` and stops economic development. Leverage cannot rescue failure.
+- Only after 1x qualification study gross leverage 1/2/3/5/8/10/15/20x, equity
+  risk budgets 0.5/1/2/3/5%, collateral reserves 20/35/50%, and liquidation
+  safety multiples 2/3/4. Never raise exposure to satisfy exchange minimums or
+  silently substitute more than 20 USDT equity.
+- Model isolated initial/maintenance margin, brackets, liquidation price/distance,
+  unrealized PnL, and funding accrual. Liquidation is never the planned stop.
+  Require liquidation distance > safety multiple × planned adverse exit distance.
+  Historical bracket uncertainty requires disclosed conservative assumptions;
+  current/Testnet execution queries actual filters and brackets.
+- Freeze deterministic block/stationary Monte Carlo, impairment/ruin and
+  liquidation definitions, costs, seeds, chronological walk-forward, selection,
+  and gates before outcomes. Derive dynamic sizing and normal/reduced/minimum-risk/
+  flatten-lock drawdown thresholds from development data before final holdout.
+  Report component PnL, stability, concentration, tail risk, drawdown, margin,
+  liquidation, impairment/ruin probabilities, and recovery times. Select by
+  stress expectancy, stability, tail survival, drawdown, risk-adjusted performance,
+  capital efficiency, then simplicity; never maximum terminal equity alone.
+- No random temporal splits, global scaling, future universe/features, test-fold
+  tuning, post-outcome gate changes, or unearned holdout access. Each test period
+  is evaluated once. Preserve Research → Backtest → Walk-Forward → Monte Carlo
+  → Paper → Explicit Live Approval; require Futures Testnet as well.
+- Build only minimal futures Execution adaptation after Alpha and leverage/risk
+  qualification. Offline safety tests precede Futures Testnet, which may use only
+  appropriate locally available credentials. Missing credentials do not negate
+  an earned Alpha pass. Never request secrets in chat.
+- **Zero Mainnet economic orders. Do not read/use Mainnet futures credentials.**
+  Real capital remains untouched. Mainnet is **LOCKED / NOT_APPROVED** until
+  separate explicit authorization after Alpha, risk/leverage, final holdout,
+  Futures Testnet, and Futures Paper success.
+
+Cross margin, COIN-M, options, borrowed Spot margin, martingale, grid averaging,
+uncontrolled pyramiding, other exchanges, and all unrelated V1 exclusions remain
+prohibited. AF4B/AF4C remain independent: do not inspect or reuse their worktrees,
+results, or artifacts. Do not reopen TSMOM, TRB, SAE/TBL, Spot hourly XGBoost, or
+V1-T5. Store this sprint's data/evidence outside Git under the authorized V1-F1
+data root. No push or merge is authorized.
+
 ## 1. Purpose
 
 This document is the highest-priority specification for QuantOS Version 1.

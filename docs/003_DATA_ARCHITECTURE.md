@@ -6,6 +6,18 @@ Last Updated: 2026-09-21
 
 Amendment: 2026-09-21 — Human-approved DE1A research-only aggregate-trade scope; production semantics unchanged.
 
+V1-F1 amendment (2026-09-30): 000 §0 supersedes Spot-only, BTC/ETH-only and
+derivatives exclusions below for the sole perpetual basis family. Authorize
+Binance USD-M USDT perp/index/mark/premium klines, actual timestamped funding,
+aggregate trades, volume, point-in-time contract metadata and trustworthy
+historical open interest. Keep provider payloads outside Domain, UTC, immutable
+versioned Parquet, DuckDB queries and completed-minute causality. Distinguish
+event time, availability and ingestion time. Current metadata is not historical
+metadata. Do not fabricate observations, backward-project current eligibility,
+or silently fill outages; quarantine invalid partitions. Freeze usable coverage
+and source identities before economic inspection. Prior research-only clauses
+remain historical scope descriptions, not additional V1-F1 approvals.
+
 ## 1. Purpose
 
 Define the minimum local data architecture required for reliable, reproducible research, backtesting, paper trading, and live operation.

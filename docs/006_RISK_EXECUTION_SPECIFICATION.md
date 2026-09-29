@@ -4,6 +4,22 @@ Version: 1.0.0-V1
 Status: Frozen V1
 Last Updated: 2026-08-19
 
+V1-F1 amendment (2026-09-30): apply 000 §0. Risk additionally owns long/short
+approval, isolated one-way margin, notional/leverage, free collateral,
+liquidation buffer and prospective drawdown throttles. Size from equity risk
+budget/adverse distance under liquidity, funding, margin and tail-risk limits;
+never map confidence directly to leverage or increase size to meet minimums.
+Liquidation is not a stop. Require liquidation distance strictly greater than
+safety multiple times planned adverse exit distance. Use actual current/Testnet
+filters/brackets and disclose conservative historical bracket uncertainty.
+Execution owns account/positions, reduce-only exits, actual fills/commissions,
+funding/income reconciliation and coordinated-leg recovery/flattening. Preserve
+Risk rejection finality, Execution-only submission, idempotency, UNKNOWN
+reconciliation and restart recovery. No cross margin or uncontrolled naked legs.
+Implement futures exchange effects only after Alpha and leverage/risk pass.
+No Mainnet economic orders or Mainnet futures credential access in this sprint;
+Mainnet remains LOCKED / NOT_APPROVED regardless of automated validation results.
+
 ## 1. Objective
 
 This document defines the safety boundary between an alpha decision and an exchange order.
