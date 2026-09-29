@@ -18,7 +18,7 @@ Do not build the ultimate quant platform before the first complete system works.
 
 Implement only what is required by documents `000–007`.
 
-Do not introduce new production modules, exchanges, strategies, models, services, APIs, cloud infrastructure, distributed infrastructure, or speculative abstractions.
+Do not introduce unapproved production modules, exchanges, strategies, models, services, APIs, cloud infrastructure, distributed infrastructure, or speculative abstractions. The two V1-T5 candidate families and supervised model eligibility in 000 §6 are authorized; exactly one Alpha/model may be selected for production after every applicable gate.
 
 If a problem appears to require a new product capability, stop and resolve it against the specifications before adding it.
 
@@ -90,9 +90,10 @@ Acceptance: BTCUSDT and ETHUSDT history works, data passes validation, live data
 
 ### Phase 3 — Feature Engine
 
-Implement the small approved feature set.
+Implement the preregistered, evidence-justified feature set.
 
-Target 10–15 production features; maximum 20.
+There is no fixed numerical feature-count ceiling. Apply the complexity,
+fold-local fitting and causal provenance requirements in 000 §6 and 004.
 
 Implement deterministic calculations, versioning, temporal alignment, missing-data behavior, and tests.
 
@@ -107,7 +108,7 @@ Implement:
 - target definition;
 - training dataset construction;
 - one production model;
-- preferred initial model: LightGBM;
+- a preregistered supervised architecture under 000 §6, including neural models;
 - model artifact saving/loading;
 - one production strategy;
 - signal generation;
@@ -348,9 +349,8 @@ The first QuantOS MVP is complete when:
 
 Do not spend MVP development time on:
 
-- dozens of indicators;
+- unjustified collections of indicators;
 - model ensembles;
-- deep learning;
 - reinforcement learning;
 - automated strategy discovery;
 - portfolio optimization;

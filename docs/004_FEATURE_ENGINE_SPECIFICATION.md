@@ -8,10 +8,12 @@ Amendment: 2026-09-21 — Human-approved DE1A completed-minute research inputs a
 
 ## 1. Objective
 
-The Feature Engine transforms canonical market data into a small, deterministic feature vector for the single V1 strategy.
+The Feature Engine transforms canonical market data into a deterministic, evidence-justified feature vector for the single V1 strategy.
 
-The target is 10–15 production features.
-The hard maximum is 20.
+Amendment: 2026-09-29 — V1-T5 feature/model eligibility follows 000 §6.
+There is no fixed numerical feature-count ceiling. Complexity requires causal
+provenance, fold-local fitting, reproducibility, out-of-sample evidence, stability,
+ablation/importance evidence where meaningful, and operational feasibility.
 
 ## 2. Feature Principles
 
@@ -28,7 +30,7 @@ Features must be removed when they are redundant, unstable, or unsupported by va
 
 ## 3. Approved Feature Families
 
-The initial feature set should remain small and cover distinct information:
+The initial feature set should justify its complexity and cover distinct information:
 
 - short-term returns;
 - medium-term returns;
@@ -40,6 +42,15 @@ The initial feature set should remain small and cover distinct information:
 - range/price structure;
 - relative position within recent range;
 - regime/context state.
+
+For the two authorized V1-T5 candidates, causal fractional differentiation,
+representation learning, learned embeddings/internal latent representations and
+neural feature compression are also eligible. Fit all learned transformations
+and feature selection only on the permitted training data within each fold;
+persist their versions and fitted state for deterministic inference. Neural
+representation layers within the selected model do not constitute additional
+production models. This permission does not expand market-data scope or waive
+availability, historical/live parity, holdout or promotion requirements.
 
 A feature family may contribute more than one feature only when validation demonstrates incremental value.
 
@@ -114,7 +125,7 @@ Given identical:
 - decision timestamps;
 - applicable completion and availability policies;
 - feature configuration;
-- feature version;
+- feature version and any fitted transformation artifact identity;
 
 the Feature Engine must produce identical outputs. Research features must declare
 all data dependencies required for deterministic reproduction. Event-derived input
@@ -138,4 +149,5 @@ Tests must cover:
 
 A candidate feature enters production only when it demonstrates useful out-of-sample value without creating unacceptable instability or redundancy.
 
-The feature budget is a complexity control, not a target to fill.
+Feature complexity must be justified by evidence; larger feature counts are not
+automatically preferred.

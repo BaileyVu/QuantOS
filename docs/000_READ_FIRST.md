@@ -37,7 +37,7 @@ Target:
 - Architecture: Clean Architecture + Modular Monolith
 - Production model: exactly one, except the authorized no-ML V1-T4 strategy in §6
 - Production strategy: exactly one
-- Production features: target 10–15, hard maximum 20
+- Production features: evidence-justified complexity, without a fixed numerical ceiling
 
 ## 3. Non-Negotiable Principles
 
@@ -110,7 +110,49 @@ Do not adopt:
 
 ## 6. Model Constraint
 
-V1 has one production model except for the V1-T4 exception below.
+V1 has exactly one selected production Alpha/model, with historical deterministic
+exceptions preserved below. The V1-T5 amendment governs current model eligibility.
+
+Amendment: 2026-09-29 — Human-authorized V1-T5 supervised Alpha research.
+QuantOS V1 may use any supervised statistical or machine-learning architecture,
+including deep neural networks, provided the exact production candidate is
+preregistered before economic evaluation, all inputs and transformations are
+causal, fitting/selection occurs only on permitted training data, chronological
+out-of-sample validation is performed, realistic trading costs are included,
+canonical Risk/Execution semantics are preserved, and the candidate passes every
+applicable promotion gate. No tree model or model architecture is preferred by
+specification. Supervised autoencoders, representation learning, learned embeddings
+and internal latent representations, MLP classifiers/regressors, neural feature
+compression, fractional-differentiation features and triple-barrier supervised
+learning are eligible under these conditions.
+
+There is no arbitrary fixed feature-count ceiling. Feature/model complexity must
+be justified by causal provenance, fold-local fitting, reproducibility,
+out-of-sample evidence, stability, ablation/importance evidence where meaningful,
+and operational feasibility. More features or greater complexity are not
+automatically preferred.
+
+The current V1-T5 tournament contains exactly two authorized families:
+`sae-tbl-30m-longcash-v1` and `cost-aware-hourly-xgb-v1`. Select exactly one
+production Alpha/model if every applicable gate passes, or declare `NO_GO`.
+A third strategy family requires later user authorization. This is not an
+open-ended strategy/model search. A different supervised architecture within the
+authorized scope does not itself require another authorization; the exact
+candidate must still be preregistered before economic evaluation.
+
+This amendment supersedes earlier model-class and feature-count restrictions,
+including the T4/T4R-only research-family restrictions for the current sprint.
+Historical T4/T4R evidence, criteria, outcomes and holdout records remain unchanged.
+Risk-before-Execution, final Risk rejection, Execution-only submission and account
+state ownership, deterministic/idempotent execution, reconciliation, duplicate-order
+protection, causal completed-candle data, train/validation/test separation, realistic
+fees/slippage, walk-forward and Monte Carlo validation, 2026 holdout protection,
+Paper, Binance Testnet, and secrets/security requirements remain mandatory.
+Spot only: no leverage, futures, margin, short selling, martingale, uncontrolled
+pyramiding or withdrawal access. Mainnet remains `LOCKED / NOT_APPROVED` and
+requires explicit approval after all applicable evidence gates.
+
+The following T4/T4R clauses document historical phase scope only.
 
 Amendment: 2026-09-29 — Human-authorized V1-T4 deterministic Alpha exception.
 `published-tsmom-v1` is the sole authorized production-strategy family for this
@@ -118,7 +160,7 @@ phase, limited to preregistered 7/14/30 completed-UTC-day lookbacks and exactly 
 selected production strategy. It requires no trained ML model. This exception
 removes the ML prerequisite for the constrained momentum baseline; it permits no
 additional lookbacks, indicators, thresholds, feature searches or strategy families.
-Future introduction of ML requires separate authorization. Stable `model_version`
+The historical phase did not authorize ML. Stable `model_version`
 metadata remains `deterministic-tsmom-no-ml-v1`; this does not represent a trained
 model. Reproducible pre-holdout entry-edge calibration remains mandatory; momentum
 is not expected edge. Insufficient evidence of positive edge after realistic costs
@@ -127,9 +169,7 @@ promotion requirements remain in force, including Backtest, Walk-Forward, Monte
 Carlo, Paper, Binance Testnet and explicit Mainnet approval. This amendment grants
 none of those approvals and makes no profitability claim.
 
-Outside V1-T4, and only with separate authorization to introduce ML, LightGBM is the preferred candidate because it fits tabular market features, is fast on commodity hardware, and remains comparatively explainable.
-
-Other models may be benchmarked during research only. A benchmark does not become production merely because it has a higher in-sample score.
+A benchmark does not become production merely because it has a higher in-sample score.
 
 Amendment: 2026-09-29 — V1-T4R Recovery Sprint, explicitly authorized by the user.
 The preserved published-tsmom-v1 experiment remains NO_GO_FOR_LIVE, with its
@@ -145,7 +185,7 @@ Synthetic Testnet intents validate infrastructure only and cannot be selected fo
 Mainnet. All safety and validation gates remain mandatory. Mainnet economic
 trading is prohibited in this sprint; later enablement requires successful Alpha,
 2026 holdout, continuous Paper, Testnet, reconciliation and explicit micro-live
-approval. Future ML or any further strategy family requires separate authorization.
+approval. Current V1-T5 eligibility is governed by the amendment above.
 
 ## 7. Validation Gate
 
@@ -167,7 +207,6 @@ Excluded from V1:
 - cross-exchange arbitrage;
 - portfolio optimization;
 - multi-strategy production;
-- deep learning;
 - reinforcement learning;
 - autonomous agents;
 - news or social sentiment;

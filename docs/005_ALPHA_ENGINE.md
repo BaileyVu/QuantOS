@@ -14,13 +14,24 @@ The system must not operate multiple independent live strategies or fuse a colle
 
 ## 2. Strategy Shape
 
+Amendment: 2026-09-29 — V1-T5 eligibility follows the governing rule in 000 §6.
+The current tournament is exactly `sae-tbl-30m-longcash-v1` and
+`cost-aware-hourly-xgb-v1`; select one production Alpha/model or `NO_GO`.
+No third family is authorized. Any supervised statistical or machine-learning
+architecture, including deep neural networks, supervised autoencoders, MLPs and
+representation learning, is eligible within that scope. Preregister the exact
+candidate before economic evaluation and preserve all causal fitting, validation,
+realistic-cost, holdout, Risk/Execution and promotion requirements. The following
+T4/T4R clauses preserve historical phase scope and evidence, not current model
+restrictions.
+
 Amendment: 2026-09-29 — Human-authorized V1-T4 deterministic Alpha exception.
 `published-tsmom-v1` is the sole authorized production-strategy family for this
 phase, limited to preregistered 7/14/30 completed-UTC-day lookbacks and exactly one
 selected production strategy. It requires no trained ML model. This exception
 removes the ML prerequisite for the constrained momentum baseline; it permits no
 additional lookbacks, indicators, thresholds, feature searches or strategy families.
-Future introduction of ML requires separate authorization. Stable `model_version`
+The historical phase did not authorize ML. Stable `model_version`
 metadata remains `deterministic-tsmom-no-ml-v1`; this does not represent a trained
 model. Reproducible pre-holdout entry-edge calibration remains mandatory; momentum
 is not expected edge. Insufficient evidence of positive edge after realistic costs
@@ -43,9 +54,9 @@ Synthetic Testnet intents validate infrastructure only and cannot be selected fo
 Mainnet. All safety and validation gates remain mandatory. Mainnet economic
 trading is prohibited in this sprint; later enablement requires successful Alpha,
 2026 holdout, continuous Paper, Testnet, reconciliation and explicit micro-live
-approval. Future ML or any further strategy family requires separate authorization.
+approval. Current V1-T5 eligibility is governed by the amendment above.
 
-Outside that exception, the production strategy is a compact, rule-controlled ML-assisted strategy:
+For V1-T5, the production strategy is a rule-controlled supervised strategy:
 
 ```text
 Market state
@@ -65,11 +76,11 @@ The model informs the strategy; it does not bypass deterministic controls.
 
 ## 3. Production Model
 
-Preferred model:
-
-- LightGBM
-
-Only one model artifact is active in production when ML is separately authorized. V1-T4 has no trained model artifact; it persists strategy and entry-edge calibration artifacts with explicit deterministic version metadata.
+No supervised architecture or tree model is required or preferred. Only one
+selected model artifact is active in production. Its internal learned
+representations are part of that model, not a production ensemble. Historical
+V1-T4 has no trained model artifact; it persists strategy and entry-edge
+calibration artifacts with explicit deterministic version metadata.
 
 Candidate models may be benchmarked in research, but research candidates never affect live execution until explicitly selected, validated, versioned, and promoted.
 
@@ -86,6 +97,10 @@ Target construction must:
 - remain fixed for a given experiment;
 - include the intended prediction horizon;
 - be documented with the model artifact.
+
+Triple-barrier supervised targets are eligible with causal inputs and explicit
+label horizons. All labels used for fitting must have resolved within the
+permitted training interval; overlap must not contaminate validation/test data.
 
 ## 5. Signal Semantics
 
@@ -135,7 +150,9 @@ The purpose is to prevent the production model from acting under clearly unsuita
 
 ## 9. Training Discipline
 
-Training must be chronological. For V1-T4 this applies to entry-edge calibration; it does not authorize ML training.
+Training must be chronological and fold-local, including preprocessing, learned
+representations and feature selection. For historical V1-T4 this applies to
+entry-edge calibration. V1-T5 supervised training is authorized under 000 §6.
 
 No random shuffling across time for the final evaluation workflow.
 
@@ -156,8 +173,9 @@ A training run records:
 
 Mandatory controls:
 
-- limited feature count;
-- limited model complexity;
+- evidence-justified feature/model complexity without a fixed feature-count ceiling;
+- causal provenance, reproducibility and operational feasibility;
+- fold-local fitting and ablation/importance evidence where meaningful;
 - chronological validation;
 - walk-forward testing;
 - untouched test periods;

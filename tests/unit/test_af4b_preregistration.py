@@ -377,14 +377,15 @@ class AF4BPreregistrationTests(unittest.TestCase):
         root = Path(af.__file__).resolve().parents[1]
         doc_009 = "docs/009_ALPHA_DISCOVERY_FUNNEL_AF1.md"
         doc_009_lf_hash = "ad7803207d6939fd1c60e509fa7fcd6d7edc705a6280add43ec752e5b5c58644"
-        # User-authorized V1-T4 and V1-T4R amendments; original AF4B catalog stays immutable.
+        # User-authorized V1-T4, V1-T4R and V1-T5 amendments; original AF4B catalog stays immutable.
         current_spec_hashes = dict(af.SPEC_HASHES)
         current_spec_hashes.update({
-            "docs/000_READ_FIRST.md": "a9d11cf2ef9594677032ec749493f3912e8c9d4605161ba174f43a7b80d9f7e4",
-            "docs/001_PRODUCT_REQUIREMENTS.md": "ba3fe4273094dd7f5c88540d1fcaa33df55ca0d091549ef9ee20a139c81fd6b9",
+            "docs/000_READ_FIRST.md": "5c02f477b1fc42f7d9b830156114965bcba6a8e574977cc5779e005e90f18050",
+            "docs/001_PRODUCT_REQUIREMENTS.md": "1de7f5b93d6ca8dd0e3a68e963e20fe08069ccdfdaea39fa2562d321931d24ae",
             "docs/002_SYSTEM_ARCHITECTURE.md": "a1adaf01493a3e58211ec30933be638e2956a3d3ff2fc3e546325341933ad1ae",
-            "docs/005_ALPHA_ENGINE.md": "aaede5cf2ef8cb7191c57e154bf82932feeb987975e0c1f2d2ac3b2b74f4cc0f",
-            "docs/008_IMPLEMENTATION_GUIDE.md": "2b98401e05a246271aa30029b59db00e0552e569dd16e0ec710f9aae1bcbfc89",
+            "docs/005_ALPHA_ENGINE.md": "24fb37b38c71643f6924bb4581105bd839bbaeed0686b7a55009b2ddf04d9772",
+            "docs/008_IMPLEMENTATION_GUIDE.md": "ff61a9cbee0c8a99919f0d6d84fafac32c31c39a533d6ffab986040791a6337e",
+            "docs/004_FEATURE_ENGINE_SPECIFICATION.md": "2be9c44792c314e41e734d01e731447817d85085cb3f4c34a3fbe0df693ada6f",
         })
         actual = {}
         for path, frozen_hash in current_spec_hashes.items():

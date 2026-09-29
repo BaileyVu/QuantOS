@@ -16,7 +16,7 @@ Storage	Parquet + DuckDB
 Architecture	Clean Architecture, Modular Monolith
 Production strategies	1
 Production models	1, except zero trained ML models for V1-T4 under 000 §6
-Production features	10–15 target, 20 maximum
+Production features	Evidence-justified complexity; no fixed numerical ceiling
 Default mode	Paper trading
 3. Operating Modes
 Exactly one mode is active at runtime:
@@ -43,8 +43,7 @@ be deterministic;
 be causally valid at the decision timestamp;
 have a documented economic or statistical purpose;
 be reproducible from stored data;
-be limited to 20 production features;
-target 10–15 features for the first production strategy.
+justify complexity through causal provenance, fold-local fitting, reproducibility, out-of-sample evidence, stability, meaningful ablation/importance evidence and operational feasibility.
 Features that duplicate another feature's information without measurable incremental value should be removed.
 6. Alpha Requirements
 The Alpha Engine shall produce one unified actionable decision:
@@ -62,8 +61,8 @@ confidence or score where defined;
 strategy state;
 reason for rejection or action.
 7. Model Requirements
-Only one model may be active in production. V1-T4 instead uses the deterministic no-ML exception in 000 §6; model requirements below apply only when a trained model is separately authorized.
-The preferred candidate is LightGBM.
+Only one model may be active in production. Historical V1-T4/T4R deterministic exceptions remain documented in 000 §6. Current V1-T5 authorizes exactly the two supervised candidate families named there; select one production Alpha/model or NO_GO.
+Any supervised statistical or machine-learning architecture, including deep neural networks, may qualify under 000 §6. There is no required or preferred tree model. Preregister the exact candidate before economic evaluation; preserve all causal fitting, evidence, Risk/Execution and promotion requirements.
 Training must be reproducible from:
 dataset version;
 feature specification;

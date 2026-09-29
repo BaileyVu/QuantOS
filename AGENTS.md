@@ -73,8 +73,8 @@ Preserve the frozen constraints, including:
 * paper trading as the default operating mode;
 * exactly one production trading strategy;
 * exactly one production predictive model;
-* compact production feature set within the frozen V1 limits;
-* LightGBM as the preferred V1 model where specified;
+* evidence-justified feature/model complexity without a fixed feature-count ceiling;
+* supervised model eligibility and exactly two V1-T5 research families under `000` §6;
 * capital preservation, correctness, robustness, simplicity, explainability, performance, and profitability in the priority order defined by the frozen specifications.
 
 Do not introduce out-of-scope V1 functionality such as:
@@ -86,7 +86,6 @@ Do not introduce out-of-scope V1 functionality such as:
 * perpetuals;
 * options;
 * additional exchanges;
-* deep learning;
 * reinforcement learning;
 * autonomous trading agents;
 * multi-strategy production systems;
