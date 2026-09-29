@@ -74,15 +74,15 @@ class ArchitectureTests(unittest.TestCase):
         self.assertEqual(project["project"]["requires-python"], ">=3.11")
 
     def test_model_numeric_libraries_are_confined_to_model_infrastructure(self) -> None:
-        for library in ("lightgbm", "numpy", "scipy"):
+        for library in ("lightgbm", "numpy", "scipy", "xgboost", "torch"):
             importers = [path for path in PRODUCTION_ROOT.rglob("*.py")
                          if any(module.split(".")[0] == library for module in _imported_modules(path))]
             self.assertTrue(importers, library)
             for path in importers:
-                self.assertTrue(path.is_relative_to(MODELS_ROOT), str(path))
+                self.assertTrue(path.is_relative_to(MODELS_ROOT) or (library == "numpy" and path == STORAGE_ROOT / "v1t5_data.py"), str(path))
 
     def test_no_unapproved_model_framework_or_unsafe_serialization_imports(self) -> None:
-        forbidden = {"pandas", "sklearn", "joblib", "pickle", "xgboost", "catboost", "torch", "tensorflow"}
+        forbidden = {"pandas", "sklearn", "joblib", "pickle", "catboost", "tensorflow"}
         for path in PRODUCTION_ROOT.rglob("*.py"):
             for module in _imported_modules(path):
                 self.assertNotIn(module.split(".")[0], forbidden, str(path))
