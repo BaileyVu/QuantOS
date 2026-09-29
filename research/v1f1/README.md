@@ -1,4 +1,18 @@
-# V1-F1 source feasibility audit
+# V1-F1 economic factor research
+
+The resumed experiment follows `docs/000_READ_FIRST.md` §0.1 and
+`docs/V1_F1_PERP_ALPHA_PREREGISTRATION.md`. Historical exchange-filter snapshots
+are **not** an Alpha research gate. The initial source-audit result means
+DATA_QUALIFICATION_BLOCKED / ALPHA_NOT_EVALUATED, not failed economic Alpha.
+
+`dataset.py` acquires checksum-bound hourly archives into immutable Parquet.
+`prepare.py` constructs trailing-liquidity candidates without future survival.
+`factor.py` owns the research-only causal factor and continuous-notional
+accounting. `evaluate.py` performs a sealed one-shot development evaluation;
+it has no current exchange, credentials, order or holdout-acquisition capability.
+This research layer is not a production adapter or proof of Futures Paper parity.
+
+## Earlier diagnostic audit
 
 `audit_sources.py` is a pre-experiment public-data probe, not a backtester or a
 production adapter. It never calculates strategy returns or grants economic
@@ -29,16 +43,14 @@ archive directory membership is not a historical eligibility record, and the
 Binance `exchangeInfo` endpoint documents current rules only. A successful probe
 process means evidence was collected, not that the data or Alpha gate passed.
 
-Before economic evaluation can be implemented or authorized, supply a
-provenance-bound historical contract/status/filter timeline, including delisted
-contracts, effective dates, market lot sizes, tick sizes and minimum notionals.
-Reconstructing from official listing/delisting/rule-change notices is acceptable
-only with demonstrated coverage; isolated notices do not prove completeness.
-Do not substitute current filters or infer past executable orders from candles.
-Then validate full causal data coverage, resolve quarantines, freeze/hash the
-complete preregistration and machine config, and archive evaluated source
-identity. The requested 2025 and 2026 economic periods remain untouched until
-their respective gates are earned.
+Historical status/filter timelines remain unverified diagnostic information.
+The later authorized methodology instead uses data-observed existence and
+causal liquidity for economic factor simulation. Exact current filters are
+mandatory only at the post-qualification deployment gate. Do not infer exact
+historical executable orders from candles. Validate causal research coverage,
+exclude affected invalid observations, seal the complete preregistration,
+machine config and evaluated source identity before PnL. The 2025 and 2026
+economic periods remain untouched until their respective gates are earned.
 
 Official references:
 

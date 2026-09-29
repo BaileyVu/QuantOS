@@ -230,7 +230,7 @@ def main() -> None:
              for month in PROBE_MONTHS for family in FAMILIES]
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         report["probes"] = list(pool.map(lambda task: probe(*task), tasks))
-    report["economic_access"] = "DENIED: historical trading status/filter evidence not validated"
+    report["economic_access"] = "NOT_EVALUATED: diagnostic only; historical filters are not an Alpha gate under 000 section 0.1"
     report["limitations"] = [
         "Archive prefixes include historical instruments, but do not prove point-in-time tradability.",
         "Current exchangeInfo cannot establish historical filters or order minimums.",
