@@ -18,6 +18,13 @@ or silently fill outages; quarantine invalid partitions. Freeze usable coverage
 and source identities before economic inspection. Prior research-only clauses
 remain historical scope descriptions, not additional V1-F1 approvals.
 
+V1-F1 economic-methodology clarification: 000 §0.1 governs historical factor
+research. Causal completed 1h/8h observations and data-derived existence/liquidity
+eligibility are authorized; historical filter snapshots and globally contiguous
+1m history are not research prerequisites. Missing observations affect only
+their relevant decisions; held-position data loss follows a preregistered
+conservative exit rule. No synthetic observations or forward-filled outages.
+
 ## 1. Purpose
 
 Define the minimum local data architecture required for reliable, reproducible research, backtesting, paper trading, and live operation.

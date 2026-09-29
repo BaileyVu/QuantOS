@@ -17,6 +17,14 @@ leverage cannot rescue it. After final qualification require Futures Testnet,
 Futures Paper and separate explicit Mainnet approval. Current filters cannot
 prove historical 20 USDT executability. Unevaluated gates are never passes.
 
+V1-F1 economic-methodology clarification: 000 §0.1 permits normalized continuous
+notional factor simulation without historical order-filter replay. Freeze
+5/7/10 bps fees and 2/10 bps slippage before outcomes; actual funding remains
+separate. Historical filter gaps alone cannot deny Alpha research. Exact current
+20 USDT executability is a separate post-qualification deployment gate.
+NO_GO_ALPHA requires actual failed economic evidence; unevaluated Alpha is not
+a failure result. All chronological and holdout protections remain mandatory.
+
 ## 1. Objective
 
 Validation determines whether the single QuantOS V1 strategy is robust enough to progress toward live trading.

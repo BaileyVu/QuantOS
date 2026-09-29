@@ -377,18 +377,18 @@ class AF4BPreregistrationTests(unittest.TestCase):
         root = Path(af.__file__).resolve().parents[1]
         doc_009 = "docs/009_ALPHA_DISCOVERY_FUNNEL_AF1.md"
         doc_009_lf_hash = "ad7803207d6939fd1c60e509fa7fcd6d7edc705a6280add43ec752e5b5c58644"
-        # User-authorized V1-F1 amendment fe947f1 supersedes the current specs.
+        # User-authorized V1-F1 scope and economic-methodology amendments supersede current specs.
         # Original AF4B catalog and its historical source hashes stay immutable.
         current_spec_hashes = dict(af.SPEC_HASHES)
         current_spec_hashes.update({
-            "docs/000_READ_FIRST.md": "e462ca7ccece3d377f5ed9c18107d7e0f0a986510c3ac05b868190a84ce60afd",
+            "docs/000_READ_FIRST.md": "938b7f29faf85a3f6b6439fd409886d805310daedb8c3135013a990b8f13bfc4",
             "docs/001_PRODUCT_REQUIREMENTS.md": "9d63aee0ce3d6d005a76b0532e96edf2e4dbc6c1c36244177d9bd803eeb3e2f8",
             "docs/002_SYSTEM_ARCHITECTURE.md": "403f2b3402c7094a09e91e1c79954944359887d98cde85e3badd98e96afee023",
-            "docs/003_DATA_ARCHITECTURE.md": "86f52a77931c11fbf43e220ff655289ec060c989631023d245af216be6be8161",
+            "docs/003_DATA_ARCHITECTURE.md": "ccb84571dd41da87fab0ee3b5ed8d8bbf12fd843ab628265039bb47a0bd5e779",
             "docs/004_FEATURE_ENGINE_SPECIFICATION.md": "233c66136415c84f699eac66235a5c00b26975cdf7e48920ecec455dcdfdfb90",
             "docs/005_ALPHA_ENGINE.md": "702cfbf744ed3acc436b3a3429ad11ebbd247fcbf28c63ea75570c4c0644efed",
             "docs/006_RISK_EXECUTION_SPECIFICATION.md": "ae477b3ffed59e5f2b60bc397f9265e91109f5775d812ac06b033d1a33339f29",
-            "docs/007_VALIDATION_BACKTESTING.md": "f96a8d648caf3fe309c0281fa9a2e9821c89ac91363a3ab9ec41cc7c983af3c3",
+            "docs/007_VALIDATION_BACKTESTING.md": "816763cdc43ccbdff537f9126ac0a903e3937719b14147e239668b3a993967f7",
             "docs/008_IMPLEMENTATION_GUIDE.md": "5003dd34e978bf509913ad2f0f6b8c61f26537a16939cf0b8e41d35d32456e85",
         })
         actual = {}

@@ -105,6 +105,47 @@ results, or artifacts. Do not reopen TSMOM, TRB, SAE/TBL, Spot hourly XGBoost, o
 V1-T5. Store this sprint's data/evidence outside Git under the authorized V1-F1
 data root. No push or merge is authorized.
 
+## 0.1. V1-F1 economic-methodology amendment — 2026-09-30
+
+Explicit human authorization supersedes the historical-filter, global-minute
+continuity and fee-verification prerequisites in §0 and documents 001–008 for
+Alpha research. The earlier source-audit closeout is
+`DATA_QUALIFICATION_BLOCKED / ALPHA_NOT_EVALUATED`, not economic `NO_GO_ALPHA`.
+
+Historical research is an **economic factor simulation** with normalized
+continuous notionals, not exact historical exchange-order replay. Historical
+exchangeInfo, minimum-notional, quantity-step, tick-size and leverage-bracket
+snapshots are not prerequisites. Determine existence from actual authoritative
+historical data start, and eligibility from valid contemporaneous perp/index/
+mark data, historical funding, sufficient causal trailing history and liquidity.
+Never project today's listings backward or use future survival for eligibility.
+Missing required contemporaneous inputs exclude only the affected symbol and
+decision. Preregister conservative held-position data-loss exits at the last
+trustworthy executable/mark observation plus stress friction; record these
+events separately and never forward-fill outages.
+
+For 8h/24h research use the coarsest authoritative completed series faithfully
+supporting the model, preferably 1h or native 8h. Global minute continuity is
+not required. Quarantine affected observations/partitions only; recover January
+2020 gaps through authoritative REST or exclude affected decisions. Completed,
+causal observations and no synthetic market data remain mandatory.
+
+Keep actual market returns and historical funding, explicit fees/slippage,
+turnover and long/short exposure. Before PnL freeze fees of at least 5/7/10 bps
+per fill with baseline/stress slippage (2/10 bps), plus fee-only reporting.
+Minor current-fee uncertainty cannot block research. Select on stress evidence.
+The 1x Alpha gate still precedes leverage; leverage never rescues negative edge.
+
+After Alpha/holdout qualification, current Testnet/production execution must
+query actual status, minimum notional, market/lot steps, ticks, brackets,
+maintenance margin and account fees where available, and assess exactly
+20 USDT equity. The authorized leverage surface may be considered only within
+safe Risk limits, never to force exchange-minimum compliance. If no safe current
+configuration exists, report `ALPHA_PASS_CURRENTLY_NOT_EXECUTABLE_AT_20_USDT`;
+this does not retroactively negate Alpha. Use `NO_GO_ALPHA` only on actual
+failed economic evidence. Preserve all ownership, causal/OOS, holdout, lifecycle,
+credential and Mainnet safeguards. Mainnet remains LOCKED / NOT_APPROVED.
+
 ## 1. Purpose
 
 This document is the highest-priority specification for QuantOS Version 1.
