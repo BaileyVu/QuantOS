@@ -244,3 +244,5 @@ The architecture is correctly implemented when:
 - live execution is explicitly gated;
 - critical state transitions are observable;
 - no unapproved service or module architecture is introduced.
+
+V1-T4R clarification: the separately authorized deterministic TRB recovery exception in 000 §6 also applies to the no-ML V1-T4 references below; preserved TSMOM evidence remains unchanged. Testnet infrastructure validation proceeds independently of Alpha results; Mainnet remains locked.

@@ -164,3 +164,5 @@ paper trading operates successfully;
 live mode can be enabled safely;
 risk controls work;
 every trade is explainable and logged.
+
+V1-T4R clarification: the separately authorized deterministic TRB recovery exception in 000 §6 also applies to the no-ML V1-T4 references below; preserved TSMOM evidence remains unchanged. Testnet infrastructure validation proceeds independently of Alpha results; Mainnet remains locked.

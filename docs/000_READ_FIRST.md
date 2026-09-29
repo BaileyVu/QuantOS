@@ -131,6 +131,22 @@ Outside V1-T4, and only with separate authorization to introduce ML, LightGBM is
 
 Other models may be benchmarked during research only. A benchmark does not become production merely because it has a higher in-sample score.
 
+Amendment: 2026-09-29 — V1-T4R Recovery Sprint, explicitly authorized by the user.
+The preserved published-tsmom-v1 experiment remains NO_GO_FOR_LIVE, with its
+criteria and holdout unchanged. For this recovery phase only, the sole newly
+eligible production family is btc-trading-range-breakout-v1, restricted to
+50/150/200 prior completed UTC daily closes, strict support/resistance breakouts,
+and long/cash position persistence. Select at most one strategy. It has no trained
+ML model; deterministic-trb-no-ml-v1 is metadata only. This separate authorization
+supersedes the T4-only family restriction for TRB and no other family or parameter.
+Freeze calibration, costs and selection before outcomes; a failed Alpha is
+NO_GO_ALPHA and does not stop independent Spot execution/Testnet infrastructure.
+Synthetic Testnet intents validate infrastructure only and cannot be selected for
+Mainnet. All safety and validation gates remain mandatory. Mainnet economic
+trading is prohibited in this sprint; later enablement requires successful Alpha,
+2026 holdout, continuous Paper, Testnet, reconciliation and explicit micro-live
+approval. Future ML or any further strategy family requires separate authorization.
+
 ## 7. Validation Gate
 
 No live trading is permitted until the same strategy passes:

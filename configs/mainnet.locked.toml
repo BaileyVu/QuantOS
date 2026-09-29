@@ -1,0 +1,12 @@
+# Dormant micro-live design record. No runtime loader consumes this file.
+# The REST adapter and harness independently reject all Mainnet economic calls.
+mode = "paper"
+mainnet_enabled = false
+capital_ceiling_usdt = "20"
+initial_order_notional_ceiling_usdt = "10"
+planned_order_notional_usdt = "9.90"
+maximum_positions = 1
+pyramiding = false
+leverage = false
+symbols = ["BTCUSDT"]
+required_gates = ["selected_alpha", "2026_holdout", "continuous_paper", "testnet", "exchange_reconciliation", "explicit_micro_live_approval"]

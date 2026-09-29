@@ -10,7 +10,7 @@ from typing import Callable
 
 from quantos.application.risk_execution import TradingStep
 from quantos.domain.alpha.context import AlphaDecisionContext
-from quantos.domain.features.daily import DailyFeatureState, TSMOM_FEATURE_VERSION
+from quantos.domain.features.daily import DailyFeatureState, TSMOM_FEATURE_VERSION, DAILY_VERSIONS
 from quantos.domain.evaluation.contracts import (
     AlphaDecisionFunction,
     AlphaEvaluation,
@@ -155,14 +155,14 @@ def run_backtest(
     ledger: ExecutionLedger,
 ) -> BacktestReport:
     """Run the production Feature -> Alpha -> Risk -> Execution path sequentially."""
-    ordered = _validate_datasets(datasets, minute_end_clock=config.feature_version == TSMOM_FEATURE_VERSION)
+    ordered = _validate_datasets(datasets, minute_end_clock=config.feature_version in DAILY_VERSIONS)
     validate_account(initial_account)
     if initial_account.positions:
         raise EvaluationError("historical evaluation requires a flat initial account with complete fee basis")
     risk_policy.__post_init__()
     config.__post_init__()
     def decision_time(candle):
-        return candle.open_time+timedelta(minutes=1) if config.feature_version == TSMOM_FEATURE_VERSION else candle.close_time
+        return candle.open_time+timedelta(minutes=1) if config.feature_version in DAILY_VERSIONS else candle.close_time
 
     first_time = min(
         (decision_time(candle) for dataset in ordered for candle in dataset.candles
@@ -189,7 +189,7 @@ def run_backtest(
             events[decision_time(candle)].append(candle)
 
     histories: dict[str, list[Candle]] = defaultdict(list)
-    daily_states = {d.identity.symbol: DailyFeatureState(d.identity.symbol) for d in ordered}
+    daily_states = {d.identity.symbol: DailyFeatureState(d.identity.symbol, version=config.feature_version if config.feature_version in DAILY_VERSIONS else TSMOM_FEATURE_VERSION) for d in ordered}
     current: dict[str, Candle] = {}
     curve: list[EquityPoint] = []
     traces: list[DecisionTrace] = []
@@ -208,7 +208,7 @@ def run_backtest(
         for candle in candles:
             histories[candle.symbol].append(candle)
             histories[candle.symbol] = histories[candle.symbol][-MIN_HISTORY:]
-            if config.feature_version == TSMOM_FEATURE_VERSION:
+            if config.feature_version in DAILY_VERSIONS:
                 daily_states[candle.symbol] = daily_states[candle.symbol].advance(candle, decision_time=timestamp)
             current[candle.symbol] = candle
         if config.decision_start is not None and timestamp < config.decision_start:
@@ -232,12 +232,12 @@ def run_backtest(
         peak = max(peak, pre_equity)
 
         for candle in candles:
-            feature = (daily_states[candle.symbol].feature() if config.feature_version == TSMOM_FEATURE_VERSION
+            feature = (daily_states[candle.symbol].feature() if config.feature_version in DAILY_VERSIONS
                        else compute_feature_vector(tuple(histories[candle.symbol]), decision_time=timestamp))
             if feature is None:
                 continue
             alpha_input = (alpha_decider(feature, AlphaDecisionContext(timestamp, execution.snapshot))
-                           if config.feature_version == TSMOM_FEATURE_VERSION else alpha_decider(feature))
+                           if config.feature_version in DAILY_VERSIONS else alpha_decider(feature))
             if type(alpha_input) is not AlphaEvaluation:
                 raise EvaluationError("alpha callback must return AlphaEvaluation")
             alpha_input.__post_init__()
@@ -339,7 +339,7 @@ def run_backtest(
             initial_account,
             strategy_version,
             model_version,
-            config.feature_version if config.feature_version == TSMOM_FEATURE_VERSION else FEATURE_VERSION,
+            config.feature_version if config.feature_version in DAILY_VERSIONS else FEATURE_VERSION,
             tuple(curve),
             tuple(trade_book.completed),
             tuple(traces),
@@ -366,7 +366,7 @@ def run_backtest(
         config=config,
         strategy_version=strategy_version,
         model_version=model_version,
-        feature_version=config.feature_version if config.feature_version == TSMOM_FEATURE_VERSION else FEATURE_VERSION,
+        feature_version=config.feature_version if config.feature_version in DAILY_VERSIONS else FEATURE_VERSION,
         evaluation_start=curve[0].timestamp,
         evaluation_end=curve[-1].timestamp,
         initial_equity=initial_equity,
@@ -394,7 +394,7 @@ def run_walk_forward(
     ledger_factory: LedgerFactory,
 ) -> WalkForwardReport:
     """Build on past-only windows and validate each fold through ``run_backtest``."""
-    ordered = _validate_datasets(datasets, minute_end_clock=base_config.feature_version == TSMOM_FEATURE_VERSION)
+    ordered = _validate_datasets(datasets, minute_end_clock=base_config.feature_version in DAILY_VERSIONS)
     walk_config.__post_init__()
     base_config.__post_init__()
     if base_config.decision_start is not None or base_config.decision_end_exclusive is not None:

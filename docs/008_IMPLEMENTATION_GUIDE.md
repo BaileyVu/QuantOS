@@ -377,3 +377,5 @@ The first QuantOS should be:
 - runnable.
 
 A working simple QuantOS is more valuable than an unfinished sophisticated QuantOS.
+
+V1-T4R clarification: the separately authorized deterministic TRB recovery exception in 000 §6 also applies to the no-ML V1-T4 references below; preserved TSMOM evidence remains unchanged. Testnet infrastructure validation proceeds independently of Alpha results; Mainnet remains locked.

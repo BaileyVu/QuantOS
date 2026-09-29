@@ -6,6 +6,7 @@ import logging
 from quantos.domain.alpha import AlphaAction, AlphaDecision
 from quantos.domain.execution.contracts import OrderRequest, OrderSide, OrderType
 from quantos.domain.execution.core import ExecutionEngine, ExecutionResult, OrderIntent
+from quantos.domain.execution.exchange import ActualOrder, ExchangeExecutionEngine
 from quantos.domain.execution.evidence import canonical, identity, primitive
 from quantos.domain.risk.contracts import RiskDecision
 from quantos.domain.risk.engine import RiskContext, RiskEngine, RiskPolicy, decision_identity
@@ -33,11 +34,11 @@ def build_order_intent(alpha: AlphaDecision, risk: RiskDecision, context: RiskCo
 @dataclass(frozen=True, slots=True)
 class TradingResult:
     risk: RiskDecision
-    execution: ExecutionResult | None
+    execution: ExecutionResult | ActualOrder | None
 
 
 class TradingStep:
-    def __init__(self, risk: RiskEngine, execution: ExecutionEngine, logger: logging.Logger | None = None):
+    def __init__(self, risk: RiskEngine, execution: ExecutionEngine | ExchangeExecutionEngine, logger: logging.Logger | None = None):
         self.risk = risk
         self.execution = execution
         self.logger = logger or logging.getLogger('quantos')

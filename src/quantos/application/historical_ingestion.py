@@ -238,3 +238,27 @@ def extend_and_persist_historical_range(
     )
     combined = validate_candle_sequence(combined_identity, combined_candles)
     return _persist_historical_sequence(dataset_writer, combined)
+
+
+def prepend_and_persist_historical_range(existing, range_fetcher, dataset_writer, *,
+        start_open_time, ingestion_version, overlap_minutes=1440):
+    """Extend backward with an explicitly re-fetched, exactly matching overlap."""
+    base = _revalidate_existing_sequence(existing)
+    _require_minute_aligned(start_open_time, 'start_open_time')
+    require_non_empty(ingestion_version, 'ingestion_version')
+    if start_open_time >= base.identity.start_time or ingestion_version == base.identity.ingestion_version:
+        raise HistoricalIngestionError('invalid backward extension identity')
+    if type(overlap_minutes) is not int or not 1 <= overlap_minutes <= len(base.candles):
+        raise HistoricalIngestionError('invalid overlap verification range')
+    prefix = ingest_historical_range(range_fetcher, symbol=base.identity.symbol,
+        interval=base.identity.timeframe, start_open_time=start_open_time,
+        end_open_time_exclusive=base.identity.start_time+overlap_minutes*_ONE_MINUTE,
+        source=base.identity.source, schema_version=base.identity.schema_version,
+        ingestion_version=ingestion_version)
+    if prefix.candles[-overlap_minutes:] != base.candles[:overlap_minutes]:
+        raise HistoricalIngestionError('backward extension overlap conflicts with canonical base')
+    # Only the explicitly verified overlap is excluded, never repaired or inferred.
+    candles=prefix.candles[:-overlap_minutes]+base.candles
+    meta=DatasetIdentity(base.identity.symbol, base.identity.timeframe, start_open_time,
+        base.identity.end_time, base.identity.source, base.identity.schema_version, ingestion_version)
+    return _persist_historical_sequence(dataset_writer, validate_candle_sequence(meta,candles))

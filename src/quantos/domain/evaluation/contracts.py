@@ -48,7 +48,7 @@ class BacktestConfig:
 
     def __post_init__(self) -> None:
         require_non_empty(self.code_version, "code_version")
-        if self.feature_version not in ("candidate-v1", "tsmom-daily-v1"):
+        if self.feature_version not in ("candidate-v1", "tsmom-daily-v1", "trb-daily-v1"):
             raise ValueError("unsupported evaluation feature version")
         require_non_empty(self.alpha_implementation_id, "alpha_implementation_id")
         if self.decision_start is not None:
