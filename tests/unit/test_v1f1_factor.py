@@ -10,7 +10,7 @@ from research.v1f1.factor import Series,features,select,rank01,funding_pnl,leg_a
 from research.v1f1.prepare import trailing_sum
 from research.v1f1.dataset import parse
 from research.v1f1.dataset import digest
-from research.v1f1.evaluate import metrics,bootstrap_lower,verify_seal,authorize_development
+from research.v1f1.evaluate import metrics,bootstrap_lower,verify_seal,authorize_development,encode_report
 
 def fixture(symbol='TESTUSDT',n=800):
     p=np.tile([100.,101.,99.,100.,1.,100.,50.],(n,1))
@@ -135,5 +135,11 @@ class FactorTests(unittest.TestCase):
                     authorize_development(root,{'development_test_years':[year]})
             (root/'development.started.json').write_text('{}')
             with self.assertRaisesRegex(ValueError,'consumed'):authorize_development(root,valid)
+
+    def test_report_serializes_numpy_gates_and_rejects_invalid_values(self):
+        decoded=json.loads(encode_report({'pass':np.bool_(False),'count':np.int64(4),'mean':np.float64(.1)}))
+        self.assertEqual(decoded,{'pass':False,'count':4,'mean':.1})
+        with self.assertRaises(ValueError):encode_report({'mean':np.float64(np.nan)})
+        with self.assertRaises(TypeError):encode_report({'unexpected':object()})
 
 if __name__=='__main__':unittest.main()

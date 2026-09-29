@@ -88,6 +88,14 @@ def metrics(daily,episode_net,equity):
             'cvar_5pct_daily':float(np.sort(daily)[:max(1,int(np.ceil(.05*len(daily))))].mean()),
             'episodes':len(episode_net)}
 
+def encode_report(report):
+    """Serialize scalar NumPy diagnostics without accepting nonfinite numbers."""
+    def scalar(value):
+        if isinstance(value,np.generic):return value.item()
+        raise TypeError(f'unsupported report value: {type(value).__name__}')
+    return (json.dumps(report,indent=2,sort_keys=True,allow_nan=False,default=scalar)+'\n').encode()
+
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True)
     root=p.parse_args().root;repo=Path(__file__).resolve().parents[2]
@@ -191,7 +199,7 @@ def main():
         sink=pa.BufferOutputStream();pq.write_table(pa.Table.from_pylist(rows),sink,compression='zstd')
         raw=sink.getvalue().to_pybytes();write_once(root/'evaluation'/(name+'-'+digest(raw)+'.parquet'),raw)
         report[name+'_sha256']=digest(raw)
-    raw=(json.dumps(report,indent=2,sort_keys=True,allow_nan=False)+'\n').encode()
+    raw=encode_report(report)
     output=root/'evaluation'/('development-'+digest(raw)+'.json');write_once(output,raw)
     print(json.dumps({'report':str(output),'sha256':digest(raw),'status':report['status']}),flush=True)
 
