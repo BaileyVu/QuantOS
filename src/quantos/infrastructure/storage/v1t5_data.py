@@ -134,4 +134,3 @@ def aggregate_segment(segment: CanonicalSegment, minutes: int,
     bars.setflags(write=False)
     next_minutes.setflags(write=False)
     return AggregatedSegment(segment.dataset_id, minutes, bars, next_minutes, rows)
-
