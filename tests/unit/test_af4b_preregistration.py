@@ -377,14 +377,19 @@ class AF4BPreregistrationTests(unittest.TestCase):
         root = Path(af.__file__).resolve().parents[1]
         doc_009 = "docs/009_ALPHA_DISCOVERY_FUNNEL_AF1.md"
         doc_009_lf_hash = "ad7803207d6939fd1c60e509fa7fcd6d7edc705a6280add43ec752e5b5c58644"
-        # User-authorized V1-T4 and V1-T4R amendments; original AF4B catalog stays immutable.
+        # User-authorized V1-F1 amendment fe947f1 supersedes the current specs.
+        # Original AF4B catalog and its historical source hashes stay immutable.
         current_spec_hashes = dict(af.SPEC_HASHES)
         current_spec_hashes.update({
-            "docs/000_READ_FIRST.md": "a9d11cf2ef9594677032ec749493f3912e8c9d4605161ba174f43a7b80d9f7e4",
-            "docs/001_PRODUCT_REQUIREMENTS.md": "ba3fe4273094dd7f5c88540d1fcaa33df55ca0d091549ef9ee20a139c81fd6b9",
-            "docs/002_SYSTEM_ARCHITECTURE.md": "a1adaf01493a3e58211ec30933be638e2956a3d3ff2fc3e546325341933ad1ae",
-            "docs/005_ALPHA_ENGINE.md": "aaede5cf2ef8cb7191c57e154bf82932feeb987975e0c1f2d2ac3b2b74f4cc0f",
-            "docs/008_IMPLEMENTATION_GUIDE.md": "2b98401e05a246271aa30029b59db00e0552e569dd16e0ec710f9aae1bcbfc89",
+            "docs/000_READ_FIRST.md": "e462ca7ccece3d377f5ed9c18107d7e0f0a986510c3ac05b868190a84ce60afd",
+            "docs/001_PRODUCT_REQUIREMENTS.md": "9d63aee0ce3d6d005a76b0532e96edf2e4dbc6c1c36244177d9bd803eeb3e2f8",
+            "docs/002_SYSTEM_ARCHITECTURE.md": "403f2b3402c7094a09e91e1c79954944359887d98cde85e3badd98e96afee023",
+            "docs/003_DATA_ARCHITECTURE.md": "86f52a77931c11fbf43e220ff655289ec060c989631023d245af216be6be8161",
+            "docs/004_FEATURE_ENGINE_SPECIFICATION.md": "233c66136415c84f699eac66235a5c00b26975cdf7e48920ecec455dcdfdfb90",
+            "docs/005_ALPHA_ENGINE.md": "702cfbf744ed3acc436b3a3429ad11ebbd247fcbf28c63ea75570c4c0644efed",
+            "docs/006_RISK_EXECUTION_SPECIFICATION.md": "ae477b3ffed59e5f2b60bc397f9265e91109f5775d812ac06b033d1a33339f29",
+            "docs/007_VALIDATION_BACKTESTING.md": "f96a8d648caf3fe309c0281fa9a2e9821c89ac91363a3ab9ec41cc7c983af3c3",
+            "docs/008_IMPLEMENTATION_GUIDE.md": "5003dd34e978bf509913ad2f0f6b8c61f26537a16939cf0b8e41d35d32456e85",
         })
         actual = {}
         for path, frozen_hash in current_spec_hashes.items():
