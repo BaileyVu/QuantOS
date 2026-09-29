@@ -12,6 +12,7 @@ Mainnet: **LOCKED / NOT_APPROVED**.
 - Implementation/preregistration commit: `9748177`; subsequent source commit changes whitespace only.
 - Pre-economic full suite: 1,046 tests passed. Final full suite: 1,047 tests passed in91.429 seconds.
 - Dependency consistency (`pip check`) and Python compilation passed. No configured lint/type checker exists.
+- Replay parity covers synthetic historical/batch and streaming inputs through the canonical execution path. A continuous Paper runtime adapter for either T5 candidate was not packaged or qualified because both failed development.
 - No push, merge, exchange orders or Mainnet enablement performed. Market data/model/evidence files remain outside Git.
 
 ## Preregistration hashes
