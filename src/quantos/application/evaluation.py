@@ -9,6 +9,8 @@ from decimal import Decimal, localcontext
 from typing import Callable
 
 from quantos.application.risk_execution import TradingStep
+from quantos.domain.alpha.context import AlphaDecisionContext
+from quantos.domain.features.daily import DailyFeatureState, TSMOM_FEATURE_VERSION
 from quantos.domain.evaluation.contracts import (
     AlphaDecisionFunction,
     AlphaEvaluation,
@@ -27,7 +29,7 @@ from quantos.domain.evaluation.contracts import (
 from quantos.domain.evaluation.metrics import calculate_metrics, equity_returns
 from quantos.domain.execution.contracts import ExecutionStatus, OrderSide
 from quantos.domain.execution.core import ExecutionEngine, ExecutionLedger
-from quantos.domain.features import FEATURE_VERSION, compute_feature_vector
+from quantos.domain.features import FEATURE_VERSION, MIN_HISTORY, compute_feature_vector
 from quantos.domain.market_data import Candle, DatasetIdentity, ValidatedCandleSequence
 from quantos.domain.risk.engine import MarketState, RiskContext, RiskEngine, RiskPolicy
 from quantos.domain.runtime_contracts import AccountSnapshot, arithmetic, identity, validate_account
@@ -42,7 +44,7 @@ class EvaluationError(ValueError):
 
 
 def _validate_datasets(
-    datasets: tuple[ValidatedCandleSequence, ...],
+    datasets: tuple[ValidatedCandleSequence, ...], *, minute_end_clock: bool = False,
 ) -> tuple[ValidatedCandleSequence, ...]:
     if type(datasets) is not tuple or not datasets:
         raise EvaluationError("datasets must be a non-empty built-in tuple")
@@ -70,10 +72,11 @@ def _validate_datasets(
             if not end - timedelta(milliseconds=1) <= candle.close_time <= end:
                 raise EvaluationError("invalid one-minute candle boundary")
             if completion_reference is None:
-                completion_reference = candle.close_time
-            if (candle.close_time - completion_reference) % timedelta(minutes=1):
+                completion_reference = end if minute_end_clock else candle.close_time
+            if ((end if minute_end_clock else candle.close_time) - completion_reference) % timedelta(minutes=1):
                 raise EvaluationError("evaluation requires a common one-minute completion grid")
-    times = sorted({candle.close_time for dataset in datasets for candle in dataset.candles})
+    times = sorted({candle.open_time+timedelta(minutes=1) if minute_end_clock else candle.close_time
+                    for dataset in datasets for candle in dataset.candles})
     if any(right - left != timedelta(minutes=1) for left, right in zip(times, times[1:])):
         raise EvaluationError("evaluation clock has a missing minute")
     return tuple(sorted(datasets, key=lambda item: SYMBOL_ORDER[item.identity.symbol]))
@@ -152,16 +155,19 @@ def run_backtest(
     ledger: ExecutionLedger,
 ) -> BacktestReport:
     """Run the production Feature -> Alpha -> Risk -> Execution path sequentially."""
-    ordered = _validate_datasets(datasets)
+    ordered = _validate_datasets(datasets, minute_end_clock=config.feature_version == TSMOM_FEATURE_VERSION)
     validate_account(initial_account)
     if initial_account.positions:
         raise EvaluationError("historical evaluation requires a flat initial account with complete fee basis")
     risk_policy.__post_init__()
     config.__post_init__()
+    def decision_time(candle):
+        return candle.open_time+timedelta(minutes=1) if config.feature_version == TSMOM_FEATURE_VERSION else candle.close_time
+
     first_time = min(
-        (candle.close_time for dataset in ordered for candle in dataset.candles
-         if (config.decision_start is None or candle.close_time >= config.decision_start)
-         and (config.decision_end_exclusive is None or candle.close_time < config.decision_end_exclusive)),
+        (decision_time(candle) for dataset in ordered for candle in dataset.candles
+         if (config.decision_start is None or decision_time(candle) >= config.decision_start)
+         and (config.decision_end_exclusive is None or decision_time(candle) < config.decision_end_exclusive)),
         default=None,
     )
     if first_time is None:
@@ -180,9 +186,10 @@ def run_backtest(
     for dataset in ordered:
         content_ids.append(identity((dataset.identity, dataset.candles)))
         for candle in dataset.candles:
-            events[candle.close_time].append(candle)
+            events[decision_time(candle)].append(candle)
 
     histories: dict[str, list[Candle]] = defaultdict(list)
+    daily_states = {d.identity.symbol: DailyFeatureState(d.identity.symbol) for d in ordered}
     current: dict[str, Candle] = {}
     curve: list[EquityPoint] = []
     traces: list[DecisionTrace] = []
@@ -200,6 +207,9 @@ def run_backtest(
         candles = sorted(events[timestamp], key=lambda item: SYMBOL_ORDER[item.symbol])
         for candle in candles:
             histories[candle.symbol].append(candle)
+            histories[candle.symbol] = histories[candle.symbol][-MIN_HISTORY:]
+            if config.feature_version == TSMOM_FEATURE_VERSION:
+                daily_states[candle.symbol] = daily_states[candle.symbol].advance(candle, decision_time=timestamp)
             current[candle.symbol] = candle
         if config.decision_start is not None and timestamp < config.decision_start:
             continue
@@ -222,10 +232,12 @@ def run_backtest(
         peak = max(peak, pre_equity)
 
         for candle in candles:
-            feature = compute_feature_vector(tuple(histories[candle.symbol]), decision_time=timestamp)
+            feature = (daily_states[candle.symbol].feature() if config.feature_version == TSMOM_FEATURE_VERSION
+                       else compute_feature_vector(tuple(histories[candle.symbol]), decision_time=timestamp))
             if feature is None:
                 continue
-            alpha_input = alpha_decider(feature)
+            alpha_input = (alpha_decider(feature, AlphaDecisionContext(timestamp, execution.snapshot))
+                           if config.feature_version == TSMOM_FEATURE_VERSION else alpha_decider(feature))
             if type(alpha_input) is not AlphaEvaluation:
                 raise EvaluationError("alpha callback must return AlphaEvaluation")
             alpha_input.__post_init__()
@@ -327,7 +339,7 @@ def run_backtest(
             initial_account,
             strategy_version,
             model_version,
-            FEATURE_VERSION,
+            config.feature_version if config.feature_version == TSMOM_FEATURE_VERSION else FEATURE_VERSION,
             tuple(curve),
             tuple(trade_book.completed),
             tuple(traces),
@@ -354,7 +366,7 @@ def run_backtest(
         config=config,
         strategy_version=strategy_version,
         model_version=model_version,
-        feature_version=FEATURE_VERSION,
+        feature_version=config.feature_version if config.feature_version == TSMOM_FEATURE_VERSION else FEATURE_VERSION,
         evaluation_start=curve[0].timestamp,
         evaluation_end=curve[-1].timestamp,
         initial_equity=initial_equity,
@@ -382,7 +394,7 @@ def run_walk_forward(
     ledger_factory: LedgerFactory,
 ) -> WalkForwardReport:
     """Build on past-only windows and validate each fold through ``run_backtest``."""
-    ordered = _validate_datasets(datasets)
+    ordered = _validate_datasets(datasets, minute_end_clock=base_config.feature_version == TSMOM_FEATURE_VERSION)
     walk_config.__post_init__()
     base_config.__post_init__()
     if base_config.decision_start is not None or base_config.decision_end_exclusive is not None:

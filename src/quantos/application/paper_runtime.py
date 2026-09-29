@@ -11,6 +11,8 @@ from typing import Callable, Protocol
 
 from quantos.application.evaluation import _TradeBook, _marked_state, _validate_datasets
 from quantos.application.risk_execution import TradingStep
+from quantos.domain.alpha.context import AlphaDecisionContext
+from quantos.domain.features.daily import DailyFeatureState, TSMOM_FEATURE_VERSION
 from quantos.domain.common import require_decimal, require_non_empty, require_utc, require_v1_symbol
 from quantos.domain.evaluation import AlphaEvaluation, AlphaDecisionFunction, EquityPoint
 from quantos.domain.execution import OrderSide
@@ -34,8 +36,11 @@ class PaperRuntimePolicy:
     alpha_implementation_id: str
     provider_clock_skew_tolerance_ms: int
     mode: str = "paper"
+    feature_version: str = FEATURE_VERSION
 
     def __post_init__(self):
+        if self.feature_version not in (FEATURE_VERSION, TSMOM_FEATURE_VERSION):
+            raise ValueError("unsupported runtime feature version")
         if self.mode != "paper":
             raise ValueError("only paper runtime is enabled")
         if type(self.symbols) is not tuple or not self.symbols or len(set(self.symbols)) != len(self.symbols):
@@ -100,7 +105,7 @@ class PaperRuntime:
     def __init__(self, *, policy: PaperRuntimePolicy, alpha: AlphaDecisionFunction,
                  ledger: ExecutionLedger, store: RuntimeStore, clock: Callable[[], datetime],
                  stop: StopSignal | None = None, logger: logging.Logger | None = None,
-                 monotonic: Callable[[], float] | None = None):
+                 monotonic: Callable[[], float] | None = None, bootstrap=()):
         policy.__post_init__()
         if not callable(alpha) or not callable(clock):
             raise ValueError("explicit Alpha and UTC clock callables required")
@@ -109,10 +114,30 @@ class PaperRuntime:
         self.monotonic = monotonic
         self._last_tick = None
         self.logger = logger or logging.getLogger("quantos")
-        self.runtime_id = identity(("paper-runtime-v1", "1m", policy, FEATURE_VERSION, MIN_HISTORY))
+        self.runtime_id = identity(("paper-runtime-v2", "1m", policy, FEATURE_VERSION, MIN_HISTORY))
         self.execution: ExecutionEngine | None = None
         self.histories = {symbol: () for symbol in policy.symbols}
+        self.daily_states = {s: DailyFeatureState(s) for s in policy.symbols}
+        self.bootstrap_count = 0
+        self.bootstrap_id = None
         self.last_minute = None
+        if bootstrap:
+            if policy.feature_version != TSMOM_FEATURE_VERSION:
+                raise ValueError("bootstrap requires the explicit daily feature schema")
+            ordered = _validate_datasets(bootstrap, minute_end_clock=True)
+            if tuple(d.identity.symbol for d in ordered) != policy.symbols:
+                raise ValueError("bootstrap symbols differ from runtime")
+            if len({(d.candles[0].open_time, d.candles[-1].open_time) for d in ordered}) != 1:
+                raise ValueError("bootstrap symbol coverage differs")
+            for dataset in ordered:
+                for candle in dataset.candles:
+                    self.daily_states[candle.symbol] = self.daily_states[candle.symbol].advance(candle, decision_time=candle.close_time)
+                self.histories[dataset.identity.symbol] = dataset.candles[-MIN_HISTORY:]
+            self.bootstrap_count = len(ordered[0].candles)
+            self.last_minute = ordered[0].candles[-1].open_time
+            self.bootstrap_id = identity((tuple(d.identity for d in ordered), self.daily_states))
+        self._bootstrap_daily_id = identity(self.daily_states)
+        self.runtime_id = identity((self.runtime_id, policy.feature_version, self.bootstrap_id))
         self.day = None
         self.day_equity = self.peak = policy.initial_capital
         self.versions = None
@@ -152,8 +177,11 @@ class PaperRuntime:
 
     def _checkpoint(self, status="ready"):
         return primitive({
-            "schema": "paper-runtime-v1", "runtime_id": self.runtime_id, "status": status,
+            "schema": "paper-runtime-v2", "runtime_id": self.runtime_id, "status": status,
             "initial": self.initial, "last_minute": self.last_minute,
+            "daily_states": {s: state.evidence() for s, state in self.daily_states.items()},
+            "daily_state_id": identity(self.daily_states),
+            "bootstrap_id": self.bootstrap_id, "bootstrap_count": self.bootstrap_count,
             "histories": self.histories, "day": self.day, "day_equity": self.day_equity,
             "peak": self.peak, "versions": self.versions, "entry_fees": dict(self.book._entry_fees),
             "totals": self.totals, "last_equity": self.last_equity,
@@ -176,6 +204,8 @@ class PaperRuntime:
                 raise PaperRuntimeError("blocked/unfinished runtime or incompatible configuration/Alpha identity")
             if (saved["evidence_count"], saved["evidence_id"]) != head:
                 raise PaperRuntimeError("runtime evidence/checkpoint mismatch")
+            if saved["bootstrap_id"] != self.bootstrap_id or saved["bootstrap_count"] != self.bootstrap_count:
+                raise PaperRuntimeError("bootstrap identity mismatch")
             initial = saved["initial"]
             if initial["positions"]:
                 raise PaperRuntimeError("initial runtime account must be flat")
@@ -203,11 +233,24 @@ class PaperRuntime:
                     meta = DatasetIdentity(symbol, "1m", candles[0].open_time, candles[-1].open_time,
                                            "runtime", "v1", "v1")
                     histories.append(validate_candle_sequence(meta, candles))
-                _validate_datasets(tuple(histories))
+                _validate_datasets(tuple(histories), minute_end_clock=self.policy.feature_version == TSMOM_FEATURE_VERSION)
                 if len({tuple(c.open_time for c in h) for h in self.histories.values()}) != 1:
                     raise PaperRuntimeError("inconsistent cross-symbol histories")
             elif any(self.histories.values()):
                 raise PaperRuntimeError("history exists without committed minute")
+            if set(saved["daily_states"]) != set(self.policy.symbols):
+                raise PaperRuntimeError("daily feature symbol mismatch")
+            self.daily_states = {s: DailyFeatureState.restore(saved["daily_states"][s]) for s in self.policy.symbols}
+            if saved["daily_state_id"] != identity(self.daily_states):
+                raise PaperRuntimeError("daily state identity mismatch")
+            if head[0] == 0 and saved["daily_state_id"] != self._bootstrap_daily_id:
+                raise PaperRuntimeError("initial daily state differs from bootstrap")
+            if self.policy.feature_version == TSMOM_FEATURE_VERSION:
+                for symbol, state in self.daily_states.items():
+                    if state.last != (self.histories[symbol][-1] if self.histories[symbol] else None):
+                        raise PaperRuntimeError("daily/minute checkpoint mismatch")
+                    if state.minute_count != self.bootstrap_count + head[0]:
+                        raise PaperRuntimeError("daily coverage/evidence mismatch")
             self.day = None if saved["day"] is None else datetime.fromisoformat(saved["day"])
             self.day_equity, self.peak = Decimal(saved["day_equity"]), Decimal(saved["peak"])
             for value in (self.day_equity, self.peak):
@@ -238,19 +281,20 @@ class PaperRuntime:
                 raise PaperRuntimeError("invalid runtime checkpoint fields or canonical representation")
             latest = self.store.latest_evidence()
             if latest is not None:
-                if self.last_minute is None or any(len(h) != min(self.evidence_count, MIN_HISTORY) for h in self.histories.values()):
+                if self.last_minute is None or any(len(h) != min(self.bootstrap_count+self.evidence_count, MIN_HISTORY) for h in self.histories.values()):
                     raise PaperRuntimeError("history differs from committed evidence count")
                 if any(latest[key] != saved[key] for key in
-                       ("runtime_id", "execution_id", "ledger_id", "totals", "entry_fees")) or latest["equity"] != saved["last_equity"]:
+                       ("runtime_id", "execution_id", "ledger_id", "totals", "entry_fees", "daily_state_id")) or latest["equity"] != saved["last_equity"]:
                     raise PaperRuntimeError("runtime checkpoint/evaluation evidence mismatch")
-            elif (self.last_minute is not None or self.last_equity is not None or self.day is not None
+            elif ((self.last_minute is not None and not self.bootstrap_count) or self.last_equity is not None or self.day is not None
                   or self.versions is not None or self.book._entry_fees or any(self.totals.values())
                   or self.day_equity != self.policy.initial_capital or self.peak != self.policy.initial_capital):
                 raise PaperRuntimeError("runtime state claims observations without evidence")
-            if self.last_minute is not None:
+            if self.last_minute is not None and latest is not None:
                 marks = {s: h[-1].close for s, h in self.histories.items()}
                 equity, exposure = _marked_state(self.execution.snapshot, marks)
-                timestamp = next(iter(self.histories.values()))[-1].close_time
+                last = next(iter(self.histories.values()))[-1]
+                timestamp = last.open_time+timedelta(minutes=1) if self.policy.feature_version == TSMOM_FEATURE_VERSION else last.close_time
                 if self.day != timestamp.replace(hour=0, minute=0, second=0, microsecond=0) or self.peak < max(equity, self.day_equity):
                     raise PaperRuntimeError("inconsistent persisted equity references")
                 expected_point = EquityPoint(timestamp, equity, self.execution.snapshot.balances["USDT"],
@@ -282,7 +326,8 @@ class PaperRuntime:
                 return None
             if candle.open_time != previous[-1].open_time + timedelta(minutes=1):
                 raise PaperRuntimeError("conflicting duplicate, backward time or skipped minute")
-            if candle.close_time - previous[-1].close_time != timedelta(minutes=1):
+            if (self.policy.feature_version != TSMOM_FEATURE_VERSION
+                    and candle.close_time - previous[-1].close_time != timedelta(minutes=1)):
                 raise PaperRuntimeError("inconsistent completion grid")
         self._fresh((candle,))
         # Provider clock disagreement never changes the local observation clock.
@@ -299,7 +344,10 @@ class PaperRuntime:
         self._processing = True
         for candle in candles:
             self.histories[candle.symbol] = (self.histories[candle.symbol]+(candle,))[-MIN_HISTORY:]
-        timestamp = candles[0].close_time
+            if self.policy.feature_version == TSMOM_FEATURE_VERSION:
+                self.daily_states[candle.symbol] = self.daily_states[candle.symbol].advance(candle, decision_time=candle.close_time)
+        timestamp = (candles[0].open_time+timedelta(minutes=1)
+                     if self.policy.feature_version == TSMOM_FEATURE_VERSION else candles[0].close_time)
         marks = {c.symbol: c.close for c in candles}
         equity, _ = _marked_state(self.execution.snapshot, marks)
         day = timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -311,12 +359,14 @@ class PaperRuntime:
             if self.stop.active:
                 break
             self._fresh(candles)
-            feature = compute_feature_vector(self.histories[candle.symbol], decision_time=timestamp)
+            feature = (self.daily_states[candle.symbol].feature() if self.policy.feature_version == TSMOM_FEATURE_VERSION
+                       else compute_feature_vector(self.histories[candle.symbol], decision_time=timestamp))
             if feature is None:
                 self._log("paper_runtime_warmup", {"symbol": candle.symbol, "timestamp": timestamp,
                                                   "candles": len(self.histories[candle.symbol])})
                 continue
-            evaluated = self.alpha(feature)
+            evaluated = (self.alpha(feature, AlphaDecisionContext(timestamp, self.execution.snapshot))
+                         if self.policy.feature_version == TSMOM_FEATURE_VERSION else self.alpha(feature))
             if type(evaluated) is not AlphaEvaluation:
                 raise PaperRuntimeError("Alpha must return AlphaEvaluation")
             evaluated.__post_init__()
@@ -352,6 +402,7 @@ class PaperRuntime:
             self.totals["realized_pnl"] += sum((t.net_pnl for t in self.book.completed), Decimal("0"))
         self.totals["trade_count"] += len(self.book.completed)
         evidence = primitive({"runtime_id": self.runtime_id, "equity": point, "decisions": decisions,
+                              "daily_state_id": identity(self.daily_states),
                               "completed_trades": tuple(self.book.completed), "totals": self.totals,
                               "entry_fees": dict(self.book._entry_fees),
                               "execution_id": identity(self.execution.snapshot),

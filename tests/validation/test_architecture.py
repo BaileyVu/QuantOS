@@ -39,7 +39,7 @@ class ArchitectureTests(unittest.TestCase):
         allowed_standard = {"__future__", "dataclasses", "datetime", "decimal", "enum", "types"}
         allowed_domain = (
             "quantos.domain.common", "quantos.domain.alpha", "quantos.domain.features",
-            "quantos.domain.market_data",
+            "quantos.domain.market_data", "quantos.domain.runtime_contracts",
         )
         for path in (DOMAIN_ROOT / "alpha").rglob("*.py"):
             with self.subTest(path=path.name):
@@ -105,6 +105,7 @@ class ArchitectureTests(unittest.TestCase):
         allowed_standard = {"__future__", "datetime", "decimal", "dataclasses", "types", "typing"}
         allowed_domain = (
             "quantos.domain.common", "quantos.domain.features", "quantos.domain.market_data",
+            "quantos.domain.runtime_contracts",
         )
         for path in (DOMAIN_ROOT / "features").rglob("*.py"):
             with self.subTest(path=path.name):

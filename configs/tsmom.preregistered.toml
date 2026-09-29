@@ -1,0 +1,33 @@
+# Frozen before T4 market-data performance evaluation. No live enablement.
+[protocol]
+version = "tsmom-preregistration-v1"
+horizons = [7, 14, 30]
+feature_version = "tsmom-daily-v1"
+model_version = "deterministic-tsmom-no-ml-v1"
+development_start = "2024-01-01T00:00:00+00:00"
+holdout_start = "2026-01-01T00:00:00+00:00"
+holdout_end_exclusive = "2026-09-28T00:00:00+00:00"
+train_days = 365
+validation_days = 90
+step_days = 90
+minimum_folds = 3
+minimum_calibration_trades = 30
+lower_bound_multiplier_squared = "19"
+minimum_oos_trades = 30
+minimum_holdout_trades = 10
+profitable_fold_fraction = "0.6666666666666666666666666666666667"
+maximum_drawdown = "0.10"
+fee_rate = "0.001"
+slippage_rate = "0.002"
+stress_slippage_rate = "0.004"
+initial_capital = "20"
+order_notional = "9.90"
+max_position_notional = "10"
+max_exposure_fraction = "0.51"
+daily_loss_fraction = "0.02"
+drawdown_fraction = "0.10"
+sell_fraction = "1"
+monte_carlo_simulations = 200
+monte_carlo_seed = 240929
+monte_carlo_mean_block_minutes = 10080
+monte_carlo_positive_fraction = "0.60"

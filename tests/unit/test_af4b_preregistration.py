@@ -377,8 +377,17 @@ class AF4BPreregistrationTests(unittest.TestCase):
         root = Path(af.__file__).resolve().parents[1]
         doc_009 = "docs/009_ALPHA_DISCOVERY_FUNNEL_AF1.md"
         doc_009_lf_hash = "ad7803207d6939fd1c60e509fa7fcd6d7edc705a6280add43ec752e5b5c58644"
+        # User-authorized V1-T4 amendment c317fef; original AF4B catalog stays immutable.
+        current_spec_hashes = dict(af.SPEC_HASHES)
+        current_spec_hashes.update({
+            "docs/000_READ_FIRST.md": "2ee0938f5596175a64c249f6b1d5b4fd9c2a571790b776c4f0d6d97e9c0946dc",
+            "docs/001_PRODUCT_REQUIREMENTS.md": "ed547ac04f412dbbd1cfb39b0badaad69c8f37bd8d8be89378f27c412cbe0762",
+            "docs/002_SYSTEM_ARCHITECTURE.md": "15f49eb4c279319b1f90d5b0c1078603124137355f6b6e94408fb23145a933d4",
+            "docs/005_ALPHA_ENGINE.md": "b35c10ba6590af8f6e38048aaea98e21dc43acaefcc95a28ec21a3e25f304806",
+            "docs/008_IMPLEMENTATION_GUIDE.md": "92e8ac3bd4b9c1d73a847563d2d2f7d827ef09234ff45808be53de050fbff371",
+        })
         actual = {}
-        for path, frozen_hash in af.SPEC_HASHES.items():
+        for path, frozen_hash in current_spec_hashes.items():
             contents = (root / path).read_bytes()
             if path == doc_009:
                 # The historical pin used CRLF bytes, while Git committed the same text as LF.
@@ -387,7 +396,7 @@ class AF4BPreregistrationTests(unittest.TestCase):
                 self.assertEqual(af.digest(contents.replace(b"\n", b"\r\n")), frozen_hash)
             else:
                 actual[path] = af.digest(contents)
-        expected = {path: value for path, value in af.SPEC_HASHES.items() if path != doc_009}
+        expected = {path: value for path, value in current_spec_hashes.items() if path != doc_009}
         self.assertEqual(actual, expected)
 
     def test_33_production_code_and_feature_engine_unchanged(self):

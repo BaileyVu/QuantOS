@@ -44,9 +44,12 @@ class BacktestConfig:
     decision_start: datetime | None = None
     decision_end_exclusive: datetime | None = None
     annualization_periods: int = 365 * 24 * 60
+    feature_version: str = "candidate-v1"
 
     def __post_init__(self) -> None:
         require_non_empty(self.code_version, "code_version")
+        if self.feature_version not in ("candidate-v1", "tsmom-daily-v1"):
+            raise ValueError("unsupported evaluation feature version")
         require_non_empty(self.alpha_implementation_id, "alpha_implementation_id")
         if self.decision_start is not None:
             require_utc(self.decision_start, "decision_start")
