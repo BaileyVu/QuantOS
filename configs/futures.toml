@@ -1,0 +1,22 @@
+[futures]
+symbol = "BTCUSDT"
+starting_equity = "20"
+lookback = 120
+
+[risk]
+risk_fraction = "0.01"
+maximum_risk_fraction = "0.02"
+daily_loss_fraction = "0.03"
+consecutive_loss_limit = 3
+margin_fraction = "0.80"
+leverage_ceiling = 5
+emergency_leverage_ceiling = 10
+liquidation_buffer_fraction = "0.01"
+maintenance_margin_fraction = "0.005"
+maximum_slippage_rate = "0.0002"
+maximum_fee_rate = "0.0005"
+
+[paper]
+taker_fee_rate = "0.0005"
+slippage_rate = "0.0002"
+

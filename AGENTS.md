@@ -2,23 +2,23 @@
 
 ## 1. Authority and Specification Precedence
 
-QuantOS V1 is specification-driven.
+QuantOS V1 is specification-driven and targets autonomous Binance USDⓈ-M Futures trading.
 
 Before making changes, treat the repository specifications as authoritative:
 
 * `docs/000_READ_FIRST.md` — highest-priority V1 Source of Truth.
-* `docs/001_PRODUCT_REQUIREMENTS.md` through `docs/007_VALIDATION_BACKTESTING.md` — coequal frozen V1 specifications.
+* `docs/001_PRODUCT_REQUIREMENTS.md` through `docs/007_VALIDATION_BACKTESTING.md` — coequal V1 specifications.
 * `docs/008_IMPLEMENTATION_GUIDE.md` — implementation guidance subordinate to `000–007`.
 
 Do not infer a priority order among documents `001–007` from their filenames or numbering.
 
-If two frozen specifications appear inconsistent:
+If two specifications appear inconsistent:
 
 1. follow `000_READ_FIRST.md` where it resolves the issue;
 2. otherwise surface the conflict explicitly;
-3. do not silently choose one frozen specification over another.
+3. do not silently choose one specification over another.
 
-Do not modify `docs/000_READ_FIRST.md` through `docs/008_IMPLEMENTATION_GUIDE.md` unless explicitly instructed to update the frozen specification.
+Do not modify `docs/000_READ_FIRST.md` through `docs/008_IMPLEMENTATION_GUIDE.md` without explicit project-owner authorization.
 
 ---
 
@@ -35,7 +35,7 @@ This includes, but is not limited to:
 
 They may be inspected only when explicitly requested.
 
-The frozen specifications inside this repository govern QuantOS V1.
+The current specifications inside this repository govern QuantOS V1.
 
 ---
 
@@ -46,10 +46,10 @@ Do not reread every specification unnecessarily.
 For each task:
 
 1. read `docs/000_READ_FIRST.md`;
-2. read the frozen specification files directly relevant to the task;
+2. read the specification files directly relevant to the task;
 3. read `docs/008_IMPLEMENTATION_GUIDE.md` when implementation structure or sequencing matters.
 
-For cross-cutting architectural changes, read all affected frozen specifications before modifying code.
+For cross-cutting architectural changes, read all affected specifications before modifying code.
 
 Prefer targeted repository inspection over repeatedly scanning the entire repository.
 
@@ -57,45 +57,24 @@ Prefer targeted repository inspection over repeatedly scanning the entire reposi
 
 ## 4. V1 Scope Guardrails
 
-Do not expand QuantOS beyond the frozen V1 scope.
+Preserve the authorized V1 constraints:
 
-Preserve the frozen constraints, including:
-
-* local-first system;
-* Clean Architecture modular monolith;
-* exactly six production modules as defined by the frozen architecture;
-* infrastructure components must not become additional business modules;
-* Binance Spot only;
-* BTCUSDT and ETHUSDT only;
+* local-first Clean Architecture modular monolith;
+* exactly six production modules;
+* infrastructure must not become additional business modules;
+* Binance USDⓈ-M Futures;
+* BTCUSDT perpetual initially;
 * completed 1-minute candles;
-* Parquet + DuckDB data architecture;
-* initial reference capital of 20 USDT;
-* paper trading as the default operating mode;
-* exactly one production trading strategy;
-* exactly one production predictive model;
-* compact production feature set within the frozen V1 limits;
-* LightGBM as the preferred V1 model where specified;
-* capital preservation, correctness, robustness, simplicity, explainability, performance, and profitability in the priority order defined by the frozen specifications.
+* Parquet + DuckDB canonical data;
+* approximately 20 USDT reference capital;
+* paper trading as the safe default;
+* autonomous LONG / SHORT / HOLD;
+* a small multi-strategy library with deterministic selection;
+* isolated margin, one-way position mode, and one simultaneous position;
+* risk-sized exposure, dynamic leverage, mandatory stop, and fail-closed execution;
+* capital preservation, correctness, robustness, simplicity, explainability, performance, and profitability in that order.
 
-Do not introduce out-of-scope V1 functionality such as:
-
-* microservices;
-* Kubernetes or cloud-first infrastructure;
-* leverage;
-* futures;
-* perpetuals;
-* options;
-* additional exchanges;
-* deep learning;
-* reinforcement learning;
-* autonomous trading agents;
-* multi-strategy production systems;
-* multi-model production ensembles;
-* sentiment pipelines;
-* social-media signals;
-* on-chain signals;
-
-unless the frozen specifications are explicitly changed first.
+Do not add other exchanges, instruments, portfolio trading, microservices, Kubernetes, cloud-first infrastructure, deep learning, reinforcement learning, multi-model production ensembles, sentiment/social pipelines, or on-chain signals unless the specifications change first.
 
 ---
 
@@ -107,7 +86,7 @@ QuantOS V1 has exactly six production modules.
 
 Do not turn infrastructure, adapters, storage implementations, utilities, frameworks, or external integrations into additional business modules.
 
-Respect Clean Architecture dependency direction and module ownership defined by the canonical specifications.
+Respect Clean Architecture dependency direction and module ownership defined by the canonical specifications. Regime classification and strategy selection belong to Alpha; position management belongs to Execution subject to Risk.
 
 Do not bypass module boundaries merely for convenience.
 
@@ -160,10 +139,12 @@ Never bypass the QuantOS promotion lifecycle.
 The required progression is:
 
 Research
-→ Backtest
+→ Historical Replay / Backtest
 → Walk-Forward Validation
 → Monte Carlo Validation
-→ Paper Trading
+→ Live-Market Paper Trading
+→ Binance Testnet
+→ Mainnet Shadow
 → Explicit Live Approval
 
 No implementation may silently skip a required stage.
@@ -305,8 +286,8 @@ Do not opportunistically add:
 * unrelated features;
 * speculative optimizations;
 * additional frameworks;
-* alternate strategies;
-* additional models;
+* unapproved strategy families;
+* unnecessary additional models;
 * additional exchanges;
 * unnecessary abstractions;
 * cosmetic repository-wide refactors.
@@ -360,7 +341,7 @@ Use repository context efficiently.
 A task is complete only when:
 
 * the requested functionality is implemented;
-* implementation conforms to the frozen V1 specifications;
+* implementation conforms to the current V1 specifications;
 * architectural and module boundaries remain intact;
 * runtime safety and fail-closed requirements remain intact;
 * appropriate tests exist;

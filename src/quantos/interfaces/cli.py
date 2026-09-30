@@ -75,6 +75,8 @@ def build_parser() -> argparse.ArgumentParser:
     paper.add_argument("--runtime-config", type=Path, default=Path("configs/paper_runtime.toml"))
     paper.add_argument("--non-trading-smoke", action="store_true",
                        help="Explicit public-feed HOLD-only smoke; no selected production Alpha.")
+    from quantos.interfaces.futures import add_futures_parser
+    add_futures_parser(commands)
     aggregate_trades = commands.add_parser(
         "aggregate-trades", help="Inspect immutable research event archives."
     )
@@ -313,6 +315,13 @@ def main(argv: list[str] | None = None) -> int:
             return paper_command(args, configure_logging("INFO"))
         except (ValueError, OSError) as error:
             print(_json({"event": "paper_runtime_error", "error": str(error)}), file=sys.stderr)
+            return 2
+    if args.command == "futures":
+        from quantos.interfaces.futures import futures_command
+        try:
+            return futures_command(args)
+        except (OSError, RuntimeError, TypeError, ValueError) as error:
+            print(_json({"event": "futures_error", "error": str(error)}), file=sys.stderr)
             return 2
     try:
         config = load_config(args.config)
