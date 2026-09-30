@@ -35,6 +35,7 @@ class PaperPosition:
     margin: Decimal
     entry_fee: Decimal
     strategy_id: str
+    timeframe: str
     regime: MarketRegime
     opened_at: object
     client_order_id: str
@@ -49,6 +50,7 @@ class PaperTrade:
     pnl: Decimal
     fees: Decimal
     strategy_id: str
+    timeframe: str
     regime: MarketRegime
     opened_at: object
     closed_at: object
@@ -87,7 +89,8 @@ class FuturesPaperExecution:
         self.position = PaperPosition(signal.direction, approval.quantity, entry,
             signal.stop, signal.target, approval.leverage,
             approval.allocated_margin or Decimal(0), fee, signal.strategy_id,
-            signal.regime, signal.timestamp, approval.client_order_id)
+            signal.timeframe, signal.regime, signal.timestamp,
+            approval.client_order_id)
         return self.position
 
     def _close(self, reference: Decimal, timestamp: object, reason: str) -> PaperTrade:
@@ -104,7 +107,7 @@ class FuturesPaperExecution:
         total_trade_fees = position.entry_fee + exit_fee
         trade = PaperTrade(position.direction, position.quantity, position.entry_price,
             exit_price, gross - total_trade_fees, total_trade_fees, position.strategy_id,
-            position.regime, position.opened_at, timestamp, reason)
+            position.timeframe, position.regime, position.opened_at, timestamp, reason)
         self.trades.append(trade)
         self.position = None
         return trade

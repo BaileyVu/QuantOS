@@ -10,3 +10,5 @@ Each session obtains Futures exchangeInfo and constructs exact symbol rules: tra
 Provider decimal strings are parsed directly to Decimal. Quantity rounds down to step; prices round to tick according to intent; validation follows rounding. Float conversions are prohibited in exchange, Risk, and accounting paths.
 
 Replay, live paper, testnet, shadow, and live use the same Candle, Alpha, Risk, and accounting semantics. If funding is omitted, output records that limitation.
+
+Signal timeframes are derived deterministically from canonical completed 1-minute candles. Supported intervals are 1m, 3m, 5m, 15m, 30m, and 1h, aligned to UTC epoch boundaries. An aggregate is available only after every constituent minute is complete; incomplete or gapped buckets are excluded. Open, high, low, close, volume, quote volume, and trade count use first, maximum, minimum, final, and exact-sum semantics respectively.

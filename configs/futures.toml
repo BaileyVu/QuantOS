@@ -2,12 +2,15 @@
 symbol = "BTCUSDT"
 starting_equity = "20"
 lookback = 120
+timeframes = ["1m", "3m", "5m", "15m", "30m", "1h"]
 
 [risk]
 risk_fraction = "0.01"
 maximum_risk_fraction = "0.02"
 daily_loss_fraction = "0.03"
 consecutive_loss_limit = 3
+consecutive_loss_cooldown_minutes = 240
+consecutive_loss_reset_on_utc_day = true
 margin_fraction = "0.80"
 leverage_ceiling = 5
 emergency_leverage_ceiling = 10

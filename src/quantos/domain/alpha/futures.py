@@ -6,6 +6,9 @@ from decimal import Decimal
 from enum import Enum
 
 from quantos.domain.market_data import Candle
+from quantos.domain.market_data.timeframes import (
+    SUPPORTED_SIGNAL_TIMEFRAMES, timeframe_minutes,
+)
 
 
 class Direction(str, Enum):
@@ -46,6 +49,9 @@ class StrategySignal:
     strength: Decimal
     evidence: tuple[str, ...]
     rationale: str
+    timeframe: str = "1m"
+    higher_timeframe_context: tuple[str, ...] = ()
+    signal_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,8 +128,11 @@ def classify_regime(candles) -> RegimeState:
     return RegimeState(regime, fast, slow, atr, high, low, reason)
 
 
-def evaluate_strategies(candles, state: RegimeState) -> tuple[StrategySignal, ...]:
+def evaluate_strategies(candles, state: RegimeState, timeframe: str = "1m",
+                        higher_context=()) -> tuple[StrategySignal, ...]:
     candles = tuple(candles)
+    if timeframe not in SUPPORTED_SIGNAL_TIMEFRAMES:
+        raise ValueError("unsupported signal timeframe")
     if len(candles) < 30 or state.atr <= 0:
         return ()
     last, previous = candles[-1], candles[-2]
@@ -135,8 +144,36 @@ def evaluate_strategies(candles, state: RegimeState) -> tuple[StrategySignal, ..
             return
         if direction is Direction.SHORT and not (target < last.close < stop):
             return
-        result.append(StrategySignal(last.close_time, last.symbol, direction, strategy,
-            state.regime, last.close, stop, target, Decimal(strength), evidence, rationale))
+        context_labels = tuple(
+            f"{context_timeframe}:{context_regime.value}"
+            for context_timeframe, context_regime in higher_context
+        )
+        adjustment = Decimal(0)
+        for _, context_regime in higher_context:
+            aligned = (
+                direction is Direction.LONG and context_regime is MarketRegime.TREND_UP
+            ) or (
+                direction is Direction.SHORT and context_regime is MarketRegime.TREND_DOWN
+            )
+            opposed = (
+                direction is Direction.LONG and context_regime is MarketRegime.TREND_DOWN
+            ) or (
+                direction is Direction.SHORT and context_regime is MarketRegime.TREND_UP
+            )
+            if aligned:
+                adjustment += Decimal(".04")
+            elif opposed:
+                adjustment -= Decimal(".04")
+        adjusted_strength = min(Decimal(1), max(Decimal(0), Decimal(strength) + adjustment))
+        signal_id = "|".join((
+            last.symbol, timeframe, strategy, direction.value,
+            last.close_time.isoformat(),
+        ))
+        result.append(StrategySignal(
+            last.close_time, last.symbol, direction, strategy, state.regime,
+            last.close, stop, target, adjusted_strength, evidence, rationale,
+            timeframe, context_labels, signal_id,
+        ))
 
     if state.regime is MarketRegime.TREND_UP and last.close > previous.high:
         stop = last.close - state.atr * Decimal("1.5")
@@ -189,14 +226,26 @@ def evaluate_strategies(candles, state: RegimeState) -> tuple[StrategySignal, ..
 def select_candidate(signals,
                      minimum_strength: Decimal = Decimal(".55"),
                      conflict_margin: Decimal = Decimal(".15")) -> Selection:
-    eligible = tuple(s for s in signals if s.direction is not Direction.HOLD
-                     and s.strength >= minimum_strength)
+    raw = tuple(s for s in signals if s.direction is not Direction.HOLD
+                and s.strength >= minimum_strength)
+    deduplicated = {}
+    for signal in raw:
+        setup = (signal.symbol, signal.strategy_id, signal.direction, signal.timestamp)
+        current = deduplicated.get(setup)
+        if current is None or (
+            signal.strength, timeframe_minutes(signal.timeframe)
+        ) > (
+            current.strength, timeframe_minutes(current.timeframe)
+        ):
+            deduplicated[setup] = signal
+    eligible = tuple(deduplicated.values())
     if not eligible:
         return Selection(Direction.HOLD, None, "no eligible strategy signal", eligible)
+    score = lambda s: (s.strength, timeframe_minutes(s.timeframe), s.signal_id)
     long_best = max((s for s in eligible if s.direction is Direction.LONG),
-                    key=lambda s: s.strength, default=None)
+                    key=score, default=None)
     short_best = max((s for s in eligible if s.direction is Direction.SHORT),
-                     key=lambda s: s.strength, default=None)
+                     key=score, default=None)
     if long_best and short_best:
         if abs(long_best.strength - short_best.strength) < conflict_margin:
             return Selection(Direction.HOLD, None, "material LONG/SHORT conflict", eligible)

@@ -34,15 +34,27 @@ def load_futures_config(path: Path) -> FuturesTraderConfig:
     lookback = general.get("lookback")
     if not isinstance(lookback, int) or lookback < 30:
         raise ValueError("lookback must be an integer >= 30")
+    timeframes = general.get("timeframes")
+    if not isinstance(timeframes, list) or not all(
+        isinstance(value, str) for value in timeframes
+    ):
+        raise ValueError("timeframes must be a TOML string array")
     return FuturesTraderConfig(
         symbol="BTCUSDT",
         starting_equity=starting,
         lookback=lookback,
+        timeframes=tuple(timeframes),
         risk=FuturesRiskPolicy(
             risk_fraction=_decimal(risk, "risk_fraction"),
             maximum_risk_fraction=_decimal(risk, "maximum_risk_fraction"),
             daily_loss_fraction=_decimal(risk, "daily_loss_fraction"),
             consecutive_loss_limit=int(risk["consecutive_loss_limit"]),
+            consecutive_loss_cooldown_minutes=int(
+                risk["consecutive_loss_cooldown_minutes"]
+            ),
+            consecutive_loss_reset_on_utc_day=risk[
+                "consecutive_loss_reset_on_utc_day"
+            ],
             margin_fraction=_decimal(risk, "margin_fraction"),
             leverage_ceiling=int(risk["leverage_ceiling"]),
             emergency_leverage_ceiling=int(risk["emergency_leverage_ceiling"]),

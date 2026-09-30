@@ -136,7 +136,11 @@ class FuturesRiskTests(unittest.TestCase):
         self.assertIn("one-position", evaluate_futures_risk(
             candidate, replace(self.account, has_position=True), rules()).reason)
         self.assertIn("consecutive-loss", evaluate_futures_risk(
-            candidate, replace(self.account, consecutive_losses=3), rules()).reason)
+            candidate, replace(
+                self.account,
+                consecutive_losses=3,
+                consecutive_loss_breaker_active=True,
+            ), rules()).reason)
         self.assertIn("daily-loss", evaluate_futures_risk(
             candidate, FuturesAccountState(D("19"), D("20")), rules()).reason)
 

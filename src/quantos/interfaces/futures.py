@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import json
 from pathlib import Path
@@ -14,6 +14,7 @@ from quantos.application.futures_trader import (
 )
 from quantos.domain.market_data import Candle
 from quantos.domain.market_data.futures import parse_usdm_exchange_info
+from quantos.domain.market_data.timeframes import timeframe_minutes
 from quantos.infrastructure.binance.futures import BinanceUsdmPublicClient
 from quantos.infrastructure.configuration.futures import load_futures_config
 
@@ -137,7 +138,17 @@ def futures_command(args: argparse.Namespace) -> int:
         try:
             while args.cycles == 0 or cycle < args.cycles:
                 now = datetime.now(timezone.utc)
-                candles = client.klines(limit=max(150, config.lookback + 5))
+                if not seen:
+                    warmup = config.lookback * max(
+                        timeframe_minutes(value) for value in config.timeframes
+                    )
+                    candles = client.historical_klines(
+                        now - timedelta(minutes=warmup + 1), now
+                    )
+                else:
+                    candles = client.historical_klines(
+                        max(seen) + timedelta(minutes=1), now
+                    )
                 new = [c for c in candles if c.close_time < now and c.open_time not in seen]
                 for candle in new:
                     trader.on_candle(candle)
