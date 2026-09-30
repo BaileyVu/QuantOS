@@ -23,6 +23,7 @@ maximum_slippage_rate = "0.0002"
 maximum_fee_rate = "0.0005"
 minimum_net_reward_risk = "1.5"
 minimum_reward_to_cost_multiple = "3"
+minimum_expected_movement_to_cost_multiple = "3"
 
 [paper]
 taker_fee_rate = "0.0005"

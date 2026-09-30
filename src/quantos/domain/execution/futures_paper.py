@@ -164,6 +164,7 @@ class PaperTrade:
     final_stop: Decimal
     notional: Decimal
     leverage: int
+    holding_bars: int
 
 
 class FuturesPaperExecution:
@@ -315,6 +316,7 @@ class FuturesPaperExecution:
             position.opened_at, timestamp, reason, position.state,
             position.stop_adjustments, position.initial_stop, position.stop,
             position.reference_entry_price * position.quantity, position.leverage,
+            position.bars_held,
         )
         self.trades.append(trade)
         self.audit_events.append({

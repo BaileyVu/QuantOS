@@ -88,6 +88,9 @@ def load_futures_config(path: Path) -> FuturesTraderConfig:
             minimum_reward_to_cost_multiple=_decimal(
                 risk, "minimum_reward_to_cost_multiple"
             ),
+            minimum_expected_movement_to_cost_multiple=_decimal(
+                risk, "minimum_expected_movement_to_cost_multiple"
+            ),
         ),
         execution=FuturesPaperPolicy(
             taker_fee_rate=_decimal(paper, "taker_fee_rate"),

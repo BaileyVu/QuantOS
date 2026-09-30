@@ -296,14 +296,14 @@ class ReplayLifecycleTests(unittest.TestCase):
     @staticmethod
     def always_signal(candles, state, timeframe="1m", higher_context=()):
         last = candles[-1]
-        return (strategy_signal(last.close_time, timeframe),)
+        return (strategy_signal(last.close_time, timeframe),), ()
 
     def test_replay_resumes_after_finite_breaker_cooldown(self):
         trader = AutonomousFuturesPaperTrader(
             trader_config(cooldown=2), rules()
         )
         with patch(
-            "quantos.application.futures_trader.evaluate_strategies",
+            "quantos.application.futures_trader.evaluate_strategies_with_diagnostics",
             side_effect=self.always_signal,
         ):
             for minute in range(37):
@@ -332,8 +332,8 @@ class ReplayLifecycleTests(unittest.TestCase):
                 timeframe == "3m"
                 and last.close_time == one_minute(95).close_time
             ):
-                return (strategy_signal(last.close_time, timeframe),)
-            return ()
+                return (strategy_signal(last.close_time, timeframe),), ()
+            return (), ()
 
         candles = []
         for minute in range(97):
@@ -344,7 +344,7 @@ class ReplayLifecycleTests(unittest.TestCase):
             else:
                 candles.append(one_minute(minute))
         with patch(
-            "quantos.application.futures_trader.evaluate_strategies",
+            "quantos.application.futures_trader.evaluate_strategies_with_diagnostics",
             side_effect=scheduled,
         ):
             metrics, _ = run_futures_replay(candles, config, rules())
@@ -360,7 +360,7 @@ class ReplayLifecycleTests(unittest.TestCase):
         config = trader_config(daily=".001")
         trader = AutonomousFuturesPaperTrader(config, rules())
         with patch(
-            "quantos.application.futures_trader.evaluate_strategies",
+            "quantos.application.futures_trader.evaluate_strategies_with_diagnostics",
             side_effect=self.always_signal,
         ):
             for minute in range(32):

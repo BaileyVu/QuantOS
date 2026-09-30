@@ -7,8 +7,8 @@ from decimal import Decimal
 from typing import Iterable
 
 from quantos.domain.alpha.futures import (
-    Direction, MarketRegime, classify_regime, evaluate_strategies,
-    select_candidate, TradeCandidate,
+    Direction, MarketRegime, PRODUCTION_STRATEGY_IDS, classify_regime,
+    evaluate_strategies_with_diagnostics, select_candidate, TradeCandidate,
 )
 from quantos.domain.execution.futures_paper import (
     FuturesPaperExecution, FuturesPaperPolicy, PaperTrade,
@@ -65,6 +65,27 @@ class FuturesTraderConfig:
 
 class FuturesTraderError(RuntimeError):
     pass
+
+
+FUNNEL_STAGES = (
+    "raw_signals_generated",
+    "regime_compatible",
+    "economic_filter_pass",
+    "minimum_executable_risk_pass",
+    "leverage_filter_pass",
+    "decision_reached",
+    "selected",
+    "risk_approved",
+    "trades",
+)
+
+
+def _funnel_bucket() -> dict:
+    return {
+        **{stage: 0 for stage in FUNNEL_STAGES},
+        "pnl": Decimal(0),
+        "rejection_reasons": defaultdict(int),
+    }
 
 
 def filter_economically_feasible_candidates(
@@ -130,6 +151,37 @@ class AutonomousFuturesPaperTrader:
         self.economic_rejections_per_timeframe = {
             timeframe: defaultdict(int) for timeframe in config.timeframes
         }
+        self.strategy_funnel = {
+            strategy: {
+                **_funnel_bucket(),
+                "raw_signals_by_timeframe": {
+                    timeframe: 0 for timeframe in config.entry_timeframes
+                },
+                "raw_signals_by_regime": {
+                    regime.value: 0 for regime in MarketRegime
+                },
+            }
+            for strategy in PRODUCTION_STRATEGY_IDS
+        }
+        self.timeframe_funnel = {
+            timeframe: _funnel_bucket()
+            for timeframe in config.entry_timeframes
+        }
+        self.regime_funnel = {
+            regime.value: _funnel_bucket() for regime in MarketRegime
+        }
+        self.regime_evaluation_periods = {
+            regime.value: 0 for regime in MarketRegime
+        }
+        self.regime_evaluation_periods_by_timeframe = {
+            timeframe: {regime.value: 0 for regime in MarketRegime}
+            for timeframe in config.timeframes
+        }
+        self.funnel_rejection_matrix = defaultdict(
+            lambda: defaultdict(
+                lambda: defaultdict(lambda: defaultdict(int))
+            )
+        )
 
     @property
     def consecutive_losses(self) -> int:
@@ -152,6 +204,9 @@ class AutonomousFuturesPaperTrader:
             self.daily_loss_breaker_trigger_count += 1
 
     def _record_closed_trade(self, trade: PaperTrade) -> None:
+        self._increment_funnel(
+            trade.strategy_id, trade.timeframe, trade.regime, "pnl", trade.pnl
+        )
         self.breaker_state = record_closed_trade(
             self.breaker_state, trade.pnl, trade.closed_at, self.config.risk
         )
@@ -175,6 +230,54 @@ class AutonomousFuturesPaperTrader:
             "rounds to zero", "representable",
         )):
             self.exchange_rule_rejection_count += 1
+
+    def _increment_funnel(
+        self,
+        strategy: str,
+        timeframe: str,
+        regime: MarketRegime,
+        field: str,
+        amount=1,
+    ) -> None:
+        if strategy not in self.strategy_funnel:
+            self.strategy_funnel[strategy] = {
+                **_funnel_bucket(),
+                "raw_signals_by_timeframe": {
+                    value: 0 for value in self.config.entry_timeframes
+                },
+                "raw_signals_by_regime": {
+                    value.value: 0 for value in MarketRegime
+                },
+            }
+        strategy_bucket = self.strategy_funnel[strategy]
+        timeframe_bucket = self.timeframe_funnel[timeframe]
+        regime_bucket = self.regime_funnel[regime.value]
+        for bucket in (strategy_bucket, timeframe_bucket, regime_bucket):
+            bucket[field] += amount
+        if field == "raw_signals_generated":
+            strategy_bucket["raw_signals_by_timeframe"][timeframe] += amount
+            strategy_bucket["raw_signals_by_regime"][regime.value] += amount
+
+    def _record_funnel_rejection(
+        self,
+        strategy: str,
+        timeframe: str,
+        regime: MarketRegime,
+        reason: str,
+    ) -> None:
+        if strategy not in self.strategy_funnel:
+            self._increment_funnel(
+                strategy, timeframe, regime, "raw_signals_generated", 0
+            )
+        for bucket in (
+            self.strategy_funnel[strategy],
+            self.timeframe_funnel[timeframe],
+            self.regime_funnel[regime.value],
+        ):
+            bucket["rejection_reasons"][reason] += 1
+        self.funnel_rejection_matrix[strategy][timeframe][
+            regime.value
+        ][reason] += 1
 
     def _account_state(self, price: Decimal) -> FuturesAccountState:
         equity = self.execution.marked_equity(price)
@@ -222,6 +325,10 @@ class AutonomousFuturesPaperTrader:
                 regime = classify_regime(history)
                 self.latest_regimes[timeframe] = regime
                 ready.append((timeframe, regime))
+                self.regime_evaluation_periods[regime.regime.value] += 1
+                self.regime_evaluation_periods_by_timeframe[
+                    timeframe
+                ][regime.regime.value] += 1
 
         if closed is None and self.execution.position is not None:
             managed_timeframe = self.execution.position.timeframe
@@ -239,15 +346,38 @@ class AutonomousFuturesPaperTrader:
                     self._record_closed_trade(closed)
 
         signals = []
+        strategy_evaluations = []
         for timeframe, regime in ready:
             if timeframe not in self.config.entry_timeframes:
                 continue
-            timeframe_signals = evaluate_strategies(
+            timeframe_signals, evaluations = evaluate_strategies_with_diagnostics(
                 self.histories[timeframe],
                 regime,
                 timeframe=timeframe,
                 higher_context=self._higher_context(timeframe),
             )
+            for evaluation in evaluations:
+                self._increment_funnel(
+                    evaluation.strategy_id,
+                    evaluation.timeframe,
+                    evaluation.detected_regime,
+                    "raw_signals_generated",
+                )
+                if evaluation.regime_compatible:
+                    self._increment_funnel(
+                        evaluation.strategy_id,
+                        evaluation.timeframe,
+                        evaluation.detected_regime,
+                        "regime_compatible",
+                    )
+                if evaluation.rejection_reason is not None:
+                    self._record_funnel_rejection(
+                        evaluation.strategy_id,
+                        evaluation.timeframe,
+                        evaluation.detected_regime,
+                        evaluation.rejection_reason,
+                    )
+            strategy_evaluations.extend(evaluations)
             self.candidate_count[timeframe] += len(timeframe_signals)
             signals.extend(timeframe_signals)
 
@@ -258,6 +388,50 @@ class AutonomousFuturesPaperTrader:
             )
             for item in signals:
                 result = economics[item.signal_id]
+                dimensions = (item.strategy_id, item.timeframe, item.regime)
+                failed_reasons = set()
+                economic_pass = (
+                    result.passes_exchange_filter
+                    and result.passes_cost_filter
+                    and result.passes_expected_movement_filter
+                    and result.passes_net_reward_risk_filter
+                )
+                if economic_pass:
+                    self._increment_funnel(
+                        *dimensions, "economic_filter_pass"
+                    )
+                elif result.passes_exchange_filter:
+                    if not result.passes_cost_filter:
+                        failed_reasons.add("cost")
+                    if not result.passes_expected_movement_filter:
+                        failed_reasons.add("expected_movement_cost")
+                    if not result.passes_net_reward_risk_filter:
+                        failed_reasons.add("net_reward_risk")
+                if (
+                    economic_pass
+                    and result.passes_minimum_executable_risk_filter
+                ):
+                    self._increment_funnel(
+                        *dimensions, "minimum_executable_risk_pass"
+                    )
+                elif not result.passes_minimum_executable_risk_filter:
+                    failed_reasons.add("minimum_executable_risk")
+                if (
+                    economic_pass
+                    and result.passes_minimum_executable_risk_filter
+                    and result.passes_leverage_filter
+                ):
+                    self._increment_funnel(
+                        *dimensions, "leverage_filter_pass"
+                    )
+                elif not result.passes_leverage_filter:
+                    failed_reasons.add("leverage")
+                if not result.passes_exchange_filter:
+                    failed_reasons.add("exchange_filters")
+                if result.approved:
+                    self._increment_funnel(*dimensions, "decision_reached")
+                for reason in failed_reasons:
+                    self._record_funnel_rejection(*dimensions, reason)
                 if not result.approved:
                     category = result.rejection_category or "unknown"
                     self.economic_rejections[category] += 1
@@ -273,6 +447,9 @@ class AutonomousFuturesPaperTrader:
                     for timeframe, _ in ready
                 },
                 signals=[_value(asdict(item)) for item in signals],
+                strategy_evaluations=[
+                    _value(asdict(item)) for item in strategy_evaluations
+                ],
                 candidate_economics={
                     signal_id: _value(asdict(result))
                     for signal_id, result in economics.items()
@@ -285,13 +462,31 @@ class AutonomousFuturesPaperTrader:
             for item in feasible_signals:
                 if item.signal_id != selected_id:
                     self.rejected_candidate_count[item.timeframe] += 1
+                    reason = (
+                        "directional_conflict"
+                        if selection.candidate is None
+                        else "outranked_by_selected_candidate"
+                    )
+                    self._record_funnel_rejection(
+                        item.strategy_id, item.timeframe, item.regime, reason
+                    )
             if not signals:
                 self.no_valid_signal_count += 1
             if selection.candidate is not None:
-                signal_timeframe = selection.candidate.signal.timeframe
+                selected_signal = selection.candidate.signal
+                signal_timeframe = selected_signal.timeframe
+                selected_dimensions = (
+                    selected_signal.strategy_id,
+                    selected_signal.timeframe,
+                    selected_signal.regime,
+                )
+                self._increment_funnel(*selected_dimensions, "selected")
                 if closed is not None:
                     record["reason"] = "same-candle exit prevents causal re-entry"
                     self.rejected_candidate_count[signal_timeframe] += 1
+                    self._record_funnel_rejection(
+                        *selected_dimensions, "same_candle_exit"
+                    )
                 else:
                     account = self._account_state(candle.close)
                     risk = evaluate_futures_risk(
@@ -299,12 +494,19 @@ class AutonomousFuturesPaperTrader:
                     )
                     record["risk"] = _value(asdict(risk))
                     if risk.approved:
+                        self._increment_funnel(
+                            *selected_dimensions, "risk_approved"
+                        )
                         position = self.execution.open(selection.candidate, risk)
+                        self._increment_funnel(*selected_dimensions, "trades")
                         self.selected_trade_count[signal_timeframe] += 1
                         record["execution"] = _value(asdict(position))
                     else:
                         self.rejections[risk.reason] += 1
                         self.rejected_candidate_count[signal_timeframe] += 1
+                        self._record_funnel_rejection(
+                            *selected_dimensions, risk.reason
+                        )
                         self._classify_rejection(risk.reason)
                         if risk.reason == "consecutive-loss circuit breaker":
                             self.breaker_state = record_breaker_blocked_candidate(
@@ -398,6 +600,87 @@ class AutonomousFuturesPaperTrader:
         )
         mfe_values = [trade.mfe_r for trade in trades]
         mae_values = [trade.mae_r for trade in trades]
+        strategy_diagnostics = {}
+        for strategy_id in PRODUCTION_STRATEGY_IDS:
+            strategy_trades = [
+                trade for trade in trades if trade.strategy_id == strategy_id
+            ]
+            strategy_count = len(strategy_trades)
+            denominator = Decimal(strategy_count) if strategy_count else Decimal(1)
+            strategy_diagnostics[strategy_id] = {
+                "trades": strategy_count,
+                "average_mfe_r": (
+                    sum(
+                        (trade.mfe_r for trade in strategy_trades), Decimal(0)
+                    ) / denominator
+                ),
+                "average_mfe_price": (
+                    sum(
+                        (trade.mfe_price for trade in strategy_trades),
+                        Decimal(0),
+                    ) / denominator
+                ),
+                "average_mae_r": (
+                    sum(
+                        (trade.mae_r for trade in strategy_trades), Decimal(0)
+                    ) / denominator
+                ),
+                "average_mae_price": (
+                    sum(
+                        (trade.mae_price for trade in strategy_trades),
+                        Decimal(0),
+                    ) / denominator
+                ),
+                "initial_stop_percentage": (
+                    Decimal(sum(
+                        trade.exit_reason.value == "INITIAL_STOP"
+                        for trade in strategy_trades
+                    )) / denominator
+                ),
+                "reached_0_5r_percentage": (
+                    Decimal(sum(
+                        trade.mfe_r >= Decimal(".5")
+                        for trade in strategy_trades
+                    )) / denominator
+                ),
+                "reached_1r_percentage": (
+                    Decimal(sum(
+                        trade.mfe_r >= Decimal(1)
+                        for trade in strategy_trades
+                    )) / denominator
+                ),
+                "reached_2r_percentage": (
+                    Decimal(sum(
+                        trade.mfe_r >= Decimal(2)
+                        for trade in strategy_trades
+                    )) / denominator
+                ),
+                "gross_expectancy_before_costs": (
+                    sum(
+                        (trade.gross_pnl for trade in strategy_trades), Decimal(0)
+                    ) / denominator
+                ),
+                "net_expectancy": (
+                    sum(
+                        (trade.pnl for trade in strategy_trades), Decimal(0)
+                    ) / denominator
+                ),
+                "average_holding_bars": (
+                    sum(
+                        (Decimal(trade.holding_bars) for trade in strategy_trades),
+                        Decimal(0),
+                    ) / denominator
+                ),
+                "execution_cost_per_trade": (
+                    sum(
+                        (
+                            trade.total_execution_costs
+                            for trade in strategy_trades
+                        ),
+                        Decimal(0),
+                    ) / denominator
+                ),
+            }
         result = {
             "starting_equity": self.config.starting_equity,
             "ending_equity": ending_equity,
@@ -457,6 +740,41 @@ class AutonomousFuturesPaperTrader:
                 "maximum": max(mae_values, default=Decimal(0)),
             },
             "exit_reason_attribution": dict(exit_reason),
+            "strategy_diagnostics": strategy_diagnostics,
+            "candidate_funnel_stage_semantics": {
+                "raw_signals_generated": (
+                    "technical trigger fired before regime compatibility"
+                ),
+                "regime_compatible": (
+                    "raw trigger matched the strategy's required regime"
+                ),
+                "economic_filter_pass": (
+                    "cost, expected-movement, and net reward:risk filters passed"
+                ),
+                "minimum_executable_risk_pass": (
+                    "cumulative pass through the minimum executable loss budget"
+                ),
+                "leverage_filter_pass": (
+                    "cumulative pass through configured leverage"
+                ),
+                "decision_reached": (
+                    "all entry-economics filters passed and candidate reached selection"
+                ),
+                "selected": "candidate won deterministic account-level selection",
+                "risk_approved": "selected candidate passed final authoritative Risk",
+                "trades": "paper position was opened",
+                "pnl": "net closed-trade PnL",
+            },
+            "strategy_candidate_funnel": self.strategy_funnel,
+            "timeframe_candidate_funnel": self.timeframe_funnel,
+            "regime_candidate_funnel": self.regime_funnel,
+            "candidate_funnel_rejections_by_strategy_timeframe_regime": (
+                self.funnel_rejection_matrix
+            ),
+            "regime_evaluation_periods": self.regime_evaluation_periods,
+            "regime_evaluation_periods_by_timeframe": (
+                self.regime_evaluation_periods_by_timeframe
+            ),
             "funding": None,
             "funding_limitation": "funding is not modeled in the MVP replay",
             "strategy_attribution": dict(strategy),

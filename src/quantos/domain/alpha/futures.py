@@ -25,6 +25,14 @@ class MarketRegime(str, Enum):
     UNCERTAIN = "UNCERTAIN"
 
 
+PRODUCTION_STRATEGY_IDS = (
+    "trend_continuation",
+    "trend_pullback",
+    "breakout_expansion",
+    "range_mean_reversion",
+)
+
+
 @dataclass(frozen=True, slots=True)
 class RegimeState:
     regime: MarketRegime
@@ -66,6 +74,19 @@ class Selection:
     candidate: TradeCandidate | None
     reason: str
     signals: tuple[StrategySignal, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class StrategyEvaluation:
+    timestamp: object
+    symbol: str
+    strategy_id: str
+    direction: Direction
+    timeframe: str
+    detected_regime: MarketRegime
+    regime_compatible: bool
+    signal_created: bool
+    rejection_reason: str | None = None
 
 
 def _ema(values, period: int) -> Decimal:
@@ -129,21 +150,42 @@ def classify_regime(candles) -> RegimeState:
     return RegimeState(regime, fast, slow, atr, high, low, reason)
 
 
-def evaluate_strategies(candles, state: RegimeState, timeframe: str = "1m",
-                        higher_context=()) -> tuple[StrategySignal, ...]:
+def evaluate_strategies_with_diagnostics(
+    candles,
+    state: RegimeState,
+    timeframe: str = "1m",
+    higher_context=(),
+) -> tuple[tuple[StrategySignal, ...], tuple[StrategyEvaluation, ...]]:
     candles = tuple(candles)
     if timeframe not in SUPPORTED_SIGNAL_TIMEFRAMES:
         raise ValueError("unsupported signal timeframe")
     if len(candles) < 30 or state.atr <= 0:
-        return ()
+        return (), ()
     last, previous = candles[-1], candles[-2]
     result: list[StrategySignal] = []
+    evaluations: list[StrategyEvaluation] = []
 
     def add(direction: Direction, strategy: str, stop: Decimal, target: Decimal,
-            strength: str, evidence: tuple[str, ...], rationale: str) -> None:
+            strength: str, evidence: tuple[str, ...], rationale: str,
+            compatible_regimes: tuple[MarketRegime, ...]) -> None:
+        compatible = state.regime in compatible_regimes
+        if not compatible:
+            evaluations.append(StrategyEvaluation(
+                last.close_time, last.symbol, strategy, direction, timeframe,
+                state.regime, False, False, "regime_incompatible",
+            ))
+            return
         if direction is Direction.LONG and not (stop < last.close < target):
+            evaluations.append(StrategyEvaluation(
+                last.close_time, last.symbol, strategy, direction, timeframe,
+                state.regime, True, False, "invalid_signal_geometry",
+            ))
             return
         if direction is Direction.SHORT and not (target < last.close < stop):
+            evaluations.append(StrategyEvaluation(
+                last.close_time, last.symbol, strategy, direction, timeframe,
+                state.regime, True, False, "invalid_signal_geometry",
+            ))
             return
         context_labels = tuple(
             f"{context_timeframe}:{context_regime.value}"
@@ -175,53 +217,77 @@ def evaluate_strategies(candles, state: RegimeState, timeframe: str = "1m",
             last.close, stop, target, adjusted_strength, evidence, rationale,
             timeframe, context_labels, signal_id, state.atr,
         ))
+        evaluations.append(StrategyEvaluation(
+            last.close_time, last.symbol, strategy, direction, timeframe,
+            state.regime, True, True,
+        ))
 
-    if state.regime is MarketRegime.TREND_UP and last.close > previous.high:
+    if last.close > previous.high:
         stop = last.close - state.atr * Decimal("1.5")
         add(Direction.LONG, "trend_continuation", stop,
             last.close + (last.close - stop) * 2, ".72",
-            ("ema_alignment", "higher_close"), "uptrend continuation above prior high")
-    if state.regime is MarketRegime.TREND_DOWN and last.close < previous.low:
+            ("ema_alignment", "higher_close"), "uptrend continuation above prior high",
+            (MarketRegime.TREND_UP,))
+    if last.close < previous.low:
         stop = last.close + state.atr * Decimal("1.5")
         add(Direction.SHORT, "trend_continuation", stop,
             last.close - (stop - last.close) * 2, ".72",
-            ("ema_alignment", "lower_close"), "downtrend continuation below prior low")
-    if state.regime is MarketRegime.TREND_UP and last.low <= state.ema_fast < last.close:
+            ("ema_alignment", "lower_close"), "downtrend continuation below prior low",
+            (MarketRegime.TREND_DOWN,))
+    if last.low <= state.ema_fast < last.close:
         stop = min(c.low for c in candles[-5:]) - state.atr * Decimal(".25")
         add(Direction.LONG, "trend_pullback", stop,
             last.close + (last.close - stop) * Decimal("1.8"), ".66",
-            ("ema_pullback", "trend_alignment"), "pullback reclaimed the fast EMA")
-    if state.regime is MarketRegime.TREND_DOWN and last.high >= state.ema_fast > last.close:
+            ("ema_pullback", "trend_alignment"), "pullback reclaimed the fast EMA",
+            (MarketRegime.TREND_UP,))
+    if last.high >= state.ema_fast > last.close:
         stop = max(c.high for c in candles[-5:]) + state.atr * Decimal(".25")
         add(Direction.SHORT, "trend_pullback", stop,
             last.close - (stop - last.close) * Decimal("1.8"), ".66",
-            ("ema_pullback", "trend_alignment"), "pullback rejected the fast EMA")
-    if state.regime is MarketRegime.BREAKOUT_OR_EXPANSION:
-        if last.close > state.recent_high:
-            stop = max(state.recent_high - state.atr * Decimal(".25"),
-                       last.close - state.atr * Decimal("1.5"))
-            add(Direction.LONG, "breakout_expansion", stop,
-                last.close + (last.close - stop) * 2, ".78",
-                ("range_break", "range_expansion"), "upside expansion breakout")
-        elif last.close < state.recent_low:
-            stop = min(state.recent_low + state.atr * Decimal(".25"),
-                       last.close + state.atr * Decimal("1.5"))
-            add(Direction.SHORT, "breakout_expansion", stop,
-                last.close - (stop - last.close) * 2, ".78",
-                ("range_break", "range_expansion"), "downside expansion breakout")
-    if state.regime is MarketRegime.RANGE:
-        width = state.recent_high - state.recent_low
-        if width > 0 and last.close <= state.recent_low + width * Decimal(".2"):
-            stop = state.recent_low - state.atr * Decimal(".5")
-            add(Direction.LONG, "range_mean_reversion", stop,
-                state.recent_low + width * Decimal(".5"), ".60",
-                ("range_support",), "price is near established range support")
-        if width > 0 and last.close >= state.recent_high - width * Decimal(".2"):
-            stop = state.recent_high + state.atr * Decimal(".5")
-            add(Direction.SHORT, "range_mean_reversion", stop,
-                state.recent_low + width * Decimal(".5"), ".60",
-                ("range_resistance",), "price is near established range resistance")
-    return tuple(result)
+            ("ema_pullback", "trend_alignment"), "pullback rejected the fast EMA",
+            (MarketRegime.TREND_DOWN,))
+    prior_ranges = tuple(c.high - c.low for c in candles[-11:-1])
+    average_range = sum(prior_ranges, Decimal(0)) / Decimal(len(prior_ranges))
+    expanding = (
+        average_range > 0
+        and last.high - last.low >= average_range * Decimal("1.5")
+    )
+    if expanding and last.close > state.recent_high:
+        stop = max(state.recent_high - state.atr * Decimal(".25"),
+                   last.close - state.atr * Decimal("1.5"))
+        add(Direction.LONG, "breakout_expansion", stop,
+            last.close + (last.close - stop) * 2, ".78",
+            ("range_break", "range_expansion"), "upside expansion breakout",
+            (MarketRegime.BREAKOUT_OR_EXPANSION,))
+    elif expanding and last.close < state.recent_low:
+        stop = min(state.recent_low + state.atr * Decimal(".25"),
+                   last.close + state.atr * Decimal("1.5"))
+        add(Direction.SHORT, "breakout_expansion", stop,
+            last.close - (stop - last.close) * 2, ".78",
+            ("range_break", "range_expansion"), "downside expansion breakout",
+            (MarketRegime.BREAKOUT_OR_EXPANSION,))
+    width = state.recent_high - state.recent_low
+    if width > 0 and last.close <= state.recent_low + width * Decimal(".2"):
+        stop = state.recent_low - state.atr * Decimal(".5")
+        add(Direction.LONG, "range_mean_reversion", stop,
+            state.recent_low + width * Decimal(".5"), ".60",
+            ("range_support",), "price is near established range support",
+            (MarketRegime.RANGE,))
+    if width > 0 and last.close >= state.recent_high - width * Decimal(".2"):
+        stop = state.recent_high + state.atr * Decimal(".5")
+        add(Direction.SHORT, "range_mean_reversion", stop,
+            state.recent_low + width * Decimal(".5"), ".60",
+            ("range_resistance",), "price is near established range resistance",
+            (MarketRegime.RANGE,))
+    return tuple(result), tuple(evaluations)
+
+
+def evaluate_strategies(candles, state: RegimeState, timeframe: str = "1m",
+                        higher_context=()) -> tuple[StrategySignal, ...]:
+    signals, _ = evaluate_strategies_with_diagnostics(
+        candles, state, timeframe, higher_context
+    )
+    return signals
 
 
 def select_candidate(signals,

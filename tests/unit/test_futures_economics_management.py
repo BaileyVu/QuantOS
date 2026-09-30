@@ -117,6 +117,19 @@ class CandidateEconomicsTests(unittest.TestCase):
         self.assertFalse(result.approved)
         self.assertEqual(result.rejection_category, "cost")
 
+    def test_expected_movement_must_materially_exceed_round_trip_cost(self):
+        selective = replace(
+            self.policy,
+            minimum_expected_movement_to_cost_multiple=D("100"),
+        )
+        result = assess_candidate_economics(
+            TradeCandidate(signal()), self.account, rules(), selective
+        )
+        self.assertFalse(result.approved)
+        self.assertEqual(result.rejection_category, "expected_movement_cost")
+        self.assertGreater(result.expected_movement_rate, 0)
+        self.assertGreater(result.estimated_round_trip_cost_rate, 0)
+
     def test_leverage_solves_margin_without_increasing_loss_budget(self):
         candidate = TradeCandidate(signal(stop="99.99"))
         low = evaluate_futures_risk(

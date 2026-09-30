@@ -27,13 +27,15 @@ class FuturesRiskPolicy:
     maximum_fee_rate: Decimal = Decimal(".0005")
     minimum_net_reward_risk: Decimal = Decimal("1.5")
     minimum_reward_to_cost_multiple: Decimal = Decimal("3")
+    minimum_expected_movement_to_cost_multiple: Decimal = Decimal("3")
 
     def __post_init__(self) -> None:
         decimals = ("risk_fraction", "maximum_risk_fraction", "daily_loss_fraction",
                     "margin_fraction", "liquidation_buffer_fraction",
                     "maintenance_margin_fraction", "maximum_slippage_rate",
                     "maximum_fee_rate", "minimum_net_reward_risk",
-                    "minimum_reward_to_cost_multiple")
+                    "minimum_reward_to_cost_multiple",
+                    "minimum_expected_movement_to_cost_multiple")
         if any(not isinstance(getattr(self, n), Decimal) for n in decimals):
             raise ValueError("risk policy values must use Decimal")
         if not (Decimal(0) < self.risk_fraction <= self.maximum_risk_fraction < Decimal(1)):
@@ -55,6 +57,8 @@ class FuturesRiskPolicy:
             raise ValueError("minimum net reward:risk must be positive")
         if self.minimum_reward_to_cost_multiple <= 0:
             raise ValueError("minimum reward-to-cost multiple must be positive")
+        if self.minimum_expected_movement_to_cost_multiple <= 0:
+            raise ValueError("minimum expected-movement-to-cost multiple must be positive")
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +97,16 @@ class CandidateEconomics:
     net_reward_risk: Decimal
     reward_to_execution_cost_multiple: Decimal
     risk_budget: Decimal
+    expected_movement: Decimal = Decimal(0)
+    expected_movement_to_execution_cost_multiple: Decimal = Decimal(0)
+    expected_movement_rate: Decimal = Decimal(0)
+    estimated_round_trip_cost_rate: Decimal = Decimal(0)
+    passes_exchange_filter: bool = False
+    passes_cost_filter: bool = False
+    passes_expected_movement_filter: bool = False
+    passes_net_reward_risk_filter: bool = False
+    passes_minimum_executable_risk_filter: bool = False
+    passes_leverage_filter: bool = False
 
 
 def _empty_economics(reason: str, category: str) -> CandidateEconomics:
@@ -215,12 +229,33 @@ def assess_candidate_economics(
             gross_reward / total_costs
             if total_costs > 0 else Decimal("Infinity")
         )
+        expected_movement = quantity * raw_reward_per_unit
+        expected_movement_to_cost = (
+            expected_movement / total_costs
+            if total_costs > 0 else Decimal("Infinity")
+        )
+        expected_movement_rate = raw_reward_per_unit / signal.entry
+        estimated_round_trip_cost_rate = (
+            total_costs / quantity / signal.entry
+        )
         return CandidateEconomics(
             approved, reason, category, minimum_quantity, quantity,
             entry_fill, stop_fill, target_fill, notional, margin_required,
             leverage, raw_loss, entry_cost, target_exit_cost, slippage,
             total_costs, cost_adjusted_loss, gross_reward, raw_loss, net_reward,
             gross_rr, net_rr, reward_to_cost, risk_budget,
+            expected_movement,
+            expected_movement_to_cost,
+            expected_movement_rate,
+            estimated_round_trip_cost_rate,
+            True,
+            net_reward > 0
+            and reward_to_cost >= policy.minimum_reward_to_cost_multiple,
+            expected_movement_to_cost
+            >= policy.minimum_expected_movement_to_cost_multiple,
+            net_rr >= policy.minimum_net_reward_risk,
+            risk_quantity >= minimum_quantity,
+            margin_quantity >= minimum_quantity,
         )
 
     risk_quantity = rules.round_quantity(risk_budget / loss_per_unit)
@@ -277,6 +312,16 @@ def assess_candidate_economics(
             approved=False,
             reason="candidate net reward:risk is below threshold",
             rejection_category="net_reward_risk",
+        )
+    if (
+        result.expected_movement_to_execution_cost_multiple
+        < policy.minimum_expected_movement_to_cost_multiple
+    ):
+        return replace(
+            result,
+            approved=False,
+            reason="candidate expected movement is too small relative to costs",
+            rejection_category="expected_movement_cost",
         )
     if result.leverage_required > policy.leverage_ceiling:
         return replace(
