@@ -1,0 +1,133 @@
+{
+  "family": "persistent-perp-carry-v1",
+  "variants": [
+    "A",
+    "B",
+    "C"
+  ],
+  "test_years": [
+    2021,
+    2022,
+    2023,
+    2024
+  ],
+  "seed": 20260930,
+  "data_identities": {
+    "perp_manifest_sha256": "2e2ffabef2436a125062228bd291899bb803c82d198782fdd43cee4fca372e96",
+    "context_manifest_sha256": "db6377bcdfac480b23873cf4fd06f5cd1a561d91bd360525181e9ec97a3777d1",
+    "candidate_parquet_sha256": "0c8bbd1f2849e2ccaf014afd82f434c5ded54240acf925d84696bcf23a5f03a7"
+  },
+  "benchmark_report": "evaluation/development-893516addeb1c1b4a05395e62fa802e190c481b20ad14381ddd24287b94ac5b2.json",
+  "costs": [
+    [
+      "baseline",
+      5,
+      2
+    ],
+    [
+      "stress",
+      5,
+      10
+    ],
+    [
+      "severe",
+      7,
+      10
+    ]
+  ],
+  "signal_weights": [
+    0.2,
+    0.35,
+    0.15,
+    0.2,
+    0.1
+  ],
+  "funding_and_basis_history_hours": 168,
+  "minimum_funding_observations": 15,
+  "funding_availability_lag_hours": 1,
+  "beta_history_hours": 720,
+  "beta_valid_range": [
+    0,
+    3
+  ],
+  "rebalance_hours": 8,
+  "delay_hours": 1,
+  "long_slots": 2,
+  "A_short_slots": 2,
+  "enter_fraction": 0.2,
+  "hold_fraction": 0.4,
+  "forecast_funding_intervals_8h": 21,
+  "switch_cost_bps": 15,
+  "switch_full_fills": 2,
+  "switch_cost_multiple": 2,
+  "portfolio_switch_check": "seven-day forecast funding advantage including hedges > 2 times estimated stress cost of every net quantity delta, using completed prices",
+  "alpha_gates": {
+    "positive_mean_and_compounded_return_all_costs": true,
+    "stress_daily_pf_min_exclusive": 1,
+    "stress_bootstrap_alpha": 0.016666666666666666,
+    "positive_stress_folds_min": 3,
+    "max_stress_drawdown": 0.35,
+    "min_active_fraction": 0.8,
+    "minimum_turnover_reduction": 0.5,
+    "max_data_loss_fraction_of_changes": 0.01
+  },
+  "conditional_risk_surfaces": {
+    "gross_leverage": [
+      1,
+      2,
+      3,
+      5,
+      8,
+      10,
+      15,
+      20
+    ],
+    "equity_risk_budget": [
+      0.005,
+      0.01,
+      0.02,
+      0.03,
+      0.05
+    ],
+    "free_collateral_reserve": [
+      0.2,
+      0.35,
+      0.5
+    ],
+    "liquidation_safety_multiple": [
+      2,
+      3,
+      4
+    ],
+    "planned_adverse_distance": "clip(3 * trailing_168h_hourly_return_sd * sqrt(horizon_hours), 0.02, 0.20)",
+    "historical_maintenance_margin_assumption": 0.05,
+    "liquidation_fee_assumption": 0.015,
+    "unknown_bracket_stress_maintenance_margin": 0.1,
+    "near_liquidation_distance_multiple": 1.25,
+    "drawdown_throttle": "d1=clip(development_1x_7day_block_MC_median_maxDD,0.03,0.10); d2=min(0.20,2*d1); d3=min(0.35,3*d1); below d1 full, d1-d2 half, d2-d3 no new risk, d3 flatten/lock",
+    "ruin_equity_fraction": 0.1,
+    "impairment_fractions": [
+      0.2,
+      0.35,
+      0.5,
+      0.7
+    ],
+    "maximum_mc_ruin_probability": 0.001,
+    "maximum_mc_loss_50pct_probability": 0.01,
+    "maximum_mc_liquidation_probability": 0.001,
+    "maximum_historical_liquidations": 0,
+    "maximum_mc_95pct_drawdown": 0.35,
+    "mc_paths": 10000,
+    "mc_block_days": 7,
+    "selection": "highest gross leverage meeting every risk gate; prefer lower risk budget, larger collateral reserve and larger safety multiple on ties"
+  },
+  "prefinal": [
+    "2025-01-01",
+    "2026-01-01"
+  ],
+  "final": [
+    "2026-01-01",
+    "2026-09-01"
+  ],
+  "mainnet": "LOCKED / NOT_APPROVED"
+}
