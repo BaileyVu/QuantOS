@@ -144,12 +144,13 @@ class FuturesRiskTests(unittest.TestCase):
         self.assertIn("daily-loss", evaluate_futures_risk(
             candidate, FuturesAccountState(D("19"), D("20")), rules()).reason)
 
-    def test_leverage_ceiling_and_minimum_notional_reject(self):
+    def test_leverage_ceiling_caps_size_and_minimum_notional_rejects(self):
         tiny_stop = TradeCandidate(signal(stop="99.99"))
         result = evaluate_futures_risk(tiny_stop, self.account, rules(),
             FuturesRiskPolicy(leverage_ceiling=5, emergency_leverage_ceiling=10))
-        self.assertFalse(result.approved)
-        self.assertIn("configured ceiling", result.reason)
+        self.assertTrue(result.approved, result.reason)
+        self.assertEqual(result.leverage, 5)
+        self.assertLessEqual(result.risk_amount, D(".2"))
         result = evaluate_futures_risk(TradeCandidate(signal()), self.account,
                                        rules(minimum_notional="100"))
         self.assertFalse(result.approved)
@@ -165,7 +166,7 @@ class PaperExecutionTests(unittest.TestCase):
         engine = FuturesPaperExecution(D("20"))
         engine.open(TradeCandidate(signal()), self.approval())
         closed = engine.process_candle(candle(1, "100", "103", "98"))
-        self.assertEqual(closed.exit_reason, "stop")
+        self.assertEqual(closed.exit_reason, "INITIAL_STOP")
         self.assertLess(closed.pnl, 0)
         self.assertIsNone(engine.position)
 

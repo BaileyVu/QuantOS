@@ -32,6 +32,14 @@ def add_futures_parser(commands) -> None:
     replay.add_argument("--data", type=Path, required=True)
     replay.add_argument("--futures-config", type=Path, default=Path("configs/futures.toml"))
     replay.add_argument("--exchange-info", type=Path)
+    replay.add_argument(
+        "--start",
+        help="Optional inclusive UTC replay-window start for a cached data file.",
+    )
+    replay.add_argument(
+        "--end",
+        help="Optional exclusive UTC replay-window end for a cached data file.",
+    )
     paper = operations.add_parser("paper", help="Run live-market paper trading; never submits orders.")
     paper.add_argument("--futures-config", type=Path, default=Path("configs/futures.toml"))
     paper.add_argument("--cycles", type=int, default=0,
@@ -77,7 +85,11 @@ def _write_candles(path: Path, candles: tuple[Candle, ...]) -> None:
             stream.write(_json(_candle_record(candle)) + "\n")
 
 
-def _read_candles(path: Path) -> tuple[Candle, ...]:
+def _read_candles(
+    path: Path,
+    start: datetime | None = None,
+    end: datetime | None = None,
+) -> tuple[Candle, ...]:
     result = []
     with path.open("r", encoding="ascii") as stream:
         for number, line in enumerate(stream, 1):
@@ -85,14 +97,19 @@ def _read_candles(path: Path) -> tuple[Candle, ...]:
                 continue
             try:
                 row = json.loads(line)
-                result.append(Candle(
+                candle = Candle(
                     symbol=row["symbol"], interval=row["interval"],
                     open_time=_time(row["open_time"]), close_time=_time(row["close_time"]),
                     open=Decimal(row["open"]), high=Decimal(row["high"]),
                     low=Decimal(row["low"]), close=Decimal(row["close"]),
                     volume=Decimal(row["volume"]), quote_volume=Decimal(row["quote_volume"]),
                     trade_count=int(row["trade_count"]),
-                ))
+                )
+                if start is not None and candle.open_time < start:
+                    continue
+                if end is not None and candle.open_time >= end:
+                    continue
+                result.append(candle)
             except Exception as error:
                 raise ValueError(f"invalid candle on line {number}: {error}") from error
     return tuple(result)
@@ -123,10 +140,29 @@ def futures_command(args: argparse.Namespace) -> int:
                      "output": str(args.output), "start": start, "end": end}))
         return 0
     if operation == "replay":
+        if (args.start is None) != (args.end is None):
+            raise ValueError("replay --start and --end must be supplied together")
+        start = _time(args.start) if args.start is not None else None
+        end = _time(args.end) if args.end is not None else None
+        if start is not None and end is not None and start >= end:
+            raise ValueError("replay start must be before end")
         config = load_futures_config(args.futures_config)
-        metrics, _ = run_futures_replay(_read_candles(args.data), config,
-                                        _rules(client, args.exchange_info))
-        print(_json({"event": "futures_replay", "metrics": metrics}))
+        candles = _read_candles(args.data, start, end)
+        if not candles:
+            raise ValueError("cached data contains no candles in the replay window")
+        metrics, _ = run_futures_replay(
+            candles, config, _rules(client, args.exchange_info)
+        )
+        print(_json({
+            "event": "futures_replay",
+            "data": str(args.data),
+            "window": {
+                "start": start or candles[0].open_time,
+                "end": end or candles[-1].close_time,
+                "candles": len(candles),
+            },
+            "metrics": metrics,
+        }))
         return 0
     if operation == "paper":
         if args.cycles < 0 or args.poll_seconds < 1:
@@ -151,8 +187,12 @@ def futures_command(args: argparse.Namespace) -> int:
                     )
                 new = [c for c in candles if c.close_time < now and c.open_time not in seen]
                 for candle in new:
-                    trader.on_candle(candle)
+                    decision = trader.on_candle(candle)
                     seen.add(candle.open_time)
+                    print(_json({
+                        "event": "futures_live_paper_decision",
+                        "decision": decision,
+                    }))
                 print(_json({"event": "futures_live_paper_cycle", "cycle": cycle + 1,
                              "new_candles": len(new), "metrics": trader.metrics(),
                              "last_decision": trader.decisions[-1] if trader.decisions else None}))

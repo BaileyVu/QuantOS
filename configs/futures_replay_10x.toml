@@ -1,3 +1,4 @@
+# Experimental replay-only configuration. Never use this file to authorize live orders.
 [futures]
 symbol = "BTCUSDT"
 starting_equity = "20"
@@ -14,7 +15,7 @@ consecutive_loss_limit = 3
 consecutive_loss_cooldown_minutes = 240
 consecutive_loss_reset_on_utc_day = true
 margin_fraction = "0.80"
-leverage_ceiling = 5
+leverage_ceiling = 10
 emergency_leverage_ceiling = 10
 liquidation_buffer_fraction = "0.01"
 maintenance_margin_fraction = "0.005"
@@ -45,4 +46,3 @@ time_stop_bars_5m = 8
 time_stop_bars_15m = 6
 time_stop_bars_30m = 5
 time_stop_bars_1h = 4
-

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal, ROUND_CEILING, ROUND_DOWN
 from typing import Any, Mapping
 
 
@@ -49,6 +49,14 @@ class FuturesSymbolRules:
         if not isinstance(quantity, Decimal) or not quantity.is_finite() or quantity <= 0:
             raise FuturesRuleError("quantity must be a positive Decimal")
         units = (quantity / self.quantity_step).to_integral_value(rounding=ROUND_DOWN)
+        return units * self.quantity_step
+
+    def round_quantity_up(self, quantity: Decimal) -> Decimal:
+        if not isinstance(quantity, Decimal) or not quantity.is_finite() or quantity <= 0:
+            raise FuturesRuleError("quantity must be a positive Decimal")
+        units = (quantity / self.quantity_step).to_integral_value(
+            rounding=ROUND_CEILING
+        )
         return units * self.quantity_step
 
     def round_price(self, price: Decimal) -> Decimal:

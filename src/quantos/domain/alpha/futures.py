@@ -52,6 +52,7 @@ class StrategySignal:
     timeframe: str = "1m"
     higher_timeframe_context: tuple[str, ...] = ()
     signal_id: str = ""
+    atr: Decimal = Decimal(0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,7 +173,7 @@ def evaluate_strategies(candles, state: RegimeState, timeframe: str = "1m",
         result.append(StrategySignal(
             last.close_time, last.symbol, direction, strategy, state.regime,
             last.close, stop, target, adjusted_strength, evidence, rationale,
-            timeframe, context_labels, signal_id,
+            timeframe, context_labels, signal_id, state.atr,
         ))
 
     if state.regime is MarketRegime.TREND_UP and last.close > previous.high:
