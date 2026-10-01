@@ -2,7 +2,8 @@
 
 ## 1. Authority and Specification Precedence
 
-QuantOS V1 is specification-driven and targets autonomous Binance USDⓈ-M Futures trading.
+QuantOS V1 is specification-driven and targets event-driven, paper-first
+Binance USDⓈ-M Futures HFT.
 
 Before making changes, treat the repository specifications as authoritative:
 
@@ -57,36 +58,59 @@ Prefer targeted repository inspection over repeatedly scanning the entire reposi
 
 ## 4. V1 Scope Guardrails
 
-Preserve the authorized V1 constraints:
+Preserve the authorized HFT V1 constraints:
 
 * local-first Clean Architecture modular monolith;
-* exactly six production modules;
-* infrastructure must not become additional business modules;
 * Binance USDⓈ-M Futures;
-* BTCUSDT perpetual initially;
-* completed 1-minute candles;
-* Parquet + DuckDB canonical data;
-* approximately 20 USDT reference capital;
-* paper trading as the safe default;
-* autonomous LONG / SHORT / HOLD;
-* a small multi-strategy library with deterministic selection;
-* isolated margin, one-way position mode, and one simultaneous position;
-* risk-sized exposure, dynamic leverage, mandatory stop, and fail-closed execution;
-* capital preservation, correctness, robustness, simplicity, explainability, performance, and profitability in that order.
+* BTCUSDC perpetual as the preferred contract when current exchange metadata
+  confirms eligibility, with BTCUSDT perpetual as fallback/comparison;
+* event-driven and sub-minute processing;
+* REST depth bootstrap plus sequenced diff-depth WebSockets;
+* canonical local L2 order books, bookTicker, aggregate trades, and
+  mark-price/funding observations;
+* VAMP as the primary fair-value estimator, with order-book imbalance,
+  standardized OBI, microprice, order-flow imbalance, short volatility,
+  inventory, and latency diagnostics;
+* directional maker market making using post-only / GTX execution intent;
+* conservative queue-aware simulated fills, including partial fills and an
+  explicit rule that touch does not equal fill;
+* HFT-specific replay, compressed event recording, and separate durable paper
+  state;
+* 100 USDC/USDT-equivalent starting paper capital, maximum 5x leverage, and
+  normal inventory risk no greater than 1% of equity;
+* one symbol and one bounded directional inventory, with no martingale,
+  uncontrolled averaging, pyramiding, or grid accumulation;
+* paper trading as the safe default and no reachable real-order submission in
+  the HFT V1 path;
+* capital preservation, correctness, robustness, simplicity, explainability,
+  performance, and profitability in that order.
 
-Do not add other exchanges, instruments, portfolio trading, microservices, Kubernetes, cloud-first infrastructure, deep learning, reinforcement learning, multi-model production ensembles, sentiment/social pipelines, or on-chain signals unless the specifications change first.
+The retained completed-candle Futures runtime may remain available for
+historical comparison, but it is not the authoritative HFT production Alpha
+path and must not constrain event-level HFT semantics.
+
+Do not add other exchanges, unrelated instruments, portfolio trading,
+microservices, Kubernetes, cloud-first infrastructure, deep learning,
+reinforcement learning, multi-model production ensembles, sentiment/social
+pipelines, or on-chain signals unless the specifications change first.
 
 ---
 
 ## 5. Architectural Boundaries
 
-Preserve the exact production-module boundary defined by the frozen architecture.
+Preserve the business ownership boundaries defined by the current architecture:
+Market Data, Feature, Alpha, Risk, Execution, and Evaluation. HFT-specific
+packages and paths are authorized where needed inside these responsibilities.
 
-QuantOS V1 has exactly six production modules.
+Do not turn infrastructure, adapters, storage implementations, utilities,
+frameworks, or external integrations into independent trading authorities.
 
-Do not turn infrastructure, adapters, storage implementations, utilities, frameworks, or external integrations into additional business modules.
-
-Respect Clean Architecture dependency direction and module ownership defined by the canonical specifications. Regime classification and strategy selection belong to Alpha; position management belongs to Execution subject to Risk.
+Respect Clean Architecture dependency direction and module ownership defined by
+the canonical specifications. L2 validity belongs to Market Data;
+microstructure calculations belong to Feature; VAMP/order-flow quote selection
+belongs to Alpha; exposure approval belongs to Risk; simulated post-only order,
+queue, fill, inventory, and exit management belong to Execution; metrics and
+markouts belong to Evaluation.
 
 Do not bypass module boundaries merely for convenience.
 
@@ -106,7 +130,7 @@ The following rules are mandatory:
 * Missing, stale, invalid, inconsistent, ambiguous, or unreconciled execution state must not result in a new order.
 * When safe execution state cannot be established, stop the affected action and surface the condition.
 * Paper mode must remain the safe default.
-* Live operation requires the explicit approval required by the frozen lifecycle.
+* Live operation requires the explicit approval required by the current lifecycle.
 
 Never infer that an order probably succeeded, failed, filled, or remains open when authoritative state is unavailable.
 
@@ -119,14 +143,19 @@ Data semantics must remain consistent across research, historical validation, pa
 Mandatory rules include:
 
 * internal timestamps are UTC;
-* trading decisions use completed 1-minute candles only;
-* incomplete/open candles must not influence decisions;
-* canonical historical inputs must be immutable and versioned as required by the frozen data specification;
+* HFT decisions use only fully received, validated, causally sequenced events
+  available at the decision timestamp;
+* incomplete, stale, gapped, crossed, invalid, or reconnect-ambiguous books
+  must not authorize new exposure;
+* canonical historical inputs must be immutable and versioned as required by the current data specification;
 * do not silently rewrite historical source data;
-* historical, paper, and live paths must share canonical data semantics;
-* historical, paper, and live operation must reuse the same core business logic where required by the architecture;
+* HFT replay and live-paper paths must share canonical event, book, feature,
+  Alpha, Risk, queue, fill, and accounting semantics;
+* HFT replay and live-paper operation must reuse the same core business logic
+  where required by the architecture;
 * do not create separate behavioral implementations that cause backtest logic and runtime trading logic to diverge;
-* timestamp alignment and candle boundaries must be deterministic and explicit.
+* exchange timestamps, local receive timestamps, processing timestamps, update
+  identities, and latency assumptions must be deterministic and explicit.
 
 Treat data corruption, missing required data, inconsistent timestamps, and unreconciled state as correctness failures rather than conditions to guess through.
 
@@ -139,7 +168,7 @@ Never bypass the QuantOS promotion lifecycle.
 The required progression is:
 
 Research
-→ Historical Replay / Backtest
+→ HFT Event Replay / Backtest
 → Walk-Forward Validation
 → Monte Carlo Validation
 → Live-Market Paper Trading
@@ -157,7 +186,7 @@ Live trading must never become enabled merely because automated validation passe
 
 ## 9. Implementation Principles
 
-When multiple implementations satisfy the frozen specifications, prefer the one that is:
+When multiple implementations satisfy the current specifications, prefer the one that is:
 
 1. correct;
 2. safe;
@@ -189,7 +218,7 @@ Be especially careful about:
 * look-ahead bias;
 * target leakage;
 * timestamp alignment;
-* incomplete candles;
+* incomplete candles in the retained comparison runtime;
 * train/validation/test contamination;
 * transaction fees;
 * slippage;
@@ -197,6 +226,12 @@ Be especially careful about:
 * balance accounting;
 * position state;
 * fill assumptions;
+* depth-update sequencing;
+* queue position and partial fills;
+* adverse selection and markouts;
+* post-only price behavior;
+* maker/taker fee differences;
+* feed and order latency;
 * reproducibility;
 * deterministic backtests;
 * walk-forward isolation;
@@ -219,7 +254,7 @@ Before considering a task complete:
 2. run the relevant tests;
 3. run configured linting and type checks where available;
 4. verify imports and entry points where relevant;
-5. verify no frozen V1 requirement was violated;
+5. verify no current V1 requirement was violated;
 6. verify no secrets or generated local artifacts were added.
 
 Do not claim a check passed unless it was actually run.
@@ -326,7 +361,7 @@ Surface the ambiguity and stop the affected portion of the implementation.
 Use repository context efficiently.
 
 * Read files relevant to the current task.
-* Do not repeatedly summarize frozen specifications unless requested.
+* Do not repeatedly summarize current specifications unless requested.
 * Do not regenerate architecture already defined in canonical documents.
 * Avoid long progress narratives.
 * Prefer concise implementation summaries.

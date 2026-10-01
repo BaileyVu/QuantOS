@@ -79,7 +79,9 @@ def _json(value: object) -> str:
 
 def hft_command(args: argparse.Namespace) -> int:
     config = load_hft_config(args.hft_config)
-    client = BinanceHftPublicClient()
+    client = BinanceHftPublicClient(
+        request_timeout=config.snapshot_timeout.total_seconds()
+    )
     rules = select_hft_contract(client.exchange_info(), config)
     fees = config.fees[rules.symbol]
     identity = hft_state_identity(config, rules)
@@ -146,7 +148,12 @@ def hft_command(args: argparse.Namespace) -> int:
             cycles=args.cycles,
             duration_seconds=args.duration_seconds,
             client=client,
-            stream=BinanceHftStream(),
+            stream_factory=lambda: BinanceHftStream(
+                open_timeout=config.websocket_open_timeout.total_seconds(),
+                read_timeout=config.websocket_read_timeout.total_seconds(),
+                shutdown_timeout=config.shutdown_timeout.total_seconds(),
+                lifecycle=emit,
+            ),
             recorder=HftEventRecorder(
                 args.data_root, session_id, config.checkpoint_events
             ),

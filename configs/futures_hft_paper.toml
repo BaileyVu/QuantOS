@@ -3,6 +3,13 @@ preferred_symbol = "BTCUSDC"
 fallback_symbol = "BTCUSDT"
 starting_equity = "100"
 maximum_staleness_ms = 1500
+websocket_read_timeout_ms = 1000
+websocket_open_timeout_seconds = 5
+snapshot_timeout_seconds = 5
+bootstrap_timeout_seconds = 10
+heartbeat_seconds = 5
+reconnect_delay_ms = 500
+shutdown_timeout_seconds = 3
 simulated_acknowledgement_ms = 25
 checkpoint_events = 1000
 

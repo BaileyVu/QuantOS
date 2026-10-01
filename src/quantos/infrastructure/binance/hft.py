@@ -5,7 +5,9 @@ import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
-from typing import Any, AsyncIterator, Mapping
+from typing import Any, AsyncIterator, Callable, Mapping
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from websockets.asyncio.client import connect, process_exception
 from websockets.exceptions import ConnectionClosed, WebSocketException
@@ -50,6 +52,38 @@ def _levels(value: Any, name: str) -> tuple[tuple[Decimal, Decimal], ...]:
 
 
 class BinanceHftPublicClient(BinanceUsdmPublicClient):
+    def __init__(
+        self,
+        base_url: str = "https://fapi.binance.com",
+        *,
+        request_timeout: float = 5,
+        http_get: Callable[[str], bytes] | None = None,
+    ) -> None:
+        if request_timeout <= 0:
+            raise ValueError("HFT REST timeout must be positive")
+
+        def bounded_get(url: str) -> bytes:
+            request = Request(url, headers={"User-Agent": "QuantOS/0.1"})
+            try:
+                with urlopen(request, timeout=request_timeout) as response:
+                    return response.read()
+            except HTTPError as error:
+                raise BinanceFuturesError(
+                    f"Binance Futures HTTP {error.code}",
+                    retryable=(
+                        error.code in {418, 429}
+                        or 500 <= error.code < 600
+                    ),
+                    status_code=error.code,
+                ) from error
+            except (TimeoutError, URLError, OSError) as error:
+                raise BinanceFuturesError(
+                    f"Binance Futures request failed: {error}",
+                    retryable=True,
+                ) from error
+
+        super().__init__(base_url, http_get or bounded_get)
+
     def depth_snapshot(
         self, symbol: str, limit: int = 1000,
         received_at: datetime | None = None,
@@ -145,12 +179,28 @@ class BinanceHftStream:
         self,
         *,
         base_url: str = "wss://fstream.binance.com",
-        open_timeout: int = 10,
+        open_timeout: float = 5,
+        read_timeout: float = 1,
+        shutdown_timeout: float = 3,
+        lifecycle: Callable[[dict], None] = lambda value: None,
     ) -> None:
         if not base_url.startswith("wss://"):
             raise ValueError("HFT WebSocket URL must use wss")
+        if min(open_timeout, read_timeout, shutdown_timeout) <= 0:
+            raise ValueError("HFT WebSocket timeouts must be positive")
         self.base_url = base_url
         self.open_timeout = open_timeout
+        self.read_timeout = read_timeout
+        self.shutdown_timeout = shutdown_timeout
+        self.lifecycle = lifecycle
+        self._public_ready = asyncio.Event()
+        self._market_ready = asyncio.Event()
+
+    async def wait_public_ready(self) -> None:
+        await self._public_ready.wait()
+
+    async def wait_market_ready(self) -> None:
+        await self._market_ready.wait()
 
     def urls(self, symbol: str) -> tuple[str, str]:
         if symbol not in {"BTCUSDC", "BTCUSDT"}:
@@ -176,7 +226,11 @@ class BinanceHftStream:
             DepthDelta | BookTicker | AggregateTrade | MarkPriceEvent | BaseException
         ] = asyncio.Queue(maxsize=4096)
 
-        async def pump(url: str) -> None:
+        async def pump(route: str, url: str) -> None:
+            self.lifecycle({
+                "event": "websocket_connecting",
+                "route": route,
+            })
             try:
                 async with connect(
                     url,
@@ -186,7 +240,44 @@ class BinanceHftStream:
                     process_exception=process_exception,
                     max_queue=4096,
                 ) as socket:
-                    async for raw in socket:
+                    self.lifecycle({
+                        "event": "websocket_connected",
+                        "route": route,
+                    })
+                    self.lifecycle({
+                        "event": "subscribing",
+                        "route": route,
+                    })
+                    if route == "public":
+                        self._public_ready.set()
+                    else:
+                        self._market_ready.set()
+                    self.lifecycle({
+                        "event": "subscription_confirmed",
+                        "route": route,
+                        "confirmation": "url_subscription_connection_established",
+                    })
+                    if route == "market":
+                        self.lifecycle({
+                            "event": "market_stream_ready",
+                            "route": route,
+                        })
+                    timeout_reported = False
+                    while True:
+                        try:
+                            raw = await asyncio.wait_for(
+                                socket.recv(), timeout=self.read_timeout
+                            )
+                        except TimeoutError:
+                            if not timeout_reported:
+                                self.lifecycle({
+                                    "event": "websocket_timeout",
+                                    "route": route,
+                                    "timeout_seconds": self.read_timeout,
+                                })
+                                timeout_reported = True
+                            continue
+                        timeout_reported = False
                         received = datetime.now(timezone.utc)
                         try:
                             payload = json.loads(raw)
@@ -195,15 +286,24 @@ class BinanceHftStream:
                                 "invalid WebSocket JSON"
                             ) from error
                         await queue.put(normalize_hft_message(payload, received))
+            except asyncio.CancelledError:
+                raise
             except (ConnectionClosed, WebSocketException, OSError) as error:
                 await queue.put(BinanceHftStreamError(
                     f"Binance HFT stream disconnected ambiguously: {error}"
                 ))
             except BaseException as error:
                 await queue.put(error)
+            finally:
+                self.lifecycle({
+                    "event": "websocket_disconnected",
+                    "route": route,
+                })
 
+        public_url, market_url = self.urls(symbol)
         tasks = [
-            asyncio.create_task(pump(url)) for url in self.urls(symbol)
+            asyncio.create_task(pump("public", public_url)),
+            asyncio.create_task(pump("market", market_url)),
         ]
         try:
             while True:
@@ -214,4 +314,13 @@ class BinanceHftStream:
         finally:
             for task in tasks:
                 task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            done, pending = await asyncio.wait(
+                tasks, timeout=self.shutdown_timeout
+            )
+            for task in pending:
+                task.cancel()
+            for task in done:
+                try:
+                    task.result()
+                except BaseException:
+                    pass

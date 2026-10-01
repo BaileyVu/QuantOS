@@ -28,6 +28,13 @@ class HftPaperConfig:
     fallback_symbol: str
     starting_equity: Decimal
     maximum_staleness: timedelta
+    websocket_read_timeout: timedelta
+    websocket_open_timeout: timedelta
+    snapshot_timeout: timedelta
+    bootstrap_timeout: timedelta
+    heartbeat_interval: timedelta
+    reconnect_delay: timedelta
+    shutdown_timeout: timedelta
     simulated_acknowledgement_ms: int
     checkpoint_events: int
     feature: HftFeaturePolicy
@@ -44,6 +51,17 @@ class HftPaperConfig:
             raise ValueError("explicit BTCUSDC and BTCUSDT fees are required")
         if self.maximum_staleness <= timedelta(0):
             raise ValueError("maximum_staleness must be positive")
+        for name in (
+            "websocket_read_timeout",
+            "websocket_open_timeout",
+            "snapshot_timeout",
+            "bootstrap_timeout",
+            "heartbeat_interval",
+            "reconnect_delay",
+            "shutdown_timeout",
+        ):
+            if getattr(self, name) <= timedelta(0):
+                raise ValueError(f"{name} must be positive")
         if self.simulated_acknowledgement_ms < 0 or self.checkpoint_events < 1:
             raise ValueError("invalid HFT runtime configuration")
 
@@ -64,6 +82,27 @@ def load_hft_config(path: Path) -> HftPaperConfig:
         starting_equity=_decimal(runtime, "starting_equity"),
         maximum_staleness=timedelta(
             milliseconds=int(runtime["maximum_staleness_ms"])
+        ),
+        websocket_read_timeout=timedelta(
+            milliseconds=int(runtime["websocket_read_timeout_ms"])
+        ),
+        websocket_open_timeout=timedelta(
+            seconds=int(runtime["websocket_open_timeout_seconds"])
+        ),
+        snapshot_timeout=timedelta(
+            seconds=int(runtime["snapshot_timeout_seconds"])
+        ),
+        bootstrap_timeout=timedelta(
+            seconds=int(runtime["bootstrap_timeout_seconds"])
+        ),
+        heartbeat_interval=timedelta(
+            seconds=int(runtime["heartbeat_seconds"])
+        ),
+        reconnect_delay=timedelta(
+            milliseconds=int(runtime["reconnect_delay_ms"])
+        ),
+        shutdown_timeout=timedelta(
+            seconds=int(runtime["shutdown_timeout_seconds"])
         ),
         simulated_acknowledgement_ms=int(
             runtime["simulated_acknowledgement_ms"]
