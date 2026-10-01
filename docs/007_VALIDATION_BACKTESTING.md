@@ -1,16 +1,36 @@
-# QuantOS V1 Validation and Backtesting
+# QuantOS HFT V1 Validation and Backtesting
 
-Version: 2.0.0-V1
+Version: 3.0.0-V1
 Status: Authorized
 
-Validation reuses the completed-candle Alpha, Risk, and accounting path intended for runtime.
+HFT replay consumes sequenced L2, bookTicker, trade, mark/funding, and latency
+events and reuses the live-paper book, Feature, Alpha, Risk, queue, accounting,
+and Evaluation logic. Candle replay cannot validate HFT profitability.
 
-Research → Replay/Backtest → Walk-Forward → Monte Carlo → Live Paper → Binance Testnet → Mainnet Shadow → Explicit Live Approval
+Acceptance requires valid bootstrap/reconstruction, zero tolerated sequence-gap
+corruption, conservative queue-aware fills, post-only entry, actual configured
+fees, bounded inventory, durable state, live latency measurements, and adverse
+markout diagnostics. Zero economically valid quotes is an honest result and
+must not cause threshold weakening.
 
-Replay is deterministic and includes exchange rules, adverse slippage, fees, leverage/margin, stops/targets, and causal ordering. Funding is modeled when reliable data is supplied; otherwise the limitation is recorded.
+Minimum metrics are quotes submitted/cancelled, maker fills, taker exits, fill
+rate, trades and round trips per hour, gross spread capture, directional Alpha
+PnL, gross/net PnL, maker/taker fees, funding, net PnL per fill, net bps per
+round trip, inventory turnover, average holding seconds, queue wait, latency
+median/p90/p99, maximum drawdown, kill-switch events, and 1/5/10/30/60-second
+markouts.
 
-Minimum output: starting/ending equity, net PnL, trades, wins/losses, win rate, average win/loss, expectancy, profit factor, maximum drawdown, fees/funding, strategy/regime attribution, rejection reasons, and configuration identity.
+Markouts are reported by Alpha bucket, OBI bucket, and volatility regime with
+average, median, and positive/negative proportions. Sharpe uses an explicitly
+identified appropriate time aggregation. Queue diagnostics include quantity
+ahead at placement, partial quantity, fill time/probability diagnostics, and
+cancelled-before-fill count.
 
-Replay output also reports timeframe attribution and candidate/selection/rejection counts by timeframe; consecutive-loss breaker triggers, resets, blocked candidates, and disabled duration; daily-loss breaker triggers; no-signal decisions; one-position rejections; and exchange-rule rejections.
+hftbacktest-compatible export is authorized for independent queue/latency
+research. QuantOS must document differences in timestamp, queue, fee, and
+inventory semantics and never substitute institutional rebate or sizing
+assumptions.
 
-Walk-forward preserves temporal isolation. Monte Carlo reports assumptions and never implies a guarantee. No test or automated gate enables mainnet live trading.
+Research → deterministic HFT replay → walk-forward/robustness validation →
+live-market paper → authenticated testnet → mainnet shadow → explicit live
+approval. No test, paper result, or external notebook enables real orders.

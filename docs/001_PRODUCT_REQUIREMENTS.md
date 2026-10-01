@@ -1,18 +1,39 @@
-# QuantOS V1 Product Requirements
+# QuantOS HFT V1 Product Requirements
 
-Version: 2.0.0-V1
+Version: 3.0.0-V1
 Status: Authorized
 
-QuantOS provides a runnable local workflow for autonomous BTCUSDT USDⓈ-M Futures trading from immutable historical data through explicitly approved live execution.
+QuantOS provides a local paper-only workflow for BTCUSDC or BTCUSDT USDⓈ-M
+perpetual directional maker trading:
 
-Completed market data → regime classification → strategy evaluation → deterministic selection → Risk decision → leverage/quantity plan → Execution → protected position management → exit/reconciliation.
+public exchange events → validated L2 book → microstructure features → VAMP
+fair value → fee-aware Alpha intent → Risk decision → queue-aware simulated
+Execution → inventory/markout evaluation.
 
-Exactly one mode is active: research, accelerated replay, live-market paper, Binance Futures testnet, mainnet shadow, or explicitly approved live mainnet. Paper is the safe default. Shadow reads state but never submits.
+The HFT runtime must consume fastest-practical supported diff-depth plus
+bookTicker, aggregate trades, and mark-price/funding streams. It bootstraps from
+a REST depth snapshot, buffers deltas, applies Binance update-ID rules exactly,
+and resynchronizes after every ambiguous or invalid state.
 
-Market Data supplies completed one-minute Futures candles, exchange information, mark price, and funding when available. Alpha supplies deterministic regimes and a small library covering trend continuation/pullback, breakout/expansion, breakout-retest, and range mean reversion. Signals include direction, strategy, compatibility, entry, stop, target, strength, evidence, timestamp, and rationale.
+VAMP is the primary fair-value estimator. Mid price, microprice, static and
+standardized OBI, signed trade flow, short realized volatility, spread,
+inventory, event age, and latency are required features or diagnostics. No
+one-minute indicator generates HFT Alpha.
 
-Risk sizes from equity, risk fraction, and stop distance; derives leverage from notional and allocated margin; and enforces exchange filters, one-position policy, mandatory stop, loss breakers, leverage limits, and liquidation buffer.
+Each possible quote exposes predicted displacement and every applicable cost in
+basis points. A quote is allowed only when expected Alpha strictly clears
+round-trip costs plus adverse-selection allowance and safety buffer. Entry is
+post-only. Normal exits are maker-first; taker exits are reserved for explicit
+safety conditions.
 
-Paper Execution models fees, adverse slippage, leverage/margin, conservative stop/target ordering, and realized/unrealized PnL. Evaluation reports equity, PnL, trades, wins/losses, win rate, average win/loss, expectancy, profit factor, drawdown, fees, and strategy/regime attribution.
+Starting paper equity is 100 units of quote currency, maximum leverage is 5x,
+and normal inventory risk is capped at 1% of equity. HFT V1 permits one symbol,
+one directional inventory, and the smallest valid initial quantity, subject to
+configured notional/quantity ceilings and account breakers.
 
-Business logic is deterministic, auditable, UTC-normalized, and provider-independent. Credentials never appear in logs or repository files.
+Paper fills are queue-aware and conservative. State, fills, fees, funding,
+inventory, PnL, latencies, quote lifecycle, markouts, and breakers are durable
+and auditable. Live session events are recorded as replayable research data.
+Real order submission is not implemented or reachable.
+
+The retained candle Futures commands remain available only for comparison.

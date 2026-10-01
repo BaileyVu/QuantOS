@@ -1,16 +1,30 @@
-# QuantOS V1 Alpha Engine
+# QuantOS HFT V1 Alpha Engine
 
-Version: 2.0.0-V1
+Version: 3.0.0-V1
 Status: Authorized
 
-Alpha classifies regime, evaluates compatible strategies, normalizes evidence, resolves conflicts, and returns LONG, SHORT, or HOLD. It never determines final exposure or submits orders.
+The primary production research/paper candidate is VAMP/order-flow directional
+maker HFT. Alpha never determines final exposure and never places or fills an
+order.
 
-Required regimes: TREND_UP, TREND_DOWN, RANGE, BREAKOUT_OR_EXPANSION, UNCERTAIN.
+For each eligible book state Alpha calculates VAMP displacement from mid in
+basis points. Upward displacement may propose one post-only BUY; downward
+displacement may propose one post-only SELL. Standardized OBI and signed trade
+flow provide configured same-direction confirmation and diagnostics, not an
+optimized weighted ensemble. V1 uses the simplest causal thresholds.
 
-Initial families: trend continuation, trend pullback, breakout/volatility expansion, breakout plus retest when causal evidence exists, and range mean reversion. Patterns are supporting evidence unless explicitly promoted.
+Each quote intent identifies symbol, side, price, quantity request, VAMP,
+mid/microprice, alpha bps, OBI values, trade flow, volatility, timestamps,
+book-update identity, maximum quote age, and cancellation rationale. The price
+must not cross the current spread. Execution applies exchange tick rounding
+while preserving post-only behavior.
 
-Every signal includes timestamp, symbol, direction, strategy ID, compatible regimes, entry, mandatory stop, target/reward, normalized strength, evidence, and rationale. Strength ranks evidence; it is not win probability and never authorizes leverage.
+Alpha emits cancellation when displacement no longer clears the economic
+hurdle, reverses, ages out, or market state becomes ineligible. It may request a
+maker-first inventory exit when displacement realizes or mean-reverts. Severe
+reversal may request a safety exit, but Risk decides whether taker semantics are
+allowed.
 
-Selection ranks compatible signals, combines agreeing evidence without duplicating risk, returns HOLD for weak/stale/malformed/incompatible evidence, returns HOLD on material directional conflict, and never manufactures a stop or forces a trade. Runtime selection is deterministic and uses no LLM.
-
-Each enabled timeframe evaluates only when a new candle for that timeframe completes. Higher timeframes may add an explicitly configured deterministic score adjustment to lower-timeframe candidates; agreement is supporting context, not a profitability claim or mandatory gate. Signals identify their timeframe and completed candle. Equal underlying strategy/direction/timestamp setups are deduplicated before one account-level candidate reaches Risk.
+Production HFT Alpha is deterministic and contains no LLM. The prior candle
+strategy library remains available only through the retained comparison
+runtime and must not be combined with HFT decisions or inventory.

@@ -71,6 +71,8 @@ def add_futures_parser(commands) -> None:
         default=Path("artifacts/futures-paper/state.db"),
     )
     reset.add_argument("--confirm-new-paper-account", action="store_true")
+    from quantos.interfaces.hft import add_hft_parsers
+    add_hft_parsers(operations)
 
 
 def _json(value) -> str:
@@ -243,6 +245,9 @@ def _paper_health(trader: AutonomousFuturesPaperTrader, runtime: dict,
 
 
 def futures_command(args: argparse.Namespace) -> int:
+    if args.futures_operation in {"hft-paper", "hft-paper-reset"}:
+        from quantos.interfaces.hft import hft_command
+        return hft_command(args)
     client = BinanceUsdmPublicClient()
     operation = args.futures_operation
     if operation == "exchange-info":

@@ -33,8 +33,8 @@ class FuturesSymbolRules:
     minimum_notional: Decimal
 
     def __post_init__(self) -> None:
-        if self.symbol != "BTCUSDT":
-            raise FuturesRuleError("V1 supports BTCUSDT only")
+        if self.symbol not in {"BTCUSDC", "BTCUSDT"}:
+            raise FuturesRuleError("HFT V1 supports BTCUSDC or BTCUSDT")
         for name in ("quantity_step", "minimum_quantity", "maximum_quantity",
                      "price_tick", "minimum_price", "maximum_price", "minimum_notional"):
             value = getattr(self, name)

@@ -1,19 +1,46 @@
-# QuantOS V1 Risk and Execution Specification
+# QuantOS HFT V1 Risk and Execution Specification
 
-Version: 2.0.0-V1
+Version: 3.0.0-V1
 Status: Authorized
 
-Risk runs before Execution and rejection is final.
+Risk runs before every new exposure or exposure increase; rejection is final.
+It validates a current uncrossed book, event age, exchange rules, configured
+fees, quote economics, post-only price, quantity/notional, leverage, bounded
+inventory, mark-to-market loss, daily loss, consecutive adverse fills, and kill
+switches.
 
-risk_amount = equity × allowed_risk_fraction
-raw_quantity = risk_amount ÷ absolute(entry - stop)
+The quote hurdle is expressed in basis points and includes maker entry,
+expected maker exit, configured emergency taker fee, current spread/adverse
+selection allowance, funding when applicable, and safety buffer. Expected
+Alpha must strictly exceed the applicable expected round-trip hurdle. BTCUSDC
+and BTCUSDT have independent explicit maker/taker fee settings.
 
-Quantity rounds down to exchange step and is then validated against quantity, notional, precision, and trading status. Required leverage derives from approved notional divided by allocated margin; leverage never sets loss budget. Configuration owns normal/max risk, daily/consecutive-loss breakers, leverage/emergency ceilings, margin allocation, and liquidation buffer.
+Initial order quantity is the smallest exchange-valid quantity satisfying
+minimum notional, capped by maximum quantity, inventory notional, and 5x
+leverage. Normal worst-case inventory loss may not exceed 1% of current equity.
+No risk calculation may assume a maker rebate unless configuration explicitly
+contains one.
 
-Risk rejects absent/wrong-side stops, unreconciled state, non-TRADING symbol, existing position, active breaker, invalid rounded quantity/notional, excessive leverage, or liquidation too close to the stop.
+Execution supports one working directional entry quote and one bounded
+directional inventory. Simulated orders carry GTX/post-only intent and are
+rejected if they would cross. Placement records price, visible quantity ahead,
+submission time, book identity, and acknowledgement latency.
 
-The consecutive-loss breaker has a configurable threshold and finite cooldown. The threshold trips only from closed losing trades. A profitable close resets the untripped loss streak; a breakeven close leaves the streak unchanged. A tripped breaker resets when its cooldown expires or, when configured, at the next UTC day. Daily-loss protection is independent, resets on its own UTC-day lifecycle, and remains authoritative when both breakers would block a candidate. Breaker timestamps and counters are explicit serializable runtime state.
+A passive fill occurs only after conservative queue-ahead consumption from
+subsequent trades at the quote price and unambiguously attributable depth
+reductions. Ambiguous cancellation/trade overlap does not improve queue
+position. Partial fills are allowed and exact Decimal accounting applies.
 
-Only Execution submits/cancels/queries orders. It enforces isolated margin, one-way mode, one position, client-order idempotency, protective stops, and reconciliation. Paper fills use configured adverse slippage and fees. If stop and target touch in one candle, use the conservative outcome. Accounting includes realized/unrealized PnL, fees, used margin, and equity.
+Normal exits are opposite-side post-only orders. Taker exits are allowed only
+for maximum account-risk breach, severe Alpha reversal, stale/broken data while
+exposed, kill switch, or liquidation safety. Maker/taker fees and exits are
+recorded separately.
 
-Shadow emits the exact validated order plan but never submits. Mainnet submission remains disabled by default and requires explicit approval after the validation lifecycle.
+On invalid/stale market state Execution cancels simulated working quotes and
+opens no inventory. Restart restores account, fills, inventory, and breakers
+but cancels persisted working quotes and requires a freshly reconstructed book.
+Corrupt, incompatible, or ambiguous state fails closed and is never silently
+reset.
+
+The HFT runtime has no authenticated order adapter and cannot submit real
+orders. Future testnet/mainnet capabilities require separate explicit approval.

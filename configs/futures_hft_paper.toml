@@ -1,0 +1,43 @@
+[hft]
+preferred_symbol = "BTCUSDC"
+fallback_symbol = "BTCUSDT"
+starting_equity = "100"
+maximum_staleness_ms = 1500
+simulated_acknowledgement_ms = 25
+checkpoint_events = 1000
+
+[features]
+depth_levels = 5
+obi_window = 100
+trade_flow_seconds = "5"
+volatility_seconds = "10"
+
+[alpha]
+minimum_abs_obi_z = "0"
+require_signed_flow_confirmation = false
+maximum_spread_bps = "5"
+maximum_volatility_bps = "20"
+maximum_quote_age_ms = 2000
+severe_reversal_bps = "5"
+
+[risk]
+maximum_leverage = "5"
+maximum_inventory_notional = "100"
+maximum_position_quantity = "1"
+maximum_account_loss_fraction = "0.01"
+daily_loss_fraction = "0.03"
+adverse_fill_limit = 5
+adverse_selection_bps = "0.5"
+safety_buffer_bps = "0.5"
+emergency_move_bps = "20"
+funding_allowance_bps = "0"
+
+# Explicit operator inputs. Verify against the current Binance account tier
+# before each paper session. No rebate is assumed.
+[fees.BTCUSDC]
+maker_rate = "0"
+taker_rate = "0.0004"
+
+[fees.BTCUSDT]
+maker_rate = "0.0002"
+taker_rate = "0.0005"

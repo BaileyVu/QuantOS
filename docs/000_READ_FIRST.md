@@ -1,42 +1,84 @@
-# QuantOS Core — V1 Source of Truth
+# QuantOS HFT V1 — Source of Truth
 
-Version: 2.0.0-V1
+Version: 3.0.0-V1
 Status: Authorized V1 specification
 Last Updated: 2026-10-01
 
 ## Mission
 
-QuantOS V1 is a local autonomous multi-strategy trading system for Binance USDⓈ-M Futures. It observes completed market data, classifies regime, evaluates compatible strategies, selects LONG/SHORT/HOLD, obtains independent Risk approval, and lets Execution manage orders and positions.
+QuantOS V1 is a local, event-driven Binance USDⓈ-M Futures paper-trading
+system. Its primary production research and paper candidate is directional,
+maker-first quoting driven by Volume Adjusted Mid Price (VAMP), order-book
+imbalance, and trade flow. Runtime trading contains no LLM calls.
 
-Runtime trading is independent of Codex, Astra, or per-candle LLM calls. Profitability is an objective, never a guarantee. Capital preservation and operational correctness are mandatory.
+The primary contract is BTCUSDC perpetual when current exchange metadata makes
+it eligible. BTCUSDT perpetual is the explicit fallback and comparison
+contract. Fees are configured per contract and displayed at startup; no fee or
+rebate is inferred from historical schedules.
 
-## Initial scope
+The former completed-candle Futures V1 remains available for comparison, but it
+is superseded as the authoritative production alpha path.
 
-- BTCUSDT perpetual Futures; completed one-minute candles
-- one-way position mode; isolated margin; one simultaneous position
-- deterministic regime classification and a small multi-strategy library
-- risk-governed position sizing and dynamic leverage
-- mandatory protective stops
-- approximately 20 USDT reference capital
-- local workstation; Parquet plus DuckDB
-- mainnet submission disabled unless explicitly approved
+## Authorized scope
 
-Spot/research components may remain but are not the V1 trading target.
+- Binance USDⓈ-M public WebSocket depth, bookTicker, aggregate-trade, mark-price,
+  and funding streams
+- REST depth bootstrap followed by exact sequenced L2 reconstruction
+- event-driven and sub-minute market-data, feature, Alpha, Risk, and paper
+  Execution processing
+- VAMP, static and standardized order-book imbalance, microprice, signed trade
+  flow, short realized volatility, inventory, event age, and latency features
+- directional post-only/GTX quoting, cancellation/requote, conservative
+  queue-position simulation, partial fills, maker-first exits, and safety-only
+  taker exits
+- immutable replayable HFT data, durable HFT paper state, latency and adverse
+  markout evaluation, and hftbacktest-compatible research export
+- a separate `quantos futures hft-paper` runtime that does not interrupt the
+  retained candle Futures runtime
 
-## Exact production modules
+## Capital and execution boundary
 
-V1 has exactly six business modules: Market Data, Feature Engine, Alpha Engine, Risk Engine, Execution Engine, and Evaluation Engine. Regime and strategy selection belong to Alpha. Position management belongs to Execution constrained by Risk. Storage, configuration, logging, exchange adapters, and interfaces are infrastructure.
+Initial HFT paper equity is 100 USDC or USDT-equivalent. Maximum leverage is
+5x. One symbol and one bounded directional inventory are allowed at a time.
+There is no martingale, averaging down, pyramiding, grid accumulation, or
+loss-driven leverage increase. Normal inventory risk may not exceed 1% of
+account equity.
 
-## Non-negotiable safety
+HFT V1 is paper-only. No component in the HFT path may submit a real Binance
+order. Risk evaluates every exposure before Execution and rejection is final.
+Only Execution may create, cancel, fill, or close simulated orders.
 
-Risk evaluates every exposure before Execution; rejection is final. Only Execution submits orders. Fail closed on incomplete/stale data, invalid exchange rules or precision, unreconciled account/position/order state, duplicate intent, or uncertain execution outcome.
+## Fail-closed market state
 
-Every position requires a stop. Leverage is derived after risk-sized notional and is only a capital-efficiency mechanism. No martingale, averaging down, or loss-driven margin increases. Estimated liquidation must remain beyond the stop by a configured buffer.
+The local book becomes ineligible for quoting on a sequence gap, crossed book,
+invalid price or quantity, stale stream, reconnect ambiguity, or snapshot
+bootstrap failure. Working simulated orders are cancelled, no new inventory is
+opened, and a fresh snapshot plus buffered-delta synchronization is required.
+Restart never restores a stale quote into the market.
 
-## Data and lifecycle
+Touching a passive quote is not a fill. A fill requires conservative evidence
+that visible queue ahead was consumed. Uncertain queue attribution resolves to
+NO_FILL.
 
-All timestamps are UTC. Historical and runtime modes share completed-candle, Alpha, Risk, and accounting rules. Canonical sources are immutable/versioned and exact financial arithmetic uses Decimal.
+## Economic and lifecycle authority
 
-Research → Replay/Backtest → Walk-Forward → Monte Carlo → Live Paper → Testnet → Shadow Mainnet → Explicit Live Approval
+Every quote must clear an explicit basis-point hurdle containing maker entry,
+expected maker exit, emergency taker cost, spread/adverse-selection allowance,
+funding when relevant, and a safety buffer. Retail costs must never be weakened
+to manufacture activity.
 
-No automated result grants live authority. Priorities are capital preservation, correctness, robustness, simplicity, explainability, performance, then profitability.
+Research → HFT event replay → walk-forward/robustness validation → live-market
+paper → authenticated testnet → mainnet shadow → explicit live approval.
+
+No automated result grants order authority. Priorities remain capital
+preservation, correctness, robustness, simplicity, explainability, performance,
+then profitability.
+
+## Migration note
+
+On 2026-10-01 the project owner replaced the completed-candle-only Futures
+direction with QuantOS HFT V1 because external microstructure research selected
+VAMP/order-flow directional maker quoting as the primary candidate. Existing
+candle code and results are preserved for comparison; obsolete prohibitions on
+HFT, BTCUSDC, L2/order flow, maker quoting, event-driven data, and queue-aware
+execution are removed from authoritative specifications 000–008.

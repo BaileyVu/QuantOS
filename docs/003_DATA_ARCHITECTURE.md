@@ -1,14 +1,39 @@
-# QuantOS V1 Data Architecture
+# QuantOS HFT V1 Data Architecture
 
-Version: 2.0.0-V1
+Version: 3.0.0-V1
 Status: Authorized
 
-The canonical initial dataset is BTCUSDT USDⓈ-M Futures completed one-minute OHLCV. Timestamps are timezone-aware UTC, minute-aligned, ordered, unique, and validated. Open candles never enter decisions. Historical partitions are immutable and versioned in Parquet; DuckDB supports local queries.
+Canonical HFT inputs are BTCUSDC or BTCUSDT USDⓈ-M depth snapshots, diff-depth
+deltas, bookTicker events, aggregate trades, and mark-price/funding events.
+Each record contains provider event/update identity, exchange timestamp, local
+receive timestamp, and enough raw fields to reproduce normalization. Internal
+timestamps are timezone-aware UTC. Decimal strings are parsed directly to
+Decimal in financial paths.
 
-Each session obtains Futures exchangeInfo and constructs exact symbol rules: trading status, quantity step/min/max, price tick/min/max, and minimum notional. Limits are never hardcoded. Mark price, funding, balances, positions, margin/position modes, leverage, orders, and order status carry provider timestamps and reconciliation state.
+The book bootstrap algorithm buffers WebSocket deltas while fetching a REST
+snapshot, drops updates whose final update ID is not newer than the snapshot,
+requires the first retained update to bridge the snapshot ID, then accepts only
+updates whose previous/final IDs are contiguous under Binance USDⓈ-M rules.
+Duplicates already fully applied are ignored. Gaps, invalid levels, crossed
+books, reconnect ambiguity, or stale events invalidate the book and require a
+fresh snapshot.
 
-Provider decimal strings are parsed directly to Decimal. Quantity rounds down to step; prices round to tick according to intent; validation follows rounding. Float conversions are prohibited in exchange, Risk, and accounting paths.
+Exchange metadata determines contract type, trading status, tick, quantity
+step/min/max, and minimum notional. BTCUSDC is eligible only when metadata
+confirms a trading perpetual contract and an exchange-valid minimum order.
+BTCUSDT is the configured fallback. Rules and fee configuration are captured in
+session identity.
 
-Replay, live paper, testnet, shadow, and live use the same Candle, Alpha, Risk, and accounting semantics. If funding is omitted, output records that limitation.
+Raw events and periodic reconstructed-book checkpoints are written under a
+separate HFT data root in compressed Parquet partitions suitable for replay.
+Published partitions are immutable/versioned; DuckDB may query them. State
+recovery never treats a recorder file as permission to quote.
 
-Signal timeframes are derived deterministically from canonical completed 1-minute candles. Supported intervals are 1m, 3m, 5m, 15m, 30m, and 1h, aligned to UTC epoch boundaries. An aggregate is available only after every constituent minute is complete; incomplete or gapped buckets are excluded. Open, high, low, close, volume, quote volume, and trade count use first, maximum, minimum, final, and exact-sum semantics respectively.
+Replay and live paper reuse the same normalization, book, features, Alpha,
+Risk, queue, accounting, and metrics logic. Feed and order latency are explicit
+inputs. hftbacktest export maps event timestamps, local timestamps, side,
+price, quantity, and update/trade identity, with semantic differences
+documented.
+
+Completed one-minute candle datasets remain valid only for the retained candle
+comparison runtime; they are not canonical inputs to HFT Alpha.
