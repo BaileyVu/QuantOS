@@ -27,7 +27,7 @@ from quantos.domain.risk.futures import ConsecutiveLossBreakerState
 from quantos.domain.runtime_contracts import identity
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class FuturesPaperStateError(RuntimeError):
@@ -171,6 +171,7 @@ _TRADER_FIELDS = (
     "strategy_funnel", "timeframe_funnel", "regime_funnel",
     "regime_evaluation_periods", "regime_evaluation_periods_by_timeframe",
     "funnel_rejection_matrix",
+    "projected_opportunities",
 )
 
 

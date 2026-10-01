@@ -107,6 +107,10 @@ class CandidateEconomics:
     passes_net_reward_risk_filter: bool = False
     passes_minimum_executable_risk_filter: bool = False
     passes_leverage_filter: bool = False
+    gross_projected_r: Decimal = Decimal(0)
+    net_projected_r: Decimal = Decimal(0)
+    first_structure_r: Decimal = Decimal(0)
+    continuation_objective_r: Decimal = Decimal(0)
 
 
 def _empty_economics(reason: str, category: str) -> CandidateEconomics:
@@ -238,6 +242,13 @@ def assess_candidate_economics(
         estimated_round_trip_cost_rate = (
             total_costs / quantity / signal.entry
         )
+        structure = signal.soft_structure_reference or signal.target
+        if signal.direction is Direction.LONG:
+            first_structure_distance = max(Decimal(0), structure - signal.entry)
+        else:
+            first_structure_distance = max(Decimal(0), signal.entry - structure)
+        first_structure_r = first_structure_distance / raw_loss_per_unit
+        continuation_objective_r = raw_reward_per_unit / raw_loss_per_unit
         return CandidateEconomics(
             approved, reason, category, minimum_quantity, quantity,
             entry_fill, stop_fill, target_fill, notional, margin_required,
@@ -256,6 +267,10 @@ def assess_candidate_economics(
             net_rr >= policy.minimum_net_reward_risk,
             risk_quantity >= minimum_quantity,
             margin_quantity >= minimum_quantity,
+            gross_rr,
+            net_rr,
+            first_structure_r,
+            continuation_objective_r,
         )
 
     risk_quantity = rules.round_quantity(risk_budget / loss_per_unit)

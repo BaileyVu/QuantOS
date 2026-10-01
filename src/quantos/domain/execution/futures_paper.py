@@ -148,6 +148,8 @@ class PaperPosition:
     bars_held: int = 0
     stop_adjustments: int = 0
     aligned_higher_timeframes: int = 0
+    soft_structure_reference: Decimal | None = None
+    continuation_objective: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,6 +270,10 @@ class FuturesPaperExecution:
             approval.client_order_id, PositionManagementState.INITIAL_RISK,
             risk_per_unit, risk_amount, entry, entry,
             aligned_higher_timeframes=self._aligned_context(candidate),
+            soft_structure_reference=signal.soft_structure_reference,
+            continuation_objective=(
+                signal.continuation_objective or signal.target
+            ),
         )
         self.audit_events.append({
             "timestamp": signal.timestamp, "event": "POSITION_OPENED",
@@ -276,6 +282,10 @@ class FuturesPaperExecution:
             "execution_intent": ExecutionIntent.POST_ONLY_ENTRY,
             "liquidity_role": LiquidityRole.TAKER,
             "maker_attempt_filled": False,
+            "soft_structure_reference": signal.soft_structure_reference,
+            "continuation_objective": (
+                signal.continuation_objective or signal.target
+            ),
         })
         return self.position
 

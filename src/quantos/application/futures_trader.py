@@ -187,6 +187,16 @@ class AutonomousFuturesPaperTrader:
                 lambda: defaultdict(lambda: defaultdict(int))
             )
         )
+        self.projected_opportunities = {
+            strategy: {
+                "gross_projected_r": [],
+                "net_projected_r": [],
+                "first_structure_r": [],
+                "continuation_objective_r": [],
+                "reward_to_cost": [],
+            }
+            for strategy in PRODUCTION_STRATEGY_IDS
+        }
 
     @property
     def consecutive_losses(self) -> int:
@@ -413,6 +423,31 @@ class AutonomousFuturesPaperTrader:
             for item in enabled_signals:
                 result = economics[item.signal_id]
                 dimensions = (item.strategy_id, item.timeframe, item.regime)
+                opportunity = self.projected_opportunities.setdefault(
+                    item.strategy_id,
+                    {
+                        "gross_projected_r": [],
+                        "net_projected_r": [],
+                        "first_structure_r": [],
+                        "continuation_objective_r": [],
+                        "reward_to_cost": [],
+                    },
+                )
+                opportunity["gross_projected_r"].append(
+                    result.gross_projected_r
+                )
+                opportunity["net_projected_r"].append(
+                    result.net_projected_r
+                )
+                opportunity["first_structure_r"].append(
+                    result.first_structure_r
+                )
+                opportunity["continuation_objective_r"].append(
+                    result.continuation_objective_r
+                )
+                opportunity["reward_to_cost"].append(
+                    result.reward_to_execution_cost_multiple
+                )
                 failed_reasons = set()
                 economic_pass = (
                     result.passes_exchange_filter
@@ -636,6 +671,39 @@ class AutonomousFuturesPaperTrader:
         mfe_values = [trade.mfe_r for trade in trades]
         mae_values = [trade.mae_r for trade in trades]
         strategy_diagnostics = {}
+
+        def percentiles(values) -> dict:
+            ordered = sorted(values)
+            if not ordered:
+                return {
+                    key: None for key in (
+                        "min", "p25", "median", "p75", "p90", "max"
+                    )
+                }
+
+            def percentile(fraction: Decimal) -> Decimal:
+                position = Decimal(len(ordered) - 1) * fraction
+                lower = int(position)
+                upper = min(lower + 1, len(ordered) - 1)
+                weight = position - Decimal(lower)
+                return ordered[lower] + (ordered[upper] - ordered[lower]) * weight
+
+            return {
+                "min": ordered[0],
+                "p25": percentile(Decimal(".25")),
+                "median": percentile(Decimal(".5")),
+                "p75": percentile(Decimal(".75")),
+                "p90": percentile(Decimal(".9")),
+                "max": ordered[-1],
+            }
+
+        projected_opportunity_percentiles = {
+            strategy: {
+                metric: percentiles(values)
+                for metric, values in metrics.items()
+            }
+            for strategy, metrics in self.projected_opportunities.items()
+        }
         for strategy_id in PRODUCTION_STRATEGY_IDS:
             strategy_trades = [
                 trade for trade in trades if trade.strategy_id == strategy_id
@@ -789,6 +857,9 @@ class AutonomousFuturesPaperTrader:
             },
             "exit_reason_attribution": dict(exit_reason),
             "strategy_diagnostics": strategy_diagnostics,
+            "projected_opportunity_percentiles": (
+                projected_opportunity_percentiles
+            ),
             "candidate_funnel_stage_semantics": {
                 "raw_signals_generated": (
                     "technical trigger fired before regime compatibility"

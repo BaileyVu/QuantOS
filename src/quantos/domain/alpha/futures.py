@@ -61,6 +61,8 @@ class StrategySignal:
     higher_timeframe_context: tuple[str, ...] = ()
     signal_id: str = ""
     atr: Decimal = Decimal(0)
+    soft_structure_reference: Decimal | None = None
+    continuation_objective: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,7 +169,10 @@ def evaluate_strategies_with_diagnostics(
 
     def add(direction: Direction, strategy: str, stop: Decimal, target: Decimal,
             strength: str, evidence: tuple[str, ...], rationale: str,
-            compatible_regimes: tuple[MarketRegime, ...]) -> None:
+            compatible_regimes: tuple[MarketRegime, ...],
+            soft_structure_reference: Decimal | None = None,
+            continuation_objective: Decimal | None = None) -> None:
+        objective = continuation_objective or target
         compatible = state.regime in compatible_regimes
         if not compatible:
             evaluations.append(StrategyEvaluation(
@@ -175,13 +180,13 @@ def evaluate_strategies_with_diagnostics(
                 state.regime, False, False, "regime_incompatible",
             ))
             return
-        if direction is Direction.LONG and not (stop < last.close < target):
+        if direction is Direction.LONG and not (stop < last.close < objective):
             evaluations.append(StrategyEvaluation(
                 last.close_time, last.symbol, strategy, direction, timeframe,
                 state.regime, True, False, "invalid_signal_geometry",
             ))
             return
-        if direction is Direction.SHORT and not (target < last.close < stop):
+        if direction is Direction.SHORT and not (objective < last.close < stop):
             evaluations.append(StrategyEvaluation(
                 last.close_time, last.symbol, strategy, direction, timeframe,
                 state.regime, True, False, "invalid_signal_geometry",
@@ -214,8 +219,9 @@ def evaluate_strategies_with_diagnostics(
         ))
         result.append(StrategySignal(
             last.close_time, last.symbol, direction, strategy, state.regime,
-            last.close, stop, target, adjusted_strength, evidence, rationale,
+            last.close, stop, objective, adjusted_strength, evidence, rationale,
             timeframe, context_labels, signal_id, state.atr,
+            soft_structure_reference or target, objective,
         ))
         evaluations.append(StrategyEvaluation(
             last.close_time, last.symbol, strategy, direction, timeframe,
@@ -224,16 +230,26 @@ def evaluate_strategies_with_diagnostics(
 
     if last.close > previous.high:
         stop = last.close - state.atr * Decimal("1.5")
+        reference_target = last.close + (last.close - stop) * 2
+        continuation = max(
+            reference_target,
+            last.close + (last.close - state.recent_low),
+        )
         add(Direction.LONG, "trend_continuation", stop,
-            last.close + (last.close - stop) * 2, ".72",
+            continuation, ".72",
             ("ema_alignment", "higher_close"), "uptrend continuation above prior high",
-            (MarketRegime.TREND_UP,))
+            (MarketRegime.TREND_UP,), previous.high, continuation)
     if last.close < previous.low:
         stop = last.close + state.atr * Decimal("1.5")
+        reference_target = last.close - (stop - last.close) * 2
+        continuation = min(
+            reference_target,
+            last.close - (state.recent_high - last.close),
+        )
         add(Direction.SHORT, "trend_continuation", stop,
-            last.close - (stop - last.close) * 2, ".72",
+            continuation, ".72",
             ("ema_alignment", "lower_close"), "downtrend continuation below prior low",
-            (MarketRegime.TREND_DOWN,))
+            (MarketRegime.TREND_DOWN,), previous.low, continuation)
     if last.low <= state.ema_fast < last.close:
         stop = min(c.low for c in candles[-5:]) - state.atr * Decimal(".25")
         add(Direction.LONG, "trend_pullback", stop,
@@ -255,17 +271,29 @@ def evaluate_strategies_with_diagnostics(
     if expanding and last.close > state.recent_high:
         stop = max(state.recent_high - state.atr * Decimal(".25"),
                    last.close - state.atr * Decimal("1.5"))
+        reference_target = last.close + (last.close - stop) * 2
+        continuation = max(
+            reference_target,
+            last.close + (state.recent_high - state.recent_low),
+        )
         add(Direction.LONG, "breakout_expansion", stop,
-            last.close + (last.close - stop) * 2, ".78",
+            continuation, ".78",
             ("range_break", "range_expansion"), "upside expansion breakout",
-            (MarketRegime.BREAKOUT_OR_EXPANSION,))
+            (MarketRegime.BREAKOUT_OR_EXPANSION,), state.recent_high,
+            continuation)
     elif expanding and last.close < state.recent_low:
         stop = min(state.recent_low + state.atr * Decimal(".25"),
                    last.close + state.atr * Decimal("1.5"))
+        reference_target = last.close - (stop - last.close) * 2
+        continuation = min(
+            reference_target,
+            last.close - (state.recent_high - state.recent_low),
+        )
         add(Direction.SHORT, "breakout_expansion", stop,
-            last.close - (stop - last.close) * 2, ".78",
+            continuation, ".78",
             ("range_break", "range_expansion"), "downside expansion breakout",
-            (MarketRegime.BREAKOUT_OR_EXPANSION,))
+            (MarketRegime.BREAKOUT_OR_EXPANSION,), state.recent_low,
+            continuation)
     width = state.recent_high - state.recent_low
     if width > 0 and last.close <= state.recent_low + width * Decimal(".2"):
         stop = state.recent_low - state.atr * Decimal(".5")

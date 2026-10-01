@@ -15,7 +15,8 @@ from quantos.application.futures_trader import (
     AutonomousFuturesPaperTrader, run_futures_replay,
 )
 from quantos.domain.alpha.futures import (
-    Direction, MarketRegime, StrategySignal, TradeCandidate,
+    Direction, MarketRegime, RegimeState, StrategySignal, TradeCandidate,
+    evaluate_strategies_with_diagnostics,
 )
 from quantos.domain.execution.futures_paper import (
     ExitReason, FuturesPaperExecution, PositionManagementState,
@@ -178,6 +179,83 @@ class CanonicalPaperPolicyTests(unittest.TestCase):
         self.assertFalse(result.approved)
         self.assertEqual(result.reason, "insufficient_net_opportunity")
         self.assertLess(result.net_reward_risk, D("2"))
+
+    def test_exact_nominal_two_r_reproduces_cost_adjusted_deadlock(self):
+        candidate = signal(target="60500")
+        result = assess_candidate_economics(
+            candidate, FuturesAccountState(D("100"), D("100")),
+            rules(), self.config.risk,
+        )
+        self.assertEqual(result.gross_projected_r, D("2"))
+        self.assertLess(result.net_projected_r, D("2"))
+        self.assertFalse(result.approved)
+        self.assertEqual(result.rejection_category, "net_reward_risk")
+
+    def test_causal_trend_measured_move_passes_without_soft_structure_cap(self):
+        history = [candle(i) for i in range(29)]
+        history[-1] = candle(28, close="59980", high="60000", low="59950")
+        history.append(candle(29, close="60100", high="60120", low="60020"))
+        state = RegimeState(
+            MarketRegime.TREND_UP, D("60020"), D("59750"), D("100"),
+            D("60000"), D("59000"), "entry-time fixture",
+        )
+        signals, _ = evaluate_strategies_with_diagnostics(history, state)
+        candidate = TradeCandidate(next(
+            item for item in signals
+            if item.strategy_id == "trend_continuation"
+        ))
+        self.assertEqual(candidate.signal.soft_structure_reference, D("60000"))
+        self.assertEqual(candidate.signal.continuation_objective, D("61200"))
+        result = assess_candidate_economics(
+            candidate, FuturesAccountState(D("100"), D("100")),
+            rules(), self.config.risk,
+        )
+        self.assertLess(result.first_structure_r, D("2"))
+        self.assertGreater(result.continuation_objective_r, D("2"))
+        self.assertGreater(result.net_projected_r, D("2"))
+        self.assertTrue(result.approved, result.reason)
+
+        approval = evaluate_futures_risk(
+            candidate, FuturesAccountState(D("100"), D("100")),
+            rules(), self.config.risk,
+        )
+        engine = FuturesPaperExecution(
+            D("100"), self.config.execution, D(".1")
+        )
+        engine.open(candidate, approval)
+        not_terminal = candle(
+            30, close="60400", high="60500", low="60050"
+        )
+        self.assertIsNone(engine.process_candle(not_terminal))
+        self.assertIsNotNone(engine.position)
+
+    def test_causal_breakout_range_projection_passes(self):
+        history = [
+            candle(i, close="59950", high="59970", low="59930")
+            for i in range(29)
+        ]
+        history.append(candle(
+            29, close="60100", high="60200", low="59800"
+        ))
+        state = RegimeState(
+            MarketRegime.BREAKOUT_OR_EXPANSION,
+            D("59950"), D("59950"), D("100"),
+            D("60000"), D("59000"), "entry-time fixture",
+        )
+        signals, _ = evaluate_strategies_with_diagnostics(history, state)
+        candidate = TradeCandidate(next(
+            item for item in signals
+            if item.strategy_id == "breakout_expansion"
+        ))
+        self.assertEqual(candidate.signal.soft_structure_reference, D("60000"))
+        self.assertEqual(candidate.signal.continuation_objective, D("61100"))
+        result = assess_candidate_economics(
+            candidate, FuturesAccountState(D("100"), D("100")),
+            rules(), self.config.risk,
+        )
+        self.assertLess(result.first_structure_r, D("2"))
+        self.assertGreater(result.net_projected_r, D("2"))
+        self.assertTrue(result.approved, result.reason)
 
     def test_reward_to_cost_below_five_is_rejected(self):
         policy = replace(
