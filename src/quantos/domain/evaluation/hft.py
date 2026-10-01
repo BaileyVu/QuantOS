@@ -4,8 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from quantos.domain.execution.hft_paper import HftFill, HftPaperAccount
+
+if TYPE_CHECKING:
+    from quantos.domain.features.hft import HftFeatures
+    from quantos.domain.risk.hft import HftCostHurdle
 
 
 MARKOUT_HORIZONS = (1, 5, 10, 30, 60)
@@ -56,6 +61,96 @@ class HftEvaluation:
         self.kill_switch_events = 0
         self.directional_alpha_pnl = Decimal("0")
         self.gross_spread_capture = Decimal("0")
+        self.alpha_bps_observations: list[Decimal] = []
+        self.normal_hurdle_bps_observations: list[Decimal] = []
+        self.quote_funnel = {
+            "candidate_evaluations": 0,
+            "rejected_alpha_below_normal_hurdle": 0,
+            "rejected_stale": 0,
+            "rejected_volatility": 0,
+            "rejected_spread": 0,
+            "rejected_risk": 0,
+            "rejected_inventory": 0,
+            "rejected_alpha_confirmation": 0,
+            "rejected_other": 0,
+            "passed_economic_hurdle": 0,
+        }
+        self.latest_quote_evaluation: dict | None = None
+
+    def record_quote_evaluation(
+        self,
+        features: "HftFeatures",
+        hurdle: "HftCostHurdle",
+        *,
+        quote_passed: bool,
+        rejection_reason: str | None,
+        economic_hurdle_passed: bool,
+        funnel_rejection: str | None = None,
+    ) -> None:
+        side = "BUY" if features.alpha_bps > 0 else "SELL"
+        diagnostic = {
+            "side": side,
+            "mid_price": features.mid_price,
+            "VAMP": features.vamp_price,
+            "alpha_bps": features.alpha_bps,
+            "abs_alpha_bps": abs(features.alpha_bps),
+            "maker_entry_fee_bps": hurdle.maker_entry_bps,
+            "maker_exit_fee_bps": hurdle.maker_exit_bps,
+            "normal_fee_bps": hurdle.normal_fee_bps,
+            "adverse_selection_allowance_bps": hurdle.adverse_selection_bps,
+            "funding_allowance_bps": hurdle.funding_bps,
+            "safety_buffer_bps": hurdle.safety_buffer_bps,
+            "normal_hurdle_bps": hurdle.normal_hurdle_bps,
+            "emergency_taker_fee_bps": hurdle.emergency_taker_bps,
+            "emergency_loss_hurdle_bps": hurdle.emergency_loss_hurdle_bps,
+            "spread_bps_diagnostic_only": hurdle.spread_bps,
+            "quote_passed": quote_passed,
+            "rejection_reason": rejection_reason,
+        }
+        self.latest_quote_evaluation = diagnostic
+        self.alpha_bps_observations.append(features.alpha_bps)
+        self.normal_hurdle_bps_observations.append(hurdle.normal_hurdle_bps)
+        self.quote_funnel["candidate_evaluations"] += 1
+        if economic_hurdle_passed:
+            self.quote_funnel["passed_economic_hurdle"] += 1
+        if rejection_reason is not None:
+            key = {
+                "alpha_below_normal_hurdle": "rejected_alpha_below_normal_hurdle",
+                "stale": "rejected_stale",
+                "volatility": "rejected_volatility",
+                "spread": "rejected_spread",
+                "risk": "rejected_risk",
+                "inventory": "rejected_inventory",
+                "alpha_confirmation": "rejected_alpha_confirmation",
+            }.get(funnel_rejection or rejection_reason, "rejected_other")
+            self.quote_funnel[key] += 1
+
+    def record_stale_candidate(self) -> None:
+        self.quote_funnel["candidate_evaluations"] += 1
+        self.quote_funnel["rejected_stale"] += 1
+
+    def quote_economics(self, account: HftPaperAccount) -> dict:
+        maker_fills = sum(1 for fill in account.fills if fill.maker)
+        return {
+            "latest_candidate": self.latest_quote_evaluation,
+            "alpha_distribution": {
+                "absolute_bps": self._distribution(
+                    [abs(value) for value in self.alpha_bps_observations]
+                ),
+                "signed_bps": self._signed_distribution(
+                    self.alpha_bps_observations
+                ),
+            },
+            "normal_hurdle_distribution_bps": self._distribution(
+                self.normal_hurdle_bps_observations
+            ),
+            "funnel": {
+                **self.quote_funnel,
+                "quotes_submitted": account.quotes_submitted,
+                "quotes_cancelled": account.quotes_cancelled,
+                "maker_fills": maker_fills,
+            },
+        }
 
     def record_latency(
         self, feed_ms: Decimal, processing_ms: Decimal, acknowledgement_ms: Decimal
@@ -226,6 +321,7 @@ class HftEvaluation:
             "sharpe": self._minute_sharpe(),
             "sharpe_aggregation": "one_minute_last_equity",
             "kill_switch_events": self.kill_switch_events,
+            "quote_economics": self.quote_economics(account),
         }
 
     @staticmethod
@@ -242,6 +338,29 @@ class HftEvaluation:
             "median": _percentile(values, Decimal(".5")),
             "p90": _percentile(values, Decimal(".9")),
             "p99": _percentile(values, Decimal(".99")),
+        }
+
+    @staticmethod
+    def _distribution(values: list[Decimal]) -> dict:
+        return {
+            "count": len(values),
+            "min": min(values) if values else None,
+            "p25": _percentile(values, Decimal(".25")),
+            "median": _percentile(values, Decimal(".5")),
+            "p75": _percentile(values, Decimal(".75")),
+            "p90": _percentile(values, Decimal(".9")),
+            "p95": _percentile(values, Decimal(".95")),
+            "p99": _percentile(values, Decimal(".99")),
+            "max": max(values) if values else None,
+        }
+
+    @staticmethod
+    def _signed_distribution(values: list[Decimal]) -> dict:
+        return {
+            "count": len(values),
+            "min": min(values) if values else None,
+            "median": _percentile(values, Decimal(".5")),
+            "max": max(values) if values else None,
         }
 
     def _markout_summary(self, horizon: int) -> dict:

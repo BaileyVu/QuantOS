@@ -228,6 +228,8 @@ class HftPaperEngine:
             else:
                 raise TypeError("unsupported HFT event")
         except (HftBookError, HftFeatureError) as error:
+            if "stale" in str(error).lower():
+                self.evaluation.record_stale_candidate()
             self.fail_closed(str(error), now)
             raise
         mark = self.last_mark_price
@@ -316,14 +318,61 @@ class HftPaperEngine:
         )
         intent = self.alpha.decide(
             features,
-            hurdle.admission_hurdle_bps,
+            hurdle.normal_hurdle_bps,
             self.account.inventory_quantity,
             current.side if current is not None else None,
         )
+        economic_hurdle_passed = (
+            abs(features.alpha_bps) > hurdle.normal_hurdle_bps
+        )
+
+        def record_candidate(
+            *,
+            quote_passed: bool,
+            rejection_reason: str | None,
+            funnel_rejection: str | None = None,
+        ) -> None:
+            self.evaluation.record_quote_evaluation(
+                features,
+                hurdle,
+                quote_passed=quote_passed,
+                rejection_reason=rejection_reason,
+                economic_hurdle_passed=economic_hurdle_passed,
+                funnel_rejection=funnel_rejection,
+            )
+
         if intent.action is HftIntentAction.CANCEL:
-            self.account.cancel(intent.rationale)
+            reason = intent.rationale
+            funnel_rejection = None
+            if reason == "regime_filter":
+                if features.spread_bps > self.config.alpha.maximum_spread_bps:
+                    reason = "spread_above_maximum"
+                    funnel_rejection = "spread"
+                else:
+                    reason = "volatility_above_maximum"
+                    funnel_rejection = "volatility"
+            elif reason == "alpha_below_hurdle":
+                if not economic_hurdle_passed:
+                    reason = "alpha_below_normal_hurdle"
+                    funnel_rejection = reason
+                else:
+                    reason = "alpha_confirmation_failed"
+                    funnel_rejection = "alpha_confirmation"
+            record_candidate(
+                quote_passed=False,
+                rejection_reason=reason,
+                funnel_rejection=funnel_rejection,
+            )
+            cancelled = self.account.cancel(intent.rationale)
+            if cancelled is None:
+                return {"event": "hft_hold", "reason": intent.rationale}
             return {"event": "quote_cancelled", "reason": intent.rationale}
         if intent.action is HftIntentAction.SAFETY_EXIT:
+            record_candidate(
+                quote_passed=False,
+                rejection_reason=intent.rationale,
+                funnel_rejection="inventory",
+            )
             if self.account.inventory is not None:
                 price = (
                     self.book.best_bid
@@ -335,6 +384,11 @@ class HftPaperEngine:
                 )
                 return {"event": "safety_exit", "fill": fill}
         if intent.action is HftIntentAction.MAKER_EXIT:
+            record_candidate(
+                quote_passed=False,
+                rejection_reason=intent.rationale,
+                funnel_rejection="inventory",
+            )
             if current is None and intent.side is not None and intent.price is not None:
                 ack = now + timedelta(milliseconds=self.config.simulated_acknowledgement_ms)
                 order = self.account.place_exit(
@@ -355,6 +409,10 @@ class HftPaperEngine:
         if intent.action is HftIntentAction.QUOTE:
             if current is not None:
                 if current.side is intent.side and current.price == intent.price:
+                    record_candidate(
+                        quote_passed=True,
+                        rejection_reason=None,
+                    )
                     return {"event": "quote_resting", "order": current}
                 self.account.cancel("reprice")
             state = HftRiskState(
@@ -390,16 +448,50 @@ class HftPaperEngine:
                 self.evaluation.record_acknowledgement_latency(
                     Decimal(self.config.simulated_acknowledgement_ms),
                 )
+                record_candidate(
+                    quote_passed=True,
+                    rejection_reason=None,
+                )
                 return {
                     "event": "quote_submitted",
                     "order": order,
                     "hurdle": decision.hurdle,
                 }
+            funnel_rejection = (
+                "inventory" if "inventory" in decision.reason else "risk"
+            )
+            record_candidate(
+                quote_passed=False,
+                rejection_reason=decision.reason,
+                funnel_rejection=funnel_rejection,
+            )
             return {
                 "event": "risk_rejected",
                 "reason": decision.reason,
                 "hurdle": decision.hurdle,
             }
+        if intent.rationale == "alpha_below_hurdle":
+            reason = (
+                "alpha_below_normal_hurdle"
+                if not economic_hurdle_passed
+                else "alpha_confirmation_failed"
+            )
+            funnel_rejection = (
+                "alpha_below_normal_hurdle"
+                if not economic_hurdle_passed
+                else "alpha_confirmation"
+            )
+        elif intent.rationale == "inventory_open":
+            reason = intent.rationale
+            funnel_rejection = "inventory"
+        else:
+            reason = intent.rationale
+            funnel_rejection = None
+        record_candidate(
+            quote_passed=False,
+            rejection_reason=reason,
+            funnel_rejection=funnel_rejection,
+        )
         return {"event": "hft_hold", "reason": intent.rationale}
 
     def fail_closed(self, reason: str, now: datetime) -> None:
@@ -571,6 +663,7 @@ async def run_hft_paper_session(
             "quotes_submitted": account.quotes_submitted,
             "fills": len(account.fills),
             "remaining_duration_seconds": remaining_seconds(now),
+            "quote_economics": evaluation.quote_economics(account),
         }
         payload.update(clock_monitor.payload(now))
         return payload

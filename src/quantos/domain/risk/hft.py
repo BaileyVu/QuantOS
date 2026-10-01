@@ -52,14 +52,29 @@ class HftRiskPolicy:
 class HftCostHurdle:
     maker_entry_bps: Decimal
     maker_exit_bps: Decimal
+    normal_fee_bps: Decimal
     emergency_taker_bps: Decimal
     spread_bps: Decimal
     adverse_selection_bps: Decimal
     funding_bps: Decimal
     safety_buffer_bps: Decimal
-    expected_round_trip_bps: Decimal
-    emergency_round_trip_bps: Decimal
-    admission_hurdle_bps: Decimal
+    normal_hurdle_bps: Decimal
+    emergency_loss_hurdle_bps: Decimal
+
+    @property
+    def expected_round_trip_bps(self) -> Decimal:
+        """Backward-compatible name for the normal maker lifecycle hurdle."""
+        return self.normal_hurdle_bps
+
+    @property
+    def emergency_round_trip_bps(self) -> Decimal:
+        """Backward-compatible name for the emergency loss hurdle."""
+        return self.emergency_loss_hurdle_bps
+
+    @property
+    def admission_hurdle_bps(self) -> Decimal:
+        """Only normal maker economics govern passive quote admission."""
+        return self.normal_hurdle_bps
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,27 +103,23 @@ def cost_hurdle(
 ) -> HftCostHurdle:
     maker = fees.maker_rate * BPS
     taker = fees.taker_rate * BPS
-    expected = (
-        maker + maker + features.spread_bps
-        + policy.adverse_selection_bps + policy.funding_allowance_bps
-        + policy.safety_buffer_bps
+    normal_fees = maker + maker
+    normal = (
+        normal_fees + policy.adverse_selection_bps
+        + policy.funding_allowance_bps + policy.safety_buffer_bps
     )
-    emergency = (
-        maker + taker + features.spread_bps
-        + policy.adverse_selection_bps + policy.funding_allowance_bps
-        + policy.safety_buffer_bps
-    )
+    emergency_loss = maker + taker + policy.emergency_move_bps
     return HftCostHurdle(
         maker_entry_bps=maker,
         maker_exit_bps=maker,
+        normal_fee_bps=normal_fees,
         emergency_taker_bps=taker,
         spread_bps=features.spread_bps,
         adverse_selection_bps=policy.adverse_selection_bps,
         funding_bps=policy.funding_allowance_bps,
         safety_buffer_bps=policy.safety_buffer_bps,
-        expected_round_trip_bps=expected,
-        emergency_round_trip_bps=emergency,
-        admission_hurdle_bps=max(expected, emergency),
+        normal_hurdle_bps=normal,
+        emergency_loss_hurdle_bps=emergency_loss,
     )
 
 
@@ -149,7 +160,7 @@ class HftRiskEngine:
             return rejected("account_loss_breaker")
         if inventory_quantity != 0:
             return rejected("inventory_already_open")
-        if intent.price is None or intent.expected_alpha_bps <= hurdle.admission_hurdle_bps:
+        if intent.price is None or intent.expected_alpha_bps <= hurdle.normal_hurdle_bps:
             return rejected("economic_hurdle")
         raw = max(
             self.rules.minimum_quantity,
@@ -167,9 +178,7 @@ class HftRiskEngine:
         leverage = notional / equity if equity > 0 else Decimal("Infinity")
         if leverage > self.policy.maximum_leverage:
             return rejected("leverage_ceiling")
-        worst_loss = notional * (
-            self.policy.emergency_move_bps / BPS + self.fees.taker_rate
-        )
+        worst_loss = notional * (hurdle.emergency_loss_hurdle_bps / BPS)
         if worst_loss > equity * self.policy.maximum_account_loss_fraction:
             return rejected("one_percent_account_risk")
         return HftRiskDecision(True, "approved", quantity, notional, leverage, hurdle)

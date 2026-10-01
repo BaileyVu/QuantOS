@@ -245,7 +245,10 @@ def _paper_health(trader: AutonomousFuturesPaperTrader, runtime: dict,
 
 
 def futures_command(args: argparse.Namespace) -> int:
-    if args.futures_operation in {"hft-paper", "hft-paper-reset"}:
+    if args.futures_operation in {
+        "hft-paper", "hft-paper-reset", "hft-auth-preflight",
+        "hft-execute", "hft-kill", "hft-rearm",
+    }:
         from quantos.interfaces.hft import hft_command
         return hft_command(args)
     client = BinanceUsdmPublicClient()

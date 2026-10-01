@@ -119,6 +119,12 @@ class HftPaperStateStore:
                 "kill_switch_events": evaluation.kill_switch_events,
                 "directional_alpha_pnl": evaluation.directional_alpha_pnl,
                 "gross_spread_capture": evaluation.gross_spread_capture,
+                "alpha_bps_observations": evaluation.alpha_bps_observations,
+                "normal_hurdle_bps_observations": (
+                    evaluation.normal_hurdle_bps_observations
+                ),
+                "quote_funnel": evaluation.quote_funnel,
+                "latest_quote_evaluation": evaluation.latest_quote_evaluation,
             },
             "runtime": runtime,
         }
@@ -174,6 +180,16 @@ class HftPaperStateStore:
             evaluation.kill_switch_events = saved["kill_switch_events"]
             evaluation.directional_alpha_pnl = saved["directional_alpha_pnl"]
             evaluation.gross_spread_capture = saved["gross_spread_capture"]
+            evaluation.alpha_bps_observations = saved.get(
+                "alpha_bps_observations", []
+            )
+            evaluation.normal_hurdle_bps_observations = saved.get(
+                "normal_hurdle_bps_observations", []
+            )
+            evaluation.quote_funnel.update(saved.get("quote_funnel", {}))
+            evaluation.latest_quote_evaluation = saved.get(
+                "latest_quote_evaluation"
+            )
             runtime = payload["runtime"]
         except (KeyError, TypeError, ValueError, ArithmeticError) as error:
             raise HftPaperStateError(f"invalid HFT state payload: {error}") from error

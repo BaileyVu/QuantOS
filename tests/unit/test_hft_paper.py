@@ -234,10 +234,73 @@ class CostAndRiskTests(unittest.TestCase):
         usdc = cost_hurdle(fees("BTCUSDC"), feature(), policy)
         usdt = cost_hurdle(fees("BTCUSDT"), feature(), policy)
         self.assertEqual(usdc.maker_entry_bps, D("0"))
+        self.assertEqual(usdc.maker_exit_bps, D("0"))
+        self.assertEqual(usdc.normal_fee_bps, D("0"))
+        self.assertEqual(usdc.normal_hurdle_bps, D("1"))
         self.assertEqual(usdc.emergency_taker_bps, D("4"))
+        self.assertEqual(usdc.emergency_loss_hurdle_bps, D("24"))
         self.assertEqual(usdt.maker_entry_bps, D("2"))
+        self.assertEqual(usdt.maker_exit_bps, D("2"))
+        self.assertEqual(usdt.normal_fee_bps, D("4"))
+        self.assertEqual(usdt.normal_hurdle_bps, D("5"))
         self.assertEqual(usdt.emergency_taker_bps, D("5"))
+        self.assertEqual(usdt.emergency_loss_hurdle_bps, D("27"))
         self.assertGreater(usdt.admission_hurdle_bps, usdc.admission_hurdle_bps)
+
+    def test_passive_spread_is_diagnostic_not_a_normal_cost(self) -> None:
+        narrow = cost_hurdle(
+            fees(), feature(spread=".1"), HftRiskPolicy()
+        )
+        wide = cost_hurdle(
+            fees(), feature(spread="4.9"), HftRiskPolicy()
+        )
+        self.assertEqual(narrow.normal_hurdle_bps, wide.normal_hurdle_bps)
+        self.assertEqual(narrow.normal_hurdle_bps, D("1"))
+        self.assertEqual(narrow.spread_bps, D(".1"))
+        self.assertEqual(wide.spread_bps, D("4.9"))
+
+    def test_normal_hurdle_controls_alpha_and_risk_admission(self) -> None:
+        hurdle = cost_hurdle(fees(), feature(), HftRiskPolicy())
+        alpha = VampOrderFlowAlpha("BTCUSDC", HftAlphaPolicy())
+        at_hurdle = alpha.decide(feature("1"), hurdle.normal_hurdle_bps)
+        above_hurdle = alpha.decide(feature("1.01"), hurdle.normal_hurdle_bps)
+        self.assertEqual(at_hurdle.action, HftIntentAction.HOLD)
+        self.assertEqual(above_hurdle.action, HftIntentAction.QUOTE)
+        engine = HftRiskEngine(HftRiskPolicy(), fees(), rules())
+        self.assertEqual(
+            engine.evaluate(
+                replace(self._intent(), expected_alpha_bps=D("1")),
+                feature("1"), HftRiskState(D("100")), D("100"),
+            ).reason,
+            "economic_hurdle",
+        )
+        self.assertTrue(engine.evaluate(
+            replace(self._intent(), expected_alpha_bps=D("1.01")),
+            feature("1.01"), HftRiskState(D("100")), D("100"),
+        ).approved)
+
+    def test_emergency_taker_fee_remains_in_worst_case_risk(self) -> None:
+        large_minimum = replace(rules(), minimum_notional=D("100"))
+        no_taker = HftRiskEngine(
+            replace(HftRiskPolicy(), emergency_move_bps=D("0")),
+            HftFeeSchedule(D("0"), D("0")),
+            large_minimum,
+        )
+        expensive_taker = HftRiskEngine(
+            replace(HftRiskPolicy(), emergency_move_bps=D("1")),
+            HftFeeSchedule(D("0"), D(".01")),
+            large_minimum,
+        )
+        state = HftRiskState(D("100"))
+        self.assertTrue(no_taker.evaluate(
+            self._intent(), feature(), state, D("100")
+        ).approved)
+        self.assertEqual(
+            expensive_taker.evaluate(
+                self._intent(), feature(), state, D("100")
+            ).reason,
+            "one_percent_account_risk",
+        )
 
     def _intent(self) -> HftQuoteIntent:
         return HftQuoteIntent(
@@ -378,6 +441,58 @@ class EvaluationAndPersistenceTests(unittest.TestCase):
         self.assertIsNotNone(report["sharpe"])
         self.assertEqual(report["sharpe_aggregation"], "one_minute_last_equity")
 
+    def test_quote_diagnostics_and_alpha_distribution_are_exact(self) -> None:
+        account = HftPaperAccount(D("100"), fees())
+        evaluation = HftEvaluation(D("100"))
+        hurdle = cost_hurdle(fees(), feature(), HftRiskPolicy())
+        values = (D("-2"), D("-1"), D("1"), D("4"), D("0"))
+        for value in values:
+            passed = abs(value) > hurdle.normal_hurdle_bps
+            evaluation.record_quote_evaluation(
+                feature(str(value)),
+                hurdle,
+                quote_passed=passed,
+                rejection_reason=(
+                    None if passed else "alpha_below_normal_hurdle"
+                ),
+                economic_hurdle_passed=passed,
+            )
+        metrics = evaluation.report(account, D("1"))["quote_economics"]
+        absolute = metrics["alpha_distribution"]["absolute_bps"]
+        signed = metrics["alpha_distribution"]["signed_bps"]
+        self.assertEqual(absolute["count"], 5)
+        self.assertEqual(absolute["min"], D("0"))
+        self.assertEqual(absolute["p25"], D("1"))
+        self.assertEqual(absolute["median"], D("1"))
+        self.assertEqual(absolute["p75"], D("2"))
+        self.assertEqual(absolute["p90"], D("3.2"))
+        self.assertEqual(absolute["p95"], D("3.60"))
+        self.assertEqual(absolute["p99"], D("3.920"))
+        self.assertEqual(absolute["max"], D("4"))
+        self.assertEqual(signed, {
+            "count": 5,
+            "min": D("-2"),
+            "median": D("0"),
+            "max": D("4"),
+        })
+        latest = metrics["latest_candidate"]
+        self.assertEqual(latest["VAMP"], D("100.6"))
+        self.assertEqual(latest["abs_alpha_bps"], D("0"))
+        self.assertEqual(latest["normal_fee_bps"], D("0"))
+        self.assertEqual(latest["normal_hurdle_bps"], D("1"))
+        self.assertEqual(latest["emergency_taker_fee_bps"], D("4"))
+        self.assertEqual(latest["emergency_loss_hurdle_bps"], D("24"))
+        self.assertEqual(latest["spread_bps_diagnostic_only"], D("1"))
+        self.assertFalse(latest["quote_passed"])
+        self.assertEqual(
+            latest["rejection_reason"], "alpha_below_normal_hurdle"
+        )
+        self.assertEqual(metrics["funnel"]["candidate_evaluations"], 5)
+        self.assertEqual(metrics["funnel"]["passed_economic_hurdle"], 2)
+        self.assertEqual(
+            metrics["funnel"]["rejected_alpha_below_normal_hurdle"], 3
+        )
+
     def test_restart_cancels_quote_and_rejects_changed_fees(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "hft.db"
@@ -388,11 +503,30 @@ class EvaluationAndPersistenceTests(unittest.TestCase):
             account.place_entry(
                 approved(), HftSide.BUY, D("100"), book(), at(2), at(2)
             )
+            hurdle = cost_hurdle(fees(), feature(), HftRiskPolicy())
+            evaluation.record_quote_evaluation(
+                feature(".5"),
+                hurdle,
+                quote_passed=False,
+                rejection_reason="alpha_below_normal_hurdle",
+                economic_hurdle_passed=False,
+            )
             runtime["last_update_id"] = 101
             runtime["book_valid"] = True
             store.save(account, evaluation, runtime, "identity", at(3))
-            restored, _, restored_runtime = store.load("identity", fees())
+            restored, restored_evaluation, restored_runtime = store.load(
+                "identity", fees()
+            )
             self.assertIsNone(restored.working_order)
+            self.assertEqual(
+                restored_evaluation.alpha_bps_observations, [D(".5")]
+            )
+            self.assertEqual(
+                restored_evaluation.quote_funnel[
+                    "rejected_alpha_below_normal_hurdle"
+                ],
+                1,
+            )
             self.assertFalse(restored_runtime["book_valid"])
             self.assertIsNone(restored_runtime["last_update_id"])
             with self.assertRaisesRegex(HftPaperStateError, "fees differ"):
