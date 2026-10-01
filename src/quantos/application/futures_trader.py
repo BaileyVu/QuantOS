@@ -37,6 +37,7 @@ class FuturesTraderConfig:
     execution: FuturesPaperPolicy
     entry_timeframes: tuple[str, ...] = ("1m", "3m", "5m", "15m")
     context_timeframes: tuple[str, ...] = ("15m", "30m", "1h")
+    enabled_strategies: tuple[str, ...] = PRODUCTION_STRATEGY_IDS
 
     def __post_init__(self) -> None:
         if self.symbol != "BTCUSDT":
@@ -61,6 +62,10 @@ class FuturesTraderConfig:
             raise ValueError("paper slippage exceeds Risk bound")
         if self.execution.taker_fee_rate > self.risk.maximum_fee_rate:
             raise ValueError("paper fee exceeds Risk bound")
+        if (not self.enabled_strategies
+                or len(set(self.enabled_strategies)) != len(self.enabled_strategies)
+                or set(self.enabled_strategies) - set(PRODUCTION_STRATEGY_IDS)):
+            raise ValueError("enabled strategies must be a supported non-empty subset")
 
 
 class FuturesTraderError(RuntimeError):
@@ -291,10 +296,17 @@ class AutonomousFuturesPaperTrader:
             reconciled=True,
         )
 
-    def on_candle(self, candle: Candle) -> dict:
+    def on_candle(self, candle: Candle, *, allow_new_entries: bool = True) -> dict:
         if candle.symbol != self.config.symbol or candle.interval != "1m":
             raise FuturesTraderError("unexpected market")
-        if self.last_candle and candle.open_time <= self.last_candle.open_time:
+        if self.last_candle and candle.open_time == self.last_candle.open_time:
+            return {
+                "timestamp": candle.close_time.isoformat(),
+                "direction": "HOLD",
+                "reason": "duplicate_candle_ignored",
+                "completed_timeframes": [],
+            }
+        if self.last_candle and candle.open_time < self.last_candle.open_time:
             raise FuturesTraderError("candles must be strictly chronological")
         self.breaker_state = advance_consecutive_loss_breaker(
             self.breaker_state, candle.close_time, self.config.risk
@@ -382,11 +394,23 @@ class AutonomousFuturesPaperTrader:
             signals.extend(timeframe_signals)
 
         if ready:
+            enabled_signals = []
+            for item in signals:
+                if (item.strategy_id not in PRODUCTION_STRATEGY_IDS
+                        or item.strategy_id in self.config.enabled_strategies):
+                    enabled_signals.append(item)
+                    continue
+                self.rejections["strategy_disabled"] += 1
+                self.rejected_candidate_count[item.timeframe] += 1
+                self._record_funnel_rejection(
+                    item.strategy_id, item.timeframe, item.regime,
+                    "strategy_disabled",
+                )
             account = self._account_state(candle.close)
             feasible_signals, economics = filter_economically_feasible_candidates(
-                signals, account, self.rules, self.config.risk
+                enabled_signals, account, self.rules, self.config.risk
             )
-            for item in signals:
+            for item in enabled_signals:
                 result = economics[item.signal_id]
                 dimensions = (item.strategy_id, item.timeframe, item.regime)
                 failed_reasons = set()
@@ -438,6 +462,14 @@ class AutonomousFuturesPaperTrader:
                     self.economic_rejections_per_timeframe[item.timeframe][category] += 1
                     self.rejected_candidate_count[item.timeframe] += 1
                     self.rejections[result.reason] += 1
+            if not allow_new_entries:
+                for item in feasible_signals:
+                    self.rejected_candidate_count[item.timeframe] += 1
+                    self._record_funnel_rejection(
+                        item.strategy_id, item.timeframe, item.regime,
+                        "runtime_entry_disabled",
+                    )
+                feasible_signals = ()
             selection = select_candidate(feasible_signals)
             record.update(
                 direction=selection.direction.value,
@@ -447,6 +479,7 @@ class AutonomousFuturesPaperTrader:
                     for timeframe, _ in ready
                 },
                 signals=[_value(asdict(item)) for item in signals],
+                enabled_signals=[_value(asdict(item)) for item in enabled_signals],
                 strategy_evaluations=[
                     _value(asdict(item)) for item in strategy_evaluations
                 ],
@@ -472,6 +505,8 @@ class AutonomousFuturesPaperTrader:
                     )
             if not signals:
                 self.no_valid_signal_count += 1
+            if not allow_new_entries:
+                record["reason"] = "runtime_entry_disabled"
             if selection.candidate is not None:
                 selected_signal = selection.candidate.signal
                 signal_timeframe = selected_signal.timeframe
@@ -702,7 +737,20 @@ class AutonomousFuturesPaperTrader:
             "net_profit_factor": net_wins / net_losses if net_losses else None,
             "max_drawdown": drawdown,
             "fees": self.execution.total_fees,
+            "maker_fills": self.execution.maker_fills,
+            "taker_fills": self.execution.taker_fills,
+            "maker_attempts_not_filled": (
+                self.execution.maker_attempts_not_filled
+            ),
+            "fees_by_liquidity_role": {
+                "maker": self.execution.maker_fees,
+                "taker": self.execution.taker_fees,
+            },
             "estimated_slippage_cost": self.execution.total_slippage_cost,
+            "spread_cost": None,
+            "spread_cost_limitation": (
+                "top-of-book spread is unavailable from candle-only inputs"
+            ),
             "total_execution_costs": total_costs,
             "execution_costs_as_percent_of_gross_profit": (
                 total_costs / gross_profit * Decimal(100)
@@ -775,8 +823,11 @@ class AutonomousFuturesPaperTrader:
             "regime_evaluation_periods_by_timeframe": (
                 self.regime_evaluation_periods_by_timeframe
             ),
-            "funding": None,
-            "funding_limitation": "funding is not modeled in the MVP replay",
+            "funding": self.execution.total_funding,
+            "funding_limitation": (
+                "historical replay requires explicit funding observations; "
+                "live paper applies validated public funding history"
+            ),
             "strategy_attribution": dict(strategy),
             "regime_attribution": dict(regime),
             "timeframe_attribution": timeframe,

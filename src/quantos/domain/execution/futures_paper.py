@@ -36,6 +36,18 @@ class ExitReason(str, Enum):
     LIQUIDATION_APPROXIMATION = "LIQUIDATION_APPROXIMATION"
 
 
+class LiquidityRole(str, Enum):
+    MAKER = "MAKER"
+    TAKER = "TAKER"
+
+
+class ExecutionIntent(str, Enum):
+    POST_ONLY_ENTRY = "POST_ONLY_ENTRY"
+    POST_ONLY_PROFIT_EXIT = "POST_ONLY_PROFIT_EXIT"
+    PROTECTIVE_TAKER_EXIT = "PROTECTIVE_TAKER_EXIT"
+    MARKET_INVALIDATION_TAKER_EXIT = "MARKET_INVALIDATION_TAKER_EXIT"
+
+
 @dataclass(frozen=True, slots=True)
 class PositionManagementPolicy:
     breakeven_activation_r: Decimal = Decimal(".85")
@@ -92,14 +104,19 @@ class PositionManagementPolicy:
 
 @dataclass(frozen=True, slots=True)
 class FuturesPaperPolicy:
+    maker_fee_rate: Decimal = Decimal(".0002")
     taker_fee_rate: Decimal = Decimal(".0005")
     slippage_rate: Decimal = Decimal(".0002")
     management: PositionManagementPolicy = PositionManagementPolicy()
 
     def __post_init__(self) -> None:
         if any(not isinstance(value, Decimal) or value < 0 or value >= 1
-               for value in (self.taker_fee_rate, self.slippage_rate)):
+               for value in (
+                   self.maker_fee_rate, self.taker_fee_rate, self.slippage_rate
+               )):
             raise ValueError("invalid paper execution costs")
+        if self.maker_fee_rate > self.taker_fee_rate:
+            raise ValueError("maker fee must not exceed taker fee")
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,6 +203,13 @@ class FuturesPaperExecution:
         self.audit_events: list[dict] = []
         self.total_fees = Decimal(0)
         self.total_slippage_cost = Decimal(0)
+        self.total_funding = Decimal(0)
+        self.maker_fills = 0
+        self.taker_fills = 0
+        self.maker_attempts_not_filled = 0
+        self.maker_fees = Decimal(0)
+        self.taker_fees = Decimal(0)
+        self._funding_ids: set[str] = set()
         self._order_ids: set[str] = set()
 
     def _round_up(self, value: Decimal) -> Decimal:
@@ -230,6 +254,9 @@ class FuturesPaperExecution:
             raise PaperExecutionError("initial risk must be positive")
         self.balance -= fee
         self.total_fees += fee
+        self.taker_fees += fee
+        self.taker_fills += 1
+        self.maker_attempts_not_filled += 1
         entry_slippage = abs(entry - signal.entry) * approval.quantity
         self.total_slippage_cost += entry_slippage
         self._order_ids.add(approval.client_order_id)
@@ -246,6 +273,9 @@ class FuturesPaperExecution:
             "timestamp": signal.timestamp, "event": "POSITION_OPENED",
             "state": PositionManagementState.INITIAL_RISK,
             "stop": signal.stop, "signal_id": signal.signal_id,
+            "execution_intent": ExecutionIntent.POST_ONLY_ENTRY,
+            "liquidity_role": LiquidityRole.TAKER,
+            "maker_attempt_filled": False,
         })
         return self.position
 
@@ -302,6 +332,15 @@ class FuturesPaperExecution:
         self.balance += ((exit_price - position.entry_price)
                          * position.quantity * sign - exit_fee)
         self.total_fees += exit_fee
+        self.taker_fees += exit_fee
+        self.taker_fills += 1
+        if reason in (ExitReason.FIXED_TARGET, ExitReason.STRUCTURE_TARGET):
+            self.maker_attempts_not_filled += 1
+            intent = ExecutionIntent.POST_ONLY_PROFIT_EXIT
+        elif reason is ExitReason.REGIME_INVALIDATION:
+            intent = ExecutionIntent.MARKET_INVALIDATION_TAKER_EXIT
+        else:
+            intent = ExecutionIntent.PROTECTIVE_TAKER_EXIT
         self.total_slippage_cost += exit_slippage
         realized_r = (net / position.initial_risk_amount
                       if position.initial_risk_amount > 0 else Decimal(0))
@@ -323,9 +362,40 @@ class FuturesPaperExecution:
             "timestamp": timestamp, "event": "POSITION_EXITED",
             "from_state": position.state, "state": PositionManagementState.EXIT,
             "reason": reason, "final_stop": position.stop,
+            "execution_intent": intent,
+            "liquidity_role": LiquidityRole.TAKER,
+            "maker_attempt_filled": False,
         })
         self.position = None
         return trade
+
+    def apply_funding(
+        self, rate: Decimal, mark_price: Decimal, timestamp: object,
+        funding_id: str,
+    ) -> Decimal:
+        if self.position is None:
+            return Decimal(0)
+        if not funding_id or funding_id in self._funding_ids:
+            raise PaperExecutionError("duplicate or missing funding identity")
+        if not all(
+            isinstance(value, Decimal) and value.is_finite()
+            for value in (rate, mark_price)
+        ) or mark_price <= 0:
+            raise PaperExecutionError("invalid funding observation")
+        sign = Decimal(1) if self.position.direction is Direction.LONG else Decimal(-1)
+        adjustment = -(sign * self.position.quantity * mark_price * rate)
+        self.balance += adjustment
+        self.total_funding += adjustment
+        self._funding_ids.add(funding_id)
+        self.audit_events.append({
+            "timestamp": timestamp,
+            "event": "FUNDING_APPLIED",
+            "funding_id": funding_id,
+            "rate": rate,
+            "mark_price": mark_price,
+            "adjustment": adjustment,
+        })
+        return adjustment
 
     def process_candle(self, candle: Candle) -> PaperTrade | None:
         position = self.position

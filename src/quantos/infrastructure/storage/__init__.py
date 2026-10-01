@@ -38,6 +38,10 @@ from quantos.infrastructure.storage.parquet import (
     ParquetStorageError,
     dataset_id,
 )
+from quantos.infrastructure.storage.futures_paper import (
+    FuturesPaperStateError,
+    FuturesPaperStateStore,
+)
 
 __all__ = [
     "AGGREGATE_TRADE_SCHEMA",
@@ -66,4 +70,6 @@ __all__ = [
     "AggregateTradeMinutePublication",
     "AggregateTradeMinuteStorageError",
     "ParquetAggregateTradeMinuteStateStore",
+    "FuturesPaperStateError",
+    "FuturesPaperStateStore",
 ]

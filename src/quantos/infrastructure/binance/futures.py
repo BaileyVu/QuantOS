@@ -1,19 +1,36 @@
 """Public Binance USD-M Futures REST adapter."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
 from typing import Any, Callable
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 from quantos.domain.market_data import Candle
 from quantos.domain.market_data.futures import FuturesSymbolRules, parse_usdm_exchange_info
 
 
 class BinanceFuturesError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, retryable: bool = False,
+                 status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.retryable = retryable
+        self.status_code = status_code
+
+
+@dataclass(frozen=True, slots=True)
+class FundingObservation:
+    timestamp: datetime
+    rate: Decimal
+    mark_price: Decimal
+
+    @property
+    def funding_id(self) -> str:
+        return f"BTCUSDT|{self.timestamp.isoformat()}"
 
 
 HttpGet = Callable[[str], bytes]
@@ -24,8 +41,16 @@ def _default_get(url: str) -> bytes:
     try:
         with urlopen(request, timeout=20) as response:
             return response.read()
-    except Exception as error:
-        raise BinanceFuturesError(f"Binance Futures request failed: {error}") from error
+    except HTTPError as error:
+        raise BinanceFuturesError(
+            f"Binance Futures HTTP {error.code}",
+            retryable=error.code in {418, 429} or 500 <= error.code < 600,
+            status_code=error.code,
+        ) from error
+    except (TimeoutError, URLError, OSError) as error:
+        raise BinanceFuturesError(
+            f"Binance Futures request failed: {error}", retryable=True
+        ) from error
 
 
 class BinanceUsdmPublicClient:
@@ -105,6 +130,62 @@ class BinanceUsdmPublicClient:
         if not isinstance(payload, dict) or "lastFundingRate" not in payload:
             raise BinanceFuturesError("funding rate is missing")
         return Decimal(str(payload["lastFundingRate"]))
+
+    def server_time(self) -> datetime:
+        payload = self._json("/fapi/v1/time")
+        if not isinstance(payload, dict) or set(payload) != {"serverTime"}:
+            raise BinanceFuturesError("server time response is malformed")
+        try:
+            return datetime.fromtimestamp(
+                int(payload["serverTime"]) / 1000, timezone.utc
+            )
+        except (TypeError, ValueError, OSError) as error:
+            raise BinanceFuturesError("server time is invalid") from error
+
+    def funding_history(
+        self, start_time: datetime, end_time: datetime,
+        symbol: str = "BTCUSDT",
+    ) -> tuple[FundingObservation, ...]:
+        if symbol != "BTCUSDT":
+            raise ValueError("V1 supports BTCUSDT only")
+        if start_time.tzinfo is None or end_time.tzinfo is None:
+            raise ValueError("funding range must be timezone-aware")
+        if start_time >= end_time:
+            return ()
+        payload = self._json("/fapi/v1/fundingRate", {
+            "symbol": symbol,
+            "startTime": int(start_time.timestamp() * 1000),
+            "endTime": int(end_time.timestamp() * 1000),
+            "limit": 1000,
+        })
+        if not isinstance(payload, list):
+            raise BinanceFuturesError("funding history response must be an array")
+        result = []
+        previous = None
+        for row in payload:
+            if not isinstance(row, dict) or not {
+                "symbol", "fundingTime", "fundingRate", "markPrice"
+            }.issubset(row):
+                raise BinanceFuturesError("funding history row is malformed")
+            try:
+                if row["symbol"] != symbol:
+                    raise ValueError("unexpected funding symbol")
+                timestamp = datetime.fromtimestamp(
+                    int(row["fundingTime"]) / 1000, timezone.utc
+                )
+                rate = Decimal(str(row["fundingRate"]))
+                mark = Decimal(str(row["markPrice"]))
+                if not rate.is_finite() or not mark.is_finite() or mark <= 0:
+                    raise ValueError("invalid funding values")
+            except (TypeError, ValueError, ArithmeticError, OSError) as error:
+                raise BinanceFuturesError(
+                    f"invalid funding history row: {error}"
+                ) from error
+            if previous is not None and timestamp <= previous:
+                raise BinanceFuturesError("funding history is not chronological")
+            previous = timestamp
+            result.append(FundingObservation(timestamp, rate, mark))
+        return tuple(result)
 
     @staticmethod
     def _candle(row: Any, symbol: str) -> Candle:

@@ -303,14 +303,14 @@ def assess_candidate_economics(
         return replace(
             result,
             approved=False,
-            reason="candidate reward is dominated by execution costs",
+            reason="insufficient_net_opportunity",
             rejection_category="cost",
         )
     if result.net_reward_risk < policy.minimum_net_reward_risk:
         return replace(
             result,
             approved=False,
-            reason="candidate net reward:risk is below threshold",
+            reason="insufficient_net_opportunity",
             rejection_category="net_reward_risk",
         )
     if (

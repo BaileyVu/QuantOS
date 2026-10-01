@@ -16,7 +16,11 @@ from quantos.domain.market_data import Candle
 from quantos.domain.market_data.futures import parse_usdm_exchange_info
 from quantos.domain.market_data.timeframes import timeframe_minutes
 from quantos.infrastructure.binance.futures import BinanceUsdmPublicClient
+from quantos.infrastructure.binance.futures import BinanceFuturesError
 from quantos.infrastructure.configuration.futures import load_futures_config
+from quantos.infrastructure.storage.futures_paper import (
+    FuturesPaperStateError, FuturesPaperStateStore,
+)
 
 
 def add_futures_parser(commands) -> None:
@@ -41,10 +45,32 @@ def add_futures_parser(commands) -> None:
         help="Optional exclusive UTC replay-window end for a cached data file.",
     )
     paper = operations.add_parser("paper", help="Run live-market paper trading; never submits orders.")
-    paper.add_argument("--futures-config", type=Path, default=Path("configs/futures.toml"))
+    paper.add_argument(
+        "--futures-config", type=Path,
+        default=Path("configs/futures_100usdt_paper.toml"),
+    )
+    paper.add_argument(
+        "--state-store", type=Path,
+        default=Path("artifacts/futures-paper/state.db"),
+    )
     paper.add_argument("--cycles", type=int, default=0,
                        help="Poll cycles; 0 runs until interrupted.")
     paper.add_argument("--poll-seconds", type=int, default=15)
+    paper.add_argument("--max-staleness-seconds", type=int, default=90)
+    paper.add_argument("--max-retries", type=int, default=4)
+    paper.add_argument("--retry-base-seconds", type=int, default=2)
+    reset = operations.add_parser(
+        "paper-reset", help="Explicitly create a new durable paper account."
+    )
+    reset.add_argument(
+        "--futures-config", type=Path,
+        default=Path("configs/futures_100usdt_paper.toml"),
+    )
+    reset.add_argument(
+        "--state-store", type=Path,
+        default=Path("artifacts/futures-paper/state.db"),
+    )
+    reset.add_argument("--confirm-new-paper-account", action="store_true")
 
 
 def _json(value) -> str:
@@ -121,6 +147,101 @@ def _rules(client: BinanceUsdmPublicClient, path: Path | None):
     return parse_usdm_exchange_info(json.loads(path.read_text(encoding="utf-8")))
 
 
+class FuturesLiveDataError(RuntimeError):
+    pass
+
+
+def _retry_public_call(operation, max_retries: int, base_seconds: int,
+                       sleep=time.sleep):
+    retry_count = 0
+    while True:
+        try:
+            return operation(), retry_count
+        except BinanceFuturesError as error:
+            if not error.retryable or retry_count >= max_retries:
+                raise
+            delay = min(30, base_seconds * (2 ** retry_count))
+            print(_json({
+                "event": "futures_public_api_retry",
+                "attempt": retry_count + 1,
+                "delay_seconds": delay,
+                "status_code": error.status_code,
+                "error": str(error),
+            }))
+            retry_count += 1
+            sleep(delay)
+
+
+def _validate_live_batch(candles, previous: Candle | None,
+                         now: datetime, max_staleness_seconds: int) -> None:
+    if now.tzinfo is None or now.utcoffset() != timedelta(0):
+        raise FuturesLiveDataError("runtime clock must be UTC")
+    if not candles:
+        if previous is None or (
+            now - previous.close_time
+        ).total_seconds() > max_staleness_seconds:
+            raise FuturesLiveDataError("completed market data is stale or missing")
+        return
+    expected = (
+        previous.open_time + timedelta(minutes=1)
+        if previous is not None else candles[0].open_time
+    )
+    for candle in candles:
+        if candle.open_time != expected:
+            raise FuturesLiveDataError("completed one-minute market data has a gap")
+        if candle.close_time >= now:
+            raise FuturesLiveDataError("open or future candle reached paper runtime")
+        expected += timedelta(minutes=1)
+    age = (now - candles[-1].close_time).total_seconds()
+    if age < 0 or age > max_staleness_seconds:
+        raise FuturesLiveDataError("latest completed market data is stale")
+
+
+def _position_summary(trader: AutonomousFuturesPaperTrader) -> dict | None:
+    position = trader.execution.position
+    if position is None:
+        return None
+    return {
+        "direction": position.direction,
+        "quantity": position.quantity,
+        "entry_price": position.entry_price,
+        "active_stop": position.stop,
+        "target": position.target,
+        "strategy": position.strategy_id,
+        "timeframe": position.timeframe,
+        "management_state": position.state,
+        "bars_held": position.bars_held,
+        "mfe": position.mfe_price,
+        "mae": position.mae_price,
+    }
+
+
+def _paper_health(trader: AutonomousFuturesPaperTrader, runtime: dict,
+                  retry_count: int, healthy: bool, error: str | None = None) -> dict:
+    price = trader.last_candle.close if trader.last_candle else None
+    equity = (
+        trader.execution.marked_equity(price)
+        if price is not None else trader.execution.balance
+    )
+    return {
+        "event": "futures_live_paper_health",
+        "healthy": healthy,
+        "error": error,
+        "current_equity": equity,
+        "open_position": _position_summary(trader),
+        "last_processed_candle": (
+            trader.last_candle.close_time if trader.last_candle else None
+        ),
+        "breaker_active": trader.breaker_state.active,
+        "consecutive_losses": trader.breaker_state.consecutive_losses,
+        "daily_loss_active": trader.daily_loss_active_day is not None,
+        "reconnect_retry_count": retry_count,
+        "last_healthy_runtime_timestamp": runtime.get(
+            "last_healthy_runtime_timestamp"
+        ),
+    }
+
+
 def futures_command(args: argparse.Namespace) -> int:
     client = BinanceUsdmPublicClient()
     operation = args.futures_operation
@@ -164,43 +285,189 @@ def futures_command(args: argparse.Namespace) -> int:
             "metrics": metrics,
         }))
         return 0
+    if operation == "paper-reset":
+        if not args.confirm_new_paper_account:
+            raise ValueError(
+                "paper-reset requires --confirm-new-paper-account"
+            )
+        config = load_futures_config(args.futures_config)
+        rules = client.symbol_rules()
+        now = datetime.now(timezone.utc)
+        store = FuturesPaperStateStore(args.state_store)
+        trader = store.reset(config, rules, now)
+        print(_json({
+            "event": "futures_live_paper_account_reset",
+            "mode": "PAPER MODE",
+            "real_order_submission": "DISABLED",
+            "state_store": str(args.state_store),
+            "starting_equity": trader.execution.balance,
+            "enabled_strategies": config.enabled_strategies,
+        }))
+        return 0
     if operation == "paper":
-        if args.cycles < 0 or args.poll_seconds < 1:
+        if (args.cycles < 0 or args.poll_seconds < 1
+                or args.max_staleness_seconds < 1 or args.max_retries < 0
+                or args.retry_base_seconds < 1):
             raise ValueError("invalid live paper polling options")
         config = load_futures_config(args.futures_config)
-        trader = AutonomousFuturesPaperTrader(config, client.symbol_rules())
-        seen = set()
+        rules, startup_retries = _retry_public_call(
+            client.symbol_rules, args.max_retries, args.retry_base_seconds
+        )
+        store = FuturesPaperStateStore(args.state_store)
+        trader, runtime = store.load(config, rules)
+        restored = (
+            trader.last_candle is not None
+            or trader.execution.position is not None
+            or bool(trader.execution.trades)
+        )
+        print(_json({
+            "event": "futures_live_paper_started",
+            "mode": "PAPER MODE",
+            "real_order_submission": "DISABLED",
+            "symbol": config.symbol,
+            "configured_starting_equity": config.starting_equity,
+            "current_equity": (
+                trader.execution.marked_equity(trader.last_candle.close)
+                if trader.last_candle else trader.execution.balance
+            ),
+            "state": "restored" if restored else "new",
+            "state_store": str(args.state_store),
+            "leverage_ceiling": config.risk.leverage_ceiling,
+            "risk_fraction": config.risk.risk_fraction,
+            "enabled_strategies": config.enabled_strategies,
+            "last_processed_candle": (
+                trader.last_candle.close_time if trader.last_candle else None
+            ),
+            "open_position": _position_summary(trader),
+            "startup_retry_count": startup_retries,
+        }))
         cycle = 0
+        total_retries = int(runtime.get("retry_count", 0))
         try:
             while args.cycles == 0 or cycle < args.cycles:
                 now = datetime.now(timezone.utc)
-                if not seen:
-                    warmup = config.lookback * max(
-                        timeframe_minutes(value) for value in config.timeframes
+                cycle_retries = 0
+                try:
+                    server_time, retries = _retry_public_call(
+                        client.server_time, args.max_retries,
+                        args.retry_base_seconds,
                     )
-                    candles = client.historical_klines(
-                        now - timedelta(minutes=warmup + 1), now
+                    cycle_retries += retries
+                    if abs((server_time - now).total_seconds()) > 5:
+                        raise FuturesLiveDataError(
+                            "local clock differs from Binance by more than 5 seconds"
+                        )
+                    if trader.last_candle is None:
+                        warmup = config.lookback * max(
+                            timeframe_minutes(value) for value in config.timeframes
+                        )
+                        start = now - timedelta(minutes=warmup + 1)
+                    else:
+                        start = trader.last_candle.open_time + timedelta(minutes=1)
+                    candles, retries = _retry_public_call(
+                        lambda: client.historical_klines(start, now),
+                        args.max_retries, args.retry_base_seconds,
                     )
-                else:
-                    candles = client.historical_klines(
-                        max(seen) + timedelta(minutes=1), now
+                    cycle_retries += retries
+                    new = tuple(
+                        candle for candle in candles
+                        if candle.close_time < now and (
+                            trader.last_candle is None
+                            or candle.open_time > trader.last_candle.open_time
+                        )
                     )
-                new = [c for c in candles if c.close_time < now and c.open_time not in seen]
-                for candle in new:
-                    decision = trader.on_candle(candle)
-                    seen.add(candle.open_time)
+                    _validate_live_batch(
+                        new, trader.last_candle, now, args.max_staleness_seconds
+                    )
+                    funding, retries = _retry_public_call(
+                        lambda: client.funding_history(start, now),
+                        args.max_retries, args.retry_base_seconds,
+                    )
+                    cycle_retries += retries
+                    pending_funding = list(funding)
+                    warming_up = trader.last_candle is None
+                    for candle in new:
+                        for item in pending_funding:
+                            position = trader.execution.position
+                            if item.timestamp > candle.close_time:
+                                break
+                            if (position is not None
+                                    and position.opened_at < item.timestamp
+                                    and item.funding_id
+                                    not in trader.execution._funding_ids):
+                                trader.execution.apply_funding(
+                                    item.rate, item.mark_price, item.timestamp,
+                                    item.funding_id,
+                                )
+                        pending_funding = [
+                            item for item in pending_funding
+                            if item.timestamp > candle.close_time
+                        ]
+                        decision = trader.on_candle(
+                            candle, allow_new_entries=not warming_up
+                        )
+                        runtime.update({
+                            "last_healthy_runtime_timestamp": now,
+                            "last_runtime_timestamp": now,
+                            "retry_count": total_retries + cycle_retries,
+                        })
+                        if not warming_up:
+                            store.save(trader, runtime, now)
+                        print(_json({
+                            "event": "futures_live_paper_decision",
+                            "decision": decision,
+                        }))
+                    total_retries += cycle_retries
+                    runtime.update({
+                        "last_healthy_runtime_timestamp": now,
+                        "last_runtime_timestamp": now,
+                        "retry_count": total_retries,
+                    })
+                    if warming_up or not new:
+                        store.save(trader, runtime, now)
+                    if warming_up:
+                        print(_json({
+                            "event": "futures_live_paper_warmup_complete",
+                            "candles": len(new),
+                            "entries_enabled": False,
+                            "last_processed_candle": (
+                                trader.last_candle.close_time
+                                if trader.last_candle else None
+                            ),
+                        }))
+                    print(_json(_paper_health(
+                        trader, runtime, total_retries, True
+                    )))
                     print(_json({
-                        "event": "futures_live_paper_decision",
-                        "decision": decision,
+                        "event": "futures_live_paper_cycle",
+                        "cycle": cycle + 1,
+                        "new_candles": len(new),
+                        "metrics": trader.metrics(),
+                        "last_decision": (
+                            trader.decisions[-1] if trader.decisions else None
+                        ),
                     }))
-                print(_json({"event": "futures_live_paper_cycle", "cycle": cycle + 1,
-                             "new_candles": len(new), "metrics": trader.metrics(),
-                             "last_decision": trader.decisions[-1] if trader.decisions else None}))
+                except (BinanceFuturesError, FuturesLiveDataError) as error:
+                    total_retries += cycle_retries
+                    runtime.update({
+                        "last_runtime_timestamp": now,
+                        "retry_count": total_retries,
+                    })
+                    store.save(trader, runtime, now)
+                    print(_json(_paper_health(
+                        trader, runtime, total_retries, False, str(error)
+                    )))
                 cycle += 1
                 if args.cycles == 0 or cycle < args.cycles:
                     time.sleep(args.poll_seconds)
         except KeyboardInterrupt:
-            print(_json({"event": "futures_live_paper_stopped", "metrics": trader.metrics()}))
+            now = datetime.now(timezone.utc)
+            runtime["last_runtime_timestamp"] = now
+            store.save(trader, runtime, now)
+            print(_json({
+                "event": "futures_live_paper_stopped",
+                "metrics": trader.metrics(),
+            }))
         return 0
     raise ValueError("unknown Futures operation")
 

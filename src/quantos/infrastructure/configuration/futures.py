@@ -10,6 +10,7 @@ from quantos.domain.execution.futures_paper import (
 )
 from quantos.domain.risk.futures import FuturesRiskPolicy
 from quantos.application.futures_trader import FuturesTraderConfig
+from quantos.domain.alpha.futures import PRODUCTION_STRATEGY_IDS
 
 
 def _decimal(section: dict, key: str) -> Decimal:
@@ -44,6 +45,9 @@ def load_futures_config(path: Path) -> FuturesTraderConfig:
         raise ValueError("timeframes must be a TOML string array")
     entry_timeframes = general.get("entry_timeframes")
     context_timeframes = general.get("context_timeframes")
+    enabled_strategies = general.get(
+        "enabled_strategies", list(PRODUCTION_STRATEGY_IDS)
+    )
     if not isinstance(entry_timeframes, list) or not all(
         isinstance(value, str) for value in entry_timeframes
     ):
@@ -52,6 +56,10 @@ def load_futures_config(path: Path) -> FuturesTraderConfig:
         isinstance(value, str) for value in context_timeframes
     ):
         raise ValueError("context_timeframes must be a TOML string array")
+    if not isinstance(enabled_strategies, list) or not all(
+        isinstance(value, str) for value in enabled_strategies
+    ):
+        raise ValueError("enabled_strategies must be a TOML string array")
     enabled = set(timeframes)
     for name, values in (
         ("entry_timeframes", entry_timeframes),
@@ -85,14 +93,20 @@ def load_futures_config(path: Path) -> FuturesTraderConfig:
             maximum_slippage_rate=_decimal(risk, "maximum_slippage_rate"),
             maximum_fee_rate=_decimal(risk, "maximum_fee_rate"),
             minimum_net_reward_risk=_decimal(risk, "minimum_net_reward_risk"),
-            minimum_reward_to_cost_multiple=_decimal(
-                risk, "minimum_reward_to_cost_multiple"
+            minimum_reward_to_cost_multiple=(
+                _decimal(risk, "minimum_reward_to_execution_cost")
+                if "minimum_reward_to_execution_cost" in risk
+                else _decimal(risk, "minimum_reward_to_cost_multiple")
             ),
             minimum_expected_movement_to_cost_multiple=_decimal(
                 risk, "minimum_expected_movement_to_cost_multiple"
             ),
         ),
         execution=FuturesPaperPolicy(
+            maker_fee_rate=(
+                _decimal(paper, "maker_fee_rate")
+                if "maker_fee_rate" in paper else Decimal(".0002")
+            ),
             taker_fee_rate=_decimal(paper, "taker_fee_rate"),
             slippage_rate=_decimal(paper, "slippage_rate"),
             management=PositionManagementPolicy(
@@ -133,5 +147,6 @@ def load_futures_config(path: Path) -> FuturesTraderConfig:
         ),
         entry_timeframes=tuple(entry_timeframes),
         context_timeframes=tuple(context_timeframes),
+        enabled_strategies=tuple(enabled_strategies),
     )
 
