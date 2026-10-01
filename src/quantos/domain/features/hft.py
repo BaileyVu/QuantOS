@@ -54,17 +54,23 @@ class HftFeatureEngine:
         self.policy = policy
         self._obi: list[Decimal] = []
         self._trades: list[AggregateTrade] = []
-        self._mids: list[tuple[datetime, Decimal]] = []
+        self._mids: list[tuple[datetime, int | None, Decimal]] = []
 
     def on_trade(self, trade: AggregateTrade) -> None:
         self._trades.append(trade)
-        self._trim_trades(trade.received_at)
+        self._trim_trades(
+            trade.received_at, trade.received_monotonic_ns
+        )
 
     def compute(
         self,
         book: L2OrderBook,
         now: datetime,
         inventory_quantity: Decimal = Decimal("0"),
+        *,
+        feed_latency_ms: Decimal | None = None,
+        event_age_ms: Decimal | None = None,
+        now_monotonic_ns: int | None = None,
     ) -> HftFeatures:
         require_utc(now, "now")
         require_decimal(inventory_quantity, "inventory_quantity")
@@ -92,7 +98,7 @@ class HftFeatureEngine:
         ) / best_total
         alpha_bps = (vamp - mid) / mid * Decimal("10000")
 
-        self._trim_trades(now)
+        self._trim_trades(now, now_monotonic_ns)
         flow = sum(
             (
                 trade.quantity if not trade.buyer_is_maker else -trade.quantity
@@ -100,19 +106,36 @@ class HftFeatureEngine:
             ),
             Decimal("0"),
         )
-        self._mids.append((now, mid))
+        self._mids.append((now, now_monotonic_ns, mid))
         cutoff = now - timedelta(
             microseconds=int(self.policy.volatility_seconds * Decimal("1000000"))
         )
-        while self._mids and self._mids[0][0] < cutoff:
-            self._mids.pop(0)
+        if now_monotonic_ns is not None:
+            cutoff_ns = now_monotonic_ns - int(
+                self.policy.volatility_seconds * Decimal("1000000000")
+            )
+            while (
+                self._mids
+                and self._mids[0][1] is not None
+                and self._mids[0][1] < cutoff_ns
+            ):
+                self._mids.pop(0)
+        else:
+            while self._mids and self._mids[0][0] < cutoff:
+                self._mids.pop(0)
         volatility = self._volatility()
         received = book.last_received_at
         exchange = book.last_exchange_time
         if received is None or exchange is None:
             raise HftFeatureError("book timestamps are missing")
-        feed_ms = Decimal(str((received - exchange).total_seconds() * 1000))
-        age_ms = Decimal(str((now - received).total_seconds() * 1000))
+        feed_ms = feed_latency_ms
+        if feed_ms is None:
+            feed_ms = Decimal(str(
+                (received - exchange).total_seconds() * 1000
+            ))
+        age_ms = event_age_ms
+        if age_ms is None:
+            age_ms = Decimal(str((now - received).total_seconds() * 1000))
         if feed_ms < 0 or age_ms < 0:
             raise HftFeatureError("future market timestamp")
         return HftFeatures(
@@ -136,7 +159,20 @@ class HftFeatureEngine:
             event_age_ms=age_ms,
         )
 
-    def _trim_trades(self, now: datetime) -> None:
+    def _trim_trades(
+        self, now: datetime, now_monotonic_ns: int | None
+    ) -> None:
+        if now_monotonic_ns is not None:
+            cutoff_ns = now_monotonic_ns - int(
+                self.policy.trade_flow_seconds * Decimal("1000000000")
+            )
+            while (
+                self._trades
+                and self._trades[0].received_monotonic_ns is not None
+                and self._trades[0].received_monotonic_ns < cutoff_ns
+            ):
+                self._trades.pop(0)
+            return
         cutoff = now - timedelta(
             microseconds=int(self.policy.trade_flow_seconds * Decimal("1000000"))
         )
@@ -171,7 +207,7 @@ class HftFeatureEngine:
     def _volatility(self) -> Decimal:
         if len(self._mids) < 2:
             return Decimal("0")
-        values = tuple(value for _, value in self._mids)
+        values = tuple(value for _, _, value in self._mids)
         returns = tuple(
             (current - previous) / previous
             for previous, current in zip(values, values[1:])

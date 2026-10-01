@@ -28,6 +28,14 @@ from quantos.domain.market_data.hft import (
     L2OrderBook,
     MarkPriceEvent,
 )
+from quantos.domain.market_data.hft_clock import (
+    HftClockCalibration,
+    HftClockHealth,
+    HftClockMonitor,
+    HftClockSample,
+    HftFeedLatency,
+    robust_clock_calibration,
+)
 from quantos.domain.risk.hft import HftRiskEngine, HftRiskState, cost_hurdle
 HftEvent = DepthDelta | BookTicker | AggregateTrade | MarkPriceEvent
 
@@ -46,6 +54,10 @@ class _BootstrapFailure(Exception):
         self.stage = stage
 
 
+class _RecalibrationDue(Exception):
+    pass
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -58,6 +70,32 @@ async def _queue_item(
 
 async def _snapshot(client: Any, symbol: str) -> DepthSnapshot:
     return await asyncio.to_thread(client.depth_snapshot, symbol)
+
+
+async def _clock_calibration(
+    client: Any,
+    sample_count: int,
+    lowest_rtt_sample_count: int,
+    utc_clock: Callable[[], datetime],
+    monotonic_clock: Callable[[], float],
+) -> HftClockCalibration:
+    samples = []
+    for _ in range(sample_count):
+        local_send_wall = utc_clock()
+        local_send_monotonic = monotonic_clock()
+        server_wall = await asyncio.to_thread(client.server_time)
+        local_receive_monotonic = monotonic_clock()
+        local_receive_wall = utc_clock()
+        samples.append(HftClockSample(
+            local_send_wall=local_send_wall,
+            local_receive_wall=local_receive_wall,
+            server_wall=server_wall,
+            local_send_monotonic=local_send_monotonic,
+            local_receive_monotonic=local_receive_monotonic,
+        ))
+    return robust_clock_calibration(
+        tuple(samples), lowest_rtt_sample_count
+    )
 
 
 def select_hft_contract(
@@ -135,12 +173,24 @@ class HftPaperEngine:
         self.reconstruction_count += 1
         return applied
 
-    def on_event(self, event: HftEvent, now: datetime) -> dict:
-        started = datetime.now(timezone.utc)
+    def on_event(
+        self,
+        event: HftEvent,
+        now: datetime,
+        *,
+        monotonic_now: Decimal,
+        latency: HftFeedLatency,
+        allow_quoting: bool,
+    ) -> dict:
         try:
             if isinstance(event, DepthDelta):
                 self.book.apply(event)
-                result = self._on_book(now)
+                result = self._on_book(
+                    now,
+                    monotonic_now,
+                    latency,
+                    allow_quoting,
+                )
             elif isinstance(event, AggregateTrade):
                 self.features.on_trade(event)
                 fill = self.account.on_trade(event)
@@ -180,10 +230,6 @@ class HftPaperEngine:
         except (HftBookError, HftFeatureError) as error:
             self.fail_closed(str(error), now)
             raise
-        completed = datetime.now(timezone.utc)
-        feed_ms = Decimal(str((event.received_at - event.exchange_time).total_seconds() * 1000))
-        processing_ms = Decimal(str((completed - started).total_seconds() * 1000))
-        self.evaluation.record_latency(feed_ms, max(processing_ms, Decimal("0")), Decimal("0"))
         mark = self.last_mark_price
         if mark is None and self.book.bids and self.book.asks:
             mark = (self.book.best_bid + self.book.best_ask) / Decimal("2")
@@ -191,19 +237,49 @@ class HftPaperEngine:
             self.evaluation.record_equity(self.account.marked_equity(mark), now)
         return result
 
-    def _on_book(self, now: datetime) -> dict:
-        self.book.require_fresh(now, self.config.maximum_staleness)
+    def _on_book(
+        self,
+        now: datetime,
+        monotonic_now: Decimal,
+        latency: HftFeedLatency,
+        allow_quoting: bool,
+    ) -> dict:
+        monotonic_ns = int(monotonic_now * Decimal("1000000000"))
+        self.book.require_fresh_monotonic(
+            monotonic_ns, self.config.maximum_staleness
+        )
         current = self.account.working_order
         if current is not None:
-            age_ms = Decimal(str((now - current.placed_at).total_seconds() * 1000))
+            age_ms = (
+                (monotonic_now - current.submitted_monotonic)
+                * Decimal("1000")
+                if current.submitted_monotonic is not None
+                else Decimal(str(
+                    (now - current.placed_at).total_seconds() * 1000
+                ))
+            )
             if age_ms > Decimal(self.config.alpha.maximum_quote_age_ms):
                 self.account.cancel("quote_age")
                 current = None
+        received_monotonic_ns = self.book.last_received_monotonic_ns
+        if received_monotonic_ns is None:
+            raise HftFeatureError("monotonic receive timestamp is missing")
+        event_age_ms = (
+            monotonic_now
+            - Decimal(received_monotonic_ns) / Decimal("1000000000")
+        ) * Decimal("1000")
         features = self.features.compute(
-            self.book, now, self.account.inventory_quantity
+            self.book,
+            now,
+            self.account.inventory_quantity,
+            feed_latency_ms=latency.observed_feed_latency_ms,
+            event_age_ms=max(event_age_ms, Decimal("0")),
+            now_monotonic_ns=monotonic_ns,
         )
         self.last_features = features
-        observations = self.evaluation.on_mid(now, features.mid_price)
+        observations = self.evaluation.on_mid(
+            now, features.mid_price, monotonic_now
+        )
         for observation in observations:
             if observation.horizon_seconds == 1:
                 if observation.markout_bps < 0:
@@ -224,9 +300,17 @@ class HftPaperEngine:
                 if self.account.inventory.quantity > 0
                 else self.book.best_ask
             )
-            fill = self.account.emergency_exit(price, now, "account_loss_breaker")
+            fill = self.account.emergency_exit(
+                price, now, "account_loss_breaker", monotonic_now
+            )
             self.evaluation.kill_switch_events += 1
             return {"event": "safety_exit", "fill": fill}
+        if not allow_quoting:
+            self.account.cancel("clock_health_not_healthy")
+            return {
+                "event": "hft_clock_hold",
+                "clock_health": "UNSAFE_OR_DEGRADED",
+            }
         hurdle = cost_hurdle(
             self.config.fees[self.rules.symbol], features, self.config.risk
         )
@@ -246,16 +330,25 @@ class HftPaperEngine:
                     if self.account.inventory.quantity > 0
                     else self.book.best_ask
                 )
-                fill = self.account.emergency_exit(price, now, intent.rationale)
+                fill = self.account.emergency_exit(
+                    price, now, intent.rationale, monotonic_now
+                )
                 return {"event": "safety_exit", "fill": fill}
         if intent.action is HftIntentAction.MAKER_EXIT:
             if current is None and intent.side is not None and intent.price is not None:
                 ack = now + timedelta(milliseconds=self.config.simulated_acknowledgement_ms)
                 order = self.account.place_exit(
-                    intent.side, intent.price, self.book, now, ack
+                    intent.side,
+                    intent.price,
+                    self.book,
+                    now,
+                    ack,
+                    monotonic_now,
+                    monotonic_now + Decimal(
+                        self.config.simulated_acknowledgement_ms
+                    ) / Decimal("1000"),
                 )
-                self.evaluation.record_latency(
-                    features.feed_latency_ms, Decimal("0"),
+                self.evaluation.record_acknowledgement_latency(
                     Decimal(self.config.simulated_acknowledgement_ms),
                 )
                 return {"event": "maker_exit_quoted", "order": order}
@@ -283,10 +376,18 @@ class HftPaperEngine:
             if decision.approved and intent.side is not None and intent.price is not None:
                 ack = now + timedelta(milliseconds=self.config.simulated_acknowledgement_ms)
                 order = self.account.place_entry(
-                    decision, intent.side, intent.price, self.book, now, ack
+                    decision,
+                    intent.side,
+                    intent.price,
+                    self.book,
+                    now,
+                    ack,
+                    monotonic_now,
+                    monotonic_now + Decimal(
+                        self.config.simulated_acknowledgement_ms
+                    ) / Decimal("1000"),
                 )
-                self.evaluation.record_latency(
-                    features.feed_latency_ms, Decimal("0"),
+                self.evaluation.record_acknowledgement_latency(
                     Decimal(self.config.simulated_acknowledgement_ms),
                 )
                 return {
@@ -335,6 +436,10 @@ async def run_hft_paper_session(
         [asyncio.Queue, float], Awaitable[HftEvent | BaseException]
     ] = _queue_item,
     snapshot_loader: Callable[[Any, str], Awaitable[DepthSnapshot]] = _snapshot,
+    calibration_loader: Callable[
+        [Any, int, int, Callable[[], datetime], Callable[[], float]],
+        Awaitable[HftClockCalibration],
+    ] = _clock_calibration,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> dict:
     if cycles < 0 or duration_seconds < 0:
@@ -348,6 +453,11 @@ async def run_hft_paper_session(
     heartbeat_seconds = config.heartbeat_interval.total_seconds()
     next_heartbeat = started_monotonic + heartbeat_seconds
     read_timeout = config.websocket_read_timeout.total_seconds()
+    clock_monitor = HftClockMonitor(
+        config.clock_negative_latency_tolerance_ms,
+        config.clock_excessive_negative_limit,
+        config.clock_recalibration_interval,
+    )
     processed = 0
     reconnect_count = 0
     sequence_gap_count = 0
@@ -377,7 +487,14 @@ async def run_hft_paper_session(
         )
 
     def observe(event: HftEvent) -> None:
-        observed = monotonic_clock()
+        received_monotonic_ns = getattr(
+            event, "received_monotonic_ns", None
+        )
+        observed = (
+            received_monotonic_ns / 1_000_000_000
+            if received_monotonic_ns is not None
+            else monotonic_clock()
+        )
         if isinstance(event, DepthDelta):
             key = "depth"
         elif isinstance(event, AggregateTrade):
@@ -409,7 +526,7 @@ async def run_hft_paper_session(
         equity = (
             account.marked_equity(mark) if mark is not None else account.balance
         )
-        return {
+        payload = {
             "event": "hft_heartbeat",
             "symbol": rules.symbol,
             "uptime_seconds": Decimal(str(max(now - started_monotonic, 0.0))),
@@ -455,6 +572,8 @@ async def run_hft_paper_session(
             "fills": len(account.fills),
             "remaining_duration_seconds": remaining_seconds(now),
         }
+        payload.update(clock_monitor.payload(now))
+        return payload
 
     def check_control() -> None:
         nonlocal next_heartbeat
@@ -473,13 +592,17 @@ async def run_hft_paper_session(
             candidates.append(max(remaining, 0.001))
         if stage_deadline is not None:
             candidates.append(max(stage_deadline - now, 0.001))
+        if clock_monitor.calibration is not None:
+            candidates.append(max(
+                clock_monitor.seconds_until_calibration(now), 0.001
+            ))
         return max(min(candidates), 0.001)
 
     async def await_stage(
         task: asyncio.Task,
         stage: str,
         stage_timeout: float,
-        producer: asyncio.Task,
+        producer: asyncio.Task | None,
     ):
         stage_deadline = monotonic_clock() + stage_timeout
         try:
@@ -487,7 +610,7 @@ async def run_hft_paper_session(
                 check_control()
                 if monotonic_clock() >= stage_deadline:
                     raise _BootstrapFailure(stage)
-                if producer.done():
+                if producer is not None and producer.done():
                     raise _BootstrapFailure(stage)
                 await asyncio.wait(
                     {task}, timeout=bounded_timeout(stage_deadline)
@@ -534,6 +657,11 @@ async def run_hft_paper_session(
                 check_control()
                 if (
                     stage == "event_loop"
+                    and clock_monitor.calibration_due(monotonic_clock())
+                ):
+                    raise _RecalibrationDue
+                if (
+                    stage == "event_loop"
                     and last_seen["depth"] is not None
                     and monotonic_clock() - last_seen["depth"]
                     > config.maximum_staleness.total_seconds()
@@ -558,9 +686,64 @@ async def run_hft_paper_session(
             except BaseException:
                 pass
 
+    async def perform_clock_calibration(reason: str) -> bool:
+        emit({
+            "event": "exchange_clock_calibration_started",
+            "symbol": rules.symbol,
+            "reason": reason,
+            "sample_count": config.clock_calibration_samples,
+        })
+        task = asyncio.create_task(calibration_loader(
+            client,
+            config.clock_calibration_samples,
+            config.clock_low_rtt_samples,
+            utc_clock,
+            monotonic_clock,
+        ))
+        try:
+            calibration = await await_stage(
+                task,
+                "exchange_clock_calibration",
+                config.clock_calibration_timeout.total_seconds(),
+                None,
+            )
+        except _BootstrapFailure as error:
+            clock_monitor.mark_calibration_failed()
+            account.cancel("clock_calibration_failed")
+            runtime["clock"] = clock_monitor.payload(monotonic_clock())
+            emit({
+                "event": "exchange_clock_calibration_failed",
+                "symbol": rules.symbol,
+                "reason": reason,
+                "stage": error.stage,
+                "clock_health": clock_monitor.health.value,
+                "error": (
+                    str(error.__cause__)
+                    if error.__cause__ is not None else "timeout"
+                ),
+            })
+            return False
+        clock_monitor.apply_calibration(calibration)
+        runtime["clock"] = {
+            **clock_monitor.payload(monotonic_clock()),
+            **calibration.payload(),
+        }
+        emit({
+            "event": "exchange_clock_calibrated",
+            "symbol": rules.symbol,
+            "reason": reason,
+            "clock_health": clock_monitor.health.value,
+            **calibration.payload(),
+        })
+        return True
+
     try:
+        if not await perform_clock_calibration("startup"):
+            shutdown_reason = "clock_calibration_failed"
         while (
-            (cycles == 0 or processed < cycles)
+            clock_monitor.calibration is not None
+            and clock_monitor.health is not HftClockHealth.UNSAFE
+            and (cycles == 0 or processed < cycles)
             and not deadline_expired()
         ):
             queue: asyncio.Queue[HftEvent | BaseException] = asyncio.Queue(
@@ -618,7 +801,11 @@ async def run_hft_paper_session(
                     "symbol": rules.symbol,
                     "last_update_id": snapshot.last_update_id,
                 })
-                recorder.append(snapshot, utc_clock())
+                recorder.append(
+                    snapshot,
+                    utc_clock(),
+                    int(monotonic_clock() * 1_000_000_000),
+                )
                 buffered: list[DepthDelta] = []
                 bridge_deadline = (
                     monotonic_clock()
@@ -635,7 +822,11 @@ async def run_hft_paper_session(
                             "depth_buffer_reconcile"
                         ) from item
                     observe(item)
-                    recorder.append(item, utc_clock())
+                    recorder.append(
+                        item,
+                        utc_clock(),
+                        int(monotonic_clock() * 1_000_000_000),
+                    )
                     if isinstance(item, DepthDelta):
                         buffered.append(item)
                         if (
@@ -667,13 +858,70 @@ async def run_hft_paper_session(
                 })
 
                 while cycles == 0 or processed < cycles:
-                    item = await next_item(queue, stage="event_loop")
+                    if clock_monitor.calibration_due(monotonic_clock()):
+                        reason = (
+                            "negative_latency"
+                            if clock_monitor.recalibration_requested
+                            else "periodic"
+                        )
+                        await perform_clock_calibration(reason)
+                    try:
+                        item = await next_item(queue, stage="event_loop")
+                    except _RecalibrationDue:
+                        continue
                     if isinstance(item, BaseException):
                         raise item
                     observe(item)
+                    previous_clock_health = clock_monitor.health
+                    latency = clock_monitor.observe(
+                        item.exchange_time, item.received_at
+                    )
+                    if clock_monitor.health is not previous_clock_health:
+                        emit({
+                            "event": "hft_clock_health_changed",
+                            "symbol": rules.symbol,
+                            "previous_clock_health": (
+                                previous_clock_health.value
+                            ),
+                            "clock_health": clock_monitor.health.value,
+                            "corrected_feed_latency_ms": (
+                                latency.corrected_signed_latency_ms
+                            ),
+                        })
+                    if not clock_monitor.quoting_allowed:
+                        account.cancel("clock_health_not_healthy")
+                    processing_started_monotonic = monotonic_clock()
+                    processing_monotonic = Decimal(str(
+                        processing_started_monotonic
+                    ))
                     processing_time = utc_clock()
-                    recorder.append(item, processing_time)
-                    result = engine.on_event(item, processing_time)
+                    recorder.append(
+                        item,
+                        processing_time,
+                        int(
+                            processing_started_monotonic
+                            * 1_000_000_000
+                        ),
+                    )
+                    result = engine.on_event(
+                        item,
+                        processing_time,
+                        monotonic_now=processing_monotonic,
+                        latency=latency,
+                        allow_quoting=clock_monitor.quoting_allowed,
+                    )
+                    processing_completed_monotonic = monotonic_clock()
+                    processing_latency_ms = Decimal(str(max(
+                        (
+                            processing_completed_monotonic
+                            - processing_started_monotonic
+                        ) * 1000,
+                        0.0,
+                    )))
+                    evaluation.record_event_latency(
+                        latency.observed_feed_latency_ms,
+                        processing_latency_ms,
+                    )
                     processed += 1
                     runtime.update({
                         "last_event_at": item.received_at,
@@ -682,6 +930,12 @@ async def run_hft_paper_session(
                         "alpha_state": (
                             asdict(engine.last_features)
                             if engine.last_features else {}
+                        ),
+                        "clock": clock_monitor.payload(
+                            processing_completed_monotonic
+                        ) | (
+                            clock_monitor.calibration.payload()
+                            if clock_monitor.calibration is not None else {}
                         ),
                     })
                     if processed % config.checkpoint_events == 0:
@@ -759,6 +1013,8 @@ async def run_hft_paper_session(
             check_control()
         if deadline_expired():
             shutdown_reason = "duration_expired"
+    except _DurationExpired:
+        shutdown_reason = "duration_expired"
     except asyncio.CancelledError:
         shutdown_reason = "cancelled"
         raise
@@ -770,6 +1026,10 @@ async def run_hft_paper_session(
         runtime["reconnect_count"] = reconnect_count
         runtime["sequence_gap_count"] = sequence_gap_count
         runtime["events_received"] = dict(events_received)
+        runtime["clock"] = clock_monitor.payload(monotonic_clock()) | (
+            clock_monitor.calibration.payload()
+            if clock_monitor.calibration is not None else {}
+        )
         account.cancel("runtime_shutdown")
         recorder.flush()
         state_store.save(

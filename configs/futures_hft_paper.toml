@@ -10,6 +10,12 @@ bootstrap_timeout_seconds = 10
 heartbeat_seconds = 5
 reconnect_delay_ms = 500
 shutdown_timeout_seconds = 3
+clock_calibration_timeout_seconds = 10
+clock_recalibration_seconds = 300
+clock_calibration_samples = 5
+clock_low_rtt_samples = 3
+clock_negative_latency_tolerance_ms = "5"
+clock_excessive_negative_limit = 3
 simulated_acknowledgement_ms = 25
 checkpoint_events = 1000
 

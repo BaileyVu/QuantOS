@@ -16,6 +16,10 @@ from quantos.domain.market_data.hft import (
     DepthDelta,
     DepthSnapshot,
 )
+from quantos.domain.market_data.hft_clock import (
+    HftClockSample,
+    robust_clock_calibration,
+)
 from quantos.infrastructure.binance.hft import BinanceHftStream
 from quantos.infrastructure.configuration.hft import load_hft_config
 
@@ -39,6 +43,26 @@ class FakeClock:
     async def sleep(self, seconds: float) -> None:
         self.value += seconds
         await asyncio.sleep(0)
+
+
+async def fake_calibration(
+    client, sample_count, lowest_rtt_sample_count, utc_clock, monotonic_clock
+):
+    del client
+    samples = []
+    for _ in range(sample_count):
+        wall = utc_clock()
+        monotonic = monotonic_clock()
+        samples.append(HftClockSample(
+            local_send_wall=wall,
+            local_receive_wall=wall,
+            server_wall=wall,
+            local_send_monotonic=monotonic,
+            local_receive_monotonic=monotonic,
+        ))
+    return robust_clock_calibration(
+        tuple(samples), lowest_rtt_sample_count
+    )
 
 
 class AdvancingQueueWaiter:
@@ -84,7 +108,8 @@ class FakeRecorder:
         self.events = []
         self.flush_count = 0
 
-    def append(self, event, now):
+    def append(self, event, now, processing_monotonic_ns=None):
+        del now, processing_monotonic_ns
         self.events.append(event)
 
     def checkpoint(self, *args):
@@ -159,6 +184,7 @@ class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
         stream_factory,
         cycles: int = 0,
         snapshot_loader=None,
+        calibration_loader=None,
         emit=None,
     ):
         clock = FakeClock()
@@ -191,6 +217,7 @@ class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
             utc_clock=clock.utc_now,
             wait_for_item=waiter,
             snapshot_loader=snapshot_loader or load_snapshot,
+            calibration_loader=calibration_loader or fake_calibration,
             sleep=clock.sleep,
         )
         return {
@@ -248,6 +275,11 @@ class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
             "current_vamp", "alpha_bps", "quote_state", "inventory",
             "equity", "sequence_gap_count", "reconnect_count",
             "events_received", "quotes_submitted",
+            "exchange_clock_offset_ms", "calibration_rtt_ms",
+            "raw_feed_latency_ms", "corrected_feed_latency_ms",
+            "negative_latency_observation_count",
+            "excessive_negative_latency_count", "clock_health",
+            "last_clock_calibration_age_seconds",
         }.issubset(heartbeat))
 
     async def test_read_timeout_returns_control_without_fake_fill(self) -> None:
@@ -326,6 +358,7 @@ class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
             monotonic_clock=clock.monotonic,
             utc_clock=clock.utc_now,
             snapshot_loader=load_snapshot,
+            calibration_loader=fake_calibration,
             sleep=clock.sleep,
         ))
         await asyncio.wait_for(ready.wait(), timeout=1)
@@ -353,6 +386,95 @@ class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
             "finite_cycle_completion",
         )
         self.assertEqual(result["account"].fills, [])
+
+    async def test_tolerated_clock_skew_does_not_reconnect_ready_book(self) -> None:
+        snapshot_value = DepthSnapshot(
+            symbol="BTCUSDC",
+            last_update_id=100,
+            bids=tuple(
+                (D("100000") - D(index) / D("10"), D("10"))
+                for index in range(5)
+            ),
+            asks=tuple(
+                (D("100000.1") + D(index) / D("10"), D("5"))
+                for index in range(5)
+            ),
+            exchange_time=BASE,
+            received_at=BASE,
+            received_monotonic_ns=0,
+        )
+        bridge_value = DepthDelta(
+            symbol="BTCUSDC",
+            first_update_id=100,
+            final_update_id=101,
+            previous_final_update_id=99,
+            bids=(),
+            asks=(),
+            exchange_time=BASE,
+            received_at=BASE,
+            transaction_time=BASE,
+            received_monotonic_ns=0,
+        )
+        live_value = DepthDelta(
+            symbol="BTCUSDC",
+            first_update_id=102,
+            final_update_id=102,
+            previous_final_update_id=101,
+            bids=(),
+            asks=(),
+            exchange_time=BASE + timedelta(milliseconds=100),
+            received_at=BASE + timedelta(milliseconds=20),
+            transaction_time=BASE + timedelta(milliseconds=100),
+            received_monotonic_ns=0,
+        )
+
+        async def load_snapshot(client, symbol):
+            return snapshot_value
+
+        async def skewed_calibration(
+            client, sample_count, lowest_count, utc_clock, monotonic_clock
+        ):
+            del client
+            samples = []
+            for _ in range(sample_count):
+                wall = utc_clock()
+                monotonic = monotonic_clock()
+                samples.append(HftClockSample(
+                    local_send_wall=wall,
+                    local_receive_wall=wall,
+                    server_wall=wall + timedelta(milliseconds=75),
+                    local_send_monotonic=monotonic,
+                    local_receive_monotonic=monotonic,
+                ))
+            return robust_clock_calibration(tuple(samples), lowest_count)
+
+        result = await self.run_session(
+            duration=0,
+            cycles=1,
+            stream_factory=lambda: FakeStream(
+                (bridge_value, live_value), public_ready=True
+            ),
+            snapshot_loader=load_snapshot,
+            calibration_loader=skewed_calibration,
+        )
+        self.assertEqual(result["runtime"]["reconnect_count"], 0)
+        self.assertEqual(result["runtime"]["clock"]["clock_health"], "HEALTHY")
+        self.assertEqual(
+            result["runtime"]["clock"]["corrected_feed_latency_ms"],
+            D("-5"),
+        )
+        self.assertEqual(
+            result["runtime"]["clock"]["negative_latency_observation_count"],
+            1,
+        )
+        self.assertIn("vamp_price", result["runtime"]["alpha_state"])
+        self.assertIn("alpha_bps", result["runtime"]["alpha_state"])
+        self.assertEqual(result["account"].fills, [])
+        self.assertFalse(any(
+            event.get("event") == "websocket_disconnected"
+            and event.get("stage") == "runtime"
+            for event in result["emitted"]
+        ))
 
 
 class BlockedSocket:

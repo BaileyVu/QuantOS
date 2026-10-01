@@ -35,6 +35,12 @@ class HftPaperConfig:
     heartbeat_interval: timedelta
     reconnect_delay: timedelta
     shutdown_timeout: timedelta
+    clock_calibration_timeout: timedelta
+    clock_recalibration_interval: timedelta
+    clock_calibration_samples: int
+    clock_low_rtt_samples: int
+    clock_negative_latency_tolerance_ms: Decimal
+    clock_excessive_negative_limit: int
     simulated_acknowledgement_ms: int
     checkpoint_events: int
     feature: HftFeaturePolicy
@@ -59,9 +65,20 @@ class HftPaperConfig:
             "heartbeat_interval",
             "reconnect_delay",
             "shutdown_timeout",
+            "clock_calibration_timeout",
+            "clock_recalibration_interval",
         ):
             if getattr(self, name) <= timedelta(0):
                 raise ValueError(f"{name} must be positive")
+        if not (
+            self.clock_calibration_samples >= 1
+            and 1 <= self.clock_low_rtt_samples
+            <= self.clock_calibration_samples
+            and self.clock_excessive_negative_limit >= 1
+        ):
+            raise ValueError("invalid HFT clock calibration counts")
+        if self.clock_negative_latency_tolerance_ms < 0:
+            raise ValueError("clock negative-latency tolerance must be non-negative")
         if self.simulated_acknowledgement_ms < 0 or self.checkpoint_events < 1:
             raise ValueError("invalid HFT runtime configuration")
 
@@ -103,6 +120,22 @@ def load_hft_config(path: Path) -> HftPaperConfig:
         ),
         shutdown_timeout=timedelta(
             seconds=int(runtime["shutdown_timeout_seconds"])
+        ),
+        clock_calibration_timeout=timedelta(
+            seconds=int(runtime["clock_calibration_timeout_seconds"])
+        ),
+        clock_recalibration_interval=timedelta(
+            seconds=int(runtime["clock_recalibration_seconds"])
+        ),
+        clock_calibration_samples=int(
+            runtime["clock_calibration_samples"]
+        ),
+        clock_low_rtt_samples=int(runtime["clock_low_rtt_samples"]),
+        clock_negative_latency_tolerance_ms=_decimal(
+            runtime, "clock_negative_latency_tolerance_ms"
+        ),
+        clock_excessive_negative_limit=int(
+            runtime["clock_excessive_negative_limit"]
         ),
         simulated_acknowledgement_ms=int(
             runtime["simulated_acknowledgement_ms"]

@@ -5,6 +5,7 @@ import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
+import time
 from typing import Any, AsyncIterator, Callable, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -49,6 +50,10 @@ def _levels(value: Any, name: str) -> tuple[tuple[Decimal, Decimal], ...]:
         except Exception as error:
             raise BinanceHftStreamError(f"invalid {name} decimal") from error
     return tuple(result)
+
+
+def _optional_utc_milliseconds(value: Any, name: str) -> datetime | None:
+    return None if value is None else _utc_milliseconds(value, name)
 
 
 class BinanceHftPublicClient(BinanceUsdmPublicClient):
@@ -96,6 +101,7 @@ class BinanceHftPublicClient(BinanceUsdmPublicClient):
         if not isinstance(payload, Mapping):
             raise BinanceFuturesError("depth snapshot must be an object")
         received = received_at or datetime.now(timezone.utc)
+        received_monotonic_ns = time.monotonic_ns()
         event_time = _utc_milliseconds(
             payload.get("E", int(received.timestamp() * 1000)), "snapshot event time"
         )
@@ -107,13 +113,16 @@ class BinanceHftPublicClient(BinanceUsdmPublicClient):
                 asks=_levels(payload["asks"], "snapshot asks"),
                 exchange_time=event_time,
                 received_at=received,
+                received_monotonic_ns=received_monotonic_ns,
             )
         except (KeyError, TypeError, ValueError) as error:
             raise BinanceFuturesError(f"invalid depth snapshot: {error}") from error
 
 
 def normalize_hft_message(
-    message: Mapping[str, Any], received_at: datetime
+    message: Mapping[str, Any],
+    received_at: datetime,
+    received_monotonic_ns: int | None = None,
 ) -> DepthDelta | BookTicker | AggregateTrade | MarkPriceEvent:
     if not isinstance(message, Mapping):
         raise BinanceHftStreamError("WebSocket message must be an object")
@@ -134,6 +143,10 @@ def normalize_hft_message(
                 asks=_levels(payload["a"], "depth asks"),
                 exchange_time=event_time,
                 received_at=received_at,
+                transaction_time=_optional_utc_milliseconds(
+                    payload.get("T"), "depth transaction time"
+                ),
+                received_monotonic_ns=received_monotonic_ns,
             )
         if event_type == "bookTicker":
             return BookTicker(
@@ -145,6 +158,10 @@ def normalize_hft_message(
                 ask_quantity=Decimal(str(payload["A"])),
                 exchange_time=event_time,
                 received_at=received_at,
+                transaction_time=_optional_utc_milliseconds(
+                    payload.get("T"), "bookTicker transaction time"
+                ),
+                received_monotonic_ns=received_monotonic_ns,
             )
         if event_type == "aggTrade":
             return AggregateTrade(
@@ -153,8 +170,12 @@ def normalize_hft_message(
                 price=Decimal(str(payload["p"])),
                 quantity=Decimal(str(payload["q"])),
                 buyer_is_maker=payload["m"],
-                exchange_time=_utc_milliseconds(payload["T"], "trade time"),
+                exchange_time=event_time,
                 received_at=received_at,
+                transaction_time=_utc_milliseconds(
+                    payload["T"], "trade transaction time"
+                ),
+                received_monotonic_ns=received_monotonic_ns,
             )
         if event_type == "markPriceUpdate":
             return MarkPriceEvent(
@@ -166,6 +187,7 @@ def normalize_hft_message(
                 ),
                 exchange_time=event_time,
                 received_at=received_at,
+                received_monotonic_ns=received_monotonic_ns,
             )
     except (KeyError, TypeError, ValueError, ArithmeticError) as error:
         raise BinanceHftStreamError(
@@ -279,13 +301,16 @@ class BinanceHftStream:
                             continue
                         timeout_reported = False
                         received = datetime.now(timezone.utc)
+                        received_monotonic_ns = time.monotonic_ns()
                         try:
                             payload = json.loads(raw)
                         except (TypeError, json.JSONDecodeError) as error:
                             raise BinanceHftStreamError(
                                 "invalid WebSocket JSON"
                             ) from error
-                        await queue.put(normalize_hft_message(payload, received))
+                        await queue.put(normalize_hft_message(
+                            payload, received, received_monotonic_ns
+                        ))
             except asyncio.CancelledError:
                 raise
             except (ConnectionClosed, WebSocketException, OSError) as error:

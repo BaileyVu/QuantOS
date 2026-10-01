@@ -7,7 +7,9 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
+import platform
 from pathlib import Path
+import time
 
 from quantos.application.hft_trader import (
     hft_state_identity,
@@ -134,6 +136,37 @@ def hft_command(args: argparse.Namespace) -> int:
     def emit(payload: dict) -> None:
         if payload.get("event") not in {"book_ticker", "aggregate_trade", "hft_hold"}:
             print(_json(payload))
+
+    wall_clock = time.get_clock_info("time")
+    monotonic_clock = time.get_clock_info("monotonic")
+    emit({
+        "event": "local_clock_diagnostics",
+        "platform": platform.platform(),
+        "utc_now": datetime.now(timezone.utc),
+        "local_timezone": datetime.now().astimezone().tzname(),
+        "wall_clock": {
+            "implementation": wall_clock.implementation,
+            "resolution_seconds": wall_clock.resolution,
+            "adjustable": wall_clock.adjustable,
+            "monotonic": wall_clock.monotonic,
+        },
+        "monotonic_clock": {
+            "implementation": monotonic_clock.implementation,
+            "resolution_seconds": monotonic_clock.resolution,
+            "adjustable": monotonic_clock.adjustable,
+            "monotonic": monotonic_clock.monotonic,
+        },
+        "clock_domains": {
+            "exchange_event": "UTC epoch milliseconds from Binance E",
+            "exchange_transaction": "UTC epoch milliseconds from Binance T when applicable",
+            "local_receive_wall": "timezone-aware UTC wall clock",
+            "local_receive_monotonic": "monotonic_ns",
+            "processing": "monotonic",
+            "simulated_order_send": "monotonic",
+            "simulated_acknowledgement": "monotonic",
+        },
+        "system_clock_mutation_required": False,
+    })
 
     try:
         session_id = now.strftime("%Y%m%dT%H%M%S.%fZ") + "-" + rules.symbol

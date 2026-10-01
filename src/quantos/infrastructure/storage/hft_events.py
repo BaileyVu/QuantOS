@@ -39,7 +39,12 @@ class HftEventRecorder:
         self._rows: list[dict[str, Any]] = []
         self._sequence = 0
 
-    def append(self, event: object, processing_completed_at: datetime) -> Path | None:
+    def append(
+        self,
+        event: object,
+        processing_completed_at: datetime,
+        processing_monotonic_ns: int | None = None,
+    ) -> Path | None:
         if not is_dataclass(event):
             raise TypeError("recorded HFT event must be a dataclass")
         payload = _json_value(asdict(event))
@@ -49,6 +54,7 @@ class HftEventRecorder:
             "exchange_time": payload.get("exchange_time"),
             "received_at": payload.get("received_at"),
             "processing_completed_at": processing_completed_at.isoformat(),
+            "processing_monotonic_ns": processing_monotonic_ns,
             "payload_json": json.dumps(
                 payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
             ),
@@ -123,6 +129,13 @@ def export_hftbacktest_research(
             "exchange_timestamp": row["exchange_time"],
             "local_timestamp": row["received_at"],
             "processing_timestamp": row["processing_completed_at"],
+            "processing_monotonic_ns": row.get("processing_monotonic_ns"),
+            "local_receive_monotonic_ns": payload.get(
+                "received_monotonic_ns"
+            ),
+            "exchange_transaction_timestamp": payload.get(
+                "transaction_time"
+            ),
             "first_update_id": payload.get("first_update_id"),
             "final_update_id": payload.get("final_update_id"),
             "previous_final_update_id": payload.get("previous_final_update_id"),

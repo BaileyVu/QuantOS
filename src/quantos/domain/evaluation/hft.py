@@ -69,6 +69,22 @@ class HftEvaluation:
                 raise ValueError("latency cannot be negative")
             self.latencies[name].append(value)
 
+    def record_event_latency(
+        self, feed_ms: Decimal, processing_ms: Decimal
+    ) -> None:
+        for name, value in (
+            ("feed_ms", feed_ms),
+            ("processing_ms", processing_ms),
+        ):
+            if value < 0:
+                raise ValueError("latency cannot be negative")
+            self.latencies[name].append(value)
+
+    def record_acknowledgement_latency(self, value: Decimal) -> None:
+        if value < 0:
+            raise ValueError("latency cannot be negative")
+        self.latencies["ack_ms"].append(value)
+
     def register_passive_fill(
         self,
         fill: HftFill,
@@ -89,14 +105,31 @@ class HftEvaluation:
             completed=set(),
         ))
 
-    def on_mid(self, timestamp: datetime, mid_price: Decimal) -> tuple[Markout, ...]:
+    def on_mid(
+        self,
+        timestamp: datetime,
+        mid_price: Decimal,
+        monotonic_timestamp: Decimal | None = None,
+    ) -> tuple[Markout, ...]:
         added: list[Markout] = []
         remaining: list[_PendingMarkout] = []
         for pending in self._pending:
             for horizon in MARKOUT_HORIZONS:
                 if horizon in pending.completed:
                     continue
-                if timestamp >= pending.fill.timestamp + timedelta(seconds=horizon):
+                wall_due = (
+                    timestamp
+                    >= pending.fill.timestamp + timedelta(seconds=horizon)
+                )
+                monotonic_due = (
+                    monotonic_timestamp is not None
+                    and pending.fill.monotonic_timestamp is not None
+                    and monotonic_timestamp - pending.fill.monotonic_timestamp
+                    >= Decimal(horizon)
+                )
+                if monotonic_due or (
+                    pending.fill.monotonic_timestamp is None and wall_due
+                ):
                     direction = Decimal("1") if pending.fill.side.value == "BUY" else Decimal("-1")
                     bps = (
                         (mid_price - pending.fill.price)
@@ -145,10 +178,12 @@ class HftEvaluation:
                 if account.quotes_submitted else Decimal("0")
             ),
             "trades_per_hour": (
-                Decimal(len(account.fills)) / hours if hours else Decimal("0")
+                Decimal(len(account.fills)) / hours
+                if hours and account.fills else Decimal("0")
             ),
             "round_trips_per_hour": (
-                Decimal(round_trips) / hours if hours else Decimal("0")
+                Decimal(round_trips) / hours
+                if hours and round_trips else Decimal("0")
             ),
             "gross_spread_capture": self.gross_spread_capture,
             "directional_alpha_pnl": self.directional_alpha_pnl,
@@ -238,12 +273,25 @@ class HftEvaluation:
         entries: dict[str, datetime] = {}
         durations: list[Decimal] = []
         last_entry: datetime | None = None
+        last_entry_monotonic: Decimal | None = None
         for fill in fills:
             if fill.role == "ENTRY":
                 last_entry = fill.timestamp
+                last_entry_monotonic = fill.monotonic_timestamp
             elif fill.role in {"EXIT", "SAFETY_EXIT"} and last_entry is not None:
-                durations.append(Decimal(str((fill.timestamp - last_entry).total_seconds())))
+                if (
+                    fill.monotonic_timestamp is not None
+                    and last_entry_monotonic is not None
+                ):
+                    durations.append(
+                        fill.monotonic_timestamp - last_entry_monotonic
+                    )
+                else:
+                    durations.append(Decimal(str(
+                        (fill.timestamp - last_entry).total_seconds()
+                    )))
                 last_entry = None
+                last_entry_monotonic = None
         return sum(durations, Decimal("0")) / Decimal(len(durations)) if durations else Decimal("0")
 
     def _maximum_drawdown(self) -> Decimal:

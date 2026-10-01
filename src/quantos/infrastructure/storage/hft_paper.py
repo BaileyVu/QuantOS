@@ -188,13 +188,30 @@ class HftPaperStateStore:
 
     @staticmethod
     def _account_payload(account: HftPaperAccount) -> dict:
+        working_order = (
+            asdict(account.working_order)
+            if account.working_order else None
+        )
+        if working_order is not None:
+            working_order["submitted_monotonic"] = None
+            working_order["acknowledged_monotonic"] = None
+        inventory = asdict(account.inventory) if account.inventory else None
+        if inventory is not None:
+            inventory["opened_monotonic"] = None
+        fills = []
+        for fill in account.fills:
+            payload = asdict(fill)
+            payload["monotonic_timestamp"] = None
+            fills.append(payload)
         return {
             "starting_equity": account.starting_equity,
             "balance": account.balance,
             "fees": asdict(account.fees),
-            "working_order": asdict(account.working_order) if account.working_order else None,
-            "inventory": asdict(account.inventory) if account.inventory else None,
-            "fills": [asdict(item) for item in account.fills],
+            # Monotonic values are process/boot-local and intentionally are not
+            # durable authorities across restart.
+            "working_order": working_order,
+            "inventory": inventory,
+            "fills": fills,
             "maker_fees": account.maker_fees,
             "taker_fees": account.taker_fees,
             "realized_pnl": account.realized_pnl,

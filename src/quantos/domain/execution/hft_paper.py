@@ -28,6 +28,8 @@ class HftWorkingOrder:
     acknowledged_at: datetime
     book_update_id: int
     role: str
+    submitted_monotonic: Decimal | None = None
+    acknowledged_monotonic: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +46,7 @@ class HftFill:
     realized_pnl: Decimal
     queue_wait_ms: Decimal
     queue_ahead_at_placement: Decimal
+    monotonic_timestamp: Decimal | None = None
 
 
 @dataclass(slots=True)
@@ -51,6 +54,7 @@ class HftInventory:
     quantity: Decimal
     entry_price: Decimal
     opened_at: datetime
+    opened_monotonic: Decimal | None = None
 
 
 class HftPaperAccount:
@@ -96,13 +100,16 @@ class HftPaperAccount:
         book: L2OrderBook,
         submitted_at: datetime,
         acknowledged_at: datetime,
+        submitted_monotonic: Decimal | None = None,
+        acknowledged_monotonic: Decimal | None = None,
     ) -> HftWorkingOrder:
         if not decision.approved:
             raise HftExecutionError("Risk approval required")
         if self.working_order is not None or self.inventory is not None:
             raise HftExecutionError("entry requires no order or inventory")
         return self._place(
-            side, price, decision.quantity, book, submitted_at, acknowledged_at, "ENTRY"
+            side, price, decision.quantity, book, submitted_at, acknowledged_at,
+            "ENTRY", submitted_monotonic, acknowledged_monotonic,
         )
 
     def place_exit(
@@ -112,6 +119,8 @@ class HftPaperAccount:
         book: L2OrderBook,
         submitted_at: datetime,
         acknowledged_at: datetime,
+        submitted_monotonic: Decimal | None = None,
+        acknowledged_monotonic: Decimal | None = None,
     ) -> HftWorkingOrder:
         if self.inventory is None or self.working_order is not None:
             raise HftExecutionError("exit requires inventory and no working order")
@@ -121,6 +130,7 @@ class HftPaperAccount:
         return self._place(
             side, price, abs(self.inventory.quantity), book,
             submitted_at, acknowledged_at, "EXIT",
+            submitted_monotonic, acknowledged_monotonic,
         )
 
     def _place(
@@ -132,6 +142,8 @@ class HftPaperAccount:
         submitted_at: datetime,
         acknowledged_at: datetime,
         role: str,
+        submitted_monotonic: Decimal | None,
+        acknowledged_monotonic: Decimal | None,
     ) -> HftWorkingOrder:
         require_utc(submitted_at, "submitted_at")
         require_utc(acknowledged_at, "acknowledged_at")
@@ -139,6 +151,12 @@ class HftPaperAccount:
             raise HftExecutionError("valid book required")
         if acknowledged_at < submitted_at:
             raise HftExecutionError("negative acknowledgement latency")
+        if (
+            submitted_monotonic is not None
+            and acknowledged_monotonic is not None
+            and acknowledged_monotonic < submitted_monotonic
+        ):
+            raise HftExecutionError("negative monotonic acknowledgement latency")
         if side is HftSide.BUY and price >= book.best_ask:
             raise HftExecutionError("post-only BUY would cross")
         if side is HftSide.SELL and price <= book.best_bid:
@@ -157,6 +175,8 @@ class HftPaperAccount:
             acknowledged_at=acknowledged_at,
             book_update_id=book.last_update_id,
             role=role,
+            submitted_monotonic=submitted_monotonic,
+            acknowledged_monotonic=acknowledged_monotonic,
         )
         self.working_order = order
         self.quotes_submitted += 1
@@ -176,6 +196,21 @@ class HftPaperAccount:
         order = self.working_order
         if order is None or trade.price != order.price:
             return None
+        trade_monotonic = (
+            Decimal(trade.received_monotonic_ns) / Decimal("1000000000")
+            if trade.received_monotonic_ns is not None else None
+        )
+        if (
+            trade_monotonic is not None
+            and order.submitted_monotonic is not None
+            and trade_monotonic < order.submitted_monotonic
+        ):
+            return None
+        if (
+            trade_monotonic is None
+            and trade.received_at < order.placed_at
+        ):
+            return None
         hits_order_side = (
             (order.side is HftSide.BUY and trade.buyer_is_maker)
             or (order.side is HftSide.SELL and not trade.buyer_is_maker)
@@ -191,7 +226,8 @@ class HftPaperAccount:
             return None
         quantity = min(order.remaining_quantity, available)
         fill = self._apply_fill(
-            order, quantity, trade.price, trade.received_at, maker=True
+            order, quantity, trade.price, trade.received_at,
+            monotonic_timestamp=trade_monotonic, maker=True,
         )
         order.remaining_quantity -= quantity
         if order.remaining_quantity == 0:
@@ -199,7 +235,11 @@ class HftPaperAccount:
         return fill
 
     def emergency_exit(
-        self, price: Decimal, timestamp: datetime, reason: str
+        self,
+        price: Decimal,
+        timestamp: datetime,
+        reason: str,
+        monotonic_timestamp: Decimal | None = None,
     ) -> HftFill:
         del reason
         if self.inventory is None:
@@ -219,10 +259,13 @@ class HftPaperAccount:
             acknowledged_at=timestamp,
             book_update_id=-1,
             role="SAFETY_EXIT",
+            submitted_monotonic=monotonic_timestamp,
+            acknowledged_monotonic=monotonic_timestamp,
         )
         self.taker_exits += 1
         return self._apply_fill(
-            synthetic, synthetic.quantity, price, timestamp, maker=False
+            synthetic, synthetic.quantity, price, timestamp,
+            monotonic_timestamp=monotonic_timestamp, maker=False,
         )
 
     def _apply_fill(
@@ -232,6 +275,7 @@ class HftPaperAccount:
         price: Decimal,
         timestamp: datetime,
         *,
+        monotonic_timestamp: Decimal | None,
         maker: bool,
     ) -> HftFill:
         fee_rate = self.fees.maker_rate if maker else self.fees.taker_rate
@@ -240,7 +284,9 @@ class HftPaperAccount:
         signed = quantity if order.side is HftSide.BUY else -quantity
         if order.role == "ENTRY":
             if self.inventory is None:
-                self.inventory = HftInventory(signed, price, timestamp)
+                self.inventory = HftInventory(
+                    signed, price, timestamp, monotonic_timestamp
+                )
             else:
                 if (
                     self.inventory.quantity * signed <= 0
@@ -267,7 +313,19 @@ class HftPaperAccount:
         else:
             self.taker_fees += fee
         self._fill_sequence += 1
-        wait_ms = Decimal(str((timestamp - order.placed_at).total_seconds() * 1000))
+        if (
+            monotonic_timestamp is not None
+            and order.submitted_monotonic is not None
+        ):
+            wait_ms = (
+                monotonic_timestamp - order.submitted_monotonic
+            ) * Decimal("1000")
+        else:
+            wait_ms = Decimal(str(
+                (timestamp - order.placed_at).total_seconds() * 1000
+            ))
+        if wait_ms < 0:
+            raise HftExecutionError("negative monotonic queue wait")
         fill = HftFill(
             fill_id=f"hft-fill-{self._fill_sequence}",
             order_id=order.order_id,
@@ -281,6 +339,7 @@ class HftPaperAccount:
             realized_pnl=realized,
             queue_wait_ms=wait_ms,
             queue_ahead_at_placement=order.initial_queue_ahead,
+            monotonic_timestamp=monotonic_timestamp,
         )
         self.fills.append(fill)
         return fill

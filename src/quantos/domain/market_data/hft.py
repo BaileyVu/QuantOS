@@ -34,6 +34,11 @@ def _levels(values: tuple[BookLevel, ...], name: str) -> tuple[BookLevel, ...]:
     return values
 
 
+def _monotonic_ns(value: int | None) -> None:
+    if value is not None and (type(value) is not int or value < 0):
+        raise HftBookError("received_monotonic_ns must be a non-negative integer")
+
+
 @dataclass(frozen=True, slots=True)
 class DepthSnapshot:
     symbol: str
@@ -42,6 +47,7 @@ class DepthSnapshot:
     asks: tuple[BookLevel, ...]
     exchange_time: datetime
     received_at: datetime
+    received_monotonic_ns: int | None = None
 
     def __post_init__(self) -> None:
         _symbol(self.symbol)
@@ -51,6 +57,7 @@ class DepthSnapshot:
         _levels(self.asks, "ask")
         require_utc(self.exchange_time, "exchange_time")
         require_utc(self.received_at, "received_at")
+        _monotonic_ns(self.received_monotonic_ns)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +70,8 @@ class DepthDelta:
     asks: tuple[BookLevel, ...]
     exchange_time: datetime
     received_at: datetime
+    transaction_time: datetime | None = None
+    received_monotonic_ns: int | None = None
 
     def __post_init__(self) -> None:
         _symbol(self.symbol)
@@ -77,6 +86,9 @@ class DepthDelta:
         _levels(self.asks, "ask")
         require_utc(self.exchange_time, "exchange_time")
         require_utc(self.received_at, "received_at")
+        if self.transaction_time is not None:
+            require_utc(self.transaction_time, "transaction_time")
+        _monotonic_ns(self.received_monotonic_ns)
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +101,8 @@ class BookTicker:
     ask_quantity: Decimal
     exchange_time: datetime
     received_at: datetime
+    transaction_time: datetime | None = None
+    received_monotonic_ns: int | None = None
 
     def __post_init__(self) -> None:
         _symbol(self.symbol)
@@ -103,6 +117,9 @@ class BookTicker:
             raise HftBookError("bookTicker is crossed")
         require_utc(self.exchange_time, "exchange_time")
         require_utc(self.received_at, "received_at")
+        if self.transaction_time is not None:
+            require_utc(self.transaction_time, "transaction_time")
+        _monotonic_ns(self.received_monotonic_ns)
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +131,8 @@ class AggregateTrade:
     buyer_is_maker: bool
     exchange_time: datetime
     received_at: datetime
+    transaction_time: datetime | None = None
+    received_monotonic_ns: int | None = None
 
     def __post_init__(self) -> None:
         _symbol(self.symbol)
@@ -128,6 +147,9 @@ class AggregateTrade:
                 raise HftBookError(f"{name} must be positive")
         require_utc(self.exchange_time, "exchange_time")
         require_utc(self.received_at, "received_at")
+        if self.transaction_time is not None:
+            require_utc(self.transaction_time, "transaction_time")
+        _monotonic_ns(self.received_monotonic_ns)
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +160,7 @@ class MarkPriceEvent:
     next_funding_time: datetime
     exchange_time: datetime
     received_at: datetime
+    received_monotonic_ns: int | None = None
 
     def __post_init__(self) -> None:
         _symbol(self.symbol)
@@ -148,6 +171,7 @@ class MarkPriceEvent:
         require_utc(self.next_funding_time, "next_funding_time")
         require_utc(self.exchange_time, "exchange_time")
         require_utc(self.received_at, "received_at")
+        _monotonic_ns(self.received_monotonic_ns)
 
 
 class L2OrderBook:
@@ -160,6 +184,7 @@ class L2OrderBook:
         self.last_update_id: int | None = None
         self.last_exchange_time: datetime | None = None
         self.last_received_at: datetime | None = None
+        self.last_received_monotonic_ns: int | None = None
         self.valid = False
         self.invalid_reason = "not_bootstrapped"
 
@@ -177,6 +202,7 @@ class L2OrderBook:
         self.last_update_id = snapshot.last_update_id
         self.last_exchange_time = snapshot.exchange_time
         self.last_received_at = snapshot.received_at
+        self.last_received_monotonic_ns = snapshot.received_monotonic_ns
         self.valid = False
         self.invalid_reason = "awaiting_snapshot_bridge"
         self._validate_shape()
@@ -202,6 +228,7 @@ class L2OrderBook:
         self.last_update_id = first.final_update_id
         self.last_exchange_time = first.exchange_time
         self.last_received_at = first.received_at
+        self.last_received_monotonic_ns = first.received_monotonic_ns
         self.valid = True
         self.invalid_reason = ""
         self._validate_shape()
@@ -226,6 +253,7 @@ class L2OrderBook:
         self.last_update_id = delta.final_update_id
         self.last_exchange_time = delta.exchange_time
         self.last_received_at = delta.received_at
+        self.last_received_monotonic_ns = delta.received_monotonic_ns
         try:
             self._validate_shape()
         except HftBookError:
@@ -282,5 +310,18 @@ class L2OrderBook:
             raise HftBookError(f"book is invalid: {self.invalid_reason}")
         age = self.event_age(now)
         if age < timedelta(0) or age > maximum_age:
+            self.invalidate("stale_stream")
+            raise HftBookError("book is stale")
+
+    def require_fresh_monotonic(
+        self, now_ns: int, maximum_age: timedelta
+    ) -> None:
+        if not self.valid:
+            raise HftBookError(f"book is invalid: {self.invalid_reason}")
+        if self.last_received_monotonic_ns is None:
+            raise HftBookError("book has no monotonic receive timestamp")
+        age_ns = now_ns - self.last_received_monotonic_ns
+        maximum_ns = int(maximum_age.total_seconds() * 1_000_000_000)
+        if age_ns < 0 or age_ns > maximum_ns:
             self.invalidate("stale_stream")
             raise HftBookError("book is stale")
