@@ -1,170 +1,132 @@
 # QuantOS
 
-QuantOS is a local, research-driven quantitative trading system for building and evaluating one explainable Binance Spot strategy. Its V1 design prioritizes capital preservation, deterministic behavior, reproducibility, and clear safety boundaries over strategy complexity.
+<p align="center">
+  <img src="assets/quantos-overview.svg" alt="QuantOS architecture overview">
+</p>
 
-> **Trading status:** QuantOS mainline is research and paper-trading oriented. It is not live-approved, does not claim profitability, and must not be treated as an autonomous live-trading system.
+<p align="center">
+  A local quantitative trading research system for building, testing, and validating systematic Binance Spot strategies.
+</p>
 
-## What QuantOS Is
+> **Research and paper trading first.** QuantOS does not claim profitability and is not live-approved.
 
-QuantOS is a Python modular monolith with Clean Architecture boundaries. The frozen V1 scope is deliberately narrow:
+## What is QuantOS?
 
-- Binance Spot only
-- BTCUSDT and ETHUSDT only
-- Completed 1-minute candles only
-- Approximately 20 USDT reference capital
-- One production strategy, one production model, and a compact feature set
-- Paper trading by default
+QuantOS is a Python project for taking a strategy from market data to backtesting and paper trading without mixing up research, risk, and execution concerns.
 
-The authoritative requirements are in [docs/000_READ_FIRST.md](docs/000_READ_FIRST.md) and the related frozen V1 specifications. This README is a project overview, not a replacement specification.
+The V1 mainline is intentionally focused: Binance Spot, BTCUSDT and ETHUSDT, completed one-minute candles, one strategy, one model, and a paper-first workflow. The goal is a small system that is understandable, reproducible, and safe to work on.
 
-## Current Status
+## Where the project is now
 
-| Area | Current mainline status |
+| Area | Current state |
 |---|---|
-| V1 scope | Frozen Spot-only specification |
-| Market data | Historical and live Binance Spot candle paths, canonical validation, Parquet persistence, and local DuckDB queries |
-| Features and modelling | Deterministic candidate features, causal training data, temporal splitting, and LightGBM artifact infrastructure |
-| Evaluation | Event-driven backtesting, cost-aware simulation, metrics, walk-forward evaluation, and Monte Carlo support |
+| Main branch | Frozen Spot-only V1 baseline |
+| Market data | Historical and live candle handling, validation, Parquet storage, and DuckDB queries |
+| Research | Deterministic features, causal training data, temporal splits, and model artifacts |
+| Evaluation | Backtesting, costs, performance metrics, walk-forward checks, and Monte Carlo support |
 | Runtime | Risk-controlled paper execution and a continuous paper-runtime path |
-| Live trading | Not approved; explicit promotion and approval gates remain mandatory |
+| Live trading | Not approved; explicit promotion and human approval are required |
 
-Research records and validation artifacts are retained as evidence; they do not establish future performance or live-trading approval.
+Research results and paper runs are evidence to review, not proof of future performance.
 
-## Architecture
+## How it works
 
-```text
-Market Data
-    ↓
-Feature Engine
-    ↓
-Alpha Engine
-    ↓
-Risk Engine
-    ↓
-Execution Engine
-    ↓
-Binance Spot
+QuantOS keeps the core trading loop simple:
 
-Evaluation Engine: backtest, validation, paper-trading evaluation, and reporting
-```
+~~~text
+Market data → features → strategy decision → risk checks → execution
+                          ↘
+                    evaluation and records
+~~~
 
-QuantOS has exactly six production modules:
+The project has six production modules: Market Data, Feature Engine, Alpha Engine, Risk Engine, Execution Engine, and Evaluation Engine. Storage, configuration, logging, adapters, and the CLI support those modules without becoming separate product systems.
 
-1. Market Data
-2. Feature Engine
-3. Alpha Engine
-4. Risk Engine
-5. Execution Engine
-6. Evaluation Engine
+## Research → validation → execution
 
-Configuration, adapters, storage, logging, CLI code, and tests support these modules; they are not separate product modules.
+~~~text
+Research → Backtest → Walk-Forward → Monte Carlo → Paper Trading → Live Approval
+~~~
 
-## Key Capabilities
+Each step is a gate. A promising backtest or paper run does not automatically authorize live trading.
 
-- UTC-normalized, completed-candle Binance Spot data handling for BTCUSDT and ETHUSDT.
-- Immutable canonical historical datasets stored as Parquet, with typed local DuckDB queries.
-- Deterministic feature computation shared by research and runtime paths.
-- Causal labels, chronological temporal splits, reproducible LightGBM model artifacts, and model compatibility checks.
-- Event-driven backtests with explicit fees, slippage, fills, account state, and performance metrics.
-- Walk-forward and Monte Carlo validation support.
-- Paper-first risk and execution flow with position, exposure, daily-loss, drawdown, stale-state, and after-cost-edge checks.
-- Structured logging, execution evidence, and fail-closed handling for invalid or uncertain state.
+## What's implemented
 
-## Futures / HFT Research
+- Binance Spot historical and live completed-candle data paths for BTCUSDT and ETHUSDT.
+- Immutable Parquet datasets with local DuckDB queries.
+- Deterministic feature generation shared by research and runtime paths.
+- Causal labels, chronological data splits, and reproducible LightGBM model artifacts.
+- Event-driven backtests with fees, slippage, fills, account state, and performance metrics.
+- Risk checks for position sizing, exposure, loss limits, drawdown, stale data, and expected costs.
+- Paper execution, runtime state, structured logs, and fail-closed handling for uncertain state.
 
-Futures and HFT work is intentionally preserved outside the frozen Spot-only mainline. It is not merged into `main`, is not a V1 production capability, and is not evidence of live profitability.
+## Futures / HFT research
 
-Preserved branches include:
+Futures and HFT work is preserved on separate experimental branches. It is not part of the frozen Spot-only V1 mainline and is not evidence of profitable live trading.
 
-- `codex/v1-autonomous-futures-mvp` — Binance USDⓈ-M Futures integration, L2/bookTicker/trade/mark/funding inputs, VAMP, microprice, imbalance, signed aggressive flow, maker-first research, queue-aware simulated fills, liveness controls, authenticated preflight, and Edge V2 paper research.
-- `codex/v1-f3-carry-risk-overlay` — Futures carry-risk preregistration and supporting research code.
-- `codex/v1-t5-aggressive-alpha` — separate experimental alpha work pending explicit specification review.
+- codex/v1-autonomous-futures-mvp includes Binance USDⓈ-M connectivity; L2, bookTicker, trade, mark, and funding inputs; VAMP, microprice, order-book imbalance, and signed aggressive flow; maker-first/post-only research; queue-aware paper fills; latency/liveness monitoring; authenticated preflight; and Edge V2 research.
+- codex/v1-f3-carry-risk-overlay contains Futures carry-risk research.
+- codex/v1-t5-aggressive-alpha contains separate experimental alpha work pending specification review.
 
-These branches remain separate so the frozen V1 Spot scope stays authoritative on `main`.
-
-## Research and Validation
-
-QuantOS follows a staged promotion discipline:
-
-```text
-Research → Backtest → Walk-Forward → Monte Carlo → Paper Trading → Explicit Live Approval
-```
-
-A successful backtest, model fit, or paper-runtime result never enables live trading automatically. Historical research is evaluated with leakage prevention, temporal separation, realistic costs, reproducible inputs, and documented assumptions.
-
-## Repository Structure
-
-```text
-src/quantos/
-  domain/           # Six module rules and shared contracts
-  application/      # Use-case coordination
-  infrastructure/   # Binance adapters, storage, models, config, logging
-  interfaces/       # Local CLI and paper runtime entry points
-
-configs/            # Safe example/runtime configuration
-docs/               # Frozen V1 specifications and research records
-research/           # Reproducible research programs and evidence
-tests/              # Unit, integration, and architecture validation
-```
-
-## Getting Started
+## Quick start
 
 QuantOS requires Python 3.11 or later.
 
-```bash
+~~~bash
 git clone https://github.com/BaileyVu/QuantOS.git
 cd QuantOS
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-```
-
-On Windows PowerShell, activate with:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Useful verification commands:
-
-```bash
 python -m unittest tests.validation.test_architecture
-python -m unittest discover -s tests -t . -v
+~~~
+
+On Windows PowerShell:
+
+~~~powershell
+.\.venv\Scripts\Activate.ps1
+~~~
+
+To see available local commands:
+
+~~~bash
 python -m quantos --help
-```
+~~~
 
-The CLI exposes paper-runtime and aggregate-trade research commands. The default configuration is paper mode; attempting a runtime without a selected Alpha fails closed. Configuration and command invocation do not confer live-trading approval.
+## Project structure
 
-## Development
+~~~text
+QuantOS/
+├── src/quantos/   # Domain rules, application flow, adapters, and CLI
+├── tests/         # Unit, integration, and architecture checks
+├── configs/       # Safe example and paper-runtime configuration
+├── docs/          # Frozen V1 specifications and research records
+├── research/      # Research programs and evidence
+└── README.md
+~~~
 
-Read these before changing trading behavior or architecture:
+## Safety
 
-1. [AGENTS.md](AGENTS.md)
-2. [docs/000_READ_FIRST.md](docs/000_READ_FIRST.md)
-3. The directly relevant frozen specification in [docs](docs)
-
-Preserve module ownership, use completed-candle UTC semantics, and keep backtest, paper, and live behavior aligned. Do not add exchanges, instruments, strategies, or models without an approved specification change.
-
-## Safety and Trading Status
-
-- Begin with research, validation, and paper operation.
-- Risk is evaluated before Execution; a Risk rejection is final.
+- Start with research, validation, and paper trading.
+- Risk is evaluated before execution, and a risk rejection is final.
 - Only the Execution module may submit an exchange order.
-- Missing, stale, invalid, or unreconciled state must fail closed.
-- Mainnet operation requires explicit approval and configuration; it is never the default.
-- Never commit credentials, market data, model artifacts, logs, or generated reports.
+- Missing, stale, invalid, or unreconciled state stops the affected action.
+- Mainnet access requires explicit authorization and safeguards.
 
-## Data and Secrets
+## Data & secrets
 
-Local datasets and credentials are intentionally outside Git. Typical PC-only locations include:
+Market datasets, generated artifacts, and credentials stay outside Git. Common local locations are:
 
-```text
-G:\QuantOS-Data
-G:\QuantOS-HFT-Data
-G:\QuantOS-Secrets
-```
+~~~text
+QuantOS-Data
+QuantOS-HFT-Data
+QuantOS-Secrets
+~~~
 
-Keep API keys, exchange credentials, `.env` files, Parquet datasets, DuckDB files, and generated artifacts out of commits. Transfer required data and secrets between machines separately and securely.
+Never commit API keys, .env files, account information, raw datasets, or generated trading artifacts.
+
+## Documentation
+
+Start with [AGENTS.md](AGENTS.md), then read [docs/000_READ_FIRST.md](docs/000_READ_FIRST.md) and the relevant frozen V1 specification. The documentation is the source of truth for architecture, trading behavior, and promotion rules.
 
 ## License
 
