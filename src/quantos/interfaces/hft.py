@@ -1,6 +1,8 @@
 """CLI composition for event-driven HFT paper mode."""
 from __future__ import annotations
 
+from dataclasses import asdict, is_dataclass
+
 import argparse
 import asyncio
 from dataclasses import asdict
@@ -11,6 +13,7 @@ import json
 import os
 import platform
 from pathlib import Path
+import sys
 import time
 
 from quantos.application.hft_trader import (
@@ -120,6 +123,9 @@ def _json(value: object) -> str:
             return item.isoformat()
         if hasattr(item, "value"):
             return item.value
+        if is_dataclass(item) and not isinstance(item, type):
+            return asdict(item)
+
         raise TypeError(type(item).__name__)
     return json.dumps(
         value, default=encode, sort_keys=True, separators=(",", ":"),
@@ -391,6 +397,7 @@ async def _authenticated_runtime(
 
 def _authenticated_command(args: argparse.Namespace) -> int:
     from quantos.application.hft_authenticated import (
+        HftAuthenticatedPreflightError,
         authenticated_preflight,
         reconcile_authenticated_state,
         run_authenticated_hft_session,
@@ -415,13 +422,19 @@ def _authenticated_command(args: argparse.Namespace) -> int:
     else:
         store.snapshot()
     if args.futures_operation == "hft-auth-preflight":
-        payload, _, _ = authenticated_preflight(
-            client, store,
-            environment=environment,
-            normalize_account=False,
-            perform_test_order=True,
-            allow_testnet_btcusdt=args.allow_testnet_btcusdt,
-        )
+        try:
+            payload, _, _ = authenticated_preflight(
+                client, store,
+                environment=environment,
+                normalize_account=False,
+                perform_test_order=True,
+                allow_testnet_btcusdt=args.allow_testnet_btcusdt,
+            )
+        except HftAuthenticatedPreflightError as error:
+            if not error.diagnostic:
+                raise
+            print(_json(error.diagnostic), file=sys.stderr)
+            return 2
         print(_json(payload))
         return 0
     state = store.snapshot()

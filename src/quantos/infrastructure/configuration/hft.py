@@ -152,6 +152,17 @@ def load_hft_config(path: Path) -> HftPaperConfig:
             require_signed_flow_confirmation=bool(
                 alpha["require_signed_flow_confirmation"]
             ),
+            minimum_abs_alpha_bps=(
+                _decimal(alpha, "minimum_abs_alpha_bps")
+                if "minimum_abs_alpha_bps" in alpha
+                else Decimal("1.0")
+            ),
+            require_directional_obi_confirmation=bool(
+                alpha.get(
+                    "require_directional_obi_confirmation",
+                    False,
+                )
+            ),
             maximum_spread_bps=_decimal(alpha, "maximum_spread_bps"),
             maximum_volatility_bps=_decimal(alpha, "maximum_volatility_bps"),
             maximum_quote_age_ms=int(alpha["maximum_quote_age_ms"]),

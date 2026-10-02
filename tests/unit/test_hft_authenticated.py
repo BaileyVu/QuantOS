@@ -286,6 +286,12 @@ class DurableEnvironmentTests(unittest.TestCase):
 
 class FakePreflightClient:
     def __init__(self):
+        self.can_trade = True
+        self.futures_enabled = True
+        self.api_futures_enabled = True
+        self.api_reading_enabled = True
+        self.account_status_value = "Normal"
+        self.api_trading_locked = False
         self.dual = False
         self.isolated = True
         self.leverage = 5
@@ -296,12 +302,31 @@ class FakePreflightClient:
         self.orders = []
         self.calls = []
         self.rate_limits = RateState()
+        self.balance_rows = [
+            {"asset": "USDT", "balance": "20", "availableBalance": "20"},
+            {"asset": "USDC", "balance": "100", "availableBalance": "90"},
+        ]
+        self.test_order_error = None
 
     def calibrate_clock(self): return {"clock_offset_ms": 0}
     def exchange_info(self): return exchange_info()
-    def account(self): return {"canTrade": True, "multiAssetsMargin": False}
+    def account(self):
+        result = {"multiAssetsMargin": False}
+        if self.can_trade is not None:
+            result["canTrade"] = self.can_trade
+        return result
+    def account_info(self): return {"isFutureEnabled": self.futures_enabled}
+    def account_status(self): return {"data": self.account_status_value}
+    def api_key_permissions(self): return {
+        "enableReading": self.api_reading_enabled,
+        "enableFutures": self.api_futures_enabled,
+        "enableSpotAndMarginTrading": False,
+    }
+    def api_trading_status(self): return {
+        "data": {"isLocked": self.api_trading_locked}
+    }
     def account_config(self): return {"multiAssetsMargin": False}
-    def balances(self): return [{"asset": "USDC", "balance": "100", "availableBalance": "90"}]
+    def balances(self): return list(self.balance_rows)
     def position_risk(self, symbol=None): return list(self.positions)
     def open_orders(self, symbol=None): return list(self.orders)
     def position_mode(self): return {"dualSidePosition": self.dual}
@@ -311,7 +336,11 @@ class FakePreflightClient:
     def commission_rate(self, symbol): return {"symbol": symbol, "makerCommissionRate": "0", "takerCommissionRate": ".0004"}
     def book_ticker(self, symbol): return {"symbol": symbol, "bidPrice": "100", "askPrice": "101"}
     def credential_health(self): return {"credentials_redacted": True}
-    def test_order(self, **values): self.calls.append(("test_order", values)); return {}
+    def test_order(self, **values):
+        self.calls.append(("test_order", values))
+        if self.test_order_error is not None:
+            raise self.test_order_error
+        return {}
     def set_one_way_mode(self): self.calls.append(("one_way",)); self.dual = False; return {}
     def set_isolated_margin(self, symbol): self.calls.append(("isolated", symbol)); self.isolated = True; return {}
     def set_leverage(self, symbol, value): self.calls.append(("leverage", symbol, value)); self.leverage = value; return {}
@@ -332,6 +361,131 @@ class PreflightAndReconciliationTests(unittest.TestCase):
         self.assertEqual(fees.taker_rate, D(".0004"))
         self.assertEqual(store.state["commission"]["maker_rate"], "0")
         self.assertEqual(client.calls[0][0], "test_order")
+        self.assertTrue(payload["futures_account_enabled"])
+        self.assertTrue(payload["api_key_enable_futures"])
+        self.assertEqual(payload["account_status"], "Normal")
+        self.assertEqual(payload["usdt_futures_wallet_balance"], "20")
+        self.assertEqual(payload["usdc_futures_available_balance"], "90")
+        self.assertEqual(payload["position_mode"], "ONE_WAY")
+        self.assertEqual(payload["account_mode"], "SINGLE_ASSET")
+        self.assertEqual(payload["btcusdc_status"], "TRADING")
+        self.assertTrue(payload["account_can_trade"])
+        self.assertEqual(payload["account_can_trade_source"], "fapi_v3_account.canTrade")
+        self.assertTrue(payload["account_can_trade_required"])
+        self.assertTrue(payload["order_test_attempted"])
+        self.assertTrue(payload["order_test_passed"])
+        self.assertTrue(payload["effective_trade_permission"])
+
+    def test_permission_failure_is_not_misclassified_as_zero_balance(self):
+        client = FakePreflightClient()
+        client.can_trade = False
+        client.balance_rows = [
+            {"asset": "USDT", "balance": "0", "availableBalance": "0"},
+            {"asset": "USDC", "balance": "0", "availableBalance": "0"},
+        ]
+        with self.assertRaises(HftAuthenticatedPreflightError) as raised:
+            authenticated_preflight(
+                client, MemoryStore(),
+                environment=HftExecutionEnvironment.MAINNET,
+                normalize_account=False, perform_test_order=False,
+            )
+        diagnostic = raised.exception.diagnostic
+        self.assertEqual(diagnostic["failure_code"], "ACCOUNT_PERMISSION")
+        self.assertEqual(diagnostic["failure_type"], "ACCOUNT_PERMISSION")
+        self.assertFalse(diagnostic["account_can_trade"])
+        self.assertNotEqual(
+            diagnostic["failure_code"], "INSUFFICIENT_FUTURES_COLLATERAL"
+        )
+
+    def test_permission_failure_classification_uses_exact_binance_fields(self):
+        cases = (
+            ("FUTURES_NOT_ENABLED", {"futures_enabled": False}),
+            ("API_KEY_PERMISSION", {"api_futures_enabled": False}),
+            ("ACCOUNT_RESTRICTED", {"account_status_value": "Restricted"}),
+            ("ACCOUNT_RESTRICTED", {"api_trading_locked": True}),
+        )
+        for expected, changes in cases:
+            with self.subTest(expected=expected, changes=changes):
+                client = FakePreflightClient()
+                for name, value in changes.items():
+                    setattr(client, name, value)
+                with self.assertRaises(HftAuthenticatedPreflightError) as raised:
+                    authenticated_preflight(
+                        client, MemoryStore(),
+                        environment=HftExecutionEnvironment.MAINNET,
+                        normalize_account=False, perform_test_order=False,
+                    )
+                self.assertEqual(
+                    raised.exception.diagnostic["failure_type"], expected
+                )
+
+    def test_missing_can_trade_uses_order_test_as_final_permission_probe(self):
+        client = FakePreflightClient()
+        client.can_trade = None
+        payload, _, _ = authenticated_preflight(
+            client, MemoryStore(), environment=HftExecutionEnvironment.MAINNET,
+            normalize_account=False, perform_test_order=True,
+        )
+        self.assertTrue(payload["passed"])
+        self.assertIsNone(payload["account_can_trade"])
+        self.assertIsNone(payload["account_can_trade_source"])
+        self.assertFalse(payload["account_can_trade_required"])
+        self.assertTrue(payload["order_test_passed"])
+        self.assertTrue(payload["effective_trade_permission"])
+        self.assertIn(
+            "fapi_v1_order_test=PASS",
+            payload["effective_trade_permission_evidence"],
+        )
+
+    def test_order_test_rejections_remain_fail_closed_with_exact_diagnostic(self):
+        cases = (
+            (
+                BinanceAuthenticatedError("API-key permission denied", code=-2015),
+                "API_KEY_PERMISSION",
+            ),
+            (
+                BinanceAuthenticatedError("Signature for this request is not valid", code=-1022),
+                "AUTHENTICATION_OR_TRANSPORT",
+            ),
+        )
+        for error, expected in cases:
+            with self.subTest(expected=expected):
+                client = FakePreflightClient()
+                client.can_trade = None
+                client.test_order_error = error
+                with self.assertRaises(HftAuthenticatedPreflightError) as raised:
+                    authenticated_preflight(
+                        client, MemoryStore(),
+                        environment=HftExecutionEnvironment.MAINNET,
+                        normalize_account=False, perform_test_order=True,
+                    )
+                diagnostic = raised.exception.diagnostic
+                self.assertEqual(diagnostic["failure_type"], expected)
+                self.assertTrue(diagnostic["order_test_attempted"])
+                self.assertFalse(diagnostic["order_test_passed"])
+                self.assertEqual(diagnostic["order_test_error_code"], error.code)
+                self.assertEqual(diagnostic["order_test_error_message"], str(error))
+                self.assertFalse(diagnostic["effective_trade_permission"])
+
+    def test_valid_permissions_with_zero_collateral_is_balance_only(self):
+        client = FakePreflightClient()
+        client.balance_rows = [
+            {"asset": "USDT", "balance": "0", "availableBalance": "0"},
+            {"asset": "USDC", "balance": "0", "availableBalance": "0"},
+        ]
+        with self.assertRaises(HftAuthenticatedPreflightError) as raised:
+            authenticated_preflight(
+                client, MemoryStore(),
+                environment=HftExecutionEnvironment.MAINNET,
+                normalize_account=False, perform_test_order=False,
+            )
+        diagnostic = raised.exception.diagnostic
+        self.assertEqual(
+            diagnostic["failure_code"], "INSUFFICIENT_FUTURES_COLLATERAL"
+        )
+        self.assertEqual(diagnostic["failure_type"], "BALANCE_ONLY")
+        self.assertTrue(diagnostic["account_can_trade"])
+        self.assertEqual(diagnostic["usdc_futures_wallet_balance"], "0")
 
     def test_one_way_isolated_and_leverage_normalize_only_when_flat(self):
         client, store = FakePreflightClient(), MemoryStore()

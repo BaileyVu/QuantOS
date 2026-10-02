@@ -30,6 +30,10 @@ class BinanceHftStreamError(RuntimeError):
     pass
 
 
+class BinanceHftBackpressureError(BinanceHftStreamError):
+    pass
+
+
 def _utc_milliseconds(value: Any, name: str) -> datetime:
     try:
         result = datetime.fromtimestamp(int(value) / 1000, timezone.utc)
@@ -204,19 +208,49 @@ class BinanceHftStream:
         open_timeout: float = 5,
         read_timeout: float = 1,
         shutdown_timeout: float = 3,
+        queue_maxsize: int = 4096,
         lifecycle: Callable[[dict], None] = lambda value: None,
     ) -> None:
         if not base_url.startswith("wss://"):
             raise ValueError("HFT WebSocket URL must use wss")
         if min(open_timeout, read_timeout, shutdown_timeout) <= 0:
             raise ValueError("HFT WebSocket timeouts must be positive")
+        if queue_maxsize < 1:
+            raise ValueError("HFT stream queue size must be positive")
         self.base_url = base_url
         self.open_timeout = open_timeout
         self.read_timeout = read_timeout
         self.shutdown_timeout = shutdown_timeout
+        self.queue_maxsize = queue_maxsize
         self.lifecycle = lifecycle
         self._public_ready = asyncio.Event()
         self._market_ready = asyncio.Event()
+        self._last_socket_receive_ns = {"public": None, "market": None}
+        self._last_depth_receive_ns: int | None = None
+        self._stream_queue_current = 0
+        self._stream_queue_high_water = 0
+        self._backpressure_overflow_count = 0
+        self._read_timeout_count = 0
+
+    def telemetry(self, now_ns: int | None = None) -> dict[str, Any]:
+        observed_now = time.monotonic_ns() if now_ns is None else now_ns
+
+        def age(received_ns: int | None) -> Decimal | None:
+            if received_ns is None:
+                return None
+            return Decimal(max(observed_now - received_ns, 0)) / Decimal("1000000")
+
+        return {
+            "socket_receive_age_by_route_ms": {
+                route: age(received_ns)
+                for route, received_ns in self._last_socket_receive_ns.items()
+            },
+            "depth_socket_receive_age_ms": age(self._last_depth_receive_ns),
+            "stream_queue_current": self._stream_queue_current,
+            "stream_queue_high_water": self._stream_queue_high_water,
+            "backpressure_overflow_count": self._backpressure_overflow_count,
+            "websocket_read_timeout_count": self._read_timeout_count,
+        }
 
     async def wait_public_ready(self) -> None:
         await self._public_ready.wait()
@@ -246,7 +280,14 @@ class BinanceHftStream:
     ]:
         queue: asyncio.Queue[
             DepthDelta | BookTicker | AggregateTrade | MarkPriceEvent | BaseException
-        ] = asyncio.Queue(maxsize=4096)
+        ] = asyncio.Queue(maxsize=self.queue_maxsize)
+        terminal_errors: asyncio.Queue[BaseException] = asyncio.Queue(maxsize=2)
+
+        def report_terminal(error: BaseException) -> None:
+            try:
+                terminal_errors.put_nowait(error)
+            except asyncio.QueueFull:
+                pass
 
         async def pump(route: str, url: str) -> None:
             self.lifecycle({
@@ -291,6 +332,7 @@ class BinanceHftStream:
                                 socket.recv(), timeout=self.read_timeout
                             )
                         except TimeoutError:
+                            self._read_timeout_count += 1
                             if not timeout_reported:
                                 self.lifecycle({
                                     "event": "websocket_timeout",
@@ -302,23 +344,45 @@ class BinanceHftStream:
                         timeout_reported = False
                         received = datetime.now(timezone.utc)
                         received_monotonic_ns = time.monotonic_ns()
+                        self._last_socket_receive_ns[route] = received_monotonic_ns
                         try:
                             payload = json.loads(raw)
                         except (TypeError, json.JSONDecodeError) as error:
                             raise BinanceHftStreamError(
                                 "invalid WebSocket JSON"
                             ) from error
-                        await queue.put(normalize_hft_message(
+                        event = normalize_hft_message(
                             payload, received, received_monotonic_ns
-                        ))
+                        )
+                        if isinstance(event, DepthDelta):
+                            self._last_depth_receive_ns = received_monotonic_ns
+                        try:
+                            queue.put_nowait(event)
+                        except asyncio.QueueFull as error:
+                            self._backpressure_overflow_count += 1
+                            self.lifecycle({
+                                "event": "websocket_backpressure",
+                                "route": route,
+                                "queue_size": queue.qsize(),
+                                "queue_capacity": self.queue_maxsize,
+                                "overflow_count": self._backpressure_overflow_count,
+                            })
+                            raise BinanceHftBackpressureError(
+                                f"stream_queue_overflow:{route}"
+                            ) from error
+                        self._stream_queue_current = queue.qsize()
+                        self._stream_queue_high_water = max(
+                            self._stream_queue_high_water,
+                            self._stream_queue_current,
+                        )
             except asyncio.CancelledError:
                 raise
             except (ConnectionClosed, WebSocketException, OSError) as error:
-                await queue.put(BinanceHftStreamError(
+                report_terminal(BinanceHftStreamError(
                     f"Binance HFT stream disconnected ambiguously: {error}"
                 ))
             except BaseException as error:
-                await queue.put(error)
+                report_terminal(error)
             finally:
                 self.lifecycle({
                     "event": "websocket_disconnected",
@@ -330,20 +394,62 @@ class BinanceHftStream:
             asyncio.create_task(pump("public", public_url)),
             asyncio.create_task(pump("market", market_url)),
         ]
+        item_task: asyncio.Task | None = None
+        error_task: asyncio.Task | None = None
+
         try:
             while True:
-                item = await queue.get()
+                item_task = asyncio.create_task(queue.get())
+                error_task = asyncio.create_task(terminal_errors.get())
+                done, pending = await asyncio.wait(
+                    {item_task, error_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if error_task in done:
+                    item_task.cancel()
+                    await asyncio.gather(item_task, return_exceptions=True)
+                    raise error_task.result()
+                error_task.cancel()
+                await asyncio.gather(error_task, return_exceptions=True)
+                item = item_task.result()
+                self._stream_queue_current = queue.qsize()
                 if isinstance(item, BaseException):
                     raise item
                 yield item
         finally:
+            waiter_tasks = [
+                task
+                for task in (item_task, error_task)
+                if task is not None
+            ]
+
+            for task in waiter_tasks:
+                if not task.done():
+                    task.cancel()
+
+            if waiter_tasks:
+                await asyncio.gather(
+                    *waiter_tasks,
+                    return_exceptions=True,
+                )
+
             for task in tasks:
                 task.cancel()
+
             done, pending = await asyncio.wait(
-                tasks, timeout=self.shutdown_timeout
+                tasks,
+                timeout=self.shutdown_timeout,
             )
+
             for task in pending:
                 task.cancel()
+
+            if pending:
+                await asyncio.gather(
+                    *pending,
+                    return_exceptions=True,
+                )
+
             for task in done:
                 try:
                     task.result()

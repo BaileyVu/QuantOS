@@ -30,9 +30,15 @@ class HftAlphaPolicy:
     maximum_volatility_bps: Decimal = Decimal("20")
     maximum_quote_age_ms: int = 2000
     severe_reversal_bps: Decimal = Decimal("5")
+    minimum_abs_alpha_bps: Decimal = Decimal("1.0")
+    require_directional_obi_confirmation: bool = False
 
     def __post_init__(self) -> None:
-        if self.minimum_abs_obi_z < 0 or self.maximum_spread_bps <= 0:
+        if (
+            self.minimum_abs_alpha_bps < 0
+            or self.minimum_abs_obi_z < 0
+            or self.maximum_spread_bps <= 0
+        ):
             raise ValueError("invalid HFT Alpha policy")
         if self.maximum_volatility_bps <= 0 or self.maximum_quote_age_ms < 1:
             raise ValueError("invalid HFT Alpha safety threshold")
@@ -64,30 +70,76 @@ class VampOrderFlowAlpha:
         working_side: HftSide | None = None,
     ) -> HftQuoteIntent:
         alpha = features.alpha_bps
+
         if (
             features.spread_bps > self.policy.maximum_spread_bps
-            or features.realized_volatility_bps > self.policy.maximum_volatility_bps
+            or features.realized_volatility_bps
+            > self.policy.maximum_volatility_bps
         ):
-            return self._intent(HftIntentAction.CANCEL, None, None, features, "regime_filter")
+            return self._intent(
+                HftIntentAction.CANCEL,
+                None,
+                None,
+                features,
+                "regime_filter",
+            )
 
-        direction = HftSide.BUY if alpha > 0 else HftSide.SELL
+        direction = (
+            HftSide.BUY
+            if alpha > 0
+            else HftSide.SELL
+        )
         magnitude = abs(alpha)
-        confirmed = (
-            abs(features.standardized_obi) >= self.policy.minimum_abs_obi_z
-            and (
-                not self.policy.require_signed_flow_confirmation
-                or (direction is HftSide.BUY and features.signed_trade_flow > 0)
-                or (direction is HftSide.SELL and features.signed_trade_flow < 0)
+
+        if self.policy.require_directional_obi_confirmation:
+            directional_obi = (
+                features.standardized_obi
+                if direction is HftSide.BUY
+                else -features.standardized_obi
+            )
+            obi_confirmed = (
+                directional_obi
+                >= self.policy.minimum_abs_obi_z
+            )
+        else:
+            obi_confirmed = (
+                abs(features.standardized_obi)
+                >= self.policy.minimum_abs_obi_z
+            )
+
+        flow_confirmed = (
+            not self.policy.require_signed_flow_confirmation
+            or (
+                direction is HftSide.BUY
+                and features.signed_trade_flow > 0
+            )
+            or (
+                direction is HftSide.SELL
+                and features.signed_trade_flow < 0
             )
         )
+
+        confirmed = obi_confirmed and flow_confirmed
+
         if inventory_quantity != 0:
-            inventory_side = HftSide.BUY if inventory_quantity > 0 else HftSide.SELL
-            exit_side = HftSide.SELL if inventory_quantity > 0 else HftSide.BUY
+            inventory_side = (
+                HftSide.BUY
+                if inventory_quantity > 0
+                else HftSide.SELL
+            )
+
+            exit_side = (
+                HftSide.SELL
+                if inventory_quantity > 0
+                else HftSide.BUY
+            )
+
             exit_price = (
                 features.best_ask
                 if exit_side is HftSide.SELL
                 else features.best_bid
             )
+
             if magnitude <= economic_hurdle_bps or not confirmed:
                 return self._intent(
                     HftIntentAction.MAKER_EXIT,
@@ -96,12 +148,17 @@ class VampOrderFlowAlpha:
                     features,
                     "alpha_mean_reversion",
                 )
+
             if direction is not inventory_side:
                 if magnitude >= self.policy.severe_reversal_bps:
                     return self._intent(
-                        HftIntentAction.SAFETY_EXIT, direction, None, features,
+                        HftIntentAction.SAFETY_EXIT,
+                        direction,
+                        None,
+                        features,
                         "severe_alpha_reversal",
                     )
+
                 return self._intent(
                     HftIntentAction.MAKER_EXIT,
                     exit_side,
@@ -109,14 +166,58 @@ class VampOrderFlowAlpha:
                     features,
                     "alpha_mean_reversion",
                 )
-            return self._intent(HftIntentAction.HOLD, None, None, features, "inventory_open")
-        if magnitude <= economic_hurdle_bps or not confirmed:
-            action = HftIntentAction.CANCEL if working_side is not None else HftIntentAction.HOLD
-            return self._intent(action, None, None, features, "alpha_below_hurdle")
-        if working_side is not None and direction is not working_side:
-            return self._intent(HftIntentAction.CANCEL, None, None, features, "alpha_reversal")
-        price = features.best_bid if direction is HftSide.BUY else features.best_ask
-        return self._intent(HftIntentAction.QUOTE, direction, price, features, "vamp_displacement")
+
+            return self._intent(
+                HftIntentAction.HOLD,
+                None,
+                None,
+                features,
+                "inventory_open",
+            )
+
+        if (
+            magnitude <= self.policy.minimum_abs_alpha_bps
+            or not confirmed
+        ):
+            action = (
+                HftIntentAction.CANCEL
+                if working_side is not None
+                else HftIntentAction.HOLD
+            )
+
+            return self._intent(
+                action,
+                None,
+                None,
+                features,
+                "alpha_below_hurdle",
+            )
+
+        if (
+            working_side is not None
+            and direction is not working_side
+        ):
+            return self._intent(
+                HftIntentAction.CANCEL,
+                None,
+                None,
+                features,
+                "alpha_reversal",
+            )
+
+        price = (
+            features.best_bid
+            if direction is HftSide.BUY
+            else features.best_ask
+        )
+
+        return self._intent(
+            HftIntentAction.QUOTE,
+            direction,
+            price,
+            features,
+            "vamp_displacement",
+        )
 
     def _intent(
         self,

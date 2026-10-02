@@ -1,3 +1,15 @@
+# EDGE V2 PAPER RESEARCH CONFIG
+#
+# Purpose:
+# Validate execution economics of the empirically selected BTCUSDC edge:
+#   abs(VAMP alpha) >= 0.10 bps
+#   directional standardized OBI >= 1.0 sigma
+#   signed aggressive flow confirms direction
+#
+# adverse_selection_bps and safety_buffer_bps are intentionally zero ONLY
+# in this PAPER research config so post-fill markouts measure them empirically.
+# Do not use this file for authenticated MAINNET execution.
+
 [hft]
 preferred_symbol = "BTCUSDC"
 fallback_symbol = "BTCUSDT"
@@ -26,10 +38,10 @@ trade_flow_seconds = "5"
 volatility_seconds = "10"
 
 [alpha]
-minimum_abs_obi_z = "0"
-require_signed_flow_confirmation = false
-minimum_abs_alpha_bps = "1.0"
-require_directional_obi_confirmation = false
+minimum_abs_obi_z = "1.0"
+require_signed_flow_confirmation = true
+minimum_abs_alpha_bps = "0.10"
+require_directional_obi_confirmation = true
 maximum_spread_bps = "5"
 maximum_volatility_bps = "20"
 maximum_quote_age_ms = 2000
@@ -42,8 +54,8 @@ maximum_position_quantity = "1"
 maximum_account_loss_fraction = "0.01"
 daily_loss_fraction = "0.03"
 adverse_fill_limit = 5
-adverse_selection_bps = "0.5"
-safety_buffer_bps = "0.5"
+adverse_selection_bps = "0"
+safety_buffer_bps = "0"
 emergency_move_bps = "20"
 funding_allowance_bps = "0"
 

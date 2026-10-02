@@ -5,6 +5,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
+import time
 import unittest
 from unittest.mock import patch
 
@@ -20,7 +21,10 @@ from quantos.domain.market_data.hft_clock import (
     HftClockSample,
     robust_clock_calibration,
 )
-from quantos.infrastructure.binance.hft import BinanceHftStream
+from quantos.infrastructure.binance.hft import (
+    BinanceHftBackpressureError,
+    BinanceHftStream,
+)
 from quantos.infrastructure.configuration.hft import load_hft_config
 
 from tests.unit.test_hft_paper import fees, rules
@@ -163,6 +167,74 @@ def trade() -> AggregateTrade:
     )
 
 
+def live_depth(
+    update_id: int = 102, received_monotonic_ns: int | None = None
+) -> DepthDelta:
+    return DepthDelta(
+        symbol="BTCUSDC",
+        first_update_id=update_id,
+        final_update_id=update_id,
+        previous_final_update_id=update_id - 1,
+        bids=(),
+        asks=(),
+        exchange_time=BASE,
+        received_at=BASE,
+        received_monotonic_ns=received_monotonic_ns,
+    )
+
+
+class TelemetryStream(FakeStream):
+    def __init__(self, events=(), *, depth_socket_age_ms=D("0")) -> None:
+        super().__init__(events, public_ready=True)
+        self.depth_socket_age_ms = depth_socket_age_ms
+
+    def telemetry(self, now_ns=None):
+        del now_ns
+        return {
+            "socket_receive_age_by_route_ms": {
+                "public": self.depth_socket_age_ms,
+                "market": D("0"),
+            },
+            "depth_socket_receive_age_ms": self.depth_socket_age_ms,
+            "stream_queue_current": 0,
+            "stream_queue_high_water": 1,
+            "backpressure_overflow_count": 0,
+            "websocket_read_timeout_count": 0,
+        }
+
+
+class BurstAfterBridgeStream(TelemetryStream):
+    async def events(self, symbol: str):
+        del symbol
+        try:
+            yield bridge()
+            await asyncio.sleep(0)
+            for identifier in range(100):
+                yield replace(trade(), aggregate_trade_id=identifier + 1)
+            await asyncio.Future()
+        finally:
+            self.closed = True
+
+
+class SlowClockRecorder(FakeRecorder):
+    def __init__(self, clock: FakeClock) -> None:
+        super().__init__()
+        self.clock = clock
+        self.advances_remaining = 2
+
+    def append(self, event, now, processing_monotonic_ns=None):
+        super().append(event, now, processing_monotonic_ns)
+        if self.advances_remaining > 0:
+            self.clock.value += 2
+            self.advances_remaining -= 1
+
+
+class BlockingRecorder(FakeRecorder):
+    def append(self, event, now, processing_monotonic_ns=None):
+        time.sleep(0.03)
+        return super().append(event, now, processing_monotonic_ns)
+
+
 class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         config = load_hft_config(Path("configs/futures_hft_paper.toml"))
@@ -186,10 +258,16 @@ class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
         snapshot_loader=None,
         calibration_loader=None,
         emit=None,
+        config=None,
+        recorder_factory=None,
+        application_queue_maxsize=4096,
     ):
         clock = FakeClock()
         waiter = AdvancingQueueWaiter(clock)
-        recorder = FakeRecorder()
+        recorder = (
+            recorder_factory(clock)
+            if recorder_factory is not None else FakeRecorder()
+        )
         store = FakeStateStore()
         account = HftPaperAccount(D("100"), fees())
         evaluation = HftEvaluation(D("100"))
@@ -200,7 +278,7 @@ class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
             return snapshot()
 
         metrics = await run_hft_paper_session(
-            config=self.config,
+            config=config or self.config,
             rules=rules(),
             account=account,
             evaluation=evaluation,
@@ -219,6 +297,7 @@ class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
             snapshot_loader=snapshot_loader or load_snapshot,
             calibration_loader=calibration_loader or fake_calibration,
             sleep=clock.sleep,
+            application_queue_maxsize=application_queue_maxsize,
         )
         return {
             "clock": clock,
@@ -280,6 +359,13 @@ class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
             "negative_latency_observation_count",
             "excessive_negative_latency_count", "clock_health",
             "last_clock_calibration_age_seconds",
+            "socket_receive_age_by_route_ms",
+            "depth_socket_receive_age_ms", "consumer_lag_ms",
+            "stream_queue_current", "stream_queue_high_water",
+            "application_queue_current", "application_queue_high_water",
+            "backpressure_overflow_count", "stale_trading_disarm_count",
+            "actual_transport_reconnect_count",
+            "recovery_without_reconnect_count",
         }.issubset(heartbeat))
 
     async def test_read_timeout_returns_control_without_fake_fill(self) -> None:
@@ -293,6 +379,179 @@ class HftRuntimeLivenessTests(unittest.IsolatedAsyncioTestCase):
         ))
         self.assertGreater(result["waiter"].timeouts, 0)
         self.assertEqual(result["account"].fills, [])
+        self.assertEqual(
+            result["runtime"]["reconnect_count"], 0, result["emitted"]
+        )
+        self.assertEqual(
+            result["runtime"]["actual_transport_reconnect_count"], 0
+        )
+
+    async def test_consumer_lag_disarms_without_transport_reconnect(self) -> None:
+        config = replace(
+            self.config,
+            maximum_staleness=timedelta(seconds=1),
+        )
+        result = await self.run_session(
+            duration=0,
+            cycles=1,
+            config=config,
+            stream_factory=lambda: TelemetryStream(
+                (
+                    replace(bridge(), received_monotonic_ns=0),
+                    replace(trade(), received_monotonic_ns=0),
+                )
+            ),
+            recorder_factory=SlowClockRecorder,
+        )
+        self.assertEqual(result["runtime"]["stale_trading_disarm_count"], 1)
+        self.assertEqual(result["runtime"]["reconnect_count"], 0)
+        self.assertEqual(
+            result["runtime"]["actual_transport_reconnect_count"], 0
+        )
+        self.assertGreater(result["runtime"]["consumer_lag_ms"], D("1000"))
+        self.assertTrue(any(
+            event.get("event") == "hft_trading_disarmed"
+            for event in result["emitted"]
+        ))
+
+    async def test_slow_recorder_does_not_block_asyncio_ingest_loop(self) -> None:
+        ticks = 0
+
+        async def ticker() -> None:
+            nonlocal ticks
+            while True:
+                ticks += 1
+                await asyncio.sleep(0.001)
+
+        ticker_task = asyncio.create_task(ticker())
+        try:
+            result = await self.run_session(
+                duration=0,
+                cycles=1,
+                stream_factory=lambda: TelemetryStream(
+                    (bridge(), trade())
+                ),
+                recorder_factory=lambda clock: BlockingRecorder(),
+            )
+        finally:
+            ticker_task.cancel()
+            await asyncio.gather(ticker_task, return_exceptions=True)
+        self.assertGreater(ticks, 10)
+        self.assertEqual(result["runtime"]["reconnect_count"], 0)
+        self.assertEqual(
+            result["runtime"]["actual_transport_reconnect_count"], 0
+        )
+
+    async def test_fresh_depth_recovers_without_reconnect_in_sequence(self) -> None:
+        config = replace(
+            self.config,
+            maximum_staleness=timedelta(seconds=1),
+        )
+
+        async def deep_snapshot(client, symbol):
+            del client, symbol
+            return DepthSnapshot(
+                symbol="BTCUSDC",
+                last_update_id=100,
+                bids=tuple(
+                    (D("100") - D(index), D("10"))
+                    for index in range(5)
+                ),
+                asks=tuple(
+                    (D("101") + D(index), D("10"))
+                    for index in range(5)
+                ),
+                exchange_time=BASE,
+                received_at=BASE,
+                received_monotonic_ns=0,
+            )
+
+        result = await self.run_session(
+            duration=0,
+            cycles=2,
+            config=config,
+            stream_factory=lambda: TelemetryStream((
+                replace(bridge(), received_monotonic_ns=0),
+                replace(trade(), received_monotonic_ns=0),
+                live_depth(received_monotonic_ns=4_000_000_000),
+            )),
+            recorder_factory=SlowClockRecorder,
+            snapshot_loader=deep_snapshot,
+        )
+        self.assertEqual(
+            result["runtime"]["recovery_without_reconnect_count"], 1
+        )
+        self.assertEqual(
+            result["runtime"]["reconnect_count"], 0, result["emitted"]
+        )
+        self.assertEqual(result["runtime"]["last_update_id"], 102)
+        self.assertEqual(result["runtime"]["sequence_gap_count"], 0)
+
+    async def test_application_queue_overflow_is_explicit_fail_closed(self) -> None:
+        result = await self.run_session(
+            duration=2,
+            application_queue_maxsize=1,
+            stream_factory=BurstAfterBridgeStream,
+        )
+        self.assertGreater(result["runtime"]["backpressure_overflow_count"], 0)
+        self.assertGreater(result["runtime"]["reconnect_count"], 0)
+        self.assertTrue(any(
+            event.get("reason") == "backpressure_overflow"
+            for event in result["emitted"]
+        ))
+        self.assertFalse(result["runtime"]["book_valid"])
+
+    async def test_actual_transport_staleness_reconnects(self) -> None:
+        config = replace(
+            self.config,
+            maximum_staleness=timedelta(seconds=1),
+        )
+        result = await self.run_session(
+            duration=2,
+            config=config,
+            stream_factory=lambda: TelemetryStream(
+                (bridge(),), depth_socket_age_ms=D("10000")
+            ),
+        )
+        self.assertGreater(
+            result["runtime"]["actual_transport_reconnect_count"], 0
+        )
+        self.assertGreater(result["runtime"]["reconnect_count"], 0)
+
+    async def test_periodic_clock_failure_has_deterministic_reason(self) -> None:
+        calls = 0
+
+        async def calibration(
+            client, sample_count, lowest_count, utc_clock, monotonic_clock
+        ):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return await fake_calibration(
+                    client, sample_count, lowest_count,
+                    utc_clock, monotonic_clock,
+                )
+            raise asyncio.TimeoutError
+
+        config = replace(
+            self.config,
+            clock_recalibration_interval=timedelta(seconds=1),
+        )
+        result = await self.run_session(
+            duration=0,
+            config=config,
+            stream_factory=lambda: FakeStream(
+                (bridge(),), public_ready=True
+            ),
+            calibration_loader=calibration,
+        )
+        self.assertEqual(
+            result["runtime"]["shutdown_reason"],
+            "clock_calibration_failed",
+        )
+        self.assertNotEqual(
+            result["runtime"]["shutdown_reason"], "normal_completion"
+        )
 
     async def test_snapshot_timeout_fails_closed_with_exact_stage(self) -> None:
         async def timed_out_snapshot(client, symbol):
@@ -490,6 +749,35 @@ class SocketContext:
         return False
 
 
+class ScriptedSocket:
+    def __init__(self, messages):
+        self.messages = list(messages)
+
+    async def recv(self):
+        if self.messages:
+            return self.messages.pop(0)
+        await asyncio.Future()
+
+
+class ScriptedSocketContext:
+    def __init__(self, messages):
+        self.socket = ScriptedSocket(messages)
+
+    async def __aenter__(self):
+        return self.socket
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        return False
+
+
+def depth_message(update_id: int) -> str:
+    return (
+        '{"e":"depthUpdate","E":1000,"s":"BTCUSDC",'
+        f'"U":{update_id},"u":{update_id},"pu":{update_id - 1},'
+        '"b":[],"a":[]}'
+    )
+
+
 class HftStreamReadTimeoutTests(unittest.IsolatedAsyncioTestCase):
     async def test_each_blocked_socket_receive_is_bounded(self) -> None:
         events = []
@@ -521,6 +809,66 @@ class HftStreamReadTimeoutTests(unittest.IsolatedAsyncioTestCase):
             "subscription_confirmed", "market_stream_ready",
             "websocket_timeout", "websocket_disconnected",
         }.issubset(names))
+
+    async def test_depth_events_preserve_order_without_silent_drop(self) -> None:
+        def connection(url, **kwargs):
+            del kwargs
+            messages = (
+                [depth_message(1), depth_message(2), depth_message(3)]
+                if "/public/" in url else []
+            )
+            return ScriptedSocketContext(messages)
+
+        stream = BinanceHftStream(
+            read_timeout=1,
+            shutdown_timeout=0.05,
+            queue_maxsize=10,
+        )
+        with patch(
+            "quantos.infrastructure.binance.hft.connect",
+            side_effect=connection,
+        ):
+            generator = stream.events("BTCUSDC")
+            received = [
+                (await asyncio.wait_for(anext(generator), timeout=1)).final_update_id
+                for _ in range(3)
+            ]
+            await generator.aclose()
+        self.assertEqual(received, [1, 2, 3])
+        self.assertEqual(stream.telemetry()["backpressure_overflow_count"], 0)
+
+    async def test_stream_queue_overflow_is_explicit(self) -> None:
+        lifecycle = []
+
+        def connection(url, **kwargs):
+            del kwargs
+            messages = (
+                [depth_message(value) for value in range(1, 100)]
+                if "/public/" in url else []
+            )
+            return ScriptedSocketContext(messages)
+
+        stream = BinanceHftStream(
+            read_timeout=1,
+            shutdown_timeout=0.05,
+            queue_maxsize=1,
+            lifecycle=lifecycle.append,
+        )
+        with patch(
+            "quantos.infrastructure.binance.hft.connect",
+            side_effect=connection,
+        ):
+            generator = stream.events("BTCUSDC")
+            with self.assertRaises(BinanceHftBackpressureError):
+                while True:
+                    await asyncio.wait_for(anext(generator), timeout=1)
+        self.assertGreater(
+            stream.telemetry()["backpressure_overflow_count"], 0
+        )
+        self.assertTrue(any(
+            event.get("event") == "websocket_backpressure"
+            for event in lifecycle
+        ))
 
 
 if __name__ == "__main__":

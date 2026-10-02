@@ -28,7 +28,94 @@ from quantos.domain.risk.hft import (
 
 
 class HftAuthenticatedPreflightError(RuntimeError):
-    pass
+    def __init__(
+        self, message: str, *, diagnostic: Mapping[str, Any] | None = None
+    ) -> None:
+        super().__init__(message)
+        self.diagnostic = dict(diagnostic or {})
+
+
+def _diagnostic_call(
+    client: Any, method_name: str
+) -> tuple[dict[str, Any], str]:
+    method = getattr(client, method_name, None)
+    if not callable(method):
+        return {}, "UNAVAILABLE"
+    try:
+        payload = method()
+    except Exception as error:
+        return {}, f"UNAVAILABLE_{type(error).__name__}"
+    if not isinstance(payload, Mapping):
+        return {}, "MALFORMED"
+    return dict(payload), "AVAILABLE"
+
+
+def _optional_bool(value: Any) -> bool | None:
+    return value if isinstance(value, bool) else None
+
+
+def _balance_fields(
+    balances: list[Mapping[str, Any]], asset: str
+) -> tuple[str | None, str | None]:
+    row = next((item for item in balances if item.get("asset") == asset), None)
+    if row is None:
+        return None, None
+    wallet = row.get("balance", row.get("walletBalance"))
+    available = row.get("availableBalance")
+    return (
+        None if wallet is None else str(wallet),
+        None if available is None else str(available),
+    )
+
+
+def _permission_failure_type(diagnostic: Mapping[str, Any]) -> str:
+    if diagnostic.get("futures_account_enabled") is False:
+        return "FUTURES_NOT_ENABLED"
+    status = diagnostic.get("account_status")
+    if (
+        diagnostic.get("api_trading_locked") is True
+        or (isinstance(status, str) and status.casefold() != "normal")
+    ):
+        return "ACCOUNT_RESTRICTED"
+    if (
+        diagnostic.get("api_key_enable_reading") is False
+        or diagnostic.get("api_key_enable_futures") is False
+    ):
+        return "API_KEY_PERMISSION"
+    return "ACCOUNT_PERMISSION"
+
+
+def _order_test_failure_type(error: Exception) -> str:
+    message = str(error).casefold()
+    if any(token in message for token in ("timestamp", "signature", "recvwindow")):
+        return "AUTHENTICATION_OR_TRANSPORT"
+    if any(token in message for token in ("permission", "api-key", "api key")):
+        return "API_KEY_PERMISSION"
+    if any(token in message for token in (
+        "filter", "symbol", "precision", "price", "quantity",
+    )):
+        return "SYMBOL_FILTER"
+    return "ACCOUNT_PERMISSION"
+
+
+def _preflight_failure(
+    diagnostic: Mapping[str, Any],
+    *,
+    environment: HftExecutionEnvironment,
+    failure_code: str,
+    failure_type: str,
+    message: str,
+) -> HftAuthenticatedPreflightError:
+    payload = {
+        "event": "hft_authenticated_preflight",
+        "passed": False,
+        "environment": environment.value,
+        "failure_code": failure_code,
+        "failure_type": failure_type,
+        "failure_message": message,
+        **diagnostic,
+    }
+    return HftAuthenticatedPreflightError(message, diagnostic=payload)
 
 
 def _decimal(value: Any, name: str) -> Decimal:
@@ -112,9 +199,153 @@ def authenticated_preflight(
     symbol_configs = client.symbol_config(symbol)
     order_rate_limits = client.order_rate_limits()
     commission_raw = client.commission_rate(symbol)
-    can_trade = account.get("canTrade") is True
-    if not can_trade:
-        raise HftAuthenticatedPreflightError("API account cannot trade")
+    account_can_trade = _optional_bool(account.get("canTrade"))
+    account_can_trade_source = (
+        "fapi_v3_account.canTrade"
+        if account_can_trade is not None else None
+    )
+    account_info: dict[str, Any] = {}
+    account_status: dict[str, Any] = {}
+    api_permissions: dict[str, Any] = {}
+    api_trading_status: dict[str, Any] = {}
+    diagnostic_query_status = {
+        "account_info": "NOT_APPLICABLE",
+        "account_status": "NOT_APPLICABLE",
+        "api_key_permissions": "NOT_APPLICABLE",
+        "api_trading_status": "NOT_APPLICABLE",
+    }
+    if environment is HftExecutionEnvironment.MAINNET:
+        account_info, diagnostic_query_status["account_info"] = (
+            _diagnostic_call(client, "account_info")
+        )
+        account_status, diagnostic_query_status["account_status"] = (
+            _diagnostic_call(client, "account_status")
+        )
+        api_permissions, diagnostic_query_status["api_key_permissions"] = (
+            _diagnostic_call(client, "api_key_permissions")
+        )
+        api_trading_status, diagnostic_query_status["api_trading_status"] = (
+            _diagnostic_call(client, "api_trading_status")
+        )
+    trading_status_data = api_trading_status.get("data")
+    if not isinstance(trading_status_data, Mapping):
+        trading_status_data = {}
+    usdt_wallet, usdt_available = _balance_fields(balances, "USDT")
+    usdc_wallet, usdc_available = _balance_fields(balances, "USDC")
+    dual_side_value = position_mode.get("dualSidePosition")
+    multi_assets_value = account_config.get(
+        "multiAssetsMargin", account.get("multiAssetsMargin")
+    )
+    diagnostic = {
+        "account_can_trade": account_can_trade,
+        "account_can_trade_source": account_can_trade_source,
+        "account_can_trade_required": account_can_trade is not None,
+        "futures_account_enabled": _optional_bool(
+            account_info.get("isFutureEnabled")
+        ),
+        "api_key_enable_reading": _optional_bool(
+            api_permissions.get("enableReading")
+        ),
+        "api_key_enable_futures": _optional_bool(
+            api_permissions.get("enableFutures")
+        ),
+        "api_key_enable_spot_and_margin_trading": _optional_bool(
+            api_permissions.get("enableSpotAndMarginTrading")
+        ),
+        "api_trading_permission": _optional_bool(
+            api_permissions.get("enableFutures")
+        ),
+        "account_status": account_status.get("data"),
+        "api_trading_locked": _optional_bool(
+            trading_status_data.get("isLocked")
+        ),
+        "usdt_futures_wallet_balance": usdt_wallet,
+        "usdt_futures_available_balance": usdt_available,
+        "usdc_futures_wallet_balance": usdc_wallet,
+        "usdc_futures_available_balance": usdc_available,
+        "position_mode": (
+            "HEDGE" if dual_side_value is True
+            else "ONE_WAY" if dual_side_value is False
+            else "UNKNOWN"
+        ),
+        "account_mode": (
+            "MULTI_ASSET" if multi_assets_value is True
+            else "SINGLE_ASSET" if multi_assets_value is False
+            else "UNKNOWN"
+        ),
+        "btcusdc_status": metadata.get("status"),
+        "diagnostic_query_status": diagnostic_query_status,
+        "account_config_query_status": "AVAILABLE",
+        "symbol_config_query_status": "AVAILABLE",
+        "order_test_attempted": False,
+        "order_test_passed": False,
+        "order_test_error_code": None,
+        "order_test_error_message": None,
+        "effective_trade_permission": None,
+    }
+    diagnostic["effective_trade_permission_evidence"] = [
+        (
+            "fapi_v3_account.canTrade="
+            f"{account_can_trade if account_can_trade is not None else 'UNKNOWN'}"
+        ),
+        (
+            "sapi_account_info.isFutureEnabled="
+            f"{diagnostic['futures_account_enabled']}"
+        ),
+        (
+            "sapi_api_restrictions.enableFutures="
+            f"{diagnostic['api_key_enable_futures']}"
+        ),
+        (
+            "sapi_api_trading_status.isLocked="
+            f"{diagnostic['api_trading_locked']}"
+        ),
+        f"sapi_account_status={diagnostic['account_status']}",
+    ]
+    if account_can_trade is False:
+        raise _preflight_failure(
+            diagnostic,
+            environment=environment,
+            failure_code="ACCOUNT_PERMISSION",
+            failure_type="ACCOUNT_PERMISSION",
+            message="ACCOUNT_PERMISSION: Futures account canTrade=false",
+        )
+    if environment is HftExecutionEnvironment.MAINNET:
+        if diagnostic["futures_account_enabled"] is not True:
+            raise _preflight_failure(
+                diagnostic,
+                environment=environment,
+                failure_code="FUTURES_NOT_ENABLED",
+                failure_type="FUTURES_NOT_ENABLED",
+                message="FUTURES_NOT_ENABLED: account is not Futures-enabled",
+            )
+        if (
+            diagnostic["api_key_enable_reading"] is not True
+            or diagnostic["api_key_enable_futures"] is not True
+        ):
+            raise _preflight_failure(
+                diagnostic,
+                environment=environment,
+                failure_code="API_KEY_PERMISSION",
+                failure_type="API_KEY_PERMISSION",
+                message="API_KEY_PERMISSION: Futures API permission is unavailable",
+            )
+        if diagnostic["api_trading_locked"] is not False:
+            raise _preflight_failure(
+                diagnostic,
+                environment=environment,
+                failure_code="ACCOUNT_RESTRICTED",
+                failure_type="ACCOUNT_RESTRICTED",
+                message="ACCOUNT_RESTRICTED: API trading status is locked or unknown",
+            )
+        if diagnostic["account_status"] != "Normal":
+            raise _preflight_failure(
+                diagnostic,
+                environment=environment,
+                failure_code="ACCOUNT_RESTRICTED",
+                failure_type="ACCOUNT_RESTRICTED",
+                message="ACCOUNT_RESTRICTED: account status is not Normal",
+            )
     if (
         account_config.get("multiAssetsMargin") is True
         or account.get("multiAssetsMargin") is True
@@ -125,11 +356,28 @@ def authenticated_preflight(
     asset = "USDC" if symbol == "BTCUSDC" else "USDT"
     balance = next((row for row in balances if row.get("asset") == asset), None)
     if balance is None:
-        raise HftAuthenticatedPreflightError(f"{asset} balance is unavailable")
+        raise _preflight_failure(
+            diagnostic,
+            environment=environment,
+            failure_code="INSUFFICIENT_FUTURES_COLLATERAL",
+            failure_type="BALANCE_ONLY",
+            message=f"INSUFFICIENT_FUTURES_COLLATERAL: {asset} balance is unavailable",
+        )
     wallet_balance = _decimal(balance.get("balance", "0"), f"{asset} balance")
     available_balance = _decimal(
         balance.get("availableBalance", "0"), f"{asset} available balance"
     )
+    if wallet_balance <= 0 or available_balance <= 0:
+        raise _preflight_failure(
+            diagnostic,
+            environment=environment,
+            failure_code="INSUFFICIENT_FUTURES_COLLATERAL",
+            failure_type="BALANCE_ONLY",
+            message=(
+                "INSUFFICIENT_FUTURES_COLLATERAL: "
+                f"{asset} wallet or available balance is zero"
+            ),
+        )
 
     nonflat = [
         row for row in positions
@@ -147,7 +395,24 @@ def authenticated_preflight(
         (row for row in positions if row.get("symbol") == symbol), None
     )
     if symbol_position is None:
-        raise HftAuthenticatedPreflightError("symbol position configuration is missing")
+        # Binance USDⓈ-M /fapi/v3/account intentionally omits symbols
+        # that have neither a position nor an open order. Therefore an
+        # absent BTCUSDC position row is normal when the account is flat.
+        #
+        # Fail closed if Binance simultaneously reports an open order for
+        # the symbol, because then the missing position state is inconsistent.
+        symbol_open_orders = [
+            row for row in open_orders if row.get("symbol") == symbol
+        ]
+        if symbol_open_orders:
+            raise HftAuthenticatedPreflightError(
+                "symbol position state is missing while open orders exist"
+            )
+        symbol_position = {
+            "symbol": symbol,
+            "positionAmt": "0",
+            "positionSide": "BOTH",
+        }
     symbol_config = next(
         (row for row in symbol_configs if row.get("symbol") == symbol), None
     )
@@ -184,14 +449,36 @@ def authenticated_preflight(
     test_price, test_quantity = minimum_gtx_order(rules, ticker)
     test_order_passed = False
     if perform_test_order:
-        client.test_order(
-            symbol=symbol,
-            side="BUY",
-            quantity=test_quantity,
-            price=test_price,
-            client_order_id="qoh1-preflight-test",
-        )
+        diagnostic["order_test_attempted"] = True
+        try:
+            client.test_order(
+                symbol=symbol,
+                side="BUY",
+                quantity=test_quantity,
+                price=test_price,
+                client_order_id="qoh1-preflight-test",
+            )
+        except Exception as error:
+            failure_type = _order_test_failure_type(error)
+            diagnostic["order_test_error_code"] = getattr(error, "code", None)
+            diagnostic["order_test_error_message"] = str(error)
+            diagnostic["effective_trade_permission"] = False
+            diagnostic["effective_trade_permission_evidence"].append(
+                f"fapi_v1_order_test=REJECTED:{failure_type}"
+            )
+            raise _preflight_failure(
+                diagnostic,
+                environment=environment,
+                failure_code=failure_type,
+                failure_type=failure_type,
+                message=f"{failure_type}: non-executing order test rejected",
+            ) from error
         test_order_passed = True
+        diagnostic["order_test_passed"] = True
+        diagnostic["effective_trade_permission"] = True
+        diagnostic["effective_trade_permission_evidence"].append(
+            "fapi_v1_order_test=PASS"
+        )
     payload = {
         "event": "hft_authenticated_preflight",
         "passed": True,
@@ -199,8 +486,7 @@ def authenticated_preflight(
         "auth_health": "HEALTHY",
         "credential_health": client.credential_health(),
         "clock": clock,
-        "account_can_trade": can_trade,
-        "api_trading_permission": can_trade,
+        **diagnostic,
         "symbol": symbol,
         "strategy_validation_symbol": symbol == "BTCUSDC",
         "transport_only_fallback": symbol != "BTCUSDC",
@@ -701,12 +987,18 @@ async def run_authenticated_hft_session(
     )
     clock.apply_calibration(calibration)
     queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue(maxsize=4096)
+    application_queue_high_water = 0
+    application_overflow_count = 0
+    stale_trading_disarmed = False
+    stale_trading_disarm_count = 0
+    consumer_lag_ms: Decimal | None = None
+    reconcile_enqueue_failed = False
     user_ready = asyncio.Event()
     user_ready_count = 0
 
     prior_lifecycle = user_stream.lifecycle
     def user_lifecycle(payload: dict[str, Any]) -> None:
-        nonlocal user_ready_count
+        nonlocal user_ready_count, reconcile_enqueue_failed
         prior_lifecycle(payload)
         if payload.get("event") == "user_data_ready":
             user_ready_count += 1
@@ -715,16 +1007,48 @@ async def run_authenticated_hft_session(
                 try:
                     queue.put_nowait(("reconcile", None))
                 except asyncio.QueueFull:
-                    pass
+                    reconcile_enqueue_failed = True
     user_stream.lifecycle = user_lifecycle
 
     async def market_producer() -> None:
+        nonlocal application_queue_high_water, application_overflow_count
         async for event in public_stream.events(rules.symbol):
-            await queue.put(("market", event))
+            try:
+                queue.put_nowait(("market", event))
+            except asyncio.QueueFull as error:
+                application_overflow_count += 1
+                raise HftAuthenticatedPreflightError(
+                    "authenticated_application_queue_overflow:market"
+                ) from error
+            application_queue_high_water = max(
+                application_queue_high_water, queue.qsize()
+            )
 
     async def user_producer() -> None:
+        nonlocal application_queue_high_water, application_overflow_count
         async for event in user_stream.events():
-            await queue.put(("user", event))
+            try:
+                queue.put_nowait(("user", event))
+            except asyncio.QueueFull as error:
+                application_overflow_count += 1
+                raise HftAuthenticatedPreflightError(
+                    "authenticated_application_queue_overflow:user"
+                ) from error
+            application_queue_high_water = max(
+                application_queue_high_water, queue.qsize()
+            )
+
+    def task_failure(task: asyncio.Task, name: str) -> None:
+        if not task.done():
+            return
+        if task.cancelled():
+            raise asyncio.CancelledError
+        error = task.exception()
+        if error is not None:
+            raise error
+        raise HftAuthenticatedPreflightError(
+            f"authenticated_{name}_stream_ended"
+        )
 
     market_task = asyncio.create_task(market_producer())
     user_task = asyncio.create_task(user_producer())
@@ -766,7 +1090,11 @@ async def run_authenticated_hft_session(
         emit({"event": "hft_authenticated_ready", "symbol": rules.symbol})
         started = time.monotonic()
         next_heartbeat = started
-        last_depth = started
+        last_depth_received = started
+        transport_stale_seconds = max(
+            config.websocket_read_timeout.total_seconds() * 3,
+            config.maximum_staleness.total_seconds() * 2,
+        )
         while duration_seconds == 0 or time.monotonic() - started < duration_seconds:
             remaining = None if duration_seconds == 0 else max(
                 duration_seconds - (time.monotonic() - started), 0
@@ -779,9 +1107,11 @@ async def run_authenticated_hft_session(
             except TimeoutError:
                 route = "idle"
                 event = None
-            if market_task.done() or user_task.done():
+            task_failure(market_task, "market")
+            task_failure(user_task, "user")
+            if reconcile_enqueue_failed:
                 raise HftAuthenticatedPreflightError(
-                    "authenticated market/user stream stopped ambiguously"
+                    "authenticated_application_queue_overflow:reconcile"
                 )
             if route == "user":
                 emit(apply_user_data_event(event, store))
@@ -795,7 +1125,19 @@ async def run_authenticated_hft_session(
                 emit({"event": "hft_authenticated_reconciled", **result})
             elif route == "market":
                 if isinstance(event, DepthDelta):
-                    last_depth = time.monotonic()
+                    received_ns = getattr(event, "received_monotonic_ns", None)
+                    last_depth_received = (
+                        received_ns / 1_000_000_000
+                        if received_ns is not None else time.monotonic()
+                    )
+                received_ns = getattr(event, "received_monotonic_ns", None)
+                consumer_lag_ms = Decimal(str(max(
+                    (
+                        time.monotonic() - received_ns / 1_000_000_000
+                        if received_ns is not None else 0
+                    ) * 1000,
+                    0.0,
+                )))
                 if (
                     strategy.inventory_quantity() != 0
                     and user_stream.health != "READY"
@@ -828,7 +1170,11 @@ async def run_authenticated_hft_session(
                     datetime.now(timezone.utc),
                     Decimal(str(time.monotonic())),
                     latency.observed_feed_latency_ms,
-                    clock.quoting_allowed and user_stream.health == "READY",
+                    (
+                        clock.quoting_allowed
+                        and user_stream.health == "READY"
+                        and not stale_trading_disarmed
+                    ),
                 )
                 if result.get("event") not in {
                     "authenticated_hold", "authenticated_quote_resting",
@@ -837,9 +1183,47 @@ async def run_authenticated_hft_session(
                 }:
                     emit(result)
             now = time.monotonic()
-            if (
-                now - last_depth
+            usable_stale = (
+                now - last_depth_received
                 > config.maximum_staleness.total_seconds()
+            )
+            if usable_stale and not stale_trading_disarmed:
+                stale_trading_disarmed = True
+                stale_trading_disarm_count += 1
+                execution.cancel_owned_orders()
+                emit({
+                    "event": "hft_authenticated_trading_disarmed",
+                    "reason": "stale_usable_market_data",
+                    "consumer_lag_ms": consumer_lag_ms,
+                })
+            elif not usable_stale and stale_trading_disarmed:
+                stale_trading_disarmed = False
+                emit({
+                    "event": "hft_authenticated_trading_rearmed",
+                    "reason": "fresh_sequenced_depth_recovered",
+                })
+            if usable_stale and strategy.inventory_quantity() != 0:
+                if strategy.inventory_quantity() != 0:
+                    emit({
+                        "event": "CRITICAL",
+                        "flatten": execution.emergency_flatten(
+                            "prolonged_market_data_failure"
+                        ),
+                    })
+                raise HftAuthenticatedPreflightError(
+                    "authenticated usable depth is stale while exposed"
+                )
+            stream_telemetry = (
+                public_stream.telemetry(int(now * 1_000_000_000))
+                if hasattr(public_stream, "telemetry") else {}
+            )
+            depth_socket_age = stream_telemetry.get(
+                "depth_socket_receive_age_ms"
+            )
+            if (
+                depth_socket_age is not None
+                and depth_socket_age
+                > Decimal(str(transport_stale_seconds * 1000))
             ):
                 if strategy.inventory_quantity() != 0:
                     emit({
@@ -848,10 +1232,8 @@ async def run_authenticated_hft_session(
                             "prolonged_market_data_failure"
                         ),
                     })
-                else:
-                    execution.cancel_owned_orders()
                 raise HftAuthenticatedPreflightError(
-                    "authenticated depth stream is stale"
+                    "authenticated_transport_ingest_stale:depth"
                 )
             if now >= next_heartbeat:
                 heartbeat = authenticated_heartbeat(
@@ -869,6 +1251,12 @@ async def run_authenticated_hft_session(
                     ),
                     "clock_health": clock.health.value,
                     "remaining_duration_seconds": remaining,
+                    "consumer_lag_ms": consumer_lag_ms,
+                    "application_queue_current": queue.qsize(),
+                    "application_queue_high_water": application_queue_high_water,
+                    "backpressure_overflow_count": application_overflow_count,
+                    "stale_trading_disarm_count": stale_trading_disarm_count,
+                    **stream_telemetry,
                 })
                 emit(heartbeat)
                 next_heartbeat = now + 5

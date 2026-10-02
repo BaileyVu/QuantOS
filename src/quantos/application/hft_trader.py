@@ -8,6 +8,7 @@ from decimal import Decimal
 from hashlib import sha256
 import json
 import time
+import traceback
 from typing import Any, Awaitable, Callable
 
 from quantos.domain.alpha.hft import (
@@ -55,6 +56,10 @@ class _BootstrapFailure(Exception):
 
 
 class _RecalibrationDue(Exception):
+    pass
+
+
+class _ClockCalibrationFailed(Exception):
     pass
 
 
@@ -533,9 +538,12 @@ async def run_hft_paper_session(
         Awaitable[HftClockCalibration],
     ] = _clock_calibration,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    application_queue_maxsize: int = 4096,
 ) -> dict:
     if cycles < 0 or duration_seconds < 0:
         raise ValueError("cycles and duration_seconds must be non-negative")
+    if application_queue_maxsize < 1:
+        raise ValueError("application queue size must be positive")
     engine = HftPaperEngine(config, rules, account, evaluation)
     started_monotonic = monotonic_clock()
     deadline = (
@@ -552,7 +560,16 @@ async def run_hft_paper_session(
     )
     processed = 0
     reconnect_count = 0
+    transport_reconnect_count = 0
     sequence_gap_count = 0
+    backpressure_overflow_count = 0
+    stale_trading_disarm_count = 0
+    recovery_without_reconnect_count = 0
+    stale_trading_disarmed = False
+    consumer_lag_ms: Decimal | None = None
+    application_queue_high_water = 0
+    active_application_queue: asyncio.Queue | None = None
+    active_stream: Any | None = None
     events_received = {
         "depth": 0,
         "trade": 0,
@@ -565,6 +582,10 @@ async def run_hft_paper_session(
     current_producer: asyncio.Task | None = None
     accepting_new_decisions = True
     shutdown_reason = "normal_completion"
+    transport_stale_seconds = max(
+        read_timeout * 3,
+        config.maximum_staleness.total_seconds() * 2,
+    )
 
     def remaining_seconds(now: float | None = None) -> float | None:
         if deadline is None:
@@ -659,14 +680,87 @@ async def run_hft_paper_session(
             "equity": equity,
             "sequence_gap_count": sequence_gap_count,
             "reconnect_count": reconnect_count,
+            "actual_transport_reconnect_count": transport_reconnect_count,
+            "consumer_lag_ms": consumer_lag_ms,
+            "application_queue_current": (
+                active_application_queue.qsize()
+                if active_application_queue is not None else 0
+            ),
+            "application_queue_high_water": application_queue_high_water,
+            "backpressure_overflow_count": backpressure_overflow_count,
+            "stale_trading_disarm_count": stale_trading_disarm_count,
+            "recovery_without_reconnect_count": recovery_without_reconnect_count,
             "events_received": dict(events_received),
             "quotes_submitted": account.quotes_submitted,
             "fills": len(account.fills),
             "remaining_duration_seconds": remaining_seconds(now),
             "quote_economics": evaluation.quote_economics(account),
         }
+        if active_stream is not None and hasattr(active_stream, "telemetry"):
+            payload.update(active_stream.telemetry(int(now * 1_000_000_000)))
+        else:
+            payload.update({
+                "socket_receive_age_by_route_ms": {
+                    "public": None, "market": None,
+                },
+                "depth_socket_receive_age_ms": None,
+                "stream_queue_current": 0,
+                "stream_queue_high_water": 0,
+            })
         payload.update(clock_monitor.payload(now))
         return payload
+
+    def producer_failure(producer: asyncio.Task | None) -> None:
+        if producer is None or not producer.done():
+            return
+        if producer.cancelled():
+            raise asyncio.CancelledError
+        error = producer.exception()
+        if error is not None:
+            raise error
+        raise HftPaperRuntimeError("market_data_stream_ended")
+
+    def update_feed_safety(now: float) -> None:
+        nonlocal stale_trading_disarmed
+        nonlocal stale_trading_disarm_count
+        nonlocal recovery_without_reconnect_count
+        usable_depth_age = age_ms("depth", now)
+        is_usable_stale = (
+            usable_depth_age is not None
+            and usable_depth_age
+            > Decimal(str(
+                config.maximum_staleness.total_seconds() * 1000
+            ))
+        )
+        if is_usable_stale and not stale_trading_disarmed:
+            stale_trading_disarmed = True
+            stale_trading_disarm_count += 1
+            account.cancel("stale_usable_market_data")
+            emit({
+                "event": "hft_trading_disarmed",
+                "symbol": rules.symbol,
+                "reason": "stale_usable_market_data",
+                "usable_depth_age_ms": usable_depth_age,
+                "consumer_lag_ms": consumer_lag_ms,
+            })
+        elif not is_usable_stale and stale_trading_disarmed:
+            stale_trading_disarmed = False
+            recovery_without_reconnect_count += 1
+            emit({
+                "event": "hft_trading_rearmed",
+                "symbol": rules.symbol,
+                "reason": "fresh_sequenced_depth_recovered",
+            })
+        if active_stream is None or not hasattr(active_stream, "telemetry"):
+            return
+        telemetry = active_stream.telemetry(int(now * 1_000_000_000))
+        depth_socket_age = telemetry.get("depth_socket_receive_age_ms")
+        if (
+            depth_socket_age is not None
+            and depth_socket_age
+            > Decimal(str(transport_stale_seconds * 1000))
+        ):
+            raise HftPaperRuntimeError("transport_ingest_stale:depth")
 
     def check_control() -> None:
         nonlocal next_heartbeat
@@ -704,7 +798,10 @@ async def run_hft_paper_session(
                 if monotonic_clock() >= stage_deadline:
                     raise _BootstrapFailure(stage)
                 if producer is not None and producer.done():
-                    raise _BootstrapFailure(stage)
+                    try:
+                        producer_failure(producer)
+                    except BaseException as error:
+                        raise _BootstrapFailure(stage) from error
                 await asyncio.wait(
                     {task}, timeout=bounded_timeout(stage_deadline)
                 )
@@ -729,10 +826,12 @@ async def run_hft_paper_session(
         *,
         stage: str,
         stage_deadline: float | None = None,
+        producer: asyncio.Task | None = None,
     ) -> HftEvent | BaseException:
         timeout_reported = False
         while True:
             check_control()
+            producer_failure(producer)
             if stage_deadline is not None and monotonic_clock() >= stage_deadline:
                 raise _BootstrapFailure(stage)
             try:
@@ -748,18 +847,14 @@ async def run_hft_paper_session(
                     })
                     timeout_reported = True
                 check_control()
+                producer_failure(producer)
+                if stage == "event_loop":
+                    update_feed_safety(monotonic_clock())
                 if (
                     stage == "event_loop"
                     and clock_monitor.calibration_due(monotonic_clock())
                 ):
                     raise _RecalibrationDue
-                if (
-                    stage == "event_loop"
-                    and last_seen["depth"] is not None
-                    and monotonic_clock() - last_seen["depth"]
-                    > config.maximum_staleness.total_seconds()
-                ):
-                    raise HftPaperRuntimeError("depth stream is stale")
                 continue
             check_control()
             return item
@@ -767,12 +862,23 @@ async def run_hft_paper_session(
     async def stop_producer(producer: asyncio.Task | None) -> None:
         if producer is None:
             return
+
         producer.cancel()
+
         done, pending = await asyncio.wait(
-            {producer}, timeout=config.shutdown_timeout.total_seconds()
+            {producer},
+            timeout=config.shutdown_timeout.total_seconds(),
         )
+
         for task in pending:
             task.cancel()
+
+        if pending:
+            await asyncio.gather(
+                *pending,
+                return_exceptions=True,
+            )
+
         for task in done:
             try:
                 task.result()
@@ -840,18 +946,28 @@ async def run_hft_paper_session(
             and not deadline_expired()
         ):
             queue: asyncio.Queue[HftEvent | BaseException] = asyncio.Queue(
-                maxsize=4096
+                maxsize=application_queue_maxsize
             )
             stream = stream_factory()
+            active_application_queue = queue
+            active_stream = stream
 
             async def produce() -> None:
+                nonlocal application_queue_high_water
                 try:
                     async for event in stream.events(rules.symbol):
-                        await queue.put(event)
+                        try:
+                            queue.put_nowait(event)
+                        except asyncio.QueueFull as error:
+                            raise HftPaperRuntimeError(
+                                "application_queue_overflow"
+                            ) from error
+                        application_queue_high_water = max(
+                            application_queue_high_water,
+                            queue.qsize(),
+                        )
                 except asyncio.CancelledError:
                     raise
-                except BaseException as error:
-                    await queue.put(error)
 
             producer = asyncio.create_task(produce())
             current_producer = producer
@@ -894,7 +1010,8 @@ async def run_hft_paper_session(
                     "symbol": rules.symbol,
                     "last_update_id": snapshot.last_update_id,
                 })
-                recorder.append(
+                await asyncio.to_thread(
+                    recorder.append,
                     snapshot,
                     utc_clock(),
                     int(monotonic_clock() * 1_000_000_000),
@@ -909,13 +1026,15 @@ async def run_hft_paper_session(
                         queue,
                         stage="depth_buffer_reconcile",
                         stage_deadline=bridge_deadline,
+                        producer=producer,
                     )
                     if isinstance(item, BaseException):
                         raise _BootstrapFailure(
                             "depth_buffer_reconcile"
                         ) from item
                     observe(item)
-                    recorder.append(
+                    await asyncio.to_thread(
+                        recorder.append,
                         item,
                         utc_clock(),
                         int(monotonic_clock() * 1_000_000_000),
@@ -957,14 +1076,34 @@ async def run_hft_paper_session(
                             if clock_monitor.recalibration_requested
                             else "periodic"
                         )
-                        await perform_clock_calibration(reason)
+                        if not await perform_clock_calibration(reason):
+                            shutdown_reason = "clock_calibration_failed"
+                            raise _ClockCalibrationFailed
                     try:
-                        item = await next_item(queue, stage="event_loop")
+                        item = await next_item(
+                            queue,
+                            stage="event_loop",
+                            producer=producer,
+                        )
                     except _RecalibrationDue:
                         continue
                     if isinstance(item, BaseException):
                         raise item
                     observe(item)
+                    received_monotonic_ns = getattr(
+                        item, "received_monotonic_ns", None
+                    )
+                    if received_monotonic_ns is None:
+                        consumer_lag_ms = Decimal("0")
+                    else:
+                        consumer_lag_ms = Decimal(str(max(
+                            (
+                                monotonic_clock()
+                                - received_monotonic_ns / 1_000_000_000
+                            ) * 1000,
+                            0.0,
+                        )))
+                    update_feed_safety(monotonic_clock())
                     previous_clock_health = clock_monitor.health
                     latency = clock_monitor.observe(
                         item.exchange_time, item.received_at
@@ -988,7 +1127,8 @@ async def run_hft_paper_session(
                         processing_started_monotonic
                     ))
                     processing_time = utc_clock()
-                    recorder.append(
+                    await asyncio.to_thread(
+                        recorder.append,
                         item,
                         processing_time,
                         int(
@@ -1001,7 +1141,10 @@ async def run_hft_paper_session(
                         processing_time,
                         monotonic_now=processing_monotonic,
                         latency=latency,
-                        allow_quoting=clock_monitor.quoting_allowed,
+                        allow_quoting=(
+                            clock_monitor.quoting_allowed
+                            and not stale_trading_disarmed
+                        ),
                     )
                     processing_completed_monotonic = monotonic_clock()
                     processing_latency_ms = Decimal(str(max(
@@ -1032,24 +1175,24 @@ async def run_hft_paper_session(
                         ),
                     })
                     if processed % config.checkpoint_events == 0:
-                        recorder.checkpoint(
+                        await asyncio.to_thread(
+                            recorder.checkpoint,
                             rules.symbol,
                             engine.book.last_update_id or 0,
                             engine.book.bid_levels(20),
                             engine.book.ask_levels(20),
                             processing_time,
                         )
-                        state_store.save(
+                        await asyncio.to_thread(
+                            state_store.save,
                             account, evaluation, runtime, identity,
                             processing_time,
                         )
-                    emit(result)
-                    if (
-                        last_seen["depth"] is not None
-                        and monotonic_clock() - last_seen["depth"]
-                        > config.maximum_staleness.total_seconds()
-                    ):
-                        raise HftPaperRuntimeError("depth stream is stale")
+                    await asyncio.to_thread(emit, result)
+                    update_feed_safety(monotonic_clock())
+            except _ClockCalibrationFailed:
+                shutdown_reason = "clock_calibration_failed"
+                break
             except _DurationExpired:
                 shutdown_reason = "duration_expired"
                 break
@@ -1057,32 +1200,70 @@ async def run_hft_paper_session(
                 shutdown_reason = "cancelled"
                 raise
             except _BootstrapFailure as error:
+                cause_text = (
+                    str(error.__cause__)
+                    if error.__cause__ is not None else "timeout"
+                )
+                if "queue_overflow" in cause_text:
+                    backpressure_overflow_count += 1
+                    bootstrap_reason = "backpressure_overflow"
+                elif (
+                    "disconnected ambiguously" in cause_text
+                    or "stream_ended" in cause_text
+                ):
+                    transport_reconnect_count += 1
+                    bootstrap_reason = "transport_failure"
+                else:
+                    bootstrap_reason = f"bootstrap_timeout:{error.stage}"
                 engine.fail_closed(
-                    f"bootstrap_timeout:{error.stage}", utc_clock()
+                    bootstrap_reason, utc_clock()
                 )
                 emit({
                     "event": "hft_bootstrap_failed",
                     "stage": error.stage,
                     "symbol": rules.symbol,
-                    "error": (
-                        str(error.__cause__)
-                        if error.__cause__ is not None else "timeout"
-                    ),
+                    "error": cause_text,
+                    "reason": bootstrap_reason,
                 })
                 reconnect_count += 1
             except BaseException as error:
-                if isinstance(error, HftBookError) and "sequence gap" in str(error):
+                error_text = str(error)
+                if isinstance(error, HftBookError) and "sequence gap" in error_text:
                     sequence_gap_count += 1
-                engine.fail_closed("reconnect_ambiguity", utc_clock())
+                if "queue_overflow" in error_text:
+                    backpressure_overflow_count += 1
+                    failure_reason = "backpressure_overflow"
+                elif (
+                    "transport_ingest_stale" in error_text
+                    or "disconnected ambiguously" in error_text
+                    or "market_data_stream_ended" in error_text
+                ):
+                    transport_reconnect_count += 1
+                    failure_reason = "transport_failure"
+                else:
+                    failure_reason = "reconnect_ambiguity"
+                engine.fail_closed(failure_reason, utc_clock())
                 emit({
                     "event": "websocket_disconnected",
                     "stage": "runtime",
-                    "error": str(error),
+                    "error": error_text,
+                    "error_type": type(error).__name__,
+                    "error_repr": repr(error),
+                    "traceback": "".join(
+                        traceback.format_exception(
+                            type(error),
+                            error,
+                            error.__traceback__,
+                        )
+                    )[-6000:],
+                    "reason": failure_reason,
                 })
                 reconnect_count += 1
             finally:
                 await stop_producer(producer)
                 current_producer = None
+                active_application_queue = None
+                active_stream = None
             if deadline_expired():
                 shutdown_reason = "duration_expired"
                 break
@@ -1117,15 +1298,24 @@ async def run_hft_paper_session(
         runtime["shutdown_reason"] = shutdown_reason
         runtime["book_valid"] = False
         runtime["reconnect_count"] = reconnect_count
+        runtime["actual_transport_reconnect_count"] = transport_reconnect_count
         runtime["sequence_gap_count"] = sequence_gap_count
+        runtime["consumer_lag_ms"] = consumer_lag_ms
+        runtime["application_queue_high_water"] = application_queue_high_water
+        runtime["backpressure_overflow_count"] = backpressure_overflow_count
+        runtime["stale_trading_disarm_count"] = stale_trading_disarm_count
+        runtime["recovery_without_reconnect_count"] = (
+            recovery_without_reconnect_count
+        )
         runtime["events_received"] = dict(events_received)
         runtime["clock"] = clock_monitor.payload(monotonic_clock()) | (
             clock_monitor.calibration.payload()
             if clock_monitor.calibration is not None else {}
         )
         account.cancel("runtime_shutdown")
-        recorder.flush()
-        state_store.save(
+        await asyncio.to_thread(recorder.flush)
+        await asyncio.to_thread(
+            state_store.save,
             account, evaluation, runtime, identity, utc_clock()
         )
         await stop_producer(current_producer)

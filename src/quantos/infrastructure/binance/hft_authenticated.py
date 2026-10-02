@@ -29,6 +29,7 @@ WS_BASE_URLS = {
     HftExecutionEnvironment.TESTNET: "wss://stream.binancefuture.com",
     HftExecutionEnvironment.MAINNET: "wss://fstream.binance.com",
 }
+WALLET_MAINNET_BASE_URL = "https://api.binance.com"
 
 
 class BinanceAuthenticatedError(RuntimeError):
@@ -213,6 +214,27 @@ class BinanceUsdmAuthenticatedClient:
     def account(self) -> dict[str, Any]:
         return self._object(self._request("GET", "/fapi/v3/account"))
 
+    def account_info(self) -> dict[str, Any]:
+        return self._mainnet_wallet_object("/sapi/v1/account/info")
+
+    def account_status(self) -> dict[str, Any]:
+        return self._mainnet_wallet_object("/sapi/v1/account/status")
+
+    def api_key_permissions(self) -> dict[str, Any]:
+        return self._mainnet_wallet_object("/sapi/v1/account/apiRestrictions")
+
+    def api_trading_status(self) -> dict[str, Any]:
+        return self._mainnet_wallet_object("/sapi/v1/account/apiTradingStatus")
+
+    def _mainnet_wallet_object(self, path: str) -> dict[str, Any]:
+        if self.environment is not HftExecutionEnvironment.MAINNET:
+            raise BinanceAuthenticatedError(
+                "wallet permission diagnostics are MAINNET-only"
+            )
+        return self._object(self._request(
+            "GET", path, base_url=WALLET_MAINNET_BASE_URL
+        ))
+
     def account_config(self) -> dict[str, Any]:
         return self._object(self._request("GET", "/fapi/v1/accountConfig"))
 
@@ -347,6 +369,7 @@ class BinanceUsdmAuthenticatedClient:
         *,
         signed: bool = True,
         api_key: bool | None = None,
+        base_url: str | None = None,
     ) -> Any:
         values = dict(params or {})
         if signed:
@@ -363,7 +386,7 @@ class BinanceUsdmAuthenticatedClient:
         if signed or api_key:
             headers["X-MBX-APIKEY"] = self.credentials.api_key
         body = None
-        url = self.base_url + path
+        url = (base_url or self.base_url) + path
         if method in {"POST", "PUT"}:
             body = encoded.encode("ascii")
             headers["Content-Type"] = "application/x-www-form-urlencoded"
