@@ -1,0 +1,7 @@
+# Owner-approved QOS-07 paper-only capital policy; legacy profiles are unchanged.
+profile = "retail-full-equity-v1"
+starting_equity = "200"
+maximum_exposure_fraction = "1"
+maximum_daily_loss_fraction = "0.03"
+maximum_drawdown_fraction = "0.03"
+adverse_gap_bps = "20"

@@ -1,0 +1,77 @@
+# macOS
+.DS_Store
+
+# Secrets
+.env
+.env.*
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+*.egg-info/
+
+# QuantOS local data / artifacts
+data/
+/models/
+artifacts/
+results/
+logs/
+
+# Local databases
+*.duckdb
+*.db
+
+# Public release: private material and generated runtime state (all locations)
+.envrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+credentials/
+private/
+accounts/
+state/
+captures/
+backups/
+venv/
+env/
+.cache/
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.db-*
+*.duckdb.wal
+*.parquet
+*.arrow
+*.feather
+*.jsonl
+*.ndjson
+*.pickle
+*.pkl
+*.zip
+*.tar
+*.tar.*
+*.tgz
+*.gz
+*.7z
+*.bak
+*.backup
+*~
+*credentials*.json
+*secrets*.json
+*account*.json
+*positions*.json
+*fills*.json
+*.lock
+*.kill
+*.session.json
+configs/*private*
+configs/*local*

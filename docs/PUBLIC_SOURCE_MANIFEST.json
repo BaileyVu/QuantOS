@@ -1,0 +1,2358 @@
+{
+  "schema_version": 1,
+  "derived_from": "d54c094c9bc8af8e0240e9d022ff5b03662b7854",
+  "release_branch": "freeze/qos07-engineering-baseline",
+  "commit_binding": "This manifest is bound by the independent root commit containing it. Its own digest is intentionally excluded to avoid a circular hash.",
+  "scope": "Public-feed paper engineering; no profitability validation or live authority",
+  "files": [
+    {
+      "path": "src/quantos/domain/alpha/__init__.py",
+      "group": "Alpha",
+      "bytes": 765,
+      "lines": 23,
+      "sha256": "0a411606e9b18f42275b668ddb4303792a39a89bdfb9a56345d06ee75bc51506",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/alpha/contracts.py",
+      "group": "Alpha",
+      "bytes": 1364,
+      "lines": 45,
+      "sha256": "0cdff5d89019dd40c9f125606f0203cab1ea1a81d58f086b93fdc31b60d169c9",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/alpha/futures.py",
+      "group": "Alpha",
+      "bytes": 14227,
+      "lines": 353,
+      "sha256": "3887e572e86a504b062f7bc357a442d8497806254f350b9a6b54d9c196355495",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/alpha/hft.py",
+      "group": "Alpha",
+      "bytes": 6742,
+      "lines": 240,
+      "sha256": "da9a95c6ac9e162860c039443cbed33e1653eafdd39fec82c1fc02e30b0ac839",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/alpha/reclaim.py",
+      "group": "Alpha",
+      "bytes": 5183,
+      "lines": 101,
+      "sha256": "94f9444c7fdb8422aa36247ceca06aac1100ec1959b7e957e3374471e26badd8",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/alpha/retail.py",
+      "group": "Alpha",
+      "bytes": 2899,
+      "lines": 78,
+      "sha256": "c5afb65b4e784b65c30e105d51eb72651a1dc20f73d989157c4cc129747de6b1",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/alpha/retail_edge.py",
+      "group": "Alpha",
+      "bytes": 3980,
+      "lines": 81,
+      "sha256": "9b251dee1dec60bab79a54e32da90362eaf352d3041a340525de4bb66b83869b",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/alpha/temporal_split.py",
+      "group": "Alpha",
+      "bytes": 6256,
+      "lines": 117,
+      "sha256": "3303df44d742d60b811a54b6b8f922f9b4daa6330cdc733e06f82c507b57525a",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/alpha/training_data.py",
+      "group": "Alpha",
+      "bytes": 11500,
+      "lines": 217,
+      "sha256": "8d7ad0f5bb07e2deeb79ddf9687443fd63d42446e3e44635904243bdd5a13627",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/models/__init__.py",
+      "group": "Alpha",
+      "bytes": 678,
+      "lines": 14,
+      "sha256": "9fb9d3c90622a9aa7bad558c4f89afe8946394dafc0c5a1fbc4ca5481806793d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/models/artifacts.py",
+      "group": "Alpha",
+      "bytes": 5797,
+      "lines": 125,
+      "sha256": "ee61a1423c8b250df99a25a47b44d2643d02002bb14403eb4af6002938d6e11f",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/models/config.py",
+      "group": "Alpha",
+      "bytes": 2839,
+      "lines": 67,
+      "sha256": "49b0e5c53384d5ae5bf911169be7438cfe0682061310a72c89b271eb47b9d2e4",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/models/model.py",
+      "group": "Alpha",
+      "bytes": 17940,
+      "lines": 322,
+      "sha256": "fe25e77252b2b2bb33933b6405a8d32980f0dcc67825726c84f7038b15218493",
+      "executable": false
+    },
+    {
+      "path": ".gitattributes",
+      "group": "Configuration and tests",
+      "bytes": 64,
+      "lines": 2,
+      "sha256": "ec844c840ff0c228a6a4387ff785542f8f9d7f8ed0ca7b4003eb442f43a5d8ea",
+      "executable": false
+    },
+    {
+      "path": ".gitignore",
+      "group": "Configuration and tests",
+      "bytes": 775,
+      "lines": 77,
+      "sha256": "b32363e2d04913077bd30290d3d19a31ffd74c19c93d45491ea6002eaa38d651",
+      "executable": false
+    },
+    {
+      "path": "configs/default.toml",
+      "group": "Configuration and tests",
+      "bytes": 121,
+      "lines": 7,
+      "sha256": "ef7846de4fae942b20a4832c3843814480207b1f7839da8a136941bf506c289f",
+      "executable": false
+    },
+    {
+      "path": "configs/futures.toml",
+      "group": "Configuration and tests",
+      "bytes": 1290,
+      "lines": 49,
+      "sha256": "9e643b2f95ffff88b6a684a9d3608c7365e7cd3fdb145721de69f31b180ffb3c",
+      "executable": false
+    },
+    {
+      "path": "configs/futures_100usdt.toml",
+      "group": "Configuration and tests",
+      "bytes": 1291,
+      "lines": 49,
+      "sha256": "ff76fc3aca70e17d8bd58d7784a60e44db7e5f74a260651e6015398f37a2cc22",
+      "executable": false
+    },
+    {
+      "path": "configs/futures_100usdt_paper.toml",
+      "group": "Configuration and tests",
+      "bytes": 1458,
+      "lines": 51,
+      "sha256": "a6a8058127227b767761025e72368e6b67ad8321dfb29ed306d1f379918df274",
+      "executable": false
+    },
+    {
+      "path": "configs/futures_50usdt.toml",
+      "group": "Configuration and tests",
+      "bytes": 1290,
+      "lines": 49,
+      "sha256": "dd5afe82aaf338b1efb07382edbb35ce7ebc9645324a8313bec0877a0108b00d",
+      "executable": false
+    },
+    {
+      "path": "configs/futures_hft_200_paper.toml",
+      "group": "Configuration and tests",
+      "bytes": 1480,
+      "lines": 58,
+      "sha256": "d7a5f3914425a17ef35e8c479207c2d4c61bb738da2afcf4bfd7a2337783fe78",
+      "executable": false
+    },
+    {
+      "path": "configs/futures_hft_edge_v2_paper.toml",
+      "group": "Configuration and tests",
+      "bytes": 1957,
+      "lines": 71,
+      "sha256": "8ff0aa35863dc7a546240f4f44a49a965b23a0736f1f7036debd24ce255b8852",
+      "executable": false
+    },
+    {
+      "path": "configs/futures_hft_paper.toml",
+      "group": "Configuration and tests",
+      "bytes": 1480,
+      "lines": 58,
+      "sha256": "d20d02892763d191421eba7462c6af91653f276d0d77835b58ef9ab1c0d99368",
+      "executable": false
+    },
+    {
+      "path": "configs/futures_replay_10x.toml",
+      "group": "Configuration and tests",
+      "bytes": 1378,
+      "lines": 49,
+      "sha256": "b0abcd914d9b5d646bf8a4135b39a2b56e8347e7a5b946dfff4c18f655068568",
+      "executable": false
+    },
+    {
+      "path": "configs/paper.toml",
+      "group": "Configuration and tests",
+      "bytes": 654,
+      "lines": 23,
+      "sha256": "fa2e3d1ff05b8e10ce5725724675e9886759feb23f0455a5f3668d78662f6566",
+      "executable": false
+    },
+    {
+      "path": "configs/paper_runtime.toml",
+      "group": "Configuration and tests",
+      "bytes": 430,
+      "lines": 11,
+      "sha256": "3f3f6830f38b10ab062d8ffa14c945b2b4888043e2891042f9e07e78f827d17b",
+      "executable": false
+    },
+    {
+      "path": "configs/retail_full_equity_paper.toml",
+      "group": "Configuration and tests",
+      "bytes": 267,
+      "lines": 7,
+      "sha256": "d22c879c42efe2cd9ad2badfb807e2dede2441c4ddea2b406d96131dd3984958",
+      "executable": false
+    },
+    {
+      "path": "pyproject.toml",
+      "group": "Configuration and tests",
+      "bytes": 541,
+      "lines": 22,
+      "sha256": "2fa361caf06a049a215544c00c61e4b442fa9e4e34be211c59f0386a55487cd8",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af2a/catalog.json",
+      "group": "Configuration and tests",
+      "bytes": 65937,
+      "lines": 1,
+      "sha256": "15978cd7e023a20f153271201370960725540eeb704e581e14b34d793cdc7be0",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af2a/catalog.sha256",
+      "group": "Configuration and tests",
+      "bytes": 65,
+      "lines": 1,
+      "sha256": "168c16978055e746a2323b5675a750a936791f6dff6872a50e066db7214762e3",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af2a/deferred.json",
+      "group": "Configuration and tests",
+      "bytes": 3306,
+      "lines": 1,
+      "sha256": "a69c4b73c75ee5d2f079663134a93fb23782a600cb25bce79d3f457796cacd6b",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af2a/deferred_research_lanes.json",
+      "group": "Configuration and tests",
+      "bytes": 895,
+      "lines": 1,
+      "sha256": "0189bb667f907028ad50c3ef556402cbfac8a6e1e3697e31b29203d30aa6fd99",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af2a/fdr_plan.json",
+      "group": "Configuration and tests",
+      "bytes": 130254,
+      "lines": 1,
+      "sha256": "b811ae84fc8702dc6f4d416356d4a7d158124a35ec752d2543981d6227cfa341",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af2a/killed_pre_screen.json",
+      "group": "Configuration and tests",
+      "bytes": 4521,
+      "lines": 1,
+      "sha256": "c25a7998d27001f3e637402f0db372460ba6703fd687544387c143cbcb1e20e7",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af2a/retained_af3.json",
+      "group": "Configuration and tests",
+      "bytes": 5339,
+      "lines": 1,
+      "sha256": "592b2aa0453455012a71325267419ee53a7616b1cbd4d66252f4d5cd9d926027",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af3a/materialization.json",
+      "group": "Configuration and tests",
+      "bytes": 27286,
+      "lines": 1,
+      "sha256": "f8565e0699ee1030adc1b8ca65e486ceb89f4eaa50960f95beb1366c480d1015",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af3b/split.json",
+      "group": "Configuration and tests",
+      "bytes": 987,
+      "lines": 1,
+      "sha256": "d72445295f45c7cf17eae69d0b605f824a40fafa1f39b51a9eef2cd9df4898ed",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af3b/universe.json",
+      "group": "Configuration and tests",
+      "bytes": 1565,
+      "lines": 1,
+      "sha256": "490eff6e5e16ecbfd408c87b137e373abd9de93441a90af50417ed4289d03795",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af3c/run.json",
+      "group": "Configuration and tests",
+      "bytes": 1056,
+      "lines": 1,
+      "sha256": "43ca2cf8a91fd7bf79ad592e0751e64d9154115df0100f175a63de3d1ea0d9a9",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af3c/screening_config.json",
+      "group": "Configuration and tests",
+      "bytes": 1203,
+      "lines": 1,
+      "sha256": "4cfa0501c6a004e6ed75f3992333260040509718b951c68ca886146397abe6f1",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af4a/run.json",
+      "group": "Configuration and tests",
+      "bytes": 4723,
+      "lines": 1,
+      "sha256": "223e488221c25b8de6487a96e4f50d2dd8caf67455624f62325cad5ef2295b86",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af4b/catalog.json",
+      "group": "Configuration and tests",
+      "bytes": 26347,
+      "lines": 1,
+      "sha256": "576f5a41de6701855a6c6f68283643f94bfeda3590342f1cce44fc76fa6cc273",
+      "executable": false
+    },
+    {
+      "path": "research/phase-4d-mf1/run.json",
+      "group": "Configuration and tests",
+      "bytes": 4625,
+      "lines": 1,
+      "sha256": "66b086acbf189de30981999dce2388ef079a1c1ff165f009e60f54b0ecb4ffbd",
+      "executable": false
+    },
+    {
+      "path": "tests/__init__.py",
+      "group": "Configuration and tests",
+      "bytes": 264,
+      "lines": 10,
+      "sha256": "d71a9daff6eee63cb3c55a2976dc77b089200f0401ee8a3866d87d211fe46348",
+      "executable": false
+    },
+    {
+      "path": "tests/aggregate_trade_range_fixtures.py",
+      "group": "Configuration and tests",
+      "bytes": 3634,
+      "lines": 138,
+      "sha256": "dc84f0a224f58dc8428dc94b74869012e4b8556186dca663d765582451eaab57",
+      "executable": false
+    },
+    {
+      "path": "tests/integration/__init__.py",
+      "group": "Configuration and tests",
+      "bytes": 26,
+      "lines": 2,
+      "sha256": "d64ad313a432c360b02eb8d4287d6def7ef27c65556517a7c17f2c99b4875aca",
+      "executable": false
+    },
+    {
+      "path": "tests/integration/test_cli.py",
+      "group": "Configuration and tests",
+      "bytes": 10296,
+      "lines": 270,
+      "sha256": "834e93d470c0bf6b3ebe6da1d997b9b303579a8872c3f9b943c5e7a80dba57bf",
+      "executable": false
+    },
+    {
+      "path": "tests/integration/test_daily_archive_historical_ingestion.py",
+      "group": "Configuration and tests",
+      "bytes": 6045,
+      "lines": 131,
+      "sha256": "22cf0cd7847e9f599138747ac50deab1218c7fde3877a19e7cfd157606bb70a6",
+      "executable": false
+    },
+    {
+      "path": "tests/integration/test_historical_storage_orchestration.py",
+      "group": "Configuration and tests",
+      "bytes": 4271,
+      "lines": 93,
+      "sha256": "a231b5ea2f988cc49776a79b8e6754dc1f85204b0b1591be90777677c80049e6",
+      "executable": false
+    },
+    {
+      "path": "tests/integration/test_live_market_data.py",
+      "group": "Configuration and tests",
+      "bytes": 3336,
+      "lines": 61,
+      "sha256": "b6bfcd2cec81e9d45105c939cbf740d49bbf5c2d5353a32c281a950e78310d6d",
+      "executable": false
+    },
+    {
+      "path": "tests/integration/test_model_artifacts.py",
+      "group": "Configuration and tests",
+      "bytes": 14215,
+      "lines": 280,
+      "sha256": "e8f5f315c5580bdbc9dc7ea041235368d535e024694274382c055649da05fc22",
+      "executable": false
+    },
+    {
+      "path": "tests/integration/test_parquet_publication.py",
+      "group": "Configuration and tests",
+      "bytes": 12115,
+      "lines": 261,
+      "sha256": "52462a5fe8592b6163bac2b02e4639846db4257421aaba1d162fe3c399637825",
+      "executable": false
+    },
+    {
+      "path": "tests/integration/test_v1t1_vertical.py",
+      "group": "Configuration and tests",
+      "bytes": 1989,
+      "lines": 37,
+      "sha256": "93bac7b174d74531aaacaaa0967a0692a28d4a0fe9357bb5a92403e8923564c0",
+      "executable": false
+    },
+    {
+      "path": "tests/integration/test_v1t2_vertical.py",
+      "group": "Configuration and tests",
+      "bytes": 2255,
+      "lines": 48,
+      "sha256": "a8db7325b722cadb7ef733737a02e5d39a8385bcca9ef9f974fccdf62e7bc5c2",
+      "executable": false
+    },
+    {
+      "path": "tests/integration/test_v1t3_vertical.py",
+      "group": "Configuration and tests",
+      "bytes": 5460,
+      "lines": 102,
+      "sha256": "2d25ec6dace6fe3a6e64de0d2851b13b4f7436e95661812feabe090481a93526",
+      "executable": false
+    },
+    {
+      "path": "tests/model_fixtures.py",
+      "group": "Configuration and tests",
+      "bytes": 1899,
+      "lines": 45,
+      "sha256": "77d4428a8eb0b3412c8b68510bae8ae1ffc654af693852869cbb63464bff152e",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/__init__.py",
+      "group": "Configuration and tests",
+      "bytes": 19,
+      "lines": 2,
+      "sha256": "11726d586214d5329207ffb3a1db86848bf02da97fed29ffc3e2842398eacd2d",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_af4b_development_screen.py",
+      "group": "Configuration and tests",
+      "bytes": 26469,
+      "lines": 690,
+      "sha256": "ee356d1e725126ac7b90351c5f00f0ee8da84c8ae636d6f0a57314d1eaaa4d60",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_af4b_preregistration.py",
+      "group": "Configuration and tests",
+      "bytes": 17863,
+      "lines": 449,
+      "sha256": "6db779dadda1701e3cf7e4fe937c879bab138075f2c637666e180d8c2d4384d3",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_aggregate_trade_archive_storage.py",
+      "group": "Configuration and tests",
+      "bytes": 14200,
+      "lines": 384,
+      "sha256": "27ec551e50406ae3e3c44d1bbda537be9d4fc705d4f7f4fdb29d5fab2433006f",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_aggregate_trade_catalog.py",
+      "group": "Configuration and tests",
+      "bytes": 5271,
+      "lines": 141,
+      "sha256": "1cc458d3431b15d27a74acb9c77a592b8b59aa26b3c03832b2a097514288da6d",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_aggregate_trade_minute_state.py",
+      "group": "Configuration and tests",
+      "bytes": 13261,
+      "lines": 346,
+      "sha256": "c3a0ec36a2559221b1e6055a637d9bb969ecde8ae047ec9f54ff17b914adbe73",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_aggregate_trade_minute_storage.py",
+      "group": "Configuration and tests",
+      "bytes": 5027,
+      "lines": 132,
+      "sha256": "6925a9fd87eb6a5a6103029890f866b6d9964eeff46086e0c2576df3bfad8faa",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_aggregate_trade_range_composition.py",
+      "group": "Configuration and tests",
+      "bytes": 12519,
+      "lines": 305,
+      "sha256": "dc831a646c2c7109ac237de23b71730d83f18aa93414ed06a4c58add449b01af",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_aggregate_trade_research.py",
+      "group": "Configuration and tests",
+      "bytes": 27065,
+      "lines": 658,
+      "sha256": "b67fec6090f568c836f042e35b51d5aecc4753b0127fd71ba142c35266793242",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_aggregate_trade_streaming.py",
+      "group": "Configuration and tests",
+      "bytes": 13003,
+      "lines": 364,
+      "sha256": "ee996a21818471f99b6a44a88d712ce441f80d12fcf113765e3fc15dd9cb00a4",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_alpha_catalog.py",
+      "group": "Configuration and tests",
+      "bytes": 37650,
+      "lines": 831,
+      "sha256": "0c9f293e4dfb727e2d0acceebd524a1a2e649a0b62a3bddbe0cfdef8104b1d52",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_alpha_funnel.py",
+      "group": "Configuration and tests",
+      "bytes": 51721,
+      "lines": 1255,
+      "sha256": "4f98d5ca19321b77ae7c5721b9442a8cfefb61c8d12d93b619a23a7c31db8245",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_alpha_funnel_af4a.py",
+      "group": "Configuration and tests",
+      "bytes": 13649,
+      "lines": 278,
+      "sha256": "f84cc7604c4e07cf7ba810daf2298fb88ab89e0f4106f96919394326aecaf773",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_alpha_hypotheses.py",
+      "group": "Configuration and tests",
+      "bytes": 41978,
+      "lines": 950,
+      "sha256": "7e9cd2af797401de525c71b1cee51376df6929879f44dcc58e9cc686db439158",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_alpha_temporal_split.py",
+      "group": "Configuration and tests",
+      "bytes": 8203,
+      "lines": 159,
+      "sha256": "2ec5be8d0c9478c68942bde20e2826a4c08f0e1c11347c68a71b7a09a99e4677",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_alpha_training_data.py",
+      "group": "Configuration and tests",
+      "bytes": 30628,
+      "lines": 556,
+      "sha256": "baabd28098bf00537f823cbd99106f9ea1c7904e510afcf22c2b5f2e3f81ae25",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_alpha_universe.py",
+      "group": "Configuration and tests",
+      "bytes": 8113,
+      "lines": 198,
+      "sha256": "1bdffae110841fa7b3f6edd3a3f39c8d1fcd2056b91b099552059a956b52f168",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_binance_aggregate_trade_archive.py",
+      "group": "Configuration and tests",
+      "bytes": 23692,
+      "lines": 636,
+      "sha256": "be37aa03aa6007c8cd187610866889f1f13ba7ef3f13617288246dda56d7fe21",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_binance_aggregate_trade_conformance.py",
+      "group": "Configuration and tests",
+      "bytes": 36323,
+      "lines": 910,
+      "sha256": "ce51969c06a39286ec6419391663bc4e4b1ac1b53741b78a602f6d4767405409",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_binance_daily_archive.py",
+      "group": "Configuration and tests",
+      "bytes": 22480,
+      "lines": 559,
+      "sha256": "9019e19aa5055245323024b682e66a48ef2b4e42933ff6f7fa5d6e2f529b6c63",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_binance_daily_archive_range_fetch.py",
+      "group": "Configuration and tests",
+      "bytes": 11688,
+      "lines": 280,
+      "sha256": "01d42f88ba4299fe6bd7eb4bdae7481bd5940b7d239f68c86f3844e6889588e6",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_binance_klines.py",
+      "group": "Configuration and tests",
+      "bytes": 13120,
+      "lines": 336,
+      "sha256": "402aa49f3dbeb642cda99ac8ea918a37ae6678cc36ebd9e41731d1fe7f9f7c85",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_binance_live_aggregate_trades.py",
+      "group": "Configuration and tests",
+      "bytes": 15089,
+      "lines": 400,
+      "sha256": "0aab346fbd8c30f117fdbd5c129b8242ecf3256ce4a93d17486198973c974124",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_binance_live_klines.py",
+      "group": "Configuration and tests",
+      "bytes": 13841,
+      "lines": 288,
+      "sha256": "5cce872f937eee51724c0c7840b0268a6ccd838ccfd74c4eca405973d3ec3aaf",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_binance_live_stream.py",
+      "group": "Configuration and tests",
+      "bytes": 25464,
+      "lines": 504,
+      "sha256": "48b0b558f104144905caa6fe1915747dd4e281016bcf1cb3e984fa98a16c20b7",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_binance_range_fetch.py",
+      "group": "Configuration and tests",
+      "bytes": 12984,
+      "lines": 345,
+      "sha256": "177bbe53eec8240a3b65a1af271c7372cd9ac6a6507f2f43a4f856828b9b1c04",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_configuration.py",
+      "group": "Configuration and tests",
+      "bytes": 3479,
+      "lines": 84,
+      "sha256": "cf49be799a4f4117e2aa696706efe7d7bb92ec14d4d7d9d1fead96d64b136f76",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_contracts.py",
+      "group": "Configuration and tests",
+      "bytes": 10164,
+      "lines": 289,
+      "sha256": "0a00b2d3a09572b393b30f0b0285fb570fbbadccdc45ba8463201414950b73ae",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_duckdb_query.py",
+      "group": "Configuration and tests",
+      "bytes": 19110,
+      "lines": 438,
+      "sha256": "3225364e4baae5e35a0192770ae5422ca1fa4616f92cbcd0609200a49976740f",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_feature_engine.py",
+      "group": "Configuration and tests",
+      "bytes": 22967,
+      "lines": 474,
+      "sha256": "100bb1aeee2ef8978eb26d429f1d13f4594877fe8b34e6e14c43fe6edcc6eb63",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_futures_breaker_timeframes.py",
+      "group": "Configuration and tests",
+      "bytes": 15642,
+      "lines": 380,
+      "sha256": "f1e1de349428d52b4a5331e89d132d4b8b707b66a560dd88c5d9abedf13e654b",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_futures_capital_profiles.py",
+      "group": "Configuration and tests",
+      "bytes": 8316,
+      "lines": 222,
+      "sha256": "4130e0fd9e7a6259e3500d87cd5140185504ca39f2249bcf97160607373608e3",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_futures_economics_management.py",
+      "group": "Configuration and tests",
+      "bytes": 14085,
+      "lines": 334,
+      "sha256": "fa319630f1a258a95508a8e8e1f9cab192779a86927060081d15902f419b63bf",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_futures_mvp.py",
+      "group": "Configuration and tests",
+      "bytes": 9008,
+      "lines": 198,
+      "sha256": "b030d305e5fb3b882b544441cf684fee52d1d9328af1e830c7c9e23213de6d98",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_futures_pre_paper.py",
+      "group": "Configuration and tests",
+      "bytes": 20244,
+      "lines": 479,
+      "sha256": "99e8c7c840573018e31301279836935d63738c272c2e0d5e701b6be26577f841",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_futures_strategy_funnel.py",
+      "group": "Configuration and tests",
+      "bytes": 9229,
+      "lines": 231,
+      "sha256": "c04a8b0286386cd912e922326c75e58b5930ac48940bec160d576f16a7277a2c",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_hft_authenticated.py",
+      "group": "Configuration and tests",
+      "bytes": 37679,
+      "lines": 833,
+      "sha256": "d23d3c44bdad514c7b298dab101d05616277713d1c5b66747edf0470876d170e",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_hft_clock.py",
+      "group": "Configuration and tests",
+      "bytes": 9190,
+      "lines": 254,
+      "sha256": "f3f4a3a75e2282cbf0c5311e26838db3a9969eb92a047b828727dcb2d045da6a",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_hft_paper.py",
+      "group": "Configuration and tests",
+      "bytes": 29445,
+      "lines": 703,
+      "sha256": "9fc3dff0d5cca7efd5ccbfe1ed7e594d4f10875d17b4ec053e5a79bfa9460990",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_hft_runtime_liveness.py",
+      "group": "Configuration and tests",
+      "bytes": 29247,
+      "lines": 875,
+      "sha256": "655f33829b8b52edf04df5ed41103bd7525e703a34d7ec05b9b7b9992b4d6ae4",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_historical_ingestion.py",
+      "group": "Configuration and tests",
+      "bytes": 10572,
+      "lines": 264,
+      "sha256": "3a0828ae20311838f2648b046cf4ea1f91cd8ee58813c1448a4daa3436835372",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_historical_persistence.py",
+      "group": "Configuration and tests",
+      "bytes": 21904,
+      "lines": 549,
+      "sha256": "ac519b05c0996737afee235e7a15e0a46e238e51ae5827ae78447f57d08024a3",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_lightgbm_model.py",
+      "group": "Configuration and tests",
+      "bytes": 14418,
+      "lines": 246,
+      "sha256": "7384d5486f2b55c362fdb85961f0efd426b0375240fda654371e7527987ea2e8",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_live_aggregate_trade_minutes.py",
+      "group": "Configuration and tests",
+      "bytes": 13422,
+      "lines": 381,
+      "sha256": "8d04d356e8ea20731f80885e08469abee2b8914e9ec7bd7f2c362f1ab919b9fb",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_logging.py",
+      "group": "Configuration and tests",
+      "bytes": 1283,
+      "lines": 39,
+      "sha256": "7e9a4012388de53e405647ec4dff1789bc1ba4957aa149522f8d2e920ea14c01",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_market_data.py",
+      "group": "Configuration and tests",
+      "bytes": 13461,
+      "lines": 304,
+      "sha256": "86e43a9ea9f3bfbec3cba6a8c34e73c4feb96b32f7eb1ba6fa1e6af2616b9137",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_parquet_store.py",
+      "group": "Configuration and tests",
+      "bytes": 23280,
+      "lines": 483,
+      "sha256": "5ac3d5abd415cbcf0888f245da594b5165e591b11f2785c8f6ca631f424196c9",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_reclaim.py",
+      "group": "Configuration and tests",
+      "bytes": 14347,
+      "lines": 243,
+      "sha256": "cd4ff8ad97005edca435cfb14a5575fa63bae25781238f847d3a6aec51d4efc1",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_reclaim_diagnostics.py",
+      "group": "Configuration and tests",
+      "bytes": 2521,
+      "lines": 51,
+      "sha256": "ee80310beb1dae574235fa3c289b9a48a9cd77e28c8980bd71605cc60c1f274a",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_retail_edge.py",
+      "group": "Configuration and tests",
+      "bytes": 5800,
+      "lines": 100,
+      "sha256": "ebb0e380a2d4f0420e6065cb0b2de978eb5f561d6347d0a2c3cf04d82b3ad9bd",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_retail_full_equity.py",
+      "group": "Configuration and tests",
+      "bytes": 14564,
+      "lines": 263,
+      "sha256": "40a6ffc94022cbd9ccb43ddb2c7ddf42c831b9536614a7f1b1b70e422a0bf568",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_retail_intelligence.py",
+      "group": "Configuration and tests",
+      "bytes": 4697,
+      "lines": 88,
+      "sha256": "cb77f03c172edc2e4d8b4f88f15a751cc8a37db2c89306a2975a9dcbd0a55729",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_retail_operations.py",
+      "group": "Configuration and tests",
+      "bytes": 9277,
+      "lines": 154,
+      "sha256": "3a88f2a950a4d6050e3ec568337d1a84cddd265931f229d3125c5b6dd0acd850",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_retail_paper.py",
+      "group": "Configuration and tests",
+      "bytes": 14734,
+      "lines": 291,
+      "sha256": "1f86521f558fd2bb7ab2006b0ad167721a35e05c756bf77c306c214e6d9c1726",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_retail_replay.py",
+      "group": "Configuration and tests",
+      "bytes": 8200,
+      "lines": 148,
+      "sha256": "ce42c92aa6935767571d6c5331fe76a979839684de473b9170459cba8ca1f9ef",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_v1t1.py",
+      "group": "Configuration and tests",
+      "bytes": 23251,
+      "lines": 480,
+      "sha256": "3cb24038b94829932829d593265ed97da46dae3a121ea0c74603facb8bfcbbd2",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_v1t1_audit.py",
+      "group": "Configuration and tests",
+      "bytes": 8378,
+      "lines": 144,
+      "sha256": "630a4be06ae45549d92c148efe036ab00f5434a147ecb3d086d21e5063cb0fc4",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_v1t2_audit.py",
+      "group": "Configuration and tests",
+      "bytes": 19093,
+      "lines": 323,
+      "sha256": "d1b07d4880322e472942209195fc10dac332a6e7dd136a47563584c62cbec206",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_v1t2_evaluation.py",
+      "group": "Configuration and tests",
+      "bytes": 15803,
+      "lines": 351,
+      "sha256": "a9685f8ef4f4faa959e6f90023f430735520551479bc27d517488922350bed03",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_v1t3_audit.py",
+      "group": "Configuration and tests",
+      "bytes": 14720,
+      "lines": 281,
+      "sha256": "7371b1b767edf77b8dc351e271590dfda787e73530116a0e92d1e34dc2dbc190",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_v1t3_configuration.py",
+      "group": "Configuration and tests",
+      "bytes": 4165,
+      "lines": 73,
+      "sha256": "c9ecd429f0fcf7efdb662399345a0b44d0a1cb5b7f5b47bd278072a867947f07",
+      "executable": false
+    },
+    {
+      "path": "tests/unit/test_v1t3_runtime.py",
+      "group": "Configuration and tests",
+      "bytes": 26764,
+      "lines": 520,
+      "sha256": "8e53a51edba98620856108f9896ff2e57f843503f9ab96d2df15fa3d8c54a842",
+      "executable": false
+    },
+    {
+      "path": "tests/validation/__init__.py",
+      "group": "Configuration and tests",
+      "bytes": 25,
+      "lines": 2,
+      "sha256": "d3b3be0d87c41e33bdf597a946f6411d99c75353aaa1ab1e17bdfd24dbc2b6be",
+      "executable": false
+    },
+    {
+      "path": "tests/validation/test_architecture.py",
+      "group": "Configuration and tests",
+      "bytes": 12626,
+      "lines": 238,
+      "sha256": "0dcb9396b4a1537690814dee77d4e95528c68d0ee0fc085c32df60de3b1364eb",
+      "executable": false
+    },
+    {
+      "path": "AGENTS.md",
+      "group": "Documentation",
+      "bytes": 13920,
+      "lines": 404,
+      "sha256": "029519c16ea8565d1c4524ea208b65e34606cf06b11c7aee33d1c7b04dd3f319",
+      "executable": false
+    },
+    {
+      "path": "LICENSE",
+      "group": "Documentation",
+      "bytes": 11357,
+      "lines": 201,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "executable": false
+    },
+    {
+      "path": "README.md",
+      "group": "Documentation",
+      "bytes": 24695,
+      "lines": 171,
+      "sha256": "12a1762ba48de4038fbb4efdfa0e15826a5adb88409a75eab546208c04e9c722",
+      "executable": false
+    },
+    {
+      "path": "docs/000_READ_FIRST.md",
+      "group": "Documentation",
+      "bytes": 5110,
+      "lines": 105,
+      "sha256": "509e7a10bbc8fd3b1fa1be803363faf6655322ba39854bfab0aa7ae6f15abe6d",
+      "executable": false
+    },
+    {
+      "path": "docs/001_PRODUCT_REQUIREMENTS.md",
+      "group": "Documentation",
+      "bytes": 1952,
+      "lines": 39,
+      "sha256": "661166da5da0a66dceb4697d7021bcb6d4f5982f3057710f17ee1eed4e2f1063",
+      "executable": false
+    },
+    {
+      "path": "docs/002_SYSTEM_ARCHITECTURE.md",
+      "group": "Documentation",
+      "bytes": 1959,
+      "lines": 38,
+      "sha256": "e5b8452e58ea7e168e03d4cf6f8b737e04f089c081959df63b5bee683c48e71e",
+      "executable": false
+    },
+    {
+      "path": "docs/003_DATA_ARCHITECTURE.md",
+      "group": "Documentation",
+      "bytes": 2043,
+      "lines": 39,
+      "sha256": "25352269cb105bda6ec1eb0add30eab87aff2c1a068a8bb38b7194d508eb45df",
+      "executable": false
+    },
+    {
+      "path": "docs/004_FEATURE_ENGINE_SPECIFICATION.md",
+      "group": "Documentation",
+      "bytes": 1450,
+      "lines": 29,
+      "sha256": "92ffa2c316cb49948c27a01bc08e64d81f3847cec346ea82d3d2673dafb51c46",
+      "executable": false
+    },
+    {
+      "path": "docs/005_ALPHA_ENGINE.md",
+      "group": "Documentation",
+      "bytes": 1488,
+      "lines": 30,
+      "sha256": "e0f1d706650074392e26b218a48029d1c94e9b0ce10db11bf1f1243663c850e3",
+      "executable": false
+    },
+    {
+      "path": "docs/006_RISK_EXECUTION_SPECIFICATION.md",
+      "group": "Documentation",
+      "bytes": 2409,
+      "lines": 46,
+      "sha256": "41b2a3cc351af0f16b060275dcc89b55341937a5463ed86e9e1294a7a33393ae",
+      "executable": false
+    },
+    {
+      "path": "docs/007_VALIDATION_BACKTESTING.md",
+      "group": "Documentation",
+      "bytes": 1876,
+      "lines": 36,
+      "sha256": "4f2dbfc6f87d1ab918aeb442f362d3dd3cc7cf31f7fe7ce2afa832a54ce19578",
+      "executable": false
+    },
+    {
+      "path": "docs/008_IMPLEMENTATION_GUIDE.md",
+      "group": "Documentation",
+      "bytes": 2361,
+      "lines": 46,
+      "sha256": "6abd86ac4585e6e34c4e91fd2b5291b66946344dd341e670ef34666e929f035f",
+      "executable": false
+    },
+    {
+      "path": "docs/009_ALPHA_DISCOVERY_FUNNEL_AF1.md",
+      "group": "Documentation",
+      "bytes": 11801,
+      "lines": 214,
+      "sha256": "ad7803207d6939fd1c60e509fa7fcd6d7edc705a6280add43ec752e5b5c58644",
+      "executable": false
+    },
+    {
+      "path": "docs/010_DATA_EDGE_RESEARCH_PROGRAM.md",
+      "group": "Documentation",
+      "bytes": 18792,
+      "lines": 361,
+      "sha256": "2dc1930702397618c81a3bd4bdb29da008a7f21ad9482af8088e466909dfda5f",
+      "executable": false
+    },
+    {
+      "path": "docs/011_ALPHA_DISCOVERY_FUNNEL_AF4B_DE1.md",
+      "group": "Documentation",
+      "bytes": 13838,
+      "lines": 205,
+      "sha256": "6bdeb64b9a73e6e4e1b23165598228efd6c5b403955e9942f15f545834388d8e",
+      "executable": false
+    },
+    {
+      "path": "docs/HFTBACKTEST_COMPATIBILITY.md",
+      "group": "Documentation",
+      "bytes": 1355,
+      "lines": 26,
+      "sha256": "c7148b30b8a27ff7839f95957f47c97579f4e6c996991a88db6daa71195901fb",
+      "executable": false
+    },
+    {
+      "path": "docs/PUBLIC_RELEASE.md",
+      "group": "Documentation",
+      "bytes": 2152,
+      "lines": 34,
+      "sha256": "9ce350fcc6fabc0eafd31f8a2b900e8a80fa9e72cf78201dc447192ae08d1e5a",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS03_RETAIL_PAPER_ADDENDUM.md",
+      "group": "Documentation",
+      "bytes": 2381,
+      "lines": 37,
+      "sha256": "7b1ff1e5ae7651045f019e7217516a114ff42c1ae436b2663b8d1998fa4af563",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS04_EXPERIMENTS.md",
+      "group": "Documentation",
+      "bytes": 1617,
+      "lines": 19,
+      "sha256": "cd0fde5ff3ba78253d60e90f63d7e89be10faddce89eaa129dca1b91d53023b0",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS04_FINAL_REPORT.md",
+      "group": "Documentation",
+      "bytes": 14581,
+      "lines": 246,
+      "sha256": "6150cf64cebd9488b0dbdcefc7595274bb05ef1b8edb3fc82cf5da3b7c6a58ab",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS04_OPERATIONS.md",
+      "group": "Documentation",
+      "bytes": 4189,
+      "lines": 71,
+      "sha256": "d4573a0f639708132b0872e1a7fe793a115a5ce7b49586026a8259e0f2801aab",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS04_PROGRESS.md",
+      "group": "Documentation",
+      "bytes": 7814,
+      "lines": 121,
+      "sha256": "c991f5263ccaa8b6fd3813de7c9f0a81c668380da540d4008a98d841469ada19",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS04_RETAIL_ADDENDUM.md",
+      "group": "Documentation",
+      "bytes": 4945,
+      "lines": 78,
+      "sha256": "bf071508e2e80ec059a96286ccd0c04ef6477ccb3e32e74385a226adbff9bcd2",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS05_FINAL_REPORT.md",
+      "group": "Documentation",
+      "bytes": 10627,
+      "lines": 168,
+      "sha256": "0468176e6ceefe8667fcf7c8b35181f6403db176850bada8622dc2478d7a15f2",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS05_PRECOMMIT.md",
+      "group": "Documentation",
+      "bytes": 5793,
+      "lines": 81,
+      "sha256": "feb7262410c53fc8012921ab4fdb632814be51f0d0eeb85c72145f1ff030e708",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS05_PROGRESS.md",
+      "group": "Documentation",
+      "bytes": 3483,
+      "lines": 54,
+      "sha256": "9da380fda9f379722d59a007ddda471fc21ae704b6b386d813ec7ebfbe2fd13f",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS06_FINAL_REPORT.md",
+      "group": "Documentation",
+      "bytes": 6158,
+      "lines": 47,
+      "sha256": "54034eaeda92df3e68a570c8a6315adee42aba9354c4efedb28c40ca3f567f22",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS06_PROGRESS.md",
+      "group": "Documentation",
+      "bytes": 1814,
+      "lines": 15,
+      "sha256": "4891fc8dcee3b0cfd99c9711947d61c3964c97b7540ac9825b1b8aa1fc0ad4ac",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS07_CAPITAL_ADDENDUM.md",
+      "group": "Documentation",
+      "bytes": 1576,
+      "lines": 24,
+      "sha256": "04221f85e334dbdc9a8ab49e8faa49b22cab85ccd123201d799bd40119b38887",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS07_FINAL_HANDOFF.md",
+      "group": "Documentation",
+      "bytes": 7511,
+      "lines": 126,
+      "sha256": "7442f59a36fadfc90f40a0370f53d97fcde9e60ca8755934e390ebc98d78a038",
+      "executable": false
+    },
+    {
+      "path": "docs/QOS07_OPERATOR.md",
+      "group": "Documentation",
+      "bytes": 5107,
+      "lines": 88,
+      "sha256": "aff1367394e78909cbec43d9f155824a0ced517465cdd4d7fc5c9e176dba0875",
+      "executable": false
+    },
+    {
+      "path": "docs/V1_T1_PAPER_CORE.md",
+      "group": "Documentation",
+      "bytes": 17646,
+      "lines": 140,
+      "sha256": "ec476757101fe4e67532a67c74a2342de26fd6db715a5eaa16bac0ef7bd4b7a7",
+      "executable": false
+    },
+    {
+      "path": "docs/V1_T2_EVALUATION_CORE.md",
+      "group": "Documentation",
+      "bytes": 6078,
+      "lines": 19,
+      "sha256": "ab5392ea6bf6f720aa6b50f772302b63ba562018179f671e1b2c69102fb0cbbc",
+      "executable": false
+    },
+    {
+      "path": "docs/V1_T3_PAPER_RUNTIME.md",
+      "group": "Documentation",
+      "bytes": 7198,
+      "lines": 106,
+      "sha256": "6b899b3a40c8fdd610d02962b5de24bec2002772bf09a788b1d99b586e6ce878",
+      "executable": false
+    },
+    {
+      "path": "docs/research/PHASE_4C_R1_R6_RESEARCH_DECISION.md",
+      "group": "Documentation",
+      "bytes": 8181,
+      "lines": 80,
+      "sha256": "2605bee9ef9d7126df26159ae1972fdcc57111797eb4284c680e3abb69c73678",
+      "executable": false
+    },
+    {
+      "path": "docs/research/PHASE_4D_IF1_INFORMATION_FEASIBILITY.md",
+      "group": "Documentation",
+      "bytes": 13514,
+      "lines": 87,
+      "sha256": "e81ded750333cdd2ee416c0f25f5cf3d125e8646a7fd8d9ebf3c9055a91469af",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af2a/ledger.md",
+      "group": "Documentation",
+      "bytes": 57578,
+      "lines": 727,
+      "sha256": "939ed572497b6b71fdeac6037e120279be76907056b4e4bca1e91eaf11787315",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af2a/math_prescreen.md",
+      "group": "Documentation",
+      "bytes": 11108,
+      "lines": 86,
+      "sha256": "4e0dbb3b2f5cf3d2ebe59ff8c797d7ae3d1840b27a9c2fc0a7d3046dead74ad6",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af3a/README.md",
+      "group": "Documentation",
+      "bytes": 1283,
+      "lines": 28,
+      "sha256": "e185816bddaee5c29a600b8e6dd7e0f0f5d4decd30501fe9d6248ffebd730b80",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af4a/README.md",
+      "group": "Documentation",
+      "bytes": 4939,
+      "lines": 91,
+      "sha256": "5fc9764047ef00e96f3b3d239032973c65415e444931ac32812f96894fc4453a",
+      "executable": false
+    },
+    {
+      "path": "research/alpha-funnel/af4b/CLOSURE.md",
+      "group": "Documentation",
+      "bytes": 11717,
+      "lines": 84,
+      "sha256": "418ca1d3b8919e018b6c38ce6aa68b79c4c8060d0d406c203b43b31e6ca701d9",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/__init__.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 61,
+      "lines": 4,
+      "sha256": "b696eb3c9495403c437f66bc5694b0581cd6ca4561d128a3a07bc1c7af009121",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/__main__.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 138,
+      "lines": 8,
+      "sha256": "5fd0d50aef2534fd520e045ff78471631f007ce96e2074ed4a33620acb754050",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/__init__.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 2208,
+      "lines": 63,
+      "sha256": "df271535d02de330048226d09d4c7145903ef3945f20ad4643fa813e84a08b6b",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/aggregate_trade_minute_states.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 11268,
+      "lines": 279,
+      "sha256": "3bd3aca426a3f98a1d5181be0d3ddde6435dde2ab92607c5020083bbf2e5b12a",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/aggregate_trade_ranges.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 19204,
+      "lines": 520,
+      "sha256": "62cedfba1f7d46fc2eb10a1414676a2968917475dc235f5a8d25e6be83b21251",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/evaluation.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 20138,
+      "lines": 466,
+      "sha256": "c18f16cd33e7a3fa6d0f3888e21d255952bf0a4eb968385b77ebb3f2463891ba",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/futures_trader.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 40792,
+      "lines": 945,
+      "sha256": "5abeff184a619499ed6ea6d73b4b20e763592df7a834a3c365f8fdc04b2c5ba4",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/hft_authenticated.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 52685,
+      "lines": 1288,
+      "sha256": "a01f64278746bbb13f1ab464053b426a7d81c2bb3efefa3583a95ac480e0592f",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/hft_trader.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 52894,
+      "lines": 1342,
+      "sha256": "c9e5f3aa3a05560ffe4ceb7cd34c3f2d9c45b0361758610b31700d4594a7c55c",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/historical_ingestion.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 8723,
+      "lines": 240,
+      "sha256": "9bbb9d9c912da6aff6deaa0eccf31fdbc8409975d0f7f88303b41e66025d7562",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/live_aggregate_trade_minutes.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 18527,
+      "lines": 433,
+      "sha256": "c608d1a60371276ad66a2afc2cd5ffac7511bb091f578885bdfbffa845a6ca85",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/paper_runtime.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 24522,
+      "lines": 437,
+      "sha256": "3699bf31c0dd9d34f4dd65324482013a49ff03ade2ba89fc28b2ea5ca867748d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/reclaim_qualification.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 1610,
+      "lines": 33,
+      "sha256": "4e125ca78e39e1d770a80813a09738c7a0ef806567789abd6020795b31c2d7f3",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/retail_edge_session.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 11107,
+      "lines": 187,
+      "sha256": "3781d49722915e3a28f5cc038ce6702cbd26234932dca7d38f13b8330d61009d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/retail_trader.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 27069,
+      "lines": 485,
+      "sha256": "e3556581a0874295988870a7a90725ffea5e8c2a9c6a7088bacb816a54d7cb2c",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/risk_execution.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 3341,
+      "lines": 62,
+      "sha256": "54c39c1e7d911c36dfced98bfca01f84ac7a8cd42ef9d857043ac4de8ecdc7b8",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/runtime.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 1020,
+      "lines": 21,
+      "sha256": "840c4ea2b11fc2396f936b6997175758f65c36a86f629e03b03fe645a3245b63",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/__init__.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 67,
+      "lines": 2,
+      "sha256": "49c1f2786a948d370d64b6c6dea89f0816099a001dad171d4e4f0e79e1dc9824",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/common.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 1395,
+      "lines": 41,
+      "sha256": "bebda176dd263b9ff2aeb0b5a7cd6093df429c4041083e52c0aec3592bace11c",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/runtime_contracts.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 5830,
+      "lines": 138,
+      "sha256": "3f540c28972adf11ea1b6b67caed1e0f91d6fcb7ad7d2741746d0e280707f8c6",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/__init__.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 55,
+      "lines": 2,
+      "sha256": "c7d964671b85086f4af5a4ceef340c912780108d2c4879d7595f11109a060bd3",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/configuration/__init__.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 229,
+      "lines": 6,
+      "sha256": "d347b7ee33ff562eae001f77a07a026058ac9754a0c416d87f5e14bc88b0e2fa",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/configuration/config.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 5252,
+      "lines": 124,
+      "sha256": "4103164648869f7459b6b816776f9dcf4aeb6aa2cc72120e33f83949cabdcab6",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/configuration/futures.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 6931,
+      "lines": 152,
+      "sha256": "288973c93caca2c46f375afd39c7cb7aea389c6800ca89f616920ec0e838b2f7",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/configuration/hft.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 8678,
+      "lines": 215,
+      "sha256": "cb7a67ef51496c7befb175a3686b5b890d3c29a9deea81d6cb28d90068a25588",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/configuration/paper.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 2413,
+      "lines": 51,
+      "sha256": "0fb571b440e0b17b291a7f4478568ac21dda81a1663be3f3c9790afbc2d582d0",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/configuration/paper_runtime.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 2665,
+      "lines": 47,
+      "sha256": "59efee88d7347f7b2a71f53a2b54ac8ff695e0cc153ae0f2311586bc342cdd83",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/configuration/retail.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 679,
+      "lines": 13,
+      "sha256": "10978cdb7422a4ab3b8086cd12fef3b3ebbfb5cef50dbbc94223737eb0609f27",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/logging/__init__.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 189,
+      "lines": 6,
+      "sha256": "1e5e3fe2fc1807a57d2d6caaf568c71a12a9b457f36f31e4facdfd984c1e6c81",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/logging/structured.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 1823,
+      "lines": 51,
+      "sha256": "4f8de6291660655cfdcac0cdc2dc39fa31d0ea412835bd8c6355a76a85c2c1a2",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/interfaces/__init__.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 48,
+      "lines": 2,
+      "sha256": "16adddd8fb6fd199e182119543f47d9865ed07d7b0201fb27df221a41661a286",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/interfaces/cli.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 12971,
+      "lines": 351,
+      "sha256": "ba8686192ba97f73d2010555c8d36570244932bb1f6a8551311360fa61d0f52f",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/interfaces/futures.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 21587,
+      "lines": 491,
+      "sha256": "67ad775fabed9c00680951974ba2a362136002c6d1d0a0ef66502db78751baa5",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/interfaces/hft.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 19886,
+      "lines": 538,
+      "sha256": "000565b93b033124f57afc7b43e24cf26953427aaeaaddafbb2b30df0d76eb3e",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/interfaces/paper_runtime.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 2523,
+      "lines": 48,
+      "sha256": "a93b7c7bf7445e8582d4b4372342ad0e6e50e264dc6161c64c77b288db280e7a",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/interfaces/retail.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 4919,
+      "lines": 112,
+      "sha256": "00eca58a3bcf45387a2a725856f31af2e9eb1bdbd9bbb573119811245ec1124d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/interfaces/retail_edge.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 13109,
+      "lines": 192,
+      "sha256": "34a6b183ec37365b155a2748a732b373d9b40c2754b722aff38a697b13bbf47f",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/interfaces/retail_runtime.py",
+      "group": "Entrypoints and runtime",
+      "bytes": 8482,
+      "lines": 188,
+      "sha256": "5b3724207d1db039afc0b259e7a499f8178ad5c64449d0c2299358ece0a2874c",
+      "executable": false
+    },
+    {
+      "path": "research/alpha_funnel_af4a.py",
+      "group": "Evaluation and replay",
+      "bytes": 19829,
+      "lines": 375,
+      "sha256": "159a6ce1ed03b1ed9214aefe54aa10978dc27ea6c5f1516cd2aa8acb3ed27c7d",
+      "executable": false
+    },
+    {
+      "path": "research/alpha_funnel_af4b_execute.py",
+      "group": "Evaluation and replay",
+      "bytes": 75902,
+      "lines": 1906,
+      "sha256": "2cca7134242ed83109600eac68d0b85d95dea4c62a88d67986635f5216427ae9",
+      "executable": false
+    },
+    {
+      "path": "research/alpha_funnel_af4b_preregistration.py",
+      "group": "Evaluation and replay",
+      "bytes": 30667,
+      "lines": 483,
+      "sha256": "d7a4f15edd8cf9f35a93ae7d0fc01b8923418fdba15190190a3f79ef90c37b0e",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/application/retail_replay.py",
+      "group": "Evaluation and replay",
+      "bytes": 7997,
+      "lines": 162,
+      "sha256": "c1f9fb85a9ef18deab9b43901b74cdb7da2452025a8e89e3cd758ee41e05bff1",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/__init__.py",
+      "group": "Evaluation and replay",
+      "bytes": 1080,
+      "lines": 31,
+      "sha256": "cbb47e881209e3878b1146e435ce7ab6e5a16db6d8aceab04026267b24dc6bb8",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/alpha_catalog.py",
+      "group": "Evaluation and replay",
+      "bytes": 37243,
+      "lines": 883,
+      "sha256": "cfb5d3d1ab8b1d344f0ec02ba7719562699803c94dd8e0a987450fc8aa4a3912",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/alpha_funnel.py",
+      "group": "Evaluation and replay",
+      "bytes": 82469,
+      "lines": 1908,
+      "sha256": "bdfb90b025300a3844c9625db56dca82d2a9e80a1488332a1aa16d4070d0d256",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/alpha_hypotheses.py",
+      "group": "Evaluation and replay",
+      "bytes": 31918,
+      "lines": 757,
+      "sha256": "6c35ea16985da0acf001ac5d21c156bb313111f646296fdaff0031e9392dfb9f",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/alpha_universe.py",
+      "group": "Evaluation and replay",
+      "bytes": 17434,
+      "lines": 370,
+      "sha256": "231da45438d76d5cc3a513eab587f94b6407f93302fd97f77811f0e057e0a56f",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/contracts.py",
+      "group": "Evaluation and replay",
+      "bytes": 19540,
+      "lines": 455,
+      "sha256": "917269ffd930c6cb97723f9bf06a95c684f09fc4fb13e5b180b195aab90ef4e6",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/hft.py",
+      "group": "Evaluation and replay",
+      "bytes": 17954,
+      "lines": 445,
+      "sha256": "8eb0ebcd4431e7002cd0a8f5097fbfd9b0c5ec12ed3b327f6f225a6b0bca3061",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/metrics.py",
+      "group": "Evaluation and replay",
+      "bytes": 5502,
+      "lines": 140,
+      "sha256": "8358a826a4f0acac877a6425ac0d3e8c83eb031f4c888b2abb8e7afb97e4e61f",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/monte_carlo.py",
+      "group": "Evaluation and replay",
+      "bytes": 3126,
+      "lines": 73,
+      "sha256": "6b0652b6cba056de83dc9aeef663803e0b5b0fb01026f656221c8accc920f5da",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/reclaim.py",
+      "group": "Evaluation and replay",
+      "bytes": 3804,
+      "lines": 69,
+      "sha256": "29e30b5c52778fed064a9f284ec6fc783b82763baaf032a1d37dcd45c81e79a9",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/reclaim_diagnostics.py",
+      "group": "Evaluation and replay",
+      "bytes": 3107,
+      "lines": 65,
+      "sha256": "dd2fcb108c31ee29f1f0b66a69355317440839eeacbc2cfaba92e0e371e5dcb9",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/reference_hypotheses.py",
+      "group": "Evaluation and replay",
+      "bytes": 6092,
+      "lines": 143,
+      "sha256": "f2d53ca5090f96d5dbb94923d765b51d1c38b7c166856e4c12bf367f56994fc4",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/evaluation/retail.py",
+      "group": "Evaluation and replay",
+      "bytes": 4688,
+      "lines": 87,
+      "sha256": "566789fe6d365238def70d82b2102e98a77c76a59006c5662c97b5e9d236689d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/execution/__init__.py",
+      "group": "Execution and accounting",
+      "bytes": 372,
+      "lines": 21,
+      "sha256": "166823c2212fed4f4c9d6ac998a1bd2667d92de041673fd79e9ed28809fcd079",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/execution/contracts.py",
+      "group": "Execution and accounting",
+      "bytes": 4849,
+      "lines": 117,
+      "sha256": "f14372328e4bec6ff3ef2b1fcf451eb24e7b192ff823ba844cf91ad99a48e390",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/execution/core.py",
+      "group": "Execution and accounting",
+      "bytes": 16052,
+      "lines": 326,
+      "sha256": "024b79a379e2b0c03cbb32a5018bf75dbac3b95581fbe333802d0b497d4a6426",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/execution/evidence.py",
+      "group": "Execution and accounting",
+      "bytes": 155,
+      "lines": 2,
+      "sha256": "94bedaf31884feebb43de187bd8d28fef95ce009a67dbca9522c9c23721143d2",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/execution/futures_paper.py",
+      "group": "Execution and accounting",
+      "bytes": 28862,
+      "lines": 650,
+      "sha256": "fafe4964017b33f5c240c3bab97d2dce6abb213bf191fa2ef9d08ec2b9fddb35",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/execution/hft_authenticated.py",
+      "group": "Execution and accounting",
+      "bytes": 19783,
+      "lines": 515,
+      "sha256": "a0e233d371752c24b25aa6d150731caf18554377f84ebae2cf5ef055555815ba",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/execution/hft_paper.py",
+      "group": "Execution and accounting",
+      "bytes": 16247,
+      "lines": 427,
+      "sha256": "a2dbcabf0c056345a40f901b3517b5895d6727675e51a5b04b7e7d610707bfd5",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/execution/policy.py",
+      "group": "Execution and accounting",
+      "bytes": 171,
+      "lines": 2,
+      "sha256": "bf03907afdf725c868d2147b356ece0a38916dfa05b059ca8599b85c2cd0951d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/execution/retail_paper.py",
+      "group": "Execution and accounting",
+      "bytes": 18032,
+      "lines": 398,
+      "sha256": "db691e749967a2f3dc9be9bf8e8cdd2fc7e9766e6b05c2e8ef259876db0626d4",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/execution/state.py",
+      "group": "Execution and accounting",
+      "bytes": 141,
+      "lines": 2,
+      "sha256": "34bea32ed87040ab509a9c704dc60be42abc13bfd1a90495e5683af22081dbac",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/features/__init__.py",
+      "group": "Market Data and Features",
+      "bytes": 430,
+      "lines": 16,
+      "sha256": "3809883adfbe34f5180effb09c8ca6835bde49530cd56a55e7afc1e87febe576",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/features/contracts.py",
+      "group": "Market Data and Features",
+      "bytes": 1152,
+      "lines": 34,
+      "sha256": "6c3ee0a066471b3323852c03e4586f910d2ca13e2b4d699dca3cac3cfe840fd4",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/features/engine.py",
+      "group": "Market Data and Features",
+      "bytes": 6418,
+      "lines": 161,
+      "sha256": "488660fff5f30db7da02ba769c1fd7beebab4bdb1fe7fa32cc4bded9fde4c066",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/features/hft.py",
+      "group": "Market Data and Features",
+      "bytes": 7888,
+      "lines": 217,
+      "sha256": "54e7d6e744c8fbee8c4703fab381578b8c651fabeb23e9c4297fa5c7f013d6cb",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/features/intelligence.py",
+      "group": "Market Data and Features",
+      "bytes": 3031,
+      "lines": 71,
+      "sha256": "d28b08b1551a413ec1ab2735dca05a9fee03d5d278a5b66eb44f02de9ae663eb",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/features/reclaim.py",
+      "group": "Market Data and Features",
+      "bytes": 1785,
+      "lines": 47,
+      "sha256": "627f50836856ab737f08e1b2f8e5273237d77512577c73fc08740b6fd957a83b",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/__init__.py",
+      "group": "Market Data and Features",
+      "bytes": 530,
+      "lines": 23,
+      "sha256": "05b753fd51ba3f674df9731ee4d38c90af45424aab1782c3d23d247312bd3785",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/contracts.py",
+      "group": "Market Data and Features",
+      "bytes": 4327,
+      "lines": 123,
+      "sha256": "0c0f77454e114b1e4e9440657ef9658c21ba6d4d7bb917fda9ea0073b3de5428",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/futures.py",
+      "group": "Market Data and Features",
+      "bytes": 5229,
+      "lines": 113,
+      "sha256": "95421ea7ea355ec6a70b14b86a7e25cec2eb1b2d0be60dc5f49b73ecf6a4bca9",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/hft.py",
+      "group": "Market Data and Features",
+      "bytes": 12136,
+      "lines": 327,
+      "sha256": "6b104f17d8783c8ff64ddc4f3528d4235ee4a7a0ba4143a8d07bccfb371414d9",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/hft_clock.py",
+      "group": "Market Data and Features",
+      "bytes": 10529,
+      "lines": 287,
+      "sha256": "80af08ab721535ab71008439bc9c58504024c7b74e7e67b3fed109f9e933af54",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/intelligence.py",
+      "group": "Market Data and Features",
+      "bytes": 2485,
+      "lines": 59,
+      "sha256": "fb459b62a60e1fd14bf7b15f518308ff652b132773c45dd880ca31cf524510b9",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/research_events/__init__.py",
+      "group": "Market Data and Features",
+      "bytes": 5809,
+      "lines": 151,
+      "sha256": "e7bd8e80d5cf900daae555b8944d306900810b4e11a86d3247ae39d96b9d278d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/research_events/aggregate_trade.py",
+      "group": "Market Data and Features",
+      "bytes": 11108,
+      "lines": 308,
+      "sha256": "4a95f610e02ae5ab72a0e03430613a85a75782f55a6306cf5429a0c1bdd538c2",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/research_events/archive_dataset.py",
+      "group": "Market Data and Features",
+      "bytes": 16276,
+      "lines": 369,
+      "sha256": "f2c27c644987786bac96cc9e81d679fea853a83cd434db7e2b31819be72b5bf3",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/research_events/content_identity.py",
+      "group": "Market Data and Features",
+      "bytes": 5549,
+      "lines": 157,
+      "sha256": "5ed48808b9830929085dac08259faebb593e111fb1550d88caad873483d6e607",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/research_events/live_observation.py",
+      "group": "Market Data and Features",
+      "bytes": 15150,
+      "lines": 380,
+      "sha256": "1ddad9d27659d4d61335b70e94da014dd42513765434f760d219560f27705a43",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/research_events/minute_primitives.py",
+      "group": "Market Data and Features",
+      "bytes": 12491,
+      "lines": 308,
+      "sha256": "e0a5b6b68fb5de34c3f3f5c7d8999a251a73264bd6a5f19babccb7502e70d62d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/research_events/minute_state.py",
+      "group": "Market Data and Features",
+      "bytes": 29306,
+      "lines": 698,
+      "sha256": "5c72f3824c61027b5a3084a780abdc3fa4b6bfc3ec5f45d99d619e33fc2135ff",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/research_events/range_dataset.py",
+      "group": "Market Data and Features",
+      "bytes": 28436,
+      "lines": 673,
+      "sha256": "0d5ae777d9ccd24fc9cf331a20ab9ca6260cf9afc570cb00d9d8982671b75760",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/research_events/validation.py",
+      "group": "Market Data and Features",
+      "bytes": 10809,
+      "lines": 280,
+      "sha256": "a4dcea543219497eee082cc4bb38c65996cd989f4a865e7d9e9a52649f7e427d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/timeframes.py",
+      "group": "Market Data and Features",
+      "bytes": 6231,
+      "lines": 152,
+      "sha256": "72edac17764b20fe9c67501d99a4290568c97ce87140c9edef13afa0eed44582",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/market_data/validation.py",
+      "group": "Market Data and Features",
+      "bytes": 3682,
+      "lines": 91,
+      "sha256": "370868054ffbc6fea5e646b317a655c8687fd80562f08e614e3d808ab0c20fc5",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/__init__.py",
+      "group": "Market Data and Features",
+      "bytes": 3234,
+      "lines": 83,
+      "sha256": "bd23f79f36c5e5fc2facdcf1c72e8b4e20cc44d1d52fd7bec941105cd9a59d34",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/aggregate_trade_archive.py",
+      "group": "Market Data and Features",
+      "bytes": 19608,
+      "lines": 499,
+      "sha256": "630dfa7d55c5f4da4cdf9893da51bb8cb6074839353a1a65ed35247958107b10",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/aggregate_trades.py",
+      "group": "Market Data and Features",
+      "bytes": 11867,
+      "lines": 336,
+      "sha256": "04b4f86b90e2f028a33e930c5b8de0b3b168a734f2615d3664b9de5bbbcd467c",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/daily_archive.py",
+      "group": "Market Data and Features",
+      "bytes": 13363,
+      "lines": 350,
+      "sha256": "c29a2132bd68a8f9f4a30d8bd21a34a2eb0ec9c9c1da7028c9b528b9301a2b44",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/daily_archive_range_fetch.py",
+      "group": "Market Data and Features",
+      "bytes": 2554,
+      "lines": 62,
+      "sha256": "2a5f448761557e59f01046e73bd4b060925b114c46f854cca4d8563ea4971980",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/futures.py",
+      "group": "Market Data and Features",
+      "bytes": 9118,
+      "lines": 210,
+      "sha256": "a7cc0b0bbb45b1204daee956ba70886679bbd4a620c85466718908cf79b3d7ad",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/hft.py",
+      "group": "Market Data and Features",
+      "bytes": 18270,
+      "lines": 457,
+      "sha256": "957ebe9d0f9a624e04e0c79ba22137042d38e61ba7bb6752732d1c357de5ff7f",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/hft_authenticated.py",
+      "group": "Market Data and Features",
+      "bytes": 22692,
+      "lines": 570,
+      "sha256": "d4ce931553e36204ccb9634769085b4af43c429fdade2fb8c8fbfffcb855d14d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/klines.py",
+      "group": "Market Data and Features",
+      "bytes": 9557,
+      "lines": 240,
+      "sha256": "5f146e0a93b868e8f15e32875e02f14340a4e3be3d8cc8f07834d54c10a202a4",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/live_aggregate_trades.py",
+      "group": "Market Data and Features",
+      "bytes": 24090,
+      "lines": 591,
+      "sha256": "dc27a0430f0ddc74e6a1edeae023bab803f08a6e8f5531f6fef586457d0cfd10",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/live_klines.py",
+      "group": "Market Data and Features",
+      "bytes": 5896,
+      "lines": 146,
+      "sha256": "fd37f910c230a310e26f526821b38731ee7b215e16460516a65cb06ed219758c",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/live_stream.py",
+      "group": "Market Data and Features",
+      "bytes": 8452,
+      "lines": 183,
+      "sha256": "525a5db9cffe8837770b1cc1ba2c2f461819634302c9d4c73b816405f3ee1ef5",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/binance/range_fetch.py",
+      "group": "Market Data and Features",
+      "bytes": 3424,
+      "lines": 89,
+      "sha256": "ea50fb947d6e3195b2477b7ea413de9ee8c3afe7f9da0a20646e34f41e014c37",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/public_data/retail.py",
+      "group": "Market Data and Features",
+      "bytes": 3398,
+      "lines": 68,
+      "sha256": "02562e65b7e689bbfe591cd9205efd833ed367bd83580058100605e78e78041d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/__init__.py",
+      "group": "Persistence and recovery",
+      "bytes": 2500,
+      "lines": 75,
+      "sha256": "5484a275d14fa92a582afcbf96b7d1b48f72fab626a737f421c92551c1c8f141",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/aggregate_trade_catalog.py",
+      "group": "Persistence and recovery",
+      "bytes": 27919,
+      "lines": 690,
+      "sha256": "7efe478c7b91798ec5e1a09233aa496400b33716ecbde282bb659f30ebdb8c75",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/aggregate_trade_duckdb.py",
+      "group": "Persistence and recovery",
+      "bytes": 7015,
+      "lines": 178,
+      "sha256": "1d13350a6e207b9490a8a04b8b8bc3723b90ecf428f085b4ea86cdb9cec647df",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/aggregate_trade_minute_parquet.py",
+      "group": "Persistence and recovery",
+      "bytes": 20521,
+      "lines": 506,
+      "sha256": "9153efd2e016193b6b945908bfcd0a493d3cee0195e3f19352d67a5837bdf33b",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/aggregate_trade_parquet.py",
+      "group": "Persistence and recovery",
+      "bytes": 31446,
+      "lines": 729,
+      "sha256": "1a974cde0ca998dec8316e483bf08efefc2a641f0664fd2f3947630f5fb17a1d",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/alpha_funnel.py",
+      "group": "Persistence and recovery",
+      "bytes": 6366,
+      "lines": 163,
+      "sha256": "cecbd05d559dacd778bc841889c6c62c414a715b8d81d3b3965913cf3d3422ef",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/duckdb_query.py",
+      "group": "Persistence and recovery",
+      "bytes": 8852,
+      "lines": 213,
+      "sha256": "95f567c76de1b75208642a9fe9da03a606a323f79613df7a9ea87e3aacc01ed7",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/execution_ledger.py",
+      "group": "Persistence and recovery",
+      "bytes": 3420,
+      "lines": 73,
+      "sha256": "729631828d31fff1b1b9b74570ca40ebcdd0e06225ba0637fff6af03963b19c6",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/futures_paper.py",
+      "group": "Persistence and recovery",
+      "bytes": 18428,
+      "lines": 444,
+      "sha256": "e4dab27c2af667428effbdc91f8b797f64dc25ba5a871f6c592c65c04c16b7f3",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/hft_authenticated.py",
+      "group": "Persistence and recovery",
+      "bytes": 9215,
+      "lines": 237,
+      "sha256": "c4dc1200845e16ac84ac97cb48e7a1c78749b21ac9382ec0a9cac51faaba03cb",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/hft_events.py",
+      "group": "Persistence and recovery",
+      "bytes": 5813,
+      "lines": 153,
+      "sha256": "cceb98eac4d88f51f111f3e1291d4ad7f717a640850414bd6a00d4ede00f87dd",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/hft_paper.py",
+      "group": "Persistence and recovery",
+      "bytes": 11264,
+      "lines": 275,
+      "sha256": "6150b945f6f5b0dbb110a812dfdda8c4db7191eb37a6d3a11bc2a2a076278248",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/paper_runtime.py",
+      "group": "Persistence and recovery",
+      "bytes": 8102,
+      "lines": 178,
+      "sha256": "a58970d90185f3fa448679125bd5182aead640457354076fd8feeef6238d63d9",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/parquet.py",
+      "group": "Persistence and recovery",
+      "bytes": 15134,
+      "lines": 316,
+      "sha256": "a7f1e3c54ea9a95fabdeef992924dc8abbefa17ca6a0e280061f07113e9ccb3f",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/retail_events.py",
+      "group": "Persistence and recovery",
+      "bytes": 3038,
+      "lines": 77,
+      "sha256": "c638dbaad568192d1768d65d7d2477b5a8a0b2ca7e18ce9ad34e643d5fe53f35",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/infrastructure/storage/retail_paper.py",
+      "group": "Persistence and recovery",
+      "bytes": 10989,
+      "lines": 236,
+      "sha256": "08eae9a6f512c5aaa030813ef1c708e15bfd721f0f5d9983d6b50e0660aa5988",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/risk/__init__.py",
+      "group": "Risk and capital allocation",
+      "bytes": 121,
+      "lines": 6,
+      "sha256": "88f6c8be7a9b6e813e05fd8dcbc70b2ffc5e31a971c8fb59681f57c9ef460e02",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/risk/contracts.py",
+      "group": "Risk and capital allocation",
+      "bytes": 2077,
+      "lines": 49,
+      "sha256": "fc316feba3497c2ca7419e596e457106375baead114f596869daedf3d145a212",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/risk/engine.py",
+      "group": "Risk and capital allocation",
+      "bytes": 9298,
+      "lines": 182,
+      "sha256": "b03785b3abf07c15e23af4cef639506fee8bacb8ffc335dc50b3aee40c2024f1",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/risk/futures.py",
+      "group": "Risk and capital allocation",
+      "bytes": 20643,
+      "lines": 521,
+      "sha256": "ef0b48f88fadb616fbc4b2109834c78c277f1958684d548fb91f582a0160df74",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/risk/hft.py",
+      "group": "Risk and capital allocation",
+      "bytes": 6750,
+      "lines": 184,
+      "sha256": "094646d5674a5206a7a21390dc1c35a3c749a1ea32e936029c90514656090395",
+      "executable": false
+    },
+    {
+      "path": "src/quantos/domain/risk/retail.py",
+      "group": "Risk and capital allocation",
+      "bytes": 11062,
+      "lines": 215,
+      "sha256": "449a4efcb75b0fad41d7a02d0b3b5b9f0943a768d309a78cda67a3b2429bf801",
+      "executable": false
+    }
+  ],
+  "group_counts": {
+    "Documentation": 41,
+    "Configuration and tests": 107,
+    "Evaluation and replay": 17,
+    "Entrypoints and runtime": 38,
+    "Alpha": 13,
+    "Persistence and recovery": 16,
+    "Market Data and Features": 37,
+    "Execution and accounting": 10,
+    "Risk and capital allocation": 6
+  },
+  "entrypoints": {
+    "quantos": "quantos.interfaces.cli:main",
+    "managed_paper": "python -m quantos.interfaces.retail_runtime"
+  },
+  "third_party_dependencies": [
+    "duckdb==1.5.5",
+    "pyarrow==25.0.1",
+    "websockets==17.1",
+    "lightgbm==4.7.0",
+    "numpy==2.4.6",
+    "scipy==1.17.1"
+  ],
+  "equivalence": {
+    "production_and_tests": "byte-identical to original tracked HEAD",
+    "modified_original_paths": [
+      ".gitignore",
+      "README.md",
+      "docs/QOS06_FINAL_REPORT.md",
+      "docs/QOS07_FINAL_HANDOFF.md",
+      "docs/QOS07_OPERATOR.md"
+    ],
+    "added_paths": [
+      "docs/PUBLIC_RELEASE.md",
+      "docs/PUBLIC_SOURCE_MANIFEST.json"
+    ]
+  },
+  "critical_test_index": {
+    "capital_and_protective_execution": [
+      "tests/unit/test_retail_full_equity.py",
+      "tests/unit/test_retail_paper.py"
+    ],
+    "runtime_recovery": [
+      "tests/unit/test_retail_operations.py",
+      "tests/unit/test_retail_full_equity.py"
+    ],
+    "replay": [
+      "tests/unit/test_retail_replay.py",
+      "tests/unit/test_reclaim.py",
+      "tests/unit/test_reclaim_diagnostics.py"
+    ],
+    "market_data_features": [
+      "tests/unit/test_hft_paper.py",
+      "tests/unit/test_retail_intelligence.py"
+    ],
+    "architectural_boundaries": [
+      "tests/validation/test_architecture.py"
+    ]
+  },
+  "exclusions": [
+    "original Git history",
+    "private sibling directory",
+    "credentials and private identities",
+    "raw datasets and captures",
+    "trading accounts and journals",
+    "generated artifacts and logs",
+    "virtual environments and caches",
+    "symlinks, submodules and LFS pointers"
+  ]
+}
