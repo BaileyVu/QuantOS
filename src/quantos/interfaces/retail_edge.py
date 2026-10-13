@@ -15,7 +15,7 @@ from quantos.domain.evaluation.retail import RetailEvaluation
 from quantos.domain.market_data.futures import FuturesSymbolRules
 from quantos.domain.risk.hft import HftFeeSchedule
 from quantos.domain.risk.retail import RetailRiskPolicy, policy_from_dict
-from quantos.infrastructure.binance.hft import BinanceHftPublicClient, BinanceHftStream
+from quantos.infrastructure.binance.hft import BinanceHftPublicClient, BinanceHftStream, BinanceHftStreamError, BinanceFuturesError
 from quantos.infrastructure.public_data.retail import PublicIntelligenceStream
 from quantos.infrastructure.configuration.hft import load_hft_config
 from quantos.infrastructure.storage.retail_events import RetailEventJournal, read_journal
@@ -175,7 +175,11 @@ def edge_command(args):
                 rules=asdict(rules), account=account_payload(account))
             def emit(payload):
                 if payload.get("event") not in {"mark_price", "websocket_timeout"}:
-                    print(stable_json(payload), flush=True)
+                    try:
+                        print(stable_json(payload), flush=True)
+                    except OSError as error:
+                        # Do not let WebSocket adapters reinterpret log I/O as network I/O.
+                        raise RuntimeError("critical runtime output failure") from error
             emit({"event": "qos07_paper_started" if strategy == "qos07" else "qos06_paper_started" if reliability else "qos05_paper_started" if reclaim else "qos04_paper_started", "starting_equity": account.starting_equity, "balance": account.balance,
                   "fees": asdict(account.fees), "strategy": "Q05-LR-v1" if reclaim else "QOS04", "mode": "PUBLIC PAPER ONLY", "authenticated_requests": 0, "economic_orders": 0})
             result = asyncio.run(run_edge_session(
@@ -185,6 +189,7 @@ def edge_command(args):
                 external_factories=[] if reclaim else [("coinbase", "leader_quote", lambda: PublicIntelligenceStream("coinbase", rules.symbol, emit)),
                                     ("binance", "liquidation", lambda: PublicIntelligenceStream("liquidation", rules.symbol, emit))],
                 journal=journal, emit=emit, kill_requested=marker.exists, reclaim=reclaim, reliability=reliability,
+                feed_errors=(TimeoutError, ConnectionError, BinanceHftStreamError, BinanceFuturesError),
             ))
             emit({"event": "qos07_paper_stopped" if strategy == "qos07" else "qos06_paper_stopped" if reliability else "qos05_paper_stopped" if reclaim else "qos04_paper_stopped", "metrics": result, "authenticated_requests": 0, "economic_orders": 0})
         finally:

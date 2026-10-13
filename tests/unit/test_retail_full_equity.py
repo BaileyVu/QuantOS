@@ -230,6 +230,11 @@ class ManagedRuntimeTests(unittest.TestCase):
             args=self.args(root)
             def operation(namespace):
                 self.assertTrue((args.session/'startup.json').exists())
+                from tests.unit.test_reclaim import pipeline
+                report, account = pipeline(args.session/'events.jsonl', full_equity=True)
+                store = RetailPaperStateStore(args.state_store)
+                store.reset('fixture', account.fees, account.policy)
+                store.save('fixture', account, {'metrics': report})
                 os.kill(os.getpid(),signal.SIGTERM)
                 return 0
             with patch('quantos.interfaces.retail_runtime.preflight',return_value={}):

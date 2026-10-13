@@ -38,13 +38,13 @@ class RetailPaperEngine:
         reliability: bool = False,
         alpha_provider: RetailAlphaProvider | None = None,
     ) -> None:
-        if alpha_provider is not None and (not isinstance(policy, FullEquityRiskPolicy) or not callable(getattr(alpha_provider, "reset", None))):
+        if alpha_provider is not None and (not isinstance(policy, FullEquityRiskPolicy) or not callable(getattr(alpha_provider, "reset", None)) or not callable(getattr(alpha_provider, "observe", None))):
             raise ValueError("Alpha integration requires full-equity profile and reset contract")
         self.alpha_provider = alpha_provider
-        self.reclaim = reclaim
+        self.reclaim = reclaim if alpha_provider is None else False
         self.reliability = reliability
         self.last_disarm_reason = None
-        self.unified = unified or reclaim
+        self.unified = unified or reclaim or alpha_provider is not None
         self.reclaim_alpha = LiquidityReclaimAlpha()
         self.intelligence = IntelligenceFeatureEngine()
         self.edge_alpha = RetailEdgeAlpha()
@@ -185,22 +185,42 @@ class RetailPaperEngine:
                 now_monotonic_ns=now_ns,
             )
             self.evaluation.funnel["complete_features"] += 1
-            signal = self.alpha.observe(features, now_ns)
-            self.evaluation.alpha_reasons[self.alpha.last_reason] += 1
-            self.evaluation.funnel["qos03_raw_candidates" if self.unified else "raw_candidates"] += int(self.alpha.raw_candidate)
-            self.evaluation.funnel["qos03_confirmations" if self.unified else "confirmations"] += int(signal is not None)
-            if self.unified:
-                choices = ((self.reclaim_alpha.observe(features, now_ns),) if self.reclaim else
-                           self.edge_alpha.observe(features, self.intelligence.compute(now_ns), now_ns))
-                if self.evaluation.reliability and self.reclaim:
-                    self.evaluation.reliability.observe_feature(
-                        now_ns, self.reclaim_alpha.features.last_range_bps)
-                if self.alpha_provider is not None:
-                    from quantos.domain.alpha.retail_edge import CandidateDecision
-                    proposed = self.alpha_provider.observe(features, now_ns)
-                    if proposed is not None and not isinstance(proposed, RetailSignal):
+            if self.alpha_provider is not None:
+                from quantos.domain.alpha.retail_edge import CandidateDecision
+                proposed = self.alpha_provider.observe(features, now_ns)
+                if proposed is not None:
+                    if not isinstance(proposed, ProtectedRetailSignal):
                         raise ValueError("invalid Alpha decision contract")
-                    choices = (CandidateDecision(proposed.strategy_id if proposed else "integration", "proposed" if proposed else "no_trade", proposed is not None, proposed),)
+                    numbers = (proposed.expected_move_bps, proposed.response_bps,
+                               proposed.uncertainty_bps, proposed.protective_stop_price,
+                               proposed.take_profit_price)
+                    times = (proposed.observed_ns, proposed.expires_ns,
+                             proposed.book_update_id, proposed.horizon_seconds)
+                    if (any(not isinstance(x, Decimal) or not x.is_finite() for x in numbers)
+                            or any(type(x) is not int for x in times)
+                            or not isinstance(proposed.side, HftSide)
+                            or not isinstance(proposed.signal_id, str) or not proposed.signal_id
+                            or not isinstance(proposed.strategy_id, str) or not proposed.strategy_id
+                            or not 0 <= proposed.observed_ns <= now_ns < proposed.expires_ns
+                            or proposed.book_update_id != features.book_update_id
+                            or not 0 < proposed.horizon_seconds <= 43200
+                            or proposed.expected_move_bps <= 0 or proposed.uncertainty_bps < 0
+                            or min(proposed.protective_stop_price, proposed.take_profit_price) <= 0):
+                        raise ValueError("invalid Alpha decision contract")
+                choices = (CandidateDecision(proposed.strategy_id if proposed else "integration",
+                           "proposed" if proposed else "no_trade", proposed is not None, proposed),)
+            else:
+                signal = self.alpha.observe(features, now_ns)
+                self.evaluation.alpha_reasons[self.alpha.last_reason] += 1
+                self.evaluation.funnel["qos03_raw_candidates" if self.unified else "raw_candidates"] += int(self.alpha.raw_candidate)
+                self.evaluation.funnel["qos03_confirmations" if self.unified else "confirmations"] += int(signal is not None)
+                if self.unified:
+                    choices = ((self.reclaim_alpha.observe(features, now_ns),) if self.reclaim else
+                               self.edge_alpha.observe(features, self.intelligence.compute(now_ns), now_ns))
+                    if self.evaluation.reliability and self.reclaim:
+                        self.evaluation.reliability.observe_feature(
+                            now_ns, self.reclaim_alpha.features.last_range_bps)
+            if self.unified:
                 signals = []
                 for choice in choices:
                     self.evaluation.candidate_reasons[f"{choice.strategy}:{choice.reason}"] += 1

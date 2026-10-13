@@ -186,6 +186,20 @@ class RetailRiskEngine:
             direction = 1 if signal.side is HftSide.BUY else -1
             if not stop.is_finite() or not target.is_finite() or stop <= 0 or target <= 0 or (reference_price - stop) * direction <= 0 or (target - reference_price) * direction <= 0:
                 return reject("invalid_protective_exit")
+            # Entry uses the executable ask/bid, so its half-spread is already
+            # paid. Reserve the remaining exit half-spread once, plus costs on
+            # both legs (exit fees/slippage scale with target notional).
+            target_return = (target - reference_price) * direction / reference_price * 10000
+            exit_ratio = target / reference_price
+            exit_spread = (features.best_ask - features.best_bid) / 2 / reference_price * 10000
+            target_cost = (
+                (self.fees.taker_rate * 10000 + self.policy.slippage_bps_per_leg)
+                * (1 + exit_ratio)
+                + exit_spread + latency_cost + self.policy.safety_buffer_bps
+                + abs(funding_bps)
+            )
+            if target_return <= target_cost:
+                return reject("non_economic_protective_target")
             per_unit = abs(reference_price - stop) + reference_price * (cost + self.policy.adverse_gap_bps + self.policy.stop_uncertainty_bps + 5) / 10000
             floor = max(peak_equity * (1 - self.policy.maximum_drawdown_fraction),
                         (daily_start_equity or equity) * (1 - self.policy.maximum_daily_loss_fraction))

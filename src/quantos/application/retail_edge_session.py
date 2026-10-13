@@ -6,13 +6,18 @@ import time
 from quantos.application.hft_trader import _clock_calibration
 from quantos.application.retail_replay import RetailCausalProcessor
 from quantos.application.retail_trader import RetailPaperEngine
-from quantos.domain.market_data.hft import DepthDelta
+from quantos.domain.market_data.hft import DepthDelta, HftBookError
 from quantos.domain.market_data.hft_clock import HftClockMonitor
+
+
+class RecoverableRetailFeedError(RuntimeError):
+    """A failure raised only at a public transport or book-rebuild boundary."""
 
 
 async def run_edge_session(*, config, rules, account, evaluation, policy, store,
                            identity, duration_seconds, client, stream_factory,
-                           external_factories, journal, emit, kill_requested, reclaim=False, reliability=False):
+                           external_factories, journal, emit, kill_requested, reclaim=False, reliability=False,
+                           feed_errors=(TimeoutError, ConnectionError)):
     if not 1 <= duration_seconds <= (43200 if reliability else 1800):
         raise ValueError("public session duration exceeds selected mode limit")
     engine = RetailPaperEngine(config, rules, account, evaluation, policy, unified=True, reclaim=reclaim, reliability=reliability)
@@ -22,13 +27,17 @@ async def run_edge_session(*, config, rules, account, evaluation, policy, store,
     deadline = time.monotonic() + duration_seconds
     reconnects = 0
     shutdown = "duration_expired"
+    succeeded = False
     external_queue = asyncio.Queue(maxsize=4096)
 
     def dispatch(action, **arguments):
         # Record after processing so actual submission-time clock samples are
         # included. Any write failure immediately halts and preserves state;
         # captures without a terminal record are never accepted as complete.
-        result = processor.apply(action, arguments, clock_ns=time.monotonic_ns if action == "event" else None)
+        try:
+            result = processor.apply(action, arguments, clock_ns=time.monotonic_ns if action == "event" else None)
+        except HftBookError as error:
+            raise RecoverableRetailFeedError("invalid market book; reconstruction required") from error
         journal.append("command", action=action, arguments=arguments)
         if reclaim and processor.last_decisions:
             from quantos.application.retail_replay import stable_json
@@ -49,8 +58,16 @@ async def run_edge_session(*, config, rules, account, evaluation, policy, store,
               "depth_age_ms": None if engine.book.last_received_monotonic_ns is None else
               (time.monotonic_ns() - engine.book.last_received_monotonic_ns) // 1_000_000})
 
+    async def feed_call(awaitable, timeout):
+        try:
+            return await asyncio.wait_for(awaitable, timeout)
+        except feed_errors as error:
+            if getattr(error, "retryable", True) is False:
+                raise
+            raise RecoverableRetailFeedError("public transport failure") from error
+
     async def calibrate():
-        calibration = await asyncio.wait_for(_clock_calibration(client,
+        calibration = await feed_call(_clock_calibration(client,
             config.clock_calibration_samples, config.clock_low_rtt_samples,
             lambda: datetime.now(timezone.utc), time.monotonic),
             timeout=remaining(config.clock_calibration_timeout.total_seconds()))
@@ -69,7 +86,7 @@ async def run_edge_session(*, config, rules, account, evaluation, policy, store,
                     external_queue.put_nowait(("external", {"event": event}))
             except asyncio.CancelledError:
                 raise
-            except Exception as error:
+            except feed_errors as error:
                 # A provider outage never makes up data or stops unrelated feeds.
                 external_queue.put_nowait(("source_failure", {"provider": provider,
                     "source_kind": source_kind, "reason": f"{type(error).__name__}:{error}"}))
@@ -77,7 +94,6 @@ async def run_edge_session(*, config, rules, account, evaluation, policy, store,
 
     workers = [asyncio.create_task(external_worker(*entry)) for entry in external_factories]
     try:
-        await calibrate()
         while time.monotonic() < deadline:
             if kill_requested():
                 dispatch("tick", processing_ns=time.monotonic_ns(), timestamp=datetime.now(timezone.utc), kill=True)
@@ -87,24 +103,29 @@ async def run_edge_session(*, config, rules, account, evaluation, policy, store,
             stream = stream_factory()
 
             async def produce():
-                async for event in stream.events(rules.symbol):
-                    queue.put_nowait(event)
+                try:
+                    async for event in stream.events(rules.symbol):
+                        queue.put_nowait(event)
+                except feed_errors as error:
+                    raise RecoverableRetailFeedError("public stream disconnected") from error
 
             producer = asyncio.create_task(produce())
             try:
-                await asyncio.wait_for(stream.wait_public_ready(), remaining(config.bootstrap_timeout.total_seconds()))
-                await asyncio.wait_for(stream.wait_market_ready(), remaining(config.bootstrap_timeout.total_seconds()))
-                snapshot = await asyncio.wait_for(asyncio.to_thread(client.depth_snapshot, rules.symbol), remaining(config.snapshot_timeout.total_seconds()))
+                if monitor.calibration is None:
+                    await calibrate()
+                await feed_call(stream.wait_public_ready(), remaining(config.bootstrap_timeout.total_seconds()))
+                await feed_call(stream.wait_market_ready(), remaining(config.bootstrap_timeout.total_seconds()))
+                snapshot = await feed_call(asyncio.to_thread(client.depth_snapshot, rules.symbol), remaining(config.snapshot_timeout.total_seconds()))
                 buffered = []
                 bridge_deadline = time.monotonic() + remaining(config.bootstrap_timeout.total_seconds())
                 while time.monotonic() < bridge_deadline:
-                    event = await asyncio.wait_for(queue.get(), max(.001, bridge_deadline - time.monotonic()))
+                    event = await feed_call(queue.get(), max(.001, bridge_deadline - time.monotonic()))
                     if isinstance(event, DepthDelta):
                         buffered.append(event)
                         if event.first_update_id <= snapshot.last_update_id <= event.final_update_id:
                             break
                 else:
-                    raise RuntimeError("snapshot bridge timeout")
+                    raise RecoverableRetailFeedError("snapshot bridge timeout")
                 dispatch("bootstrap", snapshot=snapshot, buffered=buffered)
                 emit({"event": "retail_book_ready", "symbol": rules.symbol, "update_id": engine.book.last_update_id})
                 last_checkpoint = time.monotonic()
@@ -115,7 +136,7 @@ async def run_edge_session(*, config, rules, account, evaluation, policy, store,
                         break
                     if producer.done():
                         producer.result()
-                        raise RuntimeError("public depth stream ended")
+                        raise RecoverableRetailFeedError("public depth stream ended")
                     for worker in workers:
                         if worker.done():
                             worker.result()
@@ -150,25 +171,37 @@ async def run_edge_session(*, config, rules, account, evaluation, policy, store,
                         dispatch("event", event=event, processing_ns=received_processing_ns,
                                  feed_latency_ms=latency.observed_feed_latency_ms, clock_healthy=healthy)
                     if engine.disarmed:
-                        raise RuntimeError(f"engine disarmed: {engine.last_disarm_reason}; fresh reconstruction required")
+                        raise RecoverableRetailFeedError(f"engine disarmed: {engine.last_disarm_reason}; fresh reconstruction required")
                     if time.monotonic() - last_checkpoint >= 5:
                         checkpoint()
                         last_checkpoint = time.monotonic()
                 if shutdown == "operator_kill":
                     break
-            except (TimeoutError, OSError, ValueError, RuntimeError) as error:
-                # Journal/storage failures must escape, never continue unrecorded.
-                if "capture" in str(error) or "state" in str(error):
-                    raise
+            except RecoverableRetailFeedError as error:
                 reconnects += 1
                 dispatch("disarm", reason="feed_or_bootstrap_failure", timestamp=datetime.now(timezone.utc))
                 emit({"event": "retail_reconnect", "reason": f"{type(error).__name__}:{error}"})
             finally:
                 producer.cancel()
-                await asyncio.gather(producer, return_exceptions=True)
-                checkpoint()
+                outcomes = await asyncio.gather(producer, return_exceptions=True)
+                for outcome in outcomes:
+                    if isinstance(outcome, BaseException) and not isinstance(outcome, (asyncio.CancelledError, RecoverableRetailFeedError)):
+                        raise outcome
             if time.monotonic() < deadline:
                 await asyncio.sleep(remaining(.5))
+        # Observe background failures before committing a successful terminal.
+        for worker in workers:
+            worker.cancel()
+        outcomes = await asyncio.gather(*workers, return_exceptions=True)
+        for outcome in outcomes:
+            if isinstance(outcome, BaseException) and not isinstance(outcome, asyncio.CancelledError):
+                raise outcome
+        # Only a normal duration/controlled stop reaches the terminal commit.
+        dispatch("disarm", reason="runtime_shutdown", timestamp=datetime.now(timezone.utc))
+        checkpoint()  # validates and durably reconciles account before completion
+        report = processor.report()
+        journal.append("complete", report=report, shutdown_reason=shutdown, reconnects=reconnects)
+        succeeded = True
     except BaseException as error:
         shutdown = f"runtime_failure:{type(error).__name__}:{error}"
         raise
@@ -176,12 +209,16 @@ async def run_edge_session(*, config, rules, account, evaluation, policy, store,
         for worker in workers:
             worker.cancel()
         await asyncio.gather(*workers, return_exceptions=True)
-        # Even if recording fails, persist disarmed account; preserve exposure honestly.
-        try:
-            dispatch("disarm", reason="runtime_shutdown", timestamp=datetime.now(timezone.utc))
-        finally:
-            engine.disarm("runtime_shutdown", datetime.now(timezone.utc))
-            checkpoint()
-        report = processor.report()
-        journal.append("complete", report=report, shutdown_reason=shutdown, reconnects=reconnects)
+        if not succeeded:
+            # Preserve the in-memory ledger when possible; never invent replay
+            # commands after an unrecorded event or label an aborted run complete.
+            try:
+                engine.disarm("runtime_shutdown", datetime.now(timezone.utc))
+                checkpoint()
+            except Exception:
+                pass  # the managed unresolved-session marker remains authoritative
+            try:
+                journal.append("aborted", shutdown_reason=shutdown, reconnects=reconnects)
+            except Exception:
+                pass  # missing terminal evidence is itself an incomplete capture
     return {**report, "shutdown_reason": shutdown, "reconnects": reconnects}

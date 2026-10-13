@@ -152,6 +152,8 @@ class RetailCausalProcessor:
 def replay_commands(processor, records):
     expected = None
     for row in records:
+        if expected is not None or row["kind"] == "aborted":
+            raise ValueError("incomplete or nonterminal capture")
         if row["kind"] == "command":
             processor.apply(row["payload"]["action"], row["payload"]["arguments"])
         elif row["kind"] == "complete":

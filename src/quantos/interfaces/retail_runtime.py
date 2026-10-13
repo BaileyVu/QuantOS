@@ -139,7 +139,19 @@ def managed_run(args, operation=None):
                     state_store=args.state_store, market_config=args.market_config, capital_profile=args.capital_profile,
                     capture=args.session / "events.jsonl", duration_seconds=args.duration_seconds, managed_session=str(args.session.resolve()))
                 code = (operation or edge_command)(namespace)
-                reason = "operator_signal" if requested else "bounded_session_finished"
+                if code == 0:
+                    from quantos.interfaces.retail_edge import replay_capture, read_state
+                    from quantos.application.retail_replay import stable_json
+                    replay = replay_capture(args.session / "events.jsonl")
+                    account, runtime = read_state(args.state_store)
+                    ledger = {"balance": account.balance, "position": account.position,
+                              "pending": account.pending, "fills": account.fills,
+                              "lifecycle": account.lifecycle, "funding": account.funding_ledger}
+                    if sha256(stable_json(ledger).encode()).hexdigest() != replay["metrics"]["ledger_digest"]:
+                        raise ValueError("durable account ledger differs from terminal capture")
+                    if stable_json(runtime.get("metrics")) != stable_json(replay["metrics"]):
+                        raise ValueError("terminal capture and durable account checkpoint differ")
+                reason = ("operator_signal" if requested else "bounded_session_finished") if code == 0 else "runtime_nonzero_exit"
         except BaseException as exc:
             error = {"type": type(exc).__name__, "message": str(exc)}
             code = 130 if isinstance(exc, KeyboardInterrupt) else 1
