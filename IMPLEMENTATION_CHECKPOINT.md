@@ -142,3 +142,52 @@ Next: commit corrections and run full committed suite; build stable .paper-venv,
 push/open PR, confirm CI, merge, clean-checkout install smoke. Then install launchd
 72h run with fresh state, verify and deliberately restart; update this checkpoint
 with exact PR/main SHA and runtime times/PID/reports. No unresolved approval need.
+
+
+## Latest resume instruction — October 27 quota checkpoint
+
+Published PR #19: https://github.com/BaileyVu/QuantOS/pull/19 (attached to chat).
+Latest remote/PR head is f114c937fee13960c90b2189be4841c140764507. It adds libomp
+installation to CI; application source remains 0993ed4, locally 1063 tests PASS.
+The first CI attempt failed only because retained LightGBM tests could not load
+libomp. The corrected CI outcome has NOT yet been checked. Do not merge a failed
+or pending check, and do not repeat local tests for the CI-only change.
+
+Stable install: .paper-venv (0.3.0) exists and imports only stdlib for paper.
+Real SIGTERM smoke passed: /tmp/quantos-v3-reviewed-observe-20261027; exit 0,
+status stopped, 10.892 seconds wall / 7.909 seconds active, no fills, cash 200.
+No V3 service installed; default ~/Library/Application Support/QuantOS/v3-paper
+was confirmed unused. No active tool processes/subagents remain. Existing
+unrelated processes untouched. CI runs independently on GitHub.
+
+Owner directly said: "Push, open PR, and merge after gates pass". No further
+publication/merge approval needed. The final code review is COMPLETE; do not
+restart it. Next action is CI status for f114c937fee13960c90b2189be4841c140764507.
+Use bounded diagnostics, printing only failure excerpts, never full CI logs.
+If CI passes, merge PR with expected head, fetch/verify remote main, clean-checkout
+install smoke, then install and launch 72h launchd paper run on fresh default state.
+Verify healthy status, deliberate restart/recovery, and local reports. Persist
+actual start/deadline/PID/main SHA. The installed wheel runs independently of repo
+branch switches and Codex availability. Never claim the 72 hours before elapsed.
+
+Last quota check before wrap-up: 78% used / 22% remaining; reset October 27 at
+05:10:38 Vietnam time. Same heartbeat confirmed ACTIVE for 05:20 October 27.
+This checkpoint-only commit may be ahead of the PR; do not unnecessarily push it
+and restart CI. If switching to merged main, preserve this checkpoint by carrying
+its doc-only commit onto a local observation branch. Then monitor daily/final
+reports and turn off continuation only after the complete actual 72h deliverable.
+
+## October 27 05:25 Vietnam — CI compatibility follow-up
+
+Resumed branch codex/quantos-v3-paper at 8a0a4a8. Corrected libomp CI on f114c93
+ran all 1063 tests; only retained temporal-split immutability assertion failed:
+Python 3.13.16 raises TypeError for replace(init=False), while local 3.12 raises
+ValueError. One lower-cost subagent made the test accept both and assert the
+original tuple remains unchanged; all 22 tests in that module passed locally.
+Main reviewed the narrow test-only diff. Production source remains 0993ed4.
+Public-data doctor passed (38 ms clock offset, BTCUSDC/ETHUSDC eligible).
+Default state remains absent and exact launchd label is not loaded. No V3 process.
+Usage checked: 89% five-hour allowance remaining, reset epoch 1793071268.
+Next: push this test compatibility commit, require current-head CI success,
+merge PR #19 with expected SHA, verify main, clean install smoke, then launch
+and deliberately restart the independent 72h service. No repeat full local suite.

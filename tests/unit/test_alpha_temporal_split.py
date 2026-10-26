@@ -148,10 +148,12 @@ class TemporalSplitTests(unittest.TestCase):
 
     def test_output_is_immutable(self):
         result = split(self.inputs)
+        original_train = result.train
         with self.assertRaises(FrozenInstanceError):
             result.train = ()
-        with self.assertRaises(ValueError):
+        with self.assertRaises((TypeError, ValueError)):
             replace(result, train=())
+        self.assertIs(result.train, original_train)
 
     def test_excluded_contract_rejects_invalid_symbol_and_time(self):
         for timestamp, symbol in ((START, "SOLUSDT"), (START.replace(tzinfo=None), "BTCUSDT")):
