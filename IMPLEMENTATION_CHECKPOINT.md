@@ -71,6 +71,11 @@ implementation deferred at the user's five-hour usage reserve threshold.
 
 ## Processes and continuation
 
+- Heartbeat at 2026-10-26 18:50 Vietnam time fired before the reset. Usage still
+  87% used / 13% remaining; reset unchanged at 18:51:19. No implementation or
+  tests repeated. Working tree was clean at `7986563`. Updated the same ACTIVE
+  heartbeat to 19:00 local to allow scheduler jitter. Exact next step unchanged.
+
 - No QuantOS V3 process launched. No child tool sessions running.
 - Existing unrelated Python PIDs: 15115, 31189, 31371, 36270, 76884;
   caffeinate PIDs: 15117, 31191, 31373, 36272. Inspected names/uptimes only,
