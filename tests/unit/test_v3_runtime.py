@@ -22,6 +22,35 @@ from tests.unit.test_v3_strategies import make_snapshot
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_restart_clears_old_finish_time_without_extending_deadline(self):
+        from quantos.paper.report import write_reports
+        with tempfile.TemporaryDirectory() as temp:
+            state = Path(temp)
+            now = int(time.time()*1000)
+            previous = dict(started_ms=now-10000, deadline_ms=now+10000,
+                            finished_ms=now-8000, evidence='natural', status='stopped',
+                            restarts=0, hours=72, reported_days=[])
+            (state/'run.json').write_text(json.dumps(previous))
+            runtime = Runtime(state)
+            runtime.scanner = lambda: None
+            runtime.feed = lambda *_: None
+            runtime.stop_requested = True
+            reports = []
+            def capture_report(path, run, **kwargs):
+                result = write_reports(path, dict(run), **kwargs)
+                reports.append(result)
+                return result
+            with (patch('quantos.paper.runtime.subprocess.Popen'),
+                  patch('quantos.paper.runtime.write_reports', side_effect=capture_report),
+                  patch('urllib.request.urlopen', side_effect=AssertionError('no network'))):
+                self.assertEqual(runtime.run(), 0)
+            first = reports[0]
+            self.assertNotIn('finished_ms', first['run'])
+            self.assertEqual(first['run']['started_ms'], previous['started_ms'])
+            self.assertEqual(first['run']['deadline_ms'], previous['deadline_ms'])
+            self.assertEqual(first['run']['restarts'], 1)
+            self.assertGreaterEqual(first['wall_seconds'], 10)
+
     def test_full_no_key_supervisor_start_uses_only_injected_public_feed(self):
         from tests.unit.test_v3_engine import INS, quote
         with tempfile.TemporaryDirectory() as temp:

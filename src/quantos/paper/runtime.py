@@ -209,6 +209,8 @@ class Runtime:
             if run["status"] == "completed": return 0
             if (self.state / "stop.request").exists():
                 (self.state / "stop.request").unlink()
+            # A resumed run retains its deadline, but is no longer finished.
+            run.pop("finished_ms", None)
             run.update(status="running", pid=os.getpid(), restarts=run["restarts"]+1)
             atomic_json(run_file, run)
             if sys.platform == "darwin":
