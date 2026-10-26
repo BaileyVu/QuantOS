@@ -67,7 +67,9 @@ class ArchitectureTests(unittest.TestCase):
 
     def test_phase_4b_pins_only_approved_model_dependencies(self) -> None:
         project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-        self.assertEqual(set(project["project"]["dependencies"]), {
+        # V3 paper is stdlib-only; retain pinned research as an optional extra.
+        self.assertEqual(project["project"]["dependencies"], [])
+        self.assertEqual(set(project["project"]["optional-dependencies"]["research"]), {
             "duckdb==1.5.5", "pyarrow==25.0.1", "websockets==17.1",
             "lightgbm==4.7.0", "numpy==2.4.6", "scipy==1.17.1",
         })

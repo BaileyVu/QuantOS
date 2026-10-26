@@ -1,0 +1,193 @@
+# QuantOS V3 implementation checkpoint
+
+Updated 2026-10-26, Vietnam time. Source commit `b21093d`; implementation exists; final review and 72-hour
+launch remain pending. Read this file first; do not repeat completed scans/tests.
+
+## Branch and source
+
+Current branch `codex/quantos-v3-paper`, based directly on verified main
+`62a797d0b725e4aef96961ddca05fd75d1cd5cc9`. Earlier checkpoint commits on this
+branch: `5bcb7d6`, `6b07e57`. Use `git log -1` for latest checkpoint/source commit.
+Old `codex/quantos-autonomous-engine` and QOS branches preserved untouched.
+No push, PR, merge, or real-order activity. Read review source on owner's Desktop:
+`TIBO_QUANTOS_PROMPT_v3_FINAL_REVIEW.md` (already read; do not reload wholesale).
+Owner directly authorized push, PR creation and merge after validation/CI gates in this chat on October 27. Do not ask again. Local commits and local paper installation/operation are authorized; live orders are not.
+
+## Completed
+
+- Reconciled branches: QOS/current and futures diverge from main at `1fd2f67`.
+  Starting from main avoided importing 20,687 historical lines. No blind merge.
+- Scoped AGENTS/V3 contract supersession, historical README preserved.
+- Two lower-cost gpt-6-luna agents implemented strategies/public data/service;
+  main reviewed and corrected timestamp, already-triggered STOP, venv symlink,
+  rate-limit, parameter and data-validation defects. Both agents finished.
+- `quantos.paper`: immutable types, strategy registry, EMA20/50 ATR14 LIMIT,
+  Donchian20 ATR14 continuation STOP, public GET allowlist and USDC filters.
+- Main-owned Decimal risk/sizing, independent p1/p5 $200 SQLite/WAL authorities,
+  atomic orders/fills/events, dedup, protection/recovery, funding, breakers.
+- Strict trade-through/queue/participation limit fills; delayed executable quote
+  and size-aware adverse impact for STOP/MARKET, additional fill-time risk check.
+- Public feed workers separate from scanner/execution; isolated lock, durable
+  deadline, gzip market inputs, reports, CLI, launchd/caffeinate helpers.
+- Offline replay, synthetic demo, source-gated E17 metadata (no active E17 monitor),
+  NOT_ESTIMABLE risk study, LATER.md. No verified economic edge/live approval.
+- Runtime stdlib-only; legacy pinned dependencies moved to optional research extra.
+- Ported existing reviewed Darwin atomic no-replace publication primitive from
+  QOS to fix baseline Mac failures, preserving no-overwrite semantics.
+- GitHub macOS validation workflow added but not yet run remotely.
+
+## Validation already performed
+
+- FINAL COMMITTED-TREE SUITE: 1056 tests PASS in 44.480 seconds against source
+  commit b21093d; log /tmp/quantos-v3-committed-full.log. The prior full-suite
+  failures are resolved. Do not repeat this suite unless code changes or a new
+  concern justifies it. Current checkpoint-only edits do not require a rerun.
+- Staged credential-pattern scan PASS (private keys, GitHub/AWS/OpenAI token
+  shapes); diff whitespace check PASS. No guarantee against every secret format.
+- Partial restart now cancels entry remainder before restoring protection.
+
+- Initial main baseline: 1001 tests, 4 errors in Windows-only artifact publication.
+- Focused package + artifact + architecture tests: 99 PASS before last small
+  recovery remainder cancellation patch. After fill-risk change: 30 engine/runtime
+  tests PASS. Full committed-tree test is the immediate final verification below.
+- Full precommit suite: 1054 tests, two failures: historical clean-HEAD assertion
+  and old mandatory-dependency assertion. Dependency test now checks unchanged
+  research pins as optional and zero paper dependencies; focused checks pass.
+  Clean-HEAD test intentionally remains unchanged; rerun AFTER commit.
+- Synthetic demo proves TP/SL/time exit/partial/cancel/expiry/crash recovery for
+  p1 and p5; unit test verifies five closed trades each and cash/R reconciliation.
+- Both actual strategy implementations traverse signal -> risk -> fill -> TP in
+  deterministic integration fixtures. Network forbidden in synthetic tests.
+- Public API check: 39 compatible USDC instruments; BTCUSDC and ETHUSDC TRADING,
+  server clock offset 8ms. Current official market API docs recorded in
+  docs/V3_MARKET_SOURCES.md. Do not repeat endpoint research.
+- Short natural observation 1: 180.306 wall seconds, 12.278 active seconds,
+  28 strategy/symbol scan evaluations, 2 signals/profile, rejected INVALID_DATA
+  and NET_REWARD_RISK; no fills. Revealed serial request stale batches.
+- Revised observation 2: 126.362 wall seconds, 112.094 active seconds, 16 scan
+  evaluations, 2 signals/profile, both rejected UNRECONCILED_OR_PAUSED; no fills.
+  8 stale-quote errors conservatively disconnected. Cash remained 200/profile.
+  This is short runtime evidence, NOT a 72-hour run or profitability claim.
+- Fresh isolated pip install succeeded without research dependencies in
+  /tmp/quantos-v3-install; strategies CLI works. Installed wheel predates the last
+  fill-risk/recovery changes: rebuild before deploying.
+- Logs and artifacts: /tmp/quantos-v3-{baseline,full,precommit,fill-risk}.log;
+  /tmp/quantos-v3-observe-20261026 and /tmp/quantos-v3-observe2-20261026.
+  Original demo at /tmp/quantos-v3-demo-20261026 used a future synthetic timestamp
+  and reported zero trades; fixed demo timestamps and accounting tests now pass.
+  Regenerate demo output to a NEW directory before final delivery.
+
+## Runtime/processes and quota
+
+No V3 72-hour daemon installed or launched. Both short observations finished.
+No active tool processes: full test and both public observations finished.
+No subagents working. Existing unrelated Python/caffeinate processes from initial
+inspection remain untouched (PIDs 15115/31189/31371/36270/76884 plus caffeinate).
+Do not repeat process inventory unless needed to isolate a real conflict.
+Last observed usage before checkpoint: 77% used/23% remaining; current reset
+2026-10-26 23:57:31 Vietnam (16:57:31 UTC). At ~20% remaining, commit/update this
+checkpoint and UPDATE existing heartbeat `quantos-v3-checkpoint-continuation`
+to 5-10 minutes after actual reset. Never create duplicates. Report actual usage.
+Confirmed heartbeat updated to daily 00:07 local, next October 27, after this reset.
+Reschedule it to each new actual reset when quota threshold is reached.
+
+## Remaining work / exact next step
+
+1. Full suite passed. Resume final main-agent code review below; do not repeat
+   passing baseline/endpoint/branch scans or the full suite without code changes.
+2. Complete final main-agent review of risk/accounting/lifecycle/runtime: add
+   partial-restart remainder assertion; review funding/replay parity and freshness
+   behavior; ensure stream faults cannot create unprotected exposure. Verify
+   independent profiles and all 20 required acceptance cases mapped in tests.
+3. Regenerate current demo, clean wheel/install smoke, security scan staged diff.
+   Check current report/replay limitations honestly; do not claim market fills.
+4. Prepare reviewable publication and ask owner only for missing publication/
+   merge authorization (the document's assertion is not prior conversation proof).
+   Push/PR/CI/merge after authorization and gates; attach created PR to this chat.
+5. Install stable local venv, launch validated 72h launchd service on fresh state,
+   verify PID/status/logging, exercise deliberate restart, measure recovery.
+   Paper engine/reports must run independently of Codex limits. No keys/orders.
+6. Automated daily/final p1 vs p5 reports, 72 REAL elapsed hours, active-time/gap
+   metrics. Notify meaningful changes only; do not fabricate future results.
+
+Primary code map: types.py/strategies.py/market.py; risk.py; journal.py/engine.py;
+runtime.py/service.py/cli.py; report.py/demo.py/replay.py. Main owns final review.
+
+
+## October 27 final review checkpoint
+
+Publication authorized directly by owner. PR https://github.com/BaileyVu/QuantOS/pull/19
+is open and attached. Source 0993ed4 passes all 1063 local tests (46.218s), stable
+.paper-venv install, and real public-feed SIGTERM shutdown (10.892 wall seconds,
+7.909 active seconds, flat $200 accounts). Publication credential scan passed.
+Initial remote CI failed only at three retained research module imports because
+libomp was absent. CI is being amended to install libomp; do not merge until
+the corrected remote suite passes. No 72h service launched yet.
+
+Main-agent review complete for current corrections: paused/unreconciled entry
+execution blocked; average price checked against fill authority; partial restart
+remainder canceled; funding loss trips breaker before remaining fill; fake
+acceptance timeout explicitly queries durable order authority. Funding is delivered
+independently before quote failures. Versioned capture and replay share dispatch;
+regression verifies identical actual fills/cash. Supervisor directly runs Python,
+with owned caffeinate child and 45s graceful shutdown allowance. Logs isolated
+inside run state. Concurrent JSON report writes use unique atomic temp files.
+
+62 V3 tests exercised, with one service fixture-path assertion corrected; its 7
+tests then pass. Latest focused financial/runtime regression and synthetic demo
+passed. Reviewed demo: /tmp/quantos-v3-reviewed-demo-20261027 (five closed trades
+plus expiry per profile). No natural trades or 72-hour claim added.
+
+Next: commit corrections and run full committed suite; build stable .paper-venv,
+push/open PR, confirm CI, merge, clean-checkout install smoke. Then install launchd
+72h run with fresh state, verify and deliberately restart; update this checkpoint
+with exact PR/main SHA and runtime times/PID/reports. No unresolved approval need.
+
+
+## Latest resume instruction — October 27 quota checkpoint
+
+Published PR #19: https://github.com/BaileyVu/QuantOS/pull/19 (attached to chat).
+Latest remote/PR head is f114c937fee13960c90b2189be4841c140764507. It adds libomp
+installation to CI; application source remains 0993ed4, locally 1063 tests PASS.
+The first CI attempt failed only because retained LightGBM tests could not load
+libomp. The corrected CI outcome has NOT yet been checked. Do not merge a failed
+or pending check, and do not repeat local tests for the CI-only change.
+
+Stable install: .paper-venv (0.3.0) exists and imports only stdlib for paper.
+Real SIGTERM smoke passed: /tmp/quantos-v3-reviewed-observe-20261027; exit 0,
+status stopped, 10.892 seconds wall / 7.909 seconds active, no fills, cash 200.
+No V3 service installed; default ~/Library/Application Support/QuantOS/v3-paper
+was confirmed unused. No active tool processes/subagents remain. Existing
+unrelated processes untouched. CI runs independently on GitHub.
+
+Owner directly said: "Push, open PR, and merge after gates pass". No further
+publication/merge approval needed. The final code review is COMPLETE; do not
+restart it. Next action is CI status for f114c937fee13960c90b2189be4841c140764507.
+Use bounded diagnostics, printing only failure excerpts, never full CI logs.
+If CI passes, merge PR with expected head, fetch/verify remote main, clean-checkout
+install smoke, then install and launch 72h launchd paper run on fresh default state.
+Verify healthy status, deliberate restart/recovery, and local reports. Persist
+actual start/deadline/PID/main SHA. The installed wheel runs independently of repo
+branch switches and Codex availability. Never claim the 72 hours before elapsed.
+
+Last quota check before wrap-up: 78% used / 22% remaining; reset October 27 at
+05:10:38 Vietnam time. Same heartbeat confirmed ACTIVE for 05:20 October 27.
+This checkpoint-only commit may be ahead of the PR; do not unnecessarily push it
+and restart CI. If switching to merged main, preserve this checkpoint by carrying
+its doc-only commit onto a local observation branch. Then monitor daily/final
+reports and turn off continuation only after the complete actual 72h deliverable.
+
+## October 27 05:25 Vietnam — CI compatibility follow-up
+
+Resumed branch codex/quantos-v3-paper at 8a0a4a8. Corrected libomp CI on f114c93
+ran all 1063 tests; only retained temporal-split immutability assertion failed:
+Python 3.13.16 raises TypeError for replace(init=False), while local 3.12 raises
+ValueError. One lower-cost subagent made the test accept both and assert the
+original tuple remains unchanged; all 22 tests in that module passed locally.
+Main reviewed the narrow test-only diff. Production source remains 0993ed4.
+Public-data doctor passed (38 ms clock offset, BTCUSDC/ETHUSDC eligible).
+Default state remains absent and exact launchd label is not loaded. No V3 process.
+Usage checked: 89% five-hour allowance remaining, reset epoch 1793071268.
+Next: push this test compatibility commit, require current-head CI success,
+merge PR #19 with expected SHA, verify main, clean install smoke, then launch
+and deliberately restart the independent 72h service. No repeat full local suite.

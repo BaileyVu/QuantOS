@@ -1,133 +1,86 @@
-# QuantOS
+# QuantOS V3 paper engine
 
-<p align="center">
-  <img src="assets/quantos-overview.svg" alt="QuantOS architecture overview">
-</p>
+A local, public-data-only Binance USD-M Futures paper engine. No API keys, real
+orders, transfers or account changes. Reference strategies demonstrate mechanics;
+there is no claim of profitability or live readiness.
 
-<p align="center">
-  A local quantitative trading research system for building, testing, and validating systematic Binance Spot strategies.
-</p>
+## Install and operate
 
-> **Research and paper trading first.** QuantOS does not claim profitability and is not live-approved.
+Python 3.11+; the paper runtime has no third-party dependencies.
 
-## What is QuantOS?
+```bash
+python3 -m venv .paper-venv
+.paper-venv/bin/python -m pip install .
+.paper-venv/bin/quantos doctor
+.paper-venv/bin/quantos strategies list
+.paper-venv/bin/quantos demo --state /tmp/quantos-new-synthetic-demo
+.paper-venv/bin/quantos start --mode paper --hours 72
+```
 
-QuantOS is a Python project for taking a strategy from market data to backtesting and paper trading without mixing up research, risk, and execution concerns.
+`start` runs in the foreground. After acceptance, use the macOS supervisor:
 
-The V1 mainline is intentionally focused: Binance Spot, BTCUSDT and ETHUSDT, completed one-minute candles, one strategy, one model, and a paper-first workflow. The goal is a small system that is understandable, reproducible, and safe to work on.
+```bash
+.paper-venv/bin/quantos install-service --hours 72
+.paper-venv/bin/quantos status
+.paper-venv/bin/quantos journal --profile p1 --limit 50
+.paper-venv/bin/quantos report --day 1
+.paper-venv/bin/quantos stop
+```
 
-## Where the project is now
+Default state is `~/Library/Application Support/QuantOS/v3-paper`. Every stateful
+command accepts `--state PATH`. Use a fresh directory for a new observation;
+restarting an existing one retains its original deadline and account history.
+`stop` requests graceful local closure, preserving unresolved exposure when the
+feed is offline. Inspect status and resume that state to finish reconciliation.
+Never delete or share another run's state. One process holds an exclusive lock.
 
-| Area | Current state |
-|---|---|
-| Main branch | Frozen Spot-only V1 baseline |
-| Market data | Historical and live candle handling, validation, Parquet storage, and DuckDB queries |
-| Research | Deterministic features, causal training data, temporal splits, and model artifacts |
-| Evaluation | Backtesting, costs, performance metrics, walk-forward checks, and Monte Carlo support |
-| Runtime | Risk-controlled paper execution and a continuous paper-runtime path |
-| Live trading | Not approved; explicit promotion and human approval are required |
+The launchd job `com.quantos.v3.paper` restarts failures and uses caffeinate.
+The plist references the exact virtualenv interpreter, so retain that environment.
+A successful completed run does not restart. Closing a laptop lid, power loss,
+offline periods and OS sleep can interrupt observation. Keep the Mac on AC with
+lid open. Reports distinguish wall time, measured observation and recorded gaps.
+Local SQLite/WAL journals, gzip input archives and daily/final reports continue
+without Codex. A stopped/crashed local process cannot emulate unseen price paths;
+restart recovery preserves known protection and cancels stale entry remainders.
 
-Research results and paper runs are evidence to review, not proof of future performance.
+## Behavior and evidence
 
-## How it works
+- Independent $200 USDC accounts: p1 (1%) and p5 (5% risk ceiling), sharing signals.
+- 1x equity gross exposure, <=3x leverage, one active position, 10% daily loss
+  breaker and 25% drawdown pause. p5 often sizes below 5% due to the exposure cap.
+- EMA20/50 ATR14 LIMIT pullback and Donchian20 ATR14 continuation STOP, completed
+  5-minute bars only; 1-minute data is also collected. No parameter optimization.
+- E17 is ineligible, with unverified source metadata. An announcement monitor is
+  not yet running. Other imported research is deferred in LATER.md.
+- LIMIT fills require strict public trade-through, 1% participation after a
+  queue allowance. Touch alone never fills. MARKET/STOP uses a later quote,
+  latency, adverse slippage and size impact; large gaps/depth shortages reject.
+- Fee estimates: maker 0.02%, taker 0.06%; funding at actual published times.
+  These are estimates, not the account's personal commission rate.
+- Protection is a local simulated bracket, not an exchange-native order.
+  Stops can slip. Missing/stale/gapped data blocks new exposure.
+- Daily and final JSON/Markdown/CSV reports live under the state `reports/` folder.
+  Signals, risk approvals, fills, no-fill/expiry causes, costs and R are separate.
 
-QuantOS keeps the core trading loop simple:
+`quantos backtest --input recorded.jsonl.gz --state NEW_DIRECTORY --strategy all`
+replays recorded inputs through the same logic without network. It leaves any
+end-of-input position open; it does not invent a final quote or missing events.
+Synthetic demo, replay and natural journals have distinct immutable identities.
 
-~~~text
-Market data → features → strategy decision → risk checks → execution
-                          ↘
-                    evaluation and records
-~~~
+See [RISK_STUDY.md](RISK_STUDY.md) for why annual tails are NOT_ESTIMABLE and
+[IMPLEMENTATION_CHECKPOINT.md](IMPLEMENTATION_CHECKPOINT.md) for actual tests,
+runtime evidence, unresolved work, commits and next action.
 
-The project has six production modules: Market Data, Feature Engine, Alpha Engine, Risk Engine, Execution Engine, and Evaluation Engine. Storage, configuration, logging, adapters, and the CLI support those modules without becoming separate product systems.
+## Development
 
-## Research → validation → execution
+```bash
+python -m pip install '.[research]'
+python -m unittest discover -s tests -t .
+```
 
-~~~text
-Research → Backtest → Walk-Forward → Monte Carlo → Paper Trading → Live Approval
-~~~
-
-Each step is a gate. A promising backtest or paper run does not automatically authorize live trading.
-
-## What's implemented
-
-- Binance Spot historical and live completed-candle data paths for BTCUSDT and ETHUSDT.
-- Immutable Parquet datasets with local DuckDB queries.
-- Deterministic feature generation shared by research and runtime paths.
-- Causal labels, chronological data splits, and reproducible LightGBM model artifacts.
-- Event-driven backtests with fees, slippage, fills, account state, and performance metrics.
-- Risk checks for position sizing, exposure, loss limits, drawdown, stale data, and expected costs.
-- Paper execution, runtime state, structured logs, and fail-closed handling for uncertain state.
-
-## Futures / HFT research
-
-Futures and HFT work is preserved on separate experimental branches. It is not part of the frozen Spot-only V1 mainline and is not evidence of profitable live trading.
-
-- codex/v1-autonomous-futures-mvp includes Binance USDⓈ-M connectivity; L2, bookTicker, trade, mark, and funding inputs; VAMP, microprice, order-book imbalance, and signed aggressive flow; maker-first/post-only research; queue-aware paper fills; latency/liveness monitoring; authenticated preflight; and Edge V2 research.
-- codex/v1-f3-carry-risk-overlay contains Futures carry-risk research.
-- codex/v1-t5-aggressive-alpha contains separate experimental alpha work pending specification review.
-
-## Quick start
-
-QuantOS requires Python 3.11 or later.
-
-~~~bash
-git clone https://github.com/BaileyVu/QuantOS.git
-cd QuantOS
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e .
-python -m unittest tests.validation.test_architecture
-~~~
-
-On Windows PowerShell:
-
-~~~powershell
-.\.venv\Scripts\Activate.ps1
-~~~
-
-To see available local commands:
-
-~~~bash
-python -m quantos --help
-~~~
-
-## Project structure
-
-~~~text
-QuantOS/
-├── src/quantos/   # Domain rules, application flow, adapters, and CLI
-├── tests/         # Unit, integration, and architecture checks
-├── configs/       # Safe example and paper-runtime configuration
-├── docs/          # Frozen V1 specifications and research records
-├── research/      # Research programs and evidence
-└── README.md
-~~~
-
-## Safety
-
-- Start with research, validation, and paper trading.
-- Risk is evaluated before execution, and a risk rejection is final.
-- Only the Execution module may submit an exchange order.
-- Missing, stale, invalid, or unreconciled state stops the affected action.
-- Mainnet access requires explicit authorization and safeguards.
-
-## Data & secrets
-
-Market datasets, generated artifacts, and credentials stay outside Git. Common local locations are:
-
-~~~text
-QuantOS-Data
-QuantOS-HFT-Data
-QuantOS-Secrets
-~~~
-
-Never commit API keys, .env files, account information, raw datasets, or generated trading artifacts.
-
-## Documentation
-
-Start with [AGENTS.md](AGENTS.md), then read [docs/000_READ_FIRST.md](docs/000_READ_FIRST.md) and the relevant frozen V1 specification. The documentation is the source of truth for architecture, trading behavior, and promotion rules.
-
-## License
-
-QuantOS is distributed under the [repository license](LICENSE).
+The retained historical research suite requires its pinned optional dependencies.
+One historical preregistration test requires a clean committed production tree;
+run the complete suite after committing reviewed implementation changes.
+The original CLI remains `quantos-legacy` and its documentation is preserved in
+[docs/LEGACY_V1_README.md](docs/LEGACY_V1_README.md). The V3 default CLI imports only
+`quantos.paper`; historical research cannot submit an order through it.

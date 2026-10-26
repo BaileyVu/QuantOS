@@ -1,5 +1,15 @@
 # QuantOS — Codex Operating Instructions
 
+## Current V3 implementation contract
+
+For the October 26 paper-engine task, `docs/V3_PAPER_CONTRACT.md` supersedes the
+historical frozen V1 scope and specification precedence below. Preserve old
+research and tests as historical evidence. V3 is public-data-only paper/fake:
+no authenticated account access, real-order code, or live enablement. Resume
+from `IMPLEMENTATION_CHECKPOINT.md`. At most two lower-cost subagents may handle
+independent components; main agent owns risk, accounting, order integration and
+final review. Existing unrelated processes and local state must remain untouched.
+
 ## 1. Authority and Specification Precedence
 
 QuantOS V1 is specification-driven.

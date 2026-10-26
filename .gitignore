@@ -10,6 +10,7 @@ secrets/
 __pycache__/
 *.py[cod]
 .venv/
+.paper-venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -26,3 +27,9 @@ logs/
 # Local databases
 *.duckdb
 *.db
+*.db-wal
+*.db-shm
+*.sqlite*
+*.log
+/.paper-state/
+!/.env.example

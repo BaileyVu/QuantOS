@@ -1,6 +1,7 @@
 """Verified, immutable publication of complete native model directories."""
 
 import logging
+import ctypes
 import os
 from pathlib import Path
 import shutil
@@ -51,10 +52,18 @@ def load_model(path: Path) -> VerifiedModel:
 
 def _publish_no_replace(temporary: Path, destination: Path) -> None:
     # Windows rename never replaces an existing destination, including an empty
-    # directory. POSIX rename may replace empty directories, so fail closed there.
-    if os.name != "nt":
-        raise ModelArtifactError("atomic no-overwrite directory publication currently requires Windows")
-    os.rename(temporary, destination)
+    # directory. Darwin RENAME_EXCL has the same atomic no-replace guarantee.
+    if os.name == "nt":
+        os.rename(temporary, destination)
+        return
+    if sys.platform != "darwin":
+        raise ModelArtifactError("atomic no-overwrite directory publication requires Windows or macOS")
+    rename = ctypes.CDLL(None, use_errno=True).renameatx_np
+    rename.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+    rename.restype = ctypes.c_int
+    if rename(-2, os.fsencode(temporary), -2, os.fsencode(destination), 0x4) != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), str(destination))
 
 
 class ModelArtifactStore:
