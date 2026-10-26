@@ -5,18 +5,22 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quantos"
 version = "0.1.0"
-description = "QuantOS V1 quantitative trading engine"
+description = "QuantOS public-data-only Futures paper engine"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "QuantOS" }]
-dependencies = [
+dependencies = []
+
+[project.optional-dependencies]
+research = [
     "duckdb==1.5.5", "pyarrow==25.0.1", "websockets==17.1",
     "lightgbm==4.7.0", "numpy==2.4.6", "scipy==1.17.1",
 ]
 
 [project.scripts]
-quantos = "quantos.interfaces.cli:main"
+quantos = "quantos.paper.cli:main"
+quantos-legacy = "quantos.interfaces.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

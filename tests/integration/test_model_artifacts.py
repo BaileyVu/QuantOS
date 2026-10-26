@@ -262,6 +262,6 @@ class ModelArtifactTests(unittest.TestCase):
             load_model(path)
 
     def test_unsupported_publication_primitive_fails_closed(self):
-        with patch(f"{MODULE}.os.name", "posix"), self.assertRaisesRegex(ModelArtifactError, "requires Windows"):
+        with patch(f"{MODULE}.os.name", "posix"), patch(f"{MODULE}.sys.platform", "linux"), self.assertRaisesRegex(ModelArtifactError, "requires Windows"):
             from quantos.infrastructure.models.artifacts import _publish_no_replace
             _publish_no_replace(self.root / "unused-source", self.root / "unused-target")

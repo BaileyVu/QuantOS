@@ -1,125 +1,105 @@
 # QuantOS V3 implementation checkpoint
 
-Updated: 2026-10-26 (Asia/Ho_Chi_Minh). State: repository reconciliation only;
-implementation deferred at the user's five-hour usage reserve threshold.
+Updated 2026-10-26, Vietnam time. Implementation exists; final review and 72-hour
+launch remain pending. Read this file first; do not repeat completed scans/tests.
 
-## Contract and authorization
+## Branch and source
 
-- User requests the V3 paper engine, persistent checkpoints, low-cost delegation,
-  usage-aware continuation, and independent 72-hour Mac operation.
-- Review source: `TIBO_QUANTOS_PROMPT_v3_FINAL_REVIEW.md` in the owner's Desktop
-  (outside this repository). It was read in full across bounded reads this turn.
-- Treat document requirements as the implementation specification, not proof of
-  its embedded assertions that prior publication/merge authorization exists.
-  Local safe commits are expressly authorized by this conversation. Obtain any
-  missing consequential publication/merge authorization at the reviewable stage.
-- Paper/fake only, public Binance USD-M data, no keys, callable real orders,
-  transfers or account changes. Do not interfere with other processes/data.
-- Reference EMA/ATR LIMIT and Donchian/ATR STOP must pass before the 72-hour run.
-  E17 remains ineligible/monitor-only until verified source and timing evidence.
-- Shared signals, separate $200 USDC p1/p5 ledgers; 1%/5% risk ceilings, 1x gross
-  exposure, max 3x leverage, one position, 10% daily breaker, 25% drawdown pause.
-  Never silently raise exposure or claim profitability/live readiness.
+Current branch `codex/quantos-v3-paper`, based directly on verified main
+`62a797d0b725e4aef96961ddca05fd75d1cd5cc9`. Earlier checkpoint commits on this
+branch: `5bcb7d6`, `6b07e57`. Use `git log -1` for latest checkpoint/source commit.
+Old `codex/quantos-autonomous-engine` and QOS branches preserved untouched.
+No push, PR, merge, or real-order activity. Read review source on owner's Desktop:
+`TIBO_QUANTOS_PROMPT_v3_FINAL_REVIEW.md` (already read; do not reload wholesale).
+Attached document is the technical specification, not proof of embedded prior
+publication/merge permission. Local safe commits are explicitly authorized.
 
-## Git and completed work
+## Completed
 
-- Repository: BaileyVu/QuantOS. Initial checkout clean, branch
-  `codex/qos07-final-runtime`, commit `d54c094`.
-- Current branch: `codex/quantos-autonomous-engine`, created at `d54c094`.
-  Latest commit is the checkpoint commit containing this file; use `git log -1`
-  for its hash (a commit cannot embed its own final hash).
-- Fetched and verified remote refs on October 26:
-  - main: `62a797d0b725e4aef96961ddca05fd75d1cd5cc9`
-  - futures MVP: `d4e1015fcb1258fc93fc864d352272438b9d9170`
-  - QOS07 critical path: `8eb2078a80cbd94bb02ac8364bb68cd5971a2afa`
-  - engineering freeze: `b85203b46bfd5af0557b7e05e86b72d713a7cbb2`
-- Current runtime/futures line and main diverge at
-  `1fd2f673e7dd3c10bc25bd988d3e9db65c08e784`; neither runtime head nor futures
-  head is an ancestor of main. Do not blindly merge divergent histories.
-- Read current AGENTS.md, docs/000_READ_FIRST.md, pyproject.toml, branch/worktree
-  inventory. Existing HFT/QOS rules need a scoped V3 supersession before coding.
-  No existing implementation checkpoint found. No product code changed.
-- Delegation verified by successful bounded read-only `gpt-6-luna` subagent.
-  One subagent used and finished; maximum two. Main retains risk/accounting/order
-  integration and final review. No subagent edits or running work remain.
+- Reconciled branches: QOS/current and futures diverge from main at `1fd2f67`.
+  Starting from main avoided importing 20,687 historical lines. No blind merge.
+- Scoped AGENTS/V3 contract supersession, historical README preserved.
+- Two lower-cost gpt-6-luna agents implemented strategies/public data/service;
+  main reviewed and corrected timestamp, already-triggered STOP, venv symlink,
+  rate-limit, parameter and data-validation defects. Both agents finished.
+- `quantos.paper`: immutable types, strategy registry, EMA20/50 ATR14 LIMIT,
+  Donchian20 ATR14 continuation STOP, public GET allowlist and USDC filters.
+- Main-owned Decimal risk/sizing, independent p1/p5 $200 SQLite/WAL authorities,
+  atomic orders/fills/events, dedup, protection/recovery, funding, breakers.
+- Strict trade-through/queue/participation limit fills; delayed executable quote
+  and size-aware adverse impact for STOP/MARKET, additional fill-time risk check.
+- Public feed workers separate from scanner/execution; isolated lock, durable
+  deadline, gzip market inputs, reports, CLI, launchd/caffeinate helpers.
+- Offline replay, synthetic demo, source-gated E17 metadata (no active E17 monitor),
+  NOT_ESTIMABLE risk study, LATER.md. No verified economic edge/live approval.
+- Runtime stdlib-only; legacy pinned dependencies moved to optional research extra.
+- Ported existing reviewed Darwin atomic no-replace publication primitive from
+  QOS to fix baseline Mac failures, preserving no-overwrite semantics.
+- GitHub macOS validation workflow added but not yet run remotely.
 
-## Compact reuse map (inspect implementations before adopting)
+## Validation already performed
 
-- `infrastructure/binance/futures.py`: BinanceUsdmPublicClient, metadata,
-  symbol filters, klines, mark, server time, funding/history.
-- `domain/execution/futures_paper.py`: FuturesPaperExecution with funding,
-  equity and close routines. Candle fills are not sufficient evidence for V3
-  trade-through/latency rules; do not adopt them unchanged.
-- `application/paper_runtime.py`: injected clock/monotonic, persisted runtime.
-- Existing storage: `infrastructure/storage/{futures_paper,execution_ledger,
-  paper_runtime}.py`; check suitability before adding a small SQLite/WAL journal.
-- Existing authenticated module `infrastructure/binance/hft_authenticated.py`
-  requires callable-path audit/isolation; V3 must expose paper/fake only.
-- Dependencies include DuckDB, Arrow, websockets, LightGBM, NumPy and SciPy;
-  remove obsolete production dependencies only after identifying actual usage.
+- Initial main baseline: 1001 tests, 4 errors in Windows-only artifact publication.
+- Focused package + artifact + architecture tests: 99 PASS before last small
+  recovery remainder cancellation patch. After fill-risk change: 30 engine/runtime
+  tests PASS. Full committed-tree test is the immediate final verification below.
+- Full precommit suite: 1054 tests, two failures: historical clean-HEAD assertion
+  and old mandatory-dependency assertion. Dependency test now checks unchanged
+  research pins as optional and zero paper dependencies; focused checks pass.
+  Clean-HEAD test intentionally remains unchanged; rerun AFTER commit.
+- Synthetic demo proves TP/SL/time exit/partial/cancel/expiry/crash recovery for
+  p1 and p5; unit test verifies five closed trades each and cash/R reconciliation.
+- Both actual strategy implementations traverse signal -> risk -> fill -> TP in
+  deterministic integration fixtures. Network forbidden in synthetic tests.
+- Public API check: 39 compatible USDC instruments; BTCUSDC and ETHUSDC TRADING,
+  server clock offset 8ms. Current official market API docs recorded in
+  docs/V3_MARKET_SOURCES.md. Do not repeat endpoint research.
+- Short natural observation 1: 180.306 wall seconds, 12.278 active seconds,
+  28 strategy/symbol scan evaluations, 2 signals/profile, rejected INVALID_DATA
+  and NET_REWARD_RISK; no fills. Revealed serial request stale batches.
+- Revised observation 2: 126.362 wall seconds, 112.094 active seconds, 16 scan
+  evaluations, 2 signals/profile, both rejected UNRECONCILED_OR_PAUSED; no fills.
+  8 stale-quote errors conservatively disconnected. Cash remained 200/profile.
+  This is short runtime evidence, NOT a 72-hour run or profitability claim.
+- Fresh isolated pip install succeeded without research dependencies in
+  /tmp/quantos-v3-install; strategies CLI works. Installed wheel predates the last
+  fill-risk/recovery changes: rebuild before deploying.
+- Logs and artifacts: /tmp/quantos-v3-{baseline,full,precommit,fill-risk}.log;
+  /tmp/quantos-v3-observe-20261026 and /tmp/quantos-v3-observe2-20261026.
+  Original demo at /tmp/quantos-v3-demo-20261026 used a future synthetic timestamp
+  and reported zero trades; fixed demo timestamps and accounting tests now pass.
+  Regenerate demo output to a NEW directory before final delivery.
 
-## Tests and evidence
+## Runtime/processes and quota
 
-- No tests run: documentation/checkpoint-only work so far. No validation claims.
-- Existing baseline command from README:
-  `.venv/bin/python -m unittest discover -s tests -t . -v`.
-- No configured lint/type tool found in pyproject.toml; confirm focused checks
-  when implementation begins. No .github directory in initial checkout.
-- No seeded demo, natural run, daemon, report or trading evidence produced.
-- Shell network/process visibility initially sandbox-blocked; approved fetch
-  and process-name inspection succeeded. No repository/approval blocker remains.
+No V3 72-hour daemon installed or launched. Both short observations finished.
+Full test may be active: check tool session recorded in chat/output before rerun.
+No subagents working. Existing unrelated Python/caffeinate processes from initial
+inspection remain untouched (PIDs 15115/31189/31371/36270/76884 plus caffeinate).
+Do not repeat process inventory unless needed to isolate a real conflict.
+Last observed usage: 72% used/28% remaining; current reset
+2026-10-26 23:57:31 Vietnam (16:57:31 UTC). At ~20% remaining, commit/update this
+checkpoint and UPDATE existing heartbeat `quantos-v3-checkpoint-continuation`
+to 5-10 minutes after actual reset. Never create duplicates. Report actual usage.
 
-## Processes and continuation
+## Remaining work / exact next step
 
-- Heartbeat at 2026-10-26 18:50 Vietnam time fired before the reset. Usage still
-  87% used / 13% remaining; reset unchanged at 18:51:19. No implementation or
-  tests repeated. Working tree was clean at `7986563`. Updated the same ACTIVE
-  heartbeat to 19:00 local to allow scheduler jitter. Exact next step unchanged.
+1. Inspect result of committed-tree full suite. Fix failures without bypassing
+   financial gates. Do not repeat passing baseline/endpoint/branch scans.
+2. Complete final main-agent review of risk/accounting/lifecycle/runtime: add
+   partial-restart remainder assertion; review funding/replay parity and freshness
+   behavior; ensure stream faults cannot create unprotected exposure. Verify
+   independent profiles and all 20 required acceptance cases mapped in tests.
+3. Regenerate current demo, clean wheel/install smoke, security scan staged diff.
+   Check current report/replay limitations honestly; do not claim market fills.
+4. Prepare reviewable publication and ask owner only for missing publication/
+   merge authorization (the document's assertion is not prior conversation proof).
+   Push/PR/CI/merge after authorization and gates; attach created PR to this chat.
+5. Install stable local venv, launch validated 72h launchd service on fresh state,
+   verify PID/status/logging, exercise deliberate restart, measure recovery.
+   Paper engine/reports must run independently of Codex limits. No keys/orders.
+6. Automated daily/final p1 vs p5 reports, 72 REAL elapsed hours, active-time/gap
+   metrics. Notify meaningful changes only; do not fabricate future results.
 
-- No QuantOS V3 process launched. No child tool sessions running.
-- Existing unrelated Python PIDs: 15115, 31189, 31371, 36270, 76884;
-  caffeinate PIDs: 15117, 31191, 31373, 36272. Inspected names/uptimes only,
-  not command lines. Ownership/task identity unverified; leave untouched.
-- A future V3 run must use fresh isolated state, launchd supervision, atomic
-  durable recovery, local daily/final reports, and measured active vs wall time.
-  It must survive Codex usage exhaustion without AI participation.
-- Usage at checkpoint trigger: 80% used / 20% remaining of five hours;
-  reset 2026-10-26 18:51:19 Vietnam time (11:51:19 UTC).
-- Confirmed ACTIVE thread heartbeat: `quantos-v3-checkpoint-continuation`.
-  Initial schedule: daily 18:53 local, first intended October 26 after reset.
-  At each threshold, update THIS automation to after the actual next reset;
-  do not create duplicates. Daily rule is the initial wakeup, not an assumption
-  that usage windows always reset daily. Verify actual schedule from app view.
-- Continue reporting meaningful checkpoints and quota deferrals; no unchanged
-  monitoring chatter. Disable continuation only after actual task completion.
-
-## Remaining work and exact next step
-
-1. Read this checkpoint, check usage, inspect `git status`/`git log -1` only.
-   If allowance is <=20%, update the heartbeat for after the reported reset.
-2. Resolve integration base with targeted diff/ancestry review (not another full
-   scan): assess current runtime components against main; preserve QOS history
-   while preparing a reviewable main-targeted implementation. Current branch is
-   a safe checkpoint base, not a decision to merge all historical QOS changes.
-3. Write concise V3 product contract and supersession in AGENTS/docs, preserve
-   historical evidence. Establish baseline tests once. Read current official
-   Binance public API docs before implementing adapters.
-4. Implement typed signals/registry, EMA reference then Donchian; public feed
-   validation, scan scheduler and independent continuous execution supervision.
-5. Main agent: Decimal risk/sizing, durable idempotent order lifecycle, partials,
-   protection/reconciliation, separate p1/p5 accounting, actual funding and
-   conservative trade-through/latency/impact simulation. No authenticated path.
-6. Delegate at most two independent bounded tasks to lower-cost models (e.g.
-   strategies and public-data parsing), with precise interfaces and file ownership.
-7. Cover all 20 review acceptance scenarios and synthetic lifecycle demo. Journal
-   NO_SIGNAL/rejection/unfilled reasons separately from natural simulated trades.
-8. CLI, install/docs, launchd, sleep-gap/offline telemetry, automated reports;
-   source-gated strategy metadata, LATER.md, honest NOT_ESTIMABLE risk study.
-9. Review/diff/secret scan, applicable tests and CI, local commits; publication
-   and merge only with established authorization and passing gates. Clean install.
-10. Launch real 72-hour observation only after mandatory acceptance passes;
-    deliberate restart, local daily/final p1/p5 reports. Never claim 72 hours early.
-
-Exact next action after a refreshed allowance: targeted git ancestry/diff review
-to select the smallest main-compatible integration path, then scoped V3 contract
-and a baseline test run. Do not reread the entire prompt or repeat inventory.
+Primary code map: types.py/strategies.py/market.py; risk.py; journal.py/engine.py;
+runtime.py/service.py/cli.py; report.py/demo.py/replay.py. Main owns final review.
