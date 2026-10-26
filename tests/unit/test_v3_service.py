@@ -14,11 +14,12 @@ class ServiceTests(unittest.TestCase):
             root = Path(temp)
             plist = service.build_plist(root/"venv/bin/python", root/"state/run.db", root/"logs")
         self.assertEqual(plist["Label"], service.LABEL)
-        self.assertEqual(plist["ProgramArguments"], ["/usr/bin/caffeinate", "-i", "-s",
+        self.assertEqual(plist["ProgramArguments"], [
             os.path.abspath(root/"venv/bin/python"), "-m", "quantos.paper.cli", "start",
             "--mode", "paper", "--state", str((root/"state/run.db").resolve()), "--hours", "72"])
         self.assertTrue(plist["RunAtLoad"])
         self.assertEqual(plist["KeepAlive"], {"SuccessfulExit": False})
+        self.assertEqual(plist["ExitTimeOut"], 45)
         self.assertEqual(plist["ThrottleInterval"], 30)
         self.assertEqual(Path(plist["WorkingDirectory"]).name, "state")
         self.assertIn("logs", plist["StandardOutPath"])
@@ -35,8 +36,8 @@ class ServiceTests(unittest.TestCase):
             venv_python = root/"venv-python"
             venv_python.symlink_to(base)
             plist = service.build_plist(venv_python, root/"state", root/"logs")
-            self.assertEqual(plist["ProgramArguments"][3], str(venv_python))
-            self.assertNotEqual(plist["ProgramArguments"][3], str(base))
+            self.assertEqual(plist["ProgramArguments"][0], str(venv_python))
+            self.assertNotEqual(plist["ProgramArguments"][0], str(base))
 
     @patch.object(service, "_domain", return_value="gui/501")
     @patch.object(service, "_launchctl", return_value="/bin/launchctl")
@@ -55,7 +56,8 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(result, home/"Library/LaunchAgents"/f"{service.LABEL}.plist")
             with result.open("rb") as f: plist = plistlib.load(f)
             self.assertEqual(plist["ProgramArguments"][-1], "12")
-            self.assertTrue((Path(temp)/"data/logs").is_dir())
+            self.assertTrue((state/"logs").is_dir())
+            self.assertEqual((state/"logs").stat().st_mode & 0o777, 0o700)
             self.assertEqual(run.call_args_list, [
                 call(["/bin/launchctl", "print", f"gui/501/{service.LABEL}"], check=False, capture_output=True, text=True),
                 call(["/bin/launchctl", "bootstrap", "gui/501", str(result)], check=True, capture_output=True, text=True)])

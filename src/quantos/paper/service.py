@@ -1,8 +1,10 @@
 """macOS launchd supervision for the local paper CLI.
 
 This helper only installs/inspects/stops its fixed per-user launchd label; it
-never signals arbitrary PIDs. `caffeinate` requests idle/system sleep inhibition,
-but a closed lid, power loss, or OS policy can still stop observation.
+never signals arbitrary PIDs. Python is the directly supervised process so
+launchd delivers SIGTERM to the runtime for graceful checkpoint/close. Runtime
+may manage its own caffeinate child; a closed lid, power loss, or OS policy can
+still stop observation.
 """
 from __future__ import annotations
 
@@ -28,11 +30,12 @@ def build_plist(python: Path, state: Path, logdir: Path,
     errors = logdir / "quantos-v3-paper.err.log"
     return {
         "Label": LABEL,
-        "ProgramArguments": ["/usr/bin/caffeinate", "-i", "-s", str(python),
-                             "-m", "quantos.paper.cli", "start", "--mode", "paper",
+        "ProgramArguments": [str(python), "-m", "quantos.paper.cli", "start", "--mode", "paper",
                              "--state", str(state), "--hours", str(duration_hours)],
         "RunAtLoad": True,
         "KeepAlive": {"SuccessfulExit": False},
+        # The runtime uses up to 25 seconds for graceful checkpoint/close.
+        "ExitTimeOut": 45,
         "ThrottleInterval": 30,
         "WorkingDirectory": str(state.parent),
         "StandardOutPath": str(logs),
@@ -67,10 +70,11 @@ def install_service(python: Path, state: Path, duration_hours: int = 72) -> Path
     if "Could not find service" not in (existing.stderr or ""):
         raise RuntimeError("could not confirm paper service is stopped")
     path = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
-    logdir = Path(state).expanduser().resolve().parent / "logs"
+    logdir = Path(state).expanduser().resolve() / "logs"
     plist = build_plist(python, state, logdir, duration_hours)
     path.parent.mkdir(parents=True, exist_ok=True)
     logdir.mkdir(parents=True, exist_ok=True)
+    logdir.chmod(0o700)
     fd, temp_name = tempfile.mkstemp(prefix=f".{LABEL}.", suffix=".tmp", dir=path.parent)
     temp = Path(temp_name)
     try:

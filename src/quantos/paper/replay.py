@@ -8,7 +8,7 @@ from .engine import PaperEngine
 from .journal import Journal
 from .report import atomic_json, write_reports
 from .risk import Policy
-from .runtime import arbitrate
+from .runtime import arbitrate, dispatch
 from .strategies import EmaAtrLimitStrategy, DonchianAtrStopStrategy
 from .types import D, Candle, Funding, Instrument, Quote, Snapshot, Trade
 
@@ -45,6 +45,17 @@ def replay(paths, state: Path, strategy="all"):
                     if first is None:
                         first = now
                         for e in engines: e.recover(now)
+                    if row.get("schema") == 2:
+                        kind, payload = row["kind"], row["payload"]
+                        if kind == "feed":
+                            payload = [(event, decode({"quote": Quote, "trade": Trade, "funding": Funding}[event], value))
+                                       for event, value in payload]
+                        elif kind == "scan": payload = [snapshot(value) for value in payload]
+                        elif kind == "funding": payload = [decode(Funding, value) for value in payload]
+                        dispatch(engines, kind, payload, now, strategies=strategies,
+                                 active_seconds=row.get("active_seconds", 0))
+                        previous = now
+                        continue
                     if previous is not None and now-previous > 5000:
                         for e in engines: e.connection(False, now, "REPLAY_GAP")
                     previous = now

@@ -36,6 +36,30 @@ class PaperEngine:
     def active(self):
         return [o for o in self.journal.orders() if o["state"] not in TERMINAL]
 
+    def entry_allowed(self):
+        return (self.connected and self.journal.get("reconciled", False)
+                and not self.journal.get("paused", False))
+
+    def query_order(self, order_id):
+        row = self.journal.db.execute("SELECT payload FROM orders WHERE id=?", (order_id,)).fetchone()
+        if row is None: raise ValueError("unknown paper order")
+        return json.loads(row[0])
+
+    def enforce_breaker(self, now_ms):
+        account = self.account(now_ms)
+        if (account.equity > account.day_start_equity*(1-self.policy.daily_loss)
+                and account.equity > account.high_water*(1-self.policy.drawdown)):
+            return
+        first = self.journal.get("paused") != "LOSS_BREAKER"
+        self.journal.set("paused", "LOSS_BREAKER")
+        for o in self.active():
+            if D(o["filled"]) > 0 and o["state"] != "CLOSING":
+                self._closing(o, now_ms, "LOSS_BREAKER")
+            else:
+                self._cancel(o, now_ms, "LOSS_BREAKER")
+            self.journal.save(o)
+        if first: self.journal.event(now_ms, "LOSS_BREAKER", {"equity": str(account.equity)})
+
     def account(self, now_ms):
         equity = self.journal.cash()
         for o in self.active():
@@ -62,12 +86,17 @@ class PaperEngine:
             if self.journal.db.execute("PRAGMA quick_check").fetchone()[0] != "ok":
                 errors.append("DATABASE_INTEGRITY")
             for o in self.journal.orders():
-                rows = self.journal.db.execute("SELECT kind,quantity,price FROM fills WHERE order_id=?", (o["id"],)).fetchall()
+                rows = self.journal.db.execute("SELECT kind,quantity,price,fee,pnl FROM fills WHERE order_id=?", (o["id"],)).fetchall()
                 entered = sum((D(r["quantity"]) for r in rows if r["kind"] == "ENTRY"), D(0))
                 exited = sum((D(r["quantity"]) for r in rows if r["kind"] == "EXIT"), D(0))
                 if entered - exited != D(o["filled"]) or entered > D(o["quantity"]) or exited > entered:
                     errors.append("FILL_STATE_MISMATCH")
                     continue
+                if entered:
+                    average = sum((D(r["quantity"])*D(r["price"]) for r in rows if r["kind"] == "ENTRY"), D(0))/entered
+                    if average != D(o["average"]):
+                        errors.append("AVERAGE_PRICE_MISMATCH")
+                        continue
                 if D(o["filled"]) > 0:
                     o["remaining"] = "0"
                     if o["state"] in TERMINAL:
@@ -128,7 +157,10 @@ class PaperEngine:
             self.faults.timeout_after_accept = False
             # Accepted state is authoritative. Caller must query, never resubmit.
             with self.journal.transaction():
-                self.journal.event(now_ms, "TRANSPORT_TIMEOUT", {"id": order_id, "resolved": "OPEN"})
+                self.journal.event(now_ms, "TRANSPORT_TIMEOUT", {"id": order_id})
+                self.journal.event(now_ms, "RECONCILING", {"id": order_id})
+                authoritative = self.query_order(order_id)
+                self.journal.event(now_ms, "ORDER_QUERY", {"id": order_id, "resolved": authoritative["state"]})
         return order_id
 
     def _protect(self, o, now_ms):
@@ -166,7 +198,8 @@ class PaperEngine:
         self.journal.save(o)
 
     def trade(self, trade: Trade, now_ms):
-        if not self.connected or not 0 <= now_ms - trade.time_ms <= 5000:
+        if (not self.entry_allowed() or not 0 <= now_ms - trade.time_ms <= 5000
+                or not trade.price.is_finite() or trade.price <= 0):
             return
         with self.journal.transaction():
             for o in self.active():
@@ -234,6 +267,8 @@ class PaperEngine:
                                              "price": str(price), "quantity": str(quantity), "pnl_gross": str(pnl)})
 
     def quote(self, q: Quote, now_ms):
+        if not self.journal.get("reconciled", False):
+            return
         if not valid_quote(q, now_ms):
             self.connection(False, now_ms, "INVALID_DATA")
             return
@@ -243,6 +278,7 @@ class PaperEngine:
             return
         self.quotes[q.symbol] = q
         with self.journal.transaction():
+            self.enforce_breaker(now_ms)
             for o in self.active():
                 s = o["signal"]
                 if s["symbol"] != q.symbol:
@@ -258,7 +294,7 @@ class PaperEngine:
                     target = q.bid >= D(s["take_profit"]) if long else q.ask <= D(s["take_profit"])
                     if stop or target or now_ms >= o["first_fill_ms"] + s["maximum_hold_seconds"] * 1000:
                         self._closing(o, now_ms, "SL" if stop else "TP" if target else "TIME_EXIT")
-                elif (self.connected and o["state"] not in TERMINAL and D(o["remaining"]) > 0
+                elif (self.entry_allowed() and o["state"] not in TERMINAL and D(o["remaining"]) > 0
                       and s["entry_type"] in {"MARKET", "STOP"} and q.time_ms >= o["eligible_ms"]):
                     long = s["side"] == "LONG"
                     if s["entry_type"] == "STOP" and o["trigger_ms"] is None:
@@ -277,7 +313,7 @@ class PaperEngine:
                             self._cancel(o, now_ms, "FILL_EXCEEDS_GROSS_CAP")
                         else:
                             # Size-dependent additional impact, bounded by risk allowance.
-                            impact = D(".0005") + D(".01") * quantity / depth
+                            impact = (D(".0005") + D(".01") * quantity / depth) * self.policy.slippage / D(".0015")
                             price = (q.ask if long else q.bid) * (1 + D(o["direction"]) * impact)
                             exit_depth = q.bid_qty if long else q.ask_qty
                             exit_impact = self.policy.slippage + D(".01") * quantity / exit_depth
@@ -289,17 +325,7 @@ class PaperEngine:
                             else:
                                 self._entry_fill(o, quantity, price, now_ms, f"quote-{q.time_ms}", False)
                 self.journal.save(o)
-            account = self.account(now_ms)
-            if (account.equity <= account.day_start_equity * (1 - self.policy.daily_loss)
-                or account.equity <= account.high_water * (1 - self.policy.drawdown)):
-                self.journal.set("paused", "LOSS_BREAKER")
-                for o in self.active():
-                    if D(o["filled"]) > 0 and o["state"] != "CLOSING":
-                        self._closing(o, now_ms, "LOSS_BREAKER")
-                    else:
-                        self._cancel(o, now_ms, "LOSS_BREAKER")
-                    self.journal.save(o)
-                self.journal.event(now_ms, "LOSS_BREAKER", {"equity": str(account.equity)})
+            self.enforce_breaker(now_ms)
 
     def funding(self, observation: Funding, now_ms):
         if (observation.time_ms > now_ms or not observation.rate.is_finite()
@@ -321,9 +347,12 @@ class PaperEngine:
                                                 (identity, o["id"], observation.time_ms, str(amount)))
                 if result.rowcount:
                     self.journal.event(now_ms, "FUNDING", {"id": identity, "amount": str(amount), "funding_ms": observation.time_ms})
+            self.enforce_breaker(now_ms)
 
     def tick(self, now_ms, finish=False):
         """Deadlines remain supervised even while public I/O is blocked/offline."""
+        if not self.journal.get("reconciled", False):
+            return
         with self.journal.transaction():
             for o in self.active():
                 if now_ms >= o["signal"]["expires_ms"] or finish:

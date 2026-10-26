@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import queue
 import signal
+import subprocess
+import sys
 import threading
 import time
 
@@ -32,6 +34,67 @@ def arbitrate(signals):
                   key=lambda s: (s.symbol, s.strategy_id, s.signal_id)), conflicts
 
 
+def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0):
+    """Identical state transitions for recorded input replay and natural runtime."""
+    if kind == "feed":
+        quotes = [v for event, v in payload if event == "quote"]
+        healthy = bool(quotes) and all(valid_quote(q, now) for q in quotes)
+        for e in engines:
+            if not healthy:
+                e.connection(False, now, "STALE_FEED_BATCH")
+                continue
+            if not e.connected: e.connection(True, now)
+            for event, value in payload:
+                getattr(e, event)(value, now)
+            with e.journal.transaction():
+                a = e.account(now)
+                e.journal.set("equity_last_observed", str(a.equity))
+                e.journal.event(now, "OBSERVATION", {"active_seconds": active_seconds,
+                    "equity": str(a.equity), "drawdown": str(1-a.equity/a.high_water)})
+        return healthy
+    if kind == "funding":
+        for value in payload:
+            for e in engines: e.funding(value, now)
+    elif kind == "scan":
+        signals, lookup = [], {}
+        for snapshot in payload:
+            lookup[snapshot.instrument.symbol] = snapshot
+            for strategy in strategies:
+                proposal = strategy.evaluate(snapshot)
+                if proposal: signals.append(proposal)
+                for e in engines:
+                    with e.journal.transaction():
+                        e.journal.event(now, "SCAN", {"strategy": strategy.strategy_id,
+                            "symbol": snapshot.instrument.symbol,
+                            "candle_ms": snapshot.candles_5m[-1].close_ms})
+                        if proposal is None:
+                            e.journal.event(now, "NO_SIGNAL", {"strategy": strategy.strategy_id})
+                        else:
+                            e.journal.event(now, "CANDIDATE", asdict(proposal))
+        candidates, conflicts = arbitrate(signals)
+        for e in engines:
+            with e.journal.transaction():
+                for symbol in conflicts: e.journal.event(now, "CONFLICT", {"symbol": symbol})
+        for proposal in candidates:
+            snapshot = lookup[proposal.symbol]
+            for e in engines:
+                q = max((snapshot.quote, e.quotes.get(proposal.symbol, snapshot.quote)), key=lambda q:q.time_ms)
+                e.propose(proposal, snapshot.instrument, q, now)
+    elif kind == "restart":
+        for e in engines:
+            e.connected = False
+            e.recover(now)
+    elif kind == "tick":
+        for e in engines: e.tick(now, finish=payload["finish"])
+    elif kind == "disconnected":
+        for e in engines:
+            e.connection(False, now, payload["error"])
+            with e.journal.transaction(): e.journal.event(now, "ERROR", payload)
+    else:
+        raise ValueError(f"unknown input kind: {kind}")
+    return False
+
+
 class Runtime:
     def __init__(self, state: Path, hours=72, market_factory=PublicMarket):
         if not 0 < hours <= 72: raise ValueError("duration must be >0 and <=72 hours")
@@ -42,11 +105,22 @@ class Runtime:
         self.instrument_lock = threading.Lock()
         self.instruments = {}
         self.stop_requested = False
+        self.last_final_attempt = 0
 
     def emit(self, kind, payload):
         try: self.messages.put((kind, payload), timeout=1)
         except queue.Full:
             self.stop_requested = True
+            return False
+        return True
+
+    def record(self, kind, payload, now, active_seconds=0):
+        folder = self.state / "market"
+        folder.mkdir(exist_ok=True)
+        day = time.strftime("%Y-%m-%d", time.gmtime(now/1000))
+        with gzip.open(folder / f"{day}.jsonl.gz", "at") as f:
+            f.write(dumps({"schema": 2, "received_ms": now, "kind": kind,
+                           "payload": payload, "active_seconds": active_seconds}) + "\n")
 
     def scanner(self):
         market = self.market_factory()
@@ -100,8 +174,9 @@ class Runtime:
                     records.extend(("trade", t) for t in trades)
                     if now >= next_funding:
                         fund = market.funding(symbol, funding_since.get(symbol, started_ms), now)
-                        records.extend(("funding", f) for f in fund)
-                        if fund: funding_since[symbol] = fund[-1].time_ms + 1
+                        # Funding is valid independently of a later quote failure.
+                        if fund and self.emit("funding", fund):
+                            funding_since[symbol] = fund[-1].time_ms + 1
                     # Quote last so trade/funding request latency cannot stale it.
                     records.insert(0, ("quote", market.quote(symbol)))
                 if now >= next_funding: next_funding = now + 60000
@@ -122,6 +197,7 @@ class Runtime:
         except BlockingIOError:
             lock.close(); raise RuntimeError("paper state already has a running owner")
         journals = []
+        caffeine = None
         try:
             now = milliseconds()
             run_file = self.state / "run.json"
@@ -135,6 +211,9 @@ class Runtime:
                 (self.state / "stop.request").unlink()
             run.update(status="running", pid=os.getpid(), restarts=run["restarts"]+1)
             atomic_json(run_file, run)
+            if sys.platform == "darwin":
+                caffeine = subprocess.Popen(["/usr/bin/caffeinate", "-i", "-s", "-w", str(os.getpid())],
+                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             engines = []
             for profile, fraction in (("p1", ".01"), ("p5", ".05")):
                 j = Journal(self.state / f"journal_{profile}.db", profile)
@@ -142,6 +221,7 @@ class Runtime:
                 e = PaperEngine(j, Policy(risk_fraction=D(fraction)))
                 e.recover(now); engines.append(e)
                 with j.transaction(): j.event(now, "START" if run["restarts"] == 0 else "RESTART", {"pid": os.getpid()})
+            self.record("restart", {}, now)
             workers = [threading.Thread(target=self.scanner, daemon=True)] + [
                 threading.Thread(target=self.feed, args=(run["started_ms"], symbol), daemon=True)
                 for symbol in ("BTCUSDC", "ETHUSDC")]
@@ -157,8 +237,10 @@ class Runtime:
                 now, mono = milliseconds(), time.monotonic()
                 gap = (now-last_wall)/1000
                 if gap > 5 or abs(gap-(mono-last_mono)) > 2:
+                    detail = {"worker": "supervisor", "error": "SLEEP_OR_CLOCK_GAP"}
+                    self.record("disconnected", detail, now)
+                    dispatch(engines, "disconnected", detail, now)
                     for e in engines:
-                        e.connection(False, now, "SLEEP_OR_CLOCK_GAP")
                         with e.journal.transaction():
                             e.journal.event(now, "OBSERVATION_GAP", {"seconds": gap, "missed_scan_estimate": int(gap//30)})
                 last_wall, last_mono = now, mono
@@ -171,64 +253,30 @@ class Runtime:
                 except queue.Empty: kind, payload = "tick", None
                 now = milliseconds()
                 if kind == "feed":
-                    quotes = [value for event, value in payload if event == "quote"]
-                    archive = self.state / "market"; archive.mkdir(exist_ok=True)
-                    day = time.strftime("%Y-%m-%d", time.gmtime(now/1000))
-                    with gzip.open(archive / f"{day}.jsonl.gz", "at") as f:
-                        f.write(dumps({"received_ms": now, "records": payload}) + "\n")
-                    healthy = quotes and all(valid_quote(q, now) for q in quotes)
-                    if healthy:
-                        interval = (now-last_feed)/1000 if last_feed else 0
-                        active = interval if 0 <= interval <= 5 else 0
+                    interval = (now-last_feed)/1000 if last_feed else 0
+                    active = interval if 0 <= interval <= 5 else 0
+                    self.record(kind, payload, now, active)
+                    if dispatch(engines, kind, payload, now, active_seconds=active):
                         last_feed = now
-                        for e in engines:
-                            if not e.connected: e.connection(True, now)
-                            for event, value in payload:
-                                getattr(e, event)(value, now)
-                            with e.journal.transaction():
-                                a = e.account(now)
-                                e.journal.set("equity_last_observed", str(a.equity))
-                                e.journal.event(now, "OBSERVATION", {"active_seconds": active,
-                                    "equity": str(a.equity), "drawdown": str(1-a.equity/a.high_water)})
-                    else:
-                        for e in engines: e.connection(False, now, "STALE_FEED_BATCH")
-                elif kind == "scan" and not finishing:
-                    archive = self.state / "market"; archive.mkdir(exist_ok=True)
-                    day = time.strftime("%Y-%m-%d", time.gmtime(now/1000))
-                    with gzip.open(archive / f"{day}.jsonl.gz", "at") as f:
-                        f.write(dumps({"received_ms": now, "records": [("snapshots", payload)]}) + "\n")
-                    signals, lookup = [], {}
-                    for snapshot in payload:
-                        lookup[snapshot.instrument.symbol] = snapshot
-                        for strategy in self.strategies:
-                            proposal = strategy.evaluate(snapshot)
-                            if proposal: signals.append(proposal)
-                            for j in journals:
-                                with j.transaction():
-                                    j.event(now, "SCAN", {"strategy": strategy.strategy_id, "symbol": snapshot.instrument.symbol,
-                                            "candle_ms": snapshot.candles_5m[-1].close_ms})
-                                    if proposal is None: j.event(now, "NO_SIGNAL", {"strategy": strategy.strategy_id})
-                    candidates, conflicts = arbitrate(signals)
-                    for j in journals:
-                        with j.transaction():
-                            for symbol in conflicts: j.event(now, "CONFLICT", {"symbol": symbol})
-                    for proposal in candidates:
-                        snap = lookup[proposal.symbol]
-                        for e in engines:
-                            freshest = max((snap.quote, e.quotes.get(proposal.symbol, snap.quote)), key=lambda q: q.time_ms)
-                            e.propose(proposal, snap.instrument, freshest, now)
+                elif kind == "funding" or (kind == "scan" and not finishing):
+                    self.record(kind, payload, now)
+                    dispatch(engines, kind, payload, now, strategies=self.strategies)
                 elif kind in {"error", "disconnected"}:
-                    archive = self.state / "market"; archive.mkdir(exist_ok=True)
-                    day = time.strftime("%Y-%m-%d", time.gmtime(now/1000))
-                    with gzip.open(archive / f"{day}.jsonl.gz", "at") as f:
-                        f.write(dumps({"received_ms": now, "records": [("disconnected", payload)]}) + "\n")
-                    for e in engines:
-                        e.connection(False, now, payload["error"])
-                        with e.journal.transaction(): e.journal.event(now, "ERROR", payload)
+                    self.record("disconnected", payload, now)
+                    dispatch(engines, "disconnected", payload, now)
                 if last_feed and now-last_feed > 5000:
-                    for e in engines:
-                        if e.connected: e.connection(False, now, "FEED_TIMEOUT")
-                for e in engines: e.tick(now, finish=finishing)
+                    if any(e.connected for e in engines):
+                        detail = {"worker": "supervisor", "error": "FEED_TIMEOUT"}
+                        self.record("disconnected", detail, now)
+                        dispatch(engines, "disconnected", detail, now)
+                due = any((D(o["remaining"]) > 0 and now >= o["signal"]["expires_ms"]) or
+                          (D(o["filled"]) > 0 and o["state"] != "CLOSING" and
+                           now >= o["first_fill_ms"] + o["signal"]["maximum_hold_seconds"]*1000)
+                          for e in engines for o in e.active())
+                if due or (finishing and any(e.active() for e in engines)):
+                    detail = {"finish": finishing}
+                    self.record("tick", detail, now)
+                    dispatch(engines, "tick", detail, now)
                 if now-last_status >= 10000:
                     atomic_json(self.state / "status.json", {"mode": "paper", "run": run, "updated_ms": now,
                         "feed_age_ms": now-last_feed if last_feed else None,
@@ -242,16 +290,20 @@ class Runtime:
                     if now >= run["started_ms"] + day*86400000 and day not in run["reported_days"]:
                         write_reports(self.state, run, day=day)
                         run["reported_days"].append(day); atomic_json(run_file, run)
-                if finishing and not any(e.active() for e in engines):
+                if finishing and not any(e.active() for e in engines) and now-self.last_final_attempt >= 60000:
+                    self.last_final_attempt = now
                     # Finish funding reconciliation before final accounting publication.
                     market = self.market_factory()
                     try:
                         with self.instrument_lock: symbols = tuple(self.instruments)
                         for symbol in symbols:
-                            for funding in market.funding(symbol, run["started_ms"], now):
-                                for e in engines: e.funding(funding, now)
+                            observations = market.funding(symbol, run["started_ms"], now)
+                            self.record("funding", observations, now)
+                            dispatch(engines, "funding", observations, now)
                         run.update(status="stopped" if self.stop_requested else "completed", finished_ms=now)
                         atomic_json(run_file, run)
+                        for day in run["reported_days"]:
+                            write_reports(self.state, run, day=day)
                         write_reports(self.state, run, final=not self.stop_requested)
                         return 0
                     except Exception as error:
@@ -263,6 +315,11 @@ class Runtime:
                     return 0
         finally:
             self.shutdown.set()
+            if caffeine is not None:
+                caffeine.terminate()
+                try: caffeine.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    caffeine.kill(); caffeine.wait()
             for j in journals: j.close()
             if "previous_handlers" in locals():
                 for sig, handler in previous_handlers.items(): signal.signal(sig, handler)

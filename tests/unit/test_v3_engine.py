@@ -2,6 +2,7 @@ from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from quantos.paper.engine import Faults, PaperEngine
 from quantos.paper.journal import Journal
@@ -61,7 +62,9 @@ class EngineTests(unittest.TestCase):
 
     def test_duplicate_and_timeout_after_accept_do_not_duplicate(self):
         self.e.faults.timeout_after_accept = True
-        identity = self.submit()
+        with patch.object(self.e, "query_order", wraps=self.e.query_order) as query:
+            identity = self.submit()
+            query.assert_called_once_with(identity)
         self.assertIsNotNone(identity)
         self.assertIsNone(self.submit())
         self.assertEqual(len(self.j.orders()), 1)
@@ -87,6 +90,18 @@ class EngineTests(unittest.TestCase):
         self.submit(); self.fill(); self.close_at("97")
         self.assertEqual(self.j.orders()[0]["close_reason"], "SL")
         self.assertLess(self.j.cash(), D(200))
+        self.assertFalse(self.j.orders()[0]["target_active"])
+
+    def test_funding_loss_breaker_prevents_remaining_partial_fill(self):
+        self.submit()
+        qty = D(self.j.orders()[0]["quantity"])
+        self.fill(str(qty*150))
+        filled = self.j.orders()[0]["filled"]
+        self.e.funding(Funding("BTCUSDC", T+1500, D("1"), D(100)), T+2000)
+        self.assertEqual(self.j.get("paused"), "LOSS_BREAKER")
+        self.fill("1000", T+3000, 2)
+        self.assertEqual(self.j.orders()[0]["filled"], filled)
+        self.assertEqual(self.j.orders()[0]["state"], "CLOSING")
 
     def test_hold_deadline_exit(self):
         self.submit(signal(maximum_hold_seconds=1)); self.fill(); self.close_at("100", T + 3000)
@@ -180,6 +195,37 @@ class EngineTests(unittest.TestCase):
         with self.j.transaction():
             o = self.j.orders()[0]; o["filled"] = "9"; self.j.save(o)
         self.assertFalse(self.e.recover(T + 2000))
+
+    def test_partial_restart_cancels_remainder_and_never_adds_exposure(self):
+        self.submit()
+        qty = D(self.j.orders()[0]["quantity"])
+        self.fill(str(qty*150))
+        filled = self.j.orders()[0]["filled"]
+        self.e = PaperEngine(self.j, Policy())
+        self.assertTrue(self.e.recover(T+2000))
+        self.e.connection(True, T+2000)
+        self.fill("1000", T+3000, 2)
+        self.assertEqual(self.j.orders()[0]["remaining"], "0")
+        self.assertEqual(self.j.orders()[0]["filled"], filled)
+        self.assertTrue(self.j.orders()[0]["stop_active"])
+
+    def test_pending_entry_cannot_fill_when_paused_or_unreconciled(self):
+        self.submit()
+        with self.j.transaction(): self.j.set("paused", "MISMATCH")
+        self.fill()
+        self.assertEqual(self.j.orders()[0]["filled"], "0")
+        with self.j.transaction():
+            self.j.set("paused", False)
+            self.j.set("reconciled", False)
+        self.fill("1000", T+2000, 2)
+        self.assertEqual(self.j.orders()[0]["filled"], "0")
+
+    def test_recovery_detects_accounting_average_mismatch(self):
+        self.submit(); self.fill()
+        with self.j.transaction():
+            o = self.j.orders()[0]; o["average"] = "90"; self.j.save(o)
+        self.assertFalse(self.e.recover(T+2000))
+        self.assertIn("AVERAGE_PRICE_MISMATCH", self.j.get("paused"))
 
     def test_p5_gross_cap_and_independent_minimum(self):
         a = Account(D(200), D(200), D(200))

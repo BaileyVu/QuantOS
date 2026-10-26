@@ -11,8 +11,7 @@ branch: `5bcb7d6`, `6b07e57`. Use `git log -1` for latest checkpoint/source comm
 Old `codex/quantos-autonomous-engine` and QOS branches preserved untouched.
 No push, PR, merge, or real-order activity. Read review source on owner's Desktop:
 `TIBO_QUANTOS_PROMPT_v3_FINAL_REVIEW.md` (already read; do not reload wholesale).
-Attached document is the technical specification, not proof of embedded prior
-publication/merge permission. Local safe commits are explicitly authorized.
+Owner directly authorized push, PR creation and merge after validation/CI gates in this chat on October 27. Do not ask again. Local commits and local paper installation/operation are authorized; live orders are not.
 
 ## Completed
 
@@ -113,3 +112,25 @@ Reschedule it to each new actual reset when quota threshold is reached.
 
 Primary code map: types.py/strategies.py/market.py; risk.py; journal.py/engine.py;
 runtime.py/service.py/cli.py; report.py/demo.py/replay.py. Main owns final review.
+
+
+## October 27 final review checkpoint
+
+Main-agent review complete for current corrections: paused/unreconciled entry
+execution blocked; average price checked against fill authority; partial restart
+remainder canceled; funding loss trips breaker before remaining fill; fake
+acceptance timeout explicitly queries durable order authority. Funding is delivered
+independently before quote failures. Versioned capture and replay share dispatch;
+regression verifies identical actual fills/cash. Supervisor directly runs Python,
+with owned caffeinate child and 45s graceful shutdown allowance. Logs isolated
+inside run state. Concurrent JSON report writes use unique atomic temp files.
+
+62 V3 tests exercised, with one service fixture-path assertion corrected; its 7
+tests then pass. Latest focused financial/runtime regression and synthetic demo
+passed. Reviewed demo: /tmp/quantos-v3-reviewed-demo-20261027 (five closed trades
+plus expiry per profile). No natural trades or 72-hour claim added.
+
+Next: commit corrections and run full committed suite; build stable .paper-venv,
+push/open PR, confirm CI, merge, clean-checkout install smoke. Then install launchd
+72h run with fresh state, verify and deliberately restart; update this checkpoint
+with exact PR/main SHA and runtime times/PID/reports. No unresolved approval need.

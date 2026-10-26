@@ -11,12 +11,17 @@ from .types import D, dumps
 
 def atomic_json(path: Path, value):
     import os
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    with temporary.open("w") as f:
-        f.write(dumps(value) + "\n")
-        f.flush()
-        os.fsync(f.fileno())
-    temporary.replace(path)
+    import tempfile
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(dumps(value) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def summarize(journal: Journal, start_ms=0, end_ms=2**63-1):
@@ -25,10 +30,13 @@ def summarize(journal: Journal, start_ms=0, end_ms=2**63-1):
     counts = Counter(r["kind"] for r in events)
     rejects, strategies, errors = Counter(), Counter(), []
     active_seconds, max_dd = D(0), D(0)
+    seen_signals = set()
     for event in events:
         p = json.loads(event["payload"])
         if event["kind"] == "REJECTED_RISK": rejects[p["reason"]] += 1
-        if event["kind"] == "SIGNAL": strategies[p["strategy_id"]] += 1
+        if event["kind"] in {"SIGNAL", "CANDIDATE"} and p["signal_id"] not in seen_signals:
+            strategies[p["strategy_id"]] += 1
+            seen_signals.add(p["signal_id"])
         if event["kind"] in {"ERROR", "RECONCILIATION_FAILED", "PROTECTION_REJECTED"}:
             errors.append({"time_ms": event["time_ms"], "kind": event["kind"], "details": p})
         if event["kind"] == "OBSERVATION":
@@ -81,6 +89,8 @@ def write_reports(state: Path, run: dict, day: int | None = None, final=False):
                   "R divides net trade PnL by cost-inclusive approved risk of the actually filled size."],
               "profiles": {}}
     for profile in ("p1", "p5"):
+        if not (state / f"journal_{profile}.db").is_file():
+            raise ValueError(f"missing {profile} journal; refusing to invent account state")
         j = Journal(state / f"journal_{profile}.db", profile, run["evidence"])
         try: result["profiles"][profile] = summarize(j, start, end)
         finally: j.close()
