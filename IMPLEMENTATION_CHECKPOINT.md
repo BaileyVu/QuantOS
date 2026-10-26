@@ -1,6 +1,6 @@
 # QuantOS V3 implementation checkpoint
 
-Updated 2026-10-26, Vietnam time. Implementation exists; final review and 72-hour
+Updated 2026-10-26, Vietnam time. Source commit `b21093d`; implementation exists; final review and 72-hour
 launch remain pending. Read this file first; do not repeat completed scans/tests.
 
 ## Branch and source
@@ -39,6 +39,14 @@ publication/merge permission. Local safe commits are explicitly authorized.
 
 ## Validation already performed
 
+- FINAL COMMITTED-TREE SUITE: 1056 tests PASS in 44.480 seconds against source
+  commit b21093d; log /tmp/quantos-v3-committed-full.log. The prior full-suite
+  failures are resolved. Do not repeat this suite unless code changes or a new
+  concern justifies it. Current checkpoint-only edits do not require a rerun.
+- Staged credential-pattern scan PASS (private keys, GitHub/AWS/OpenAI token
+  shapes); diff whitespace check PASS. No guarantee against every secret format.
+- Partial restart now cancels entry remainder before restoring protection.
+
 - Initial main baseline: 1001 tests, 4 errors in Windows-only artifact publication.
 - Focused package + artifact + architecture tests: 99 PASS before last small
   recovery remainder cancellation patch. After fill-risk change: 30 engine/runtime
@@ -73,19 +81,21 @@ publication/merge permission. Local safe commits are explicitly authorized.
 ## Runtime/processes and quota
 
 No V3 72-hour daemon installed or launched. Both short observations finished.
-Full test may be active: check tool session recorded in chat/output before rerun.
+No active tool processes: full test and both public observations finished.
 No subagents working. Existing unrelated Python/caffeinate processes from initial
 inspection remain untouched (PIDs 15115/31189/31371/36270/76884 plus caffeinate).
 Do not repeat process inventory unless needed to isolate a real conflict.
-Last observed usage: 72% used/28% remaining; current reset
+Last observed usage before checkpoint: 77% used/23% remaining; current reset
 2026-10-26 23:57:31 Vietnam (16:57:31 UTC). At ~20% remaining, commit/update this
 checkpoint and UPDATE existing heartbeat `quantos-v3-checkpoint-continuation`
 to 5-10 minutes after actual reset. Never create duplicates. Report actual usage.
+Confirmed heartbeat updated to daily 00:07 local, next October 27, after this reset.
+Reschedule it to each new actual reset when quota threshold is reached.
 
 ## Remaining work / exact next step
 
-1. Inspect result of committed-tree full suite. Fix failures without bypassing
-   financial gates. Do not repeat passing baseline/endpoint/branch scans.
+1. Full suite passed. Resume final main-agent code review below; do not repeat
+   passing baseline/endpoint/branch scans or the full suite without code changes.
 2. Complete final main-agent review of risk/accounting/lifecycle/runtime: add
    partial-restart remainder assertion; review funding/replay parity and freshness
    behavior; ensure stream faults cannot create unprotected exposure. Verify
