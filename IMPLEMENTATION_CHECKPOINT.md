@@ -116,6 +116,14 @@ runtime.py/service.py/cli.py; report.py/demo.py/replay.py. Main owns final revie
 
 ## October 27 final review checkpoint
 
+Publication authorized directly by owner. PR https://github.com/BaileyVu/QuantOS/pull/19
+is open and attached. Source 0993ed4 passes all 1063 local tests (46.218s), stable
+.paper-venv install, and real public-feed SIGTERM shutdown (10.892 wall seconds,
+7.909 active seconds, flat $200 accounts). Publication credential scan passed.
+Initial remote CI failed only at three retained research module imports because
+libomp was absent. CI is being amended to install libomp; do not merge until
+the corrected remote suite passes. No 72h service launched yet.
+
 Main-agent review complete for current corrections: paused/unreconciled entry
 execution blocked; average price checked against fill authority; partial restart
 remainder canceled; funding loss trips breaker before remaining fill; fake
