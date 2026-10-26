@@ -191,3 +191,36 @@ Usage checked: 89% five-hour allowance remaining, reset epoch 1793071268.
 Next: push this test compatibility commit, require current-head CI success,
 merge PR #19 with expected SHA, verify main, clean install smoke, then launch
 and deliberately restart the independent 72h service. No repeat full local suite.
+
+## October 27 05:30 Vietnam — merged and independent observation launched
+
+PR #19 merged as 6b42fc7a07599441f76a8a4b926f7b57744e9c71 after both CI runs
+passed on 362c24236b7fbc33ccd0dc3c8d3b256338c6388b (1063 tests plus demo).
+The local f3b5b1f and published 362c242 trees match exactly. Git push stalled in
+macOS credential helper; stopped only those task-owned processes and published
+through connected GitHub. No credential/account settings changed. Public fetch
+works with `git -c credential.helper= -c credential.interactive=false fetch`.
+Fetched main matches the tested PR tree exactly. Current local branch is
+codex/quantos-v3-observation, rooted at merged main; original branch preserved.
+Clean install/demo/doctor PASS from /tmp/quantos-v3-clean-362c242, and all 13 paper
+source files match the stable .paper-venv installed package. Existing 1063-test
+local result retained; no unnecessary full rerun.
+
+Actual natural observation began October 27 05:28:23.659 Vietnam, deadline
+October 30 05:28:23.659 Vietnam (started_ms 1793053703659,
+deadline_ms 1793312903659). State:
+/Users/bailey12/Library/Application Support/QuantOS/v3-paper
+Service: gui/501/com.quantos.v3.paper; plist under ~/Library/LaunchAgents.
+Stable executable: repo .paper-venv/bin/python. Initial PID 10913; deliberate
+restart yielded PID 10991, restarts=1, identical original start/deadline, both
+cash=200, no open orders, fresh public feeds and growing gzip capture.
+Local latest JSON/MD/CSV reports exist; hourly/daily/final reports are independent
+of Codex. No natural fills yet. No unrelated process/data touched.
+
+Restart exposed a reporting defect: graceful stop's finished_ms survived resume,
+freezing displayed wall time. Runtime now removes that old finish timestamp on
+resume without moving start/deadline. Added focused real-runtime regression.
+Next: publish focused fix in follow-up PR, require CI, merge and install corrected
+wheel; restart only this service and verify elapsed reports and preserved ledger.
+Then update this same heartbeat for daily checks after 05:28 Vietnam; actual
+72h final reports are still pending. Last usage: 62% remaining, reset 1793071268.
