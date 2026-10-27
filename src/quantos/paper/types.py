@@ -103,6 +103,7 @@ class Snapshot:
     delist_events: tuple[DelistEvent, ...] = ()
     recent_trade_ms: int | None = None
     recent_trade_volume: Decimal = D(0)
+    entry_eligible: bool = True
 
 
 @dataclass(frozen=True)

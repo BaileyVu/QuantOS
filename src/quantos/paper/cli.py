@@ -23,7 +23,7 @@ from .types import D, dumps
 def parser():
     p = argparse.ArgumentParser(prog="quantos", description="Unauthenticated Binance Futures paper engine")
     sub = p.add_subparsers(dest="command", required=True)
-    default = Path.home() / "Library" / "Application Support" / "QuantOS" / "v3-paper"
+    default = Path.home() / "Library" / "Application Support" / "QuantOS" / "v4-paper"
     for name in ("start", "status", "journal", "report", "stop", "install-service", "exits"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--state", type=Path, default=default)
@@ -76,7 +76,7 @@ def _read_pa_profile(state: Path, strategy_id: str) -> dict:
     db = None
     try:
         if path.exists():
-            db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=2)
+            db = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
             db.row_factory = sqlite3.Row
             journal = _ReadOnlyMeta(db)
             identity = journal.get("identity")
@@ -96,6 +96,8 @@ def _read_pa_profile(state: Path, strategy_id: str) -> dict:
             high_water = max(D(journal.get("high_water", "200")), equity)
             sizer = AdaptiveSizer(journal, journal)
             risk, detail = sizer.risk_fraction(strategy_id, equity, high_water)
+            if journal.get("paused", False):
+                risk = D(0)
             observed = detail["n"] > 0
             source = "persisted" if observed else "persisted_no_observations"
         else:
@@ -127,7 +129,7 @@ def _strategy_listing(state: Path) -> list[dict]:
         rows.append({
             "manifest": asdict(manifest),
             "evidence_status": manifest.evidence_status,
-            "pA": _read_pa_profile(state, manifest.strategy_id),
+            "pA": _read_pa_profile(state, strategy.strategy_id),
         })
     return rows
 
@@ -181,7 +183,7 @@ def main(argv=None):
         elif args.command == "demo":
             report = run_demo(args.state)
             result = {"evidence": "synthetic", "report": str(args.state / "reports" / "final.json"),
-                      "scenarios": report["run"]["scenarios"]}
+                      "scenarios": report["run"]["scenarios"], "library": report["run"]["library"]}
         elif args.command == "backtest":
             from .replay import replay
             selected_strategy = _strategy_from_config(args.config) if args.config else args.strategy

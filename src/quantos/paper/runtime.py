@@ -77,6 +77,8 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0):
             for e in engines:
                 e.channel_stops(snapshot, now)
             tags = regime_tags(snapshot)
+            if not snapshot.entry_eligible:
+                continue  # Exit maintenance above remains active outside the entry universe.
             for strategy in strategies:
                 proposal = strategy.evaluate(snapshot)
                 if proposal: proposal = replace(proposal, **tags)
@@ -175,12 +177,13 @@ class Runtime:
                 if now >= next_universe:
                     instruments = market.eligible_instruments(self.min_quote_volume)
                     next_universe = now+300000
-                symbols = list(instruments)
-                if not symbols: raise ValueError("NO_COMPATIBLE_USDC_SYMBOLS")
                 with self.instrument_lock:
                     # Keep held contracts available to their feed even if liquidity eligibility changes.
                     self.instruments = {**{s: i for s, i in self.instruments.items() if s in self.watched_symbols},
                                         **instruments}
+                    scan_instruments = dict(self.instruments)
+                symbols = list(scan_instruments)
+                if not symbols: raise ValueError("NO_COMPATIBLE_USDC_SYMBOLS")
                 with ThreadPoolExecutor(max_workers=4) as pool:
                     series = dict(pool.map(load, symbols))
                 events = ()
@@ -205,14 +208,16 @@ class Runtime:
                 snapshots = []
                 for symbol in symbols:
                     q = quotes.get(symbol)
-                    if q is None or (q.ask-q.bid)/q.bid > Policy().max_spread:
+                    eligible = symbol in instruments and q is not None and (q.ask-q.bid)/q.bid <= Policy().max_spread
+                    if not eligible:
                         self.emit("diagnostic", {"status": "SKIPPED_MARKET_QUALITY", "symbol": symbol})
+                    if q is None:
                         continue
                     bars = series[symbol]
                     trade_ms, volume = recent.get(symbol, (None, D(0)))
-                    snapshots.append(Snapshot(milliseconds(), instruments[symbol], q, bars["1m"], bars["5m"],
+                    snapshots.append(Snapshot(milliseconds(), scan_instruments[symbol], q, bars["1m"], bars["5m"],
                         bars["1h"], bars["4h"], bars["1d"], tuple(e for e in events if e.symbol == symbol),
-                        trade_ms, volume))
+                        trade_ms, volume, eligible))
                 self.emit("scan", snapshots)
             except Exception as error:
                 self.emit("error", {"worker": "scanner", "error": str(error)})

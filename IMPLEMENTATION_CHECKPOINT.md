@@ -473,3 +473,14 @@ Actual usage80% used/20% remaining five-hour; resets Oct27 20:35:27 Vietnam
 (epoch1793108127). Weekly83% used/17% remaining; resets Nov2 13:51:19 Vietnam
 (epoch1793602279). Check both windows next turn. Same continuation to20:45 after
 five-hour reset; do not create duplicate or revive V3 monitor.
+
+## V4 final-validation candidate — October27 evening
+
+Main fixed no-target fill-time cost ratio bypass, preserving existing fixed-target
+behavior. Held contracts outside entry universe now receive exit maintenance with
+entry_eligible=False (captured/replayed). Corrected pA listing legacyaliases/pause
+and relative state URI; V4 default state separated from canceled V3. Added synthetic
+all6 library demo:18 profile cases,15 closed/3 pA minimum-size rejections, exact
+cash/fill/stop-update replay comparisons. Main-reviewed newsource,111+ paper tests
+and final scanner tests ready; final committed tests next. Docs V4_ACCEPTANCE.md
+maps claims totests. Part2 not published yet. No task/service processes remain.

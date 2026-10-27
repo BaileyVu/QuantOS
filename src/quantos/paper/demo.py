@@ -54,5 +54,7 @@ def run_demo(state: Path):
         finally: j.close()
     run = {"started_ms": start, "finished_ms": start+700000, "evidence": "synthetic",
            "status": "completed", "scenarios": evidence}
+    from .library_demo import run_library_demo
+    run["library"] = run_library_demo(state / "library")
     atomic_json(state / "run.json", run)
     return write_reports(state, run, final=True)

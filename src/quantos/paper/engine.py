@@ -413,9 +413,16 @@ class PaperEngine:
                             exit_depth = q.bid_qty if long else q.ask_qty
                             exit_impact = self.policy.slippage + D(".01") * quantity / exit_depth
                             stop = D(s["stop_loss"])
+                            direction = D(o["direction"])
+                            distance = (price-stop)*direction
+                            costs = price*(2*self.policy.taker_fee + 2*max(self.policy.slippage, impact, exit_impact))
                             fill_risk = quantity * (abs(price-stop) + price*self.policy.taker_fee
                                                     + stop*(self.policy.taker_fee+exit_impact))
-                            if fill_risk > D(o["decision"]["achievable_risk"]):
+                            if distance <= 0:
+                                self._cancel(o, now_ms, "INVALID_BRACKET")
+                            elif s["take_profit"] is None and costs > D(".25")*distance:
+                                self._cancel(o, now_ms, "COSTS_TOO_HIGH_FOR_STOP")
+                            elif fill_risk > D(o["decision"]["achievable_risk"]):
                                 self._cancel(o, now_ms, "FILL_EXCEEDS_APPROVED_RISK")
                             else:
                                 self._entry_fill(o, quantity, price, now_ms, f"quote-{q.time_ms}", False)

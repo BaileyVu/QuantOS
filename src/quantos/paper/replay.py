@@ -30,7 +30,8 @@ def snapshot(data):
                        for key in ("candles_1h", "candles_4h", "candles_1d")},
                     delist_events=tuple(DelistEvent(**e) for e in data.get("delist_events", ())),
                     recent_trade_ms=data.get("recent_trade_ms"),
-                    recent_trade_volume=D(data.get("recent_trade_volume", "0")))
+                    recent_trade_volume=D(data.get("recent_trade_volume", "0")),
+                    entry_eligible=data.get("entry_eligible", True))
 
 
 def replay(paths, state: Path, strategy="all"):

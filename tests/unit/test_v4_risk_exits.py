@@ -55,6 +55,14 @@ class MovingStopTests(unittest.TestCase):
         self.e.quote(quote(time=T+1000),T+1000)
         return self.j.orders()[0]
 
+    def test_favorable_fill_gap_must_still_pass_cost_vs_actual_stop_risk(self):
+        self.assertIsNotNone(self.e.propose(trailing(stop_loss=D('98.32')),INS,quote(),T))
+        self.e.quote(quote('99.80',T+1000),T+1000)
+        self.assertEqual(self.j.orders()[0]['state'],'CANCELED')
+        self.assertEqual(self.j.db.execute('SELECT count(*) FROM fills').fetchone()[0],0)
+        reasons=[row[0] for row in self.j.db.execute("SELECT json_extract(payload,'$.reason') FROM events WHERE kind='CANCELED'")]
+        self.assertIn('COSTS_TOO_HIGH_FOR_STOP',reasons)
+
     def test_trailing_activates_at_one_r_and_never_loosens(self):
         o=self.enter(trailing()); self.assertGreater(D(o['filled']),0)
         self.assertFalse(o['target_active'])

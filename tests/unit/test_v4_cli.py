@@ -45,6 +45,8 @@ class V4CliTests(unittest.TestCase):
             journal = Journal(state / "journal_pA.db", "pA")
             with journal.transaction():
                 journal.set("edge:tsmom_4h", asdict(Edge(state="PROBATION", n=4, s1=2, s2=3)))
+                journal.set("edge:ema_atr_limit_pullback", asdict(Edge(n=3, s1=1, s2=2)))
+                journal.set("paused", "LOSS_BREAKER")
                 journal.set("high_water", "200")
             journal.close()
             path = state / "journal_pA.db"
@@ -56,6 +58,9 @@ class V4CliTests(unittest.TestCase):
             self.assertEqual((row["pA"]["state"], row["pA"]["n"], row["pA"]["observations"]),
                              ("PROBATION", 4, "available"))
             self.assertEqual(path.read_bytes(), before)
+            reference = next(item for item in rows if item["manifest"]["strategy_id"] == "ema_atr_ref")
+            self.assertEqual(reference["pA"]["n"],3)
+            self.assertEqual(Decimal(reference["pA"]["risk_fraction"]),Decimal(0))
 
     def test_each_preregistered_backtest_config_resolves_manifest(self):
         configs = sorted(Path("configs/strategies").glob("*.toml"))
