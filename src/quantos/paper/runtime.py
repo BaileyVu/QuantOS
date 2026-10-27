@@ -160,6 +160,8 @@ class Runtime:
         def load(symbol):
             result = {}
             for frame, (width, count) in frames.items():
+                if self.shutdown.is_set():
+                    return symbol, result
                 at = milliseconds()
                 key, expected = (symbol, frame), at//width*width-1
                 bars = cache.get(key)
@@ -186,6 +188,8 @@ class Runtime:
                 if not symbols: raise ValueError("NO_COMPATIBLE_USDC_SYMBOLS")
                 with ThreadPoolExecutor(max_workers=4) as pool:
                     series = dict(pool.map(load, symbols))
+                if self.shutdown.is_set():
+                    break
                 events = ()
                 if milliseconds() >= next_announcements:
                     try:

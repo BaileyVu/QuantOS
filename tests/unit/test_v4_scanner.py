@@ -113,6 +113,21 @@ class AnnouncementStub:
 
 
 class ScannerTests(unittest.TestCase):
+    def test_shutdown_does_not_drain_queued_universe_requests(self):
+        clock=FakeClock()
+        market=ScannerMarket(clock,[f'COIN{i}USDC' for i in range(20)])
+        with tempfile.TemporaryDirectory() as folder:
+            runtime=Runtime(Path(folder),market_factory=lambda:market,announcement_factory=lambda:None)
+            original=market.candles
+            def stopped(*args,**kwargs):
+                runtime.shutdown.set()
+                return original(*args,**kwargs)
+            market.candles=stopped
+            with patch('quantos.paper.runtime.milliseconds',side_effect=lambda:clock.now):
+                runtime.scanner()
+            self.assertLessEqual(len(market.candle_calls),4)
+            self.assertEqual(market.quote_calls,[])
+
     def messages(self, runtime):
         out = []
         while True:
