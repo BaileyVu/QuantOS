@@ -1,7 +1,7 @@
 """Independent, conservative sizing. A p5 target is a ceiling, never a promise."""
 from dataclasses import dataclass
 from decimal import Decimal
-from math import lcm
+from math import ceil, floor, lcm
 
 from .types import D, Instrument, Quote, Signal, floor_step
 
@@ -11,8 +11,9 @@ class Policy:
     risk_fraction: Decimal = D("0.01")
     daily_loss: Decimal = D("0.10")
     drawdown: Decimal = D("0.25")
-    gross_fraction: Decimal = D("1")
-    leverage: Decimal = D("3")
+    gross_fraction: Decimal = D("3")     # max notional as a multiple of equity
+    leverage: Decimal = D("3")           # max exchange leverage; the per-trade value is chosen in evaluate()
+    margin_fraction: Decimal = D("0.5")  # one trade may lock at most this share of equity as margin
     maker_fee: Decimal = D("0.0002")
     taker_fee: Decimal = D("0.0006")
     slippage: Decimal = D("0.0015")
@@ -25,8 +26,8 @@ class Policy:
             if not isinstance(value, Decimal) or not value.is_finite() or value < 0:
                 raise ValueError(f"invalid policy {name}")
         for name, ceiling in (("risk_fraction", ".05"), ("daily_loss", ".10"),
-                              ("drawdown", ".25"), ("gross_fraction", "1"),
-                              ("leverage", "3")):
+                              ("drawdown", ".25"), ("gross_fraction", "3"),
+                              ("leverage", "3"), ("margin_fraction", "1")):
             if not 0 < getattr(self, name) <= D(ceiling):
                 raise ValueError(f"hard ceiling: {name}")
         if self.leverage < 1 or self.slippage < D(".0015"):
@@ -126,8 +127,10 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     if signal.entry_type == "STOP" and (entry <= quote.ask if signal.side == "LONG" else entry >= quote.bid):
         return reject("STOP_ALREADY_TRIGGERED")
     distance = abs(entry - stop)
-    # Conservative isolated liquidation approximation; no claim about live brackets.
-    if distance / entry + policy.slippage >= 1 / policy.leverage - policy.maintenance_buffer:
+    # Leverage decision, step 1: the highest leverage whose isolated liquidation price stays at least twice
+    # as far as the stop (+slippage). Conservative approximation; no claim about live brackets.
+    safe = min(policy.leverage, D(floor(1 / (2 * (distance / entry + policy.slippage) + policy.maintenance_buffer))))
+    if safe < 1:
         return reject("LIQUIDATION_BUFFER")
     entry_fee = policy.maker_fee if signal.entry_type == "LIMIT" else policy.taker_fee
     costs = entry * (entry_fee + policy.taker_fee + 2 * policy.slippage)
@@ -139,7 +142,7 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     max_entry = entry * (1 + policy.slippage)
     bounds = {"risk": budget / unit_loss,
               "gross_notional": account.equity * policy.gross_fraction / (max_entry * (1 + entry_fee)),
-              "margin": account.equity / (max_entry / policy.leverage + costs),
+              "margin": account.equity * policy.margin_fraction / (max_entry / safe + costs),
               "exchange_max": min(instrument.max_qty, instrument.market_max_qty)}
     binding = min(bounds, key=bounds.get)
     quantity = floor_step(bounds[binding], quantity_step(instrument))
@@ -147,6 +150,9 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
             or quantity * entry < instrument.min_notional):
         return reject("BELOW_EXCHANGE_MINIMUM")
     notional = quantity * entry
+    # Leverage decision, step 2: the lowest leverage that fits the margin budget, so unused leverage
+    # never shortens the distance to liquidation and free margin stays available.
+    leverage = min(safe, max(D(1), D(ceil(notional / (account.equity * policy.margin_fraction)))))
     return Decision(True, "APPROVED", quantity, budget, quantity * unit_loss, notional,
-                    notional / policy.leverage, policy.leverage,
+                    notional / leverage, leverage,
                     notional / account.equity, binding)

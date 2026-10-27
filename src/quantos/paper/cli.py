@@ -19,12 +19,13 @@ def parser():
     p = argparse.ArgumentParser(prog="quantos", description="Unauthenticated Binance Futures paper engine")
     sub = p.add_subparsers(dest="command", required=True)
     default = Path.home() / "Library" / "Application Support" / "QuantOS" / "v3-paper"
-    for name in ("start", "status", "journal", "report", "stop", "install-service"):
+    for name in ("start", "status", "journal", "report", "stop", "install-service", "exits"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--state", type=Path, default=default)
         if name in {"start", "install-service"}: cmd.add_argument("--hours", type=float, default=72)
         if name == "start": cmd.add_argument("--mode", choices=["paper"], default="paper")
         if name == "report": cmd.add_argument("--day", type=int, choices=[1, 2, 3])
+        if name == "exits": cmd.add_argument("--profile", choices=["p1", "p5", "pA"], default="p1")
         if name == "journal":
             cmd.add_argument("--profile", choices=["p1", "p5", "pA"], default="p1")
             cmd.add_argument("--limit", type=int, default=50)
@@ -67,7 +68,13 @@ def main(argv=None):
             result = {"status": "graceful stop requested", "state": str(args.state)}
         else:
             run = json.loads((args.state / "run.json").read_text())
-            if args.command == "report":
+            if args.command == "exits":
+                from .exits import choose_exit, trades_from_orders
+                j = Journal(args.state / f"journal_{args.profile}.db", args.profile, run["evidence"])
+                try: policy, result = choose_exit(trades_from_orders(j.orders()))
+                finally: j.close()
+                result = {**result, "recommended": asdict(policy)}
+            elif args.command == "report":
                 result = write_reports(args.state, run, day=args.day)
             elif args.command == "status":
                 result = json.loads((args.state / "status.json").read_text())

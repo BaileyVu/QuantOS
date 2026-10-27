@@ -232,15 +232,16 @@ class EngineTests(unittest.TestCase):
         p1 = evaluate(signal(), INS, quote(), a, Policy(), T)
         p5 = evaluate(signal(), INS, quote(), a, Policy(risk_fraction=D(".05")), T)
         self.assertTrue(p1.approved and p5.approved)
-        self.assertEqual(p5.binding_constraint, "gross_notional")
-        self.assertLessEqual(p5.notional, D(200))
-        self.assertLess(p5.achievable_risk, p5.requested_risk)
+        capped = evaluate(signal(), INS, quote(), a, Policy(risk_fraction=D(".05"), gross_fraction=D("1")), T)
+        self.assertEqual(capped.binding_constraint, "gross_notional")
+        self.assertLessEqual(capped.notional, D(200))
+        self.assertLess(capped.achievable_risk, capped.requested_risk)
         ins = replace(INS, min_notional=D(150))
         self.assertFalse(evaluate(signal(), ins, quote(), a, Policy(), T).approved)
         self.assertTrue(evaluate(signal(), ins, quote(), a, Policy(risk_fraction=D(".05")), T).approved)
 
     def test_hard_ceilings_cannot_increase(self):
-        for kwargs in ({"risk_fraction": D(".051")}, {"leverage": D(4)}, {"gross_fraction": D("1.1")}):
+        for kwargs in ({"risk_fraction": D(".051")}, {"leverage": D(4)}, {"gross_fraction": D("3.1")}, {"margin_fraction": D("1.1")}):
             with self.assertRaises(ValueError): Policy(**kwargs)
 
     def test_stop_waits_for_next_executable_quote(self):
@@ -258,3 +259,24 @@ class EngineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LeverageDecisionTests(unittest.TestCase):
+    def test_lowest_leverage_that_fits_margin_budget(self):
+        a = Account(D(200), D(200), D(200))
+        small = evaluate(signal(), INS, quote(), a, Policy(), T)               # 1% risk -> ~$83 notional
+        big = evaluate(signal(), INS, quote(), a, Policy(risk_fraction=D(".05")), T)  # 5% -> ~$415 notional
+        self.assertEqual(small.leverage, 1)
+        self.assertGreater(big.leverage, 1)
+        self.assertLessEqual(big.margin, D(100))      # margin budget = 50% of equity
+        # 3x max leverage on a 50% margin budget allows 1.5x equity of notional: the margin budget binds.
+        self.assertEqual((big.binding_constraint, big.leverage), ("margin", 3))
+        self.assertLess(big.achievable_risk, big.requested_risk)
+
+    def test_wide_stop_caps_leverage_for_liquidation_safety(self):
+        a = Account(D(200), D(200), D(200))
+        wide = evaluate(signal(stop_loss=D("85"), take_profit=D("125")), INS, quote(), a,
+                        Policy(risk_fraction=D(".05")), T)  # 15% stop: only 1x keeps liquidation 2x beyond it
+        self.assertTrue(wide.approved)
+        self.assertEqual(wide.leverage, 1)
+        self.assertFalse(evaluate(signal(stop_loss=D("50"), take_profit=D("200")), INS, quote(), a, Policy(), T).approved)
