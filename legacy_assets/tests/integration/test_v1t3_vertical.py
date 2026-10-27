@@ -37,11 +37,11 @@ class LivePaperVerticalTests(unittest.IsolatedAsyncioTestCase):
     async def test_live_adapter_buy_stop_restart_duplicate_sell(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            paper = Path("configs/paper.toml").read_text()
+            paper = Path("legacy_assets/configs/paper.toml").read_text()
             paper = paper.replace('ledger_path = "artifacts/paper/execution.jsonl"',
                                   f'ledger_path = "{root.as_posix()}/orders.jsonl"')
             (root/"paper.toml").write_text(paper)
-            config = Path("configs/paper_runtime.toml").read_text()
+            config = Path("legacy_assets/configs/paper_runtime.toml").read_text()
             config = config.replace("artifacts/paper/runtime.json", f"{root.as_posix()}/runtime.json")
             config = config.replace("artifacts/paper/minutes.jsonl", f"{root.as_posix()}/minutes.jsonl")
             (root/"runtime.toml").write_text(config)

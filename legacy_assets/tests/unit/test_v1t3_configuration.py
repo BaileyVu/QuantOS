@@ -17,16 +17,16 @@ from tests.unit.test_v1t2_evaluation import dataset
 
 class RuntimeConfigurationTests(unittest.TestCase):
     def test_valid_external_config_and_symbol_order(self):
-        config = load_paper_runtime_config("configs/paper_runtime.toml", alpha_implementation_id="test")
+        config = load_paper_runtime_config("legacy_assets/configs/paper_runtime.toml", alpha_implementation_id="test")
         self.assertEqual(config.policy.symbols, ("BTCUSDT", "ETHUSDT"))
         self.assertEqual(config.policy.mode, "paper")
         self.assertEqual(config.policy.provider_clock_skew_tolerance_ms, 1000)
 
     def test_invalid_runtime_configuration_fails_closed(self):
-        source = Path("configs/paper_runtime.toml").read_text()
+        source = Path("legacy_assets/configs/paper_runtime.toml").read_text()
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            (root/"paper.toml").write_text(Path("configs/paper.toml").read_text())
+            (root/"paper.toml").write_text(Path("legacy_assets/configs/paper.toml").read_text())
             variants = [
                 source+'unexpected = "bad"\n',
                 source.replace('mode = "paper"', 'mode = "live"'),
@@ -52,9 +52,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
     def test_zero_provider_tolerance_is_valid(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            (root/"paper.toml").write_text(Path("configs/paper.toml").read_text())
+            (root/"paper.toml").write_text(Path("legacy_assets/configs/paper.toml").read_text())
             path = root/"runtime.toml"
-            path.write_text(Path("configs/paper_runtime.toml").read_text().replace(
+            path.write_text(Path("legacy_assets/configs/paper_runtime.toml").read_text().replace(
                 "provider_clock_skew_tolerance_ms = 1000", "provider_clock_skew_tolerance_ms = 0"))
             config = load_paper_runtime_config(path, alpha_implementation_id="test")
             self.assertEqual(config.policy.provider_clock_skew_tolerance_ms, 0)

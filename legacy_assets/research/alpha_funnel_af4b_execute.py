@@ -95,11 +95,11 @@ EXPECTED_DOC_011_SHA256 = (
 EXPECTED_EVALUATION_COUNT = 11
 EVALUATOR_ID = "af4b-event-screen-tplus2-v1"
 DATA_ROOT = Path(r"G:\QuantOS-Data")
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DOC_011_PATH = REPO_ROOT / "docs/011_ALPHA_DISCOVERY_FUNNEL_AF4B_DE1.md"
 AF4B_ARTIFACT_ROOT = DATA_ROOT / "research" / "alpha-funnel-af4b"
 CANDLE_STORE_ROOT = DATA_ROOT / "research" / "phase-4c-r"
-AF3_UNIVERSE_PATH = REPO_ROOT / "research/alpha-funnel/af3b/universe.json"
+AF3_UNIVERSE_PATH = REPO_ROOT / "legacy_assets/research/alpha-funnel/af3b/universe.json"
 EXPECTED_BASE_COMMIT = "d485c7c1c9b275c51f137790e8f3e2ac62eec7cc"
 EXPECTED_AF3_UNIVERSE_ID = (
     "fee1a1e4328d2a91d2320c1696f25a97d525122de815a06a3b1ee2a231b292ed"
@@ -1206,7 +1206,7 @@ def record_execution_gate(
         "evaluator_id": EVALUATOR_ID,
         "evaluator_source_sha256": file_sha256(Path(__file__).resolve()),
         "focused_test_file_sha256": file_sha256(
-            REPO_ROOT / "tests/unit/test_af4b_development_screen.py"
+            REPO_ROOT / "legacy_assets/tests/unit/test_af4b_development_screen.py"
         ),
         "focused_tests": {
             "command": (

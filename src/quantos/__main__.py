@@ -1,6 +1,6 @@
 """Module entry point for QuantOS."""
 
-from quantos.interfaces.cli import main
+from quantos.paper.cli import main
 
 
 if __name__ == "__main__":

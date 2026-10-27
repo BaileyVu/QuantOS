@@ -7,11 +7,11 @@ from pathlib import Path
 import tomllib
 import unittest
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PRODUCTION_ROOT = PROJECT_ROOT / "src" / "quantos"
-DOMAIN_ROOT = PROJECT_ROOT / "src" / "quantos" / "domain"
-APPLICATION_ROOT = PROJECT_ROOT / "src" / "quantos" / "application"
-STORAGE_ROOT = PROJECT_ROOT / "src" / "quantos" / "infrastructure" / "storage"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PRODUCTION_ROOT = PROJECT_ROOT / "legacy_assets" / "src" / "quantos"
+DOMAIN_ROOT = PRODUCTION_ROOT / "domain"
+APPLICATION_ROOT = PRODUCTION_ROOT / "application"
+STORAGE_ROOT = PRODUCTION_ROOT / "infrastructure" / "storage"
 BINANCE_ROOT = PRODUCTION_ROOT / "infrastructure" / "binance"
 MODELS_ROOT = PRODUCTION_ROOT / "infrastructure" / "models"
 RISK_CONTRACT = DOMAIN_ROOT / "risk" / "contracts.py"
