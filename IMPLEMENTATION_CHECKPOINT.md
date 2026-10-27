@@ -344,3 +344,47 @@ Published tree8349300 matched local c32bc5a exactly; publishing via GitHub API
 preserves file-tree hashes and rename history detection. Main reviewed final diff.
 Owner was asked asynchronously to merge Part1 after CI; answer pending.
 No V4 merge authorized yet. Part2 can branch off published Part1 while waiting.
+
+## LATEST — V4 Part1 PR passed; Part2 structure prepared; quota checkpoint
+
+Part1 PR23 https://github.com/BaileyVu/QuantOS/pull/23 is OPEN, both CI checks
+SUCCESS on exact head ed54df0e881b7de3dafd3364862b55e99b2c54d3. No merge yet:
+owner's explicit approval question is pending; do not assume elapsed time approves.
+Local tests75 paper +1001 legacy passed; clean editable install/doctor passed.
+Exact legacy command: PYTHONSAFEPATH=1 PYTHONPATH=legacy_assets:legacy_assets/src
+.venv/bin/python -m unittest discover -s legacy_assets/tests -t legacy_assets.
+Part1 remote tree matches local reviewed tree. No need repeat its tests/review.
+Publish helper /tmp/quantos-v4-publish-tree.py creates tree elements reusing base
+blob hashes so mechanical moves preserve content; verify returned tree SHA matches
+local. CLI git fetch works with credential.helper= / credential.interactive=false;
+use connected GitHub for publication rather than stalled keychain helper.
+
+Current branch codex/quantos-v4-library, based on published Part1 head ed54df0.
+Separate Part2 first step complete: strategies.py converted to strategies/ package,
+one module each for unchanged EMA and Donchian, shared _reference, _registry and
+compatible __init__ exports. 6 focused strategy tests PASS; main compared all
+old/new strategy class/function ASTs, exact semantic match. Diff whitespace clean.
+No new strategies/manifests/risk/exit/runtime integration implemented yet.
+Concrete remaining checklist: docs/V4_IMPLEMENTATION_NEXT.md. Source notes retained
+in docs/V4_STRATEGY_SOURCE_NOTES.md and docs/V4_E17_SOURCE_NOTES.md. User's exit,
+no-target cost guard and E17 source approvals are recorded above; don't ask again.
+E17 source inspected: /Users/bailey12/Desktop/e17/LIVE_SPEC.md plus referenced
+local module/prereg; result JSON/hash absent, so performance claims unverified.
+Use supplied five-minute event rule and V4 USDC/profile rules, no live operations.
+
+EXACT NEXT STEP: check usage, existing user answer to Part1 merge question and git
+status. If approved and head/CI still match, merge PR23 with expected head; preserve
+Part2 branch/checkpoint. If approval pending, continue Part2 stacked on Part1.
+Implement trusted versioned manifest + extended closed-bar/event contracts first;
+then split independent strategy modules vs public universe/event adapter across at
+most2 lower-cost agents. Main implements optional-target risk/cost guards, bounded
+hold, monotonic durable trailing/channel stops, pA-only ordering, runtime/replay,
+reporting/CLI/config selection and final review. Use existing AdaptiveSizer; no new
+learner. Seeded full lifecycle and focused tests required before final full suites
+and separate Part2 PR. No parameter tuning. User must approve Part2 merge too.
+
+All subagents complete; no active tool or paper processes owned by this task.
+Paper service remains STOPPED by user request. Existing V3 data preserved; do not
+restart it. No new 72h run authorized; final deliverable includes start commands.
+Last actual quota77% used /23% remaining; reset October27 15:26:22 Vietnam
+(epoch1793089582). SAME continuation confirmed ACTIVE for15:36 after reset, no duplicate.
