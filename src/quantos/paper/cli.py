@@ -26,7 +26,7 @@ def parser():
         if name == "start": cmd.add_argument("--mode", choices=["paper"], default="paper")
         if name == "report": cmd.add_argument("--day", type=int, choices=[1, 2, 3])
         if name == "journal":
-            cmd.add_argument("--profile", choices=["p1", "p5"], default="p1")
+            cmd.add_argument("--profile", choices=["p1", "p5", "pA"], default="p1")
             cmd.add_argument("--limit", type=int, default=50)
     sub.add_parser("doctor")
     cmd = sub.add_parser("strategies"); cmd.add_argument("action", choices=["list"])

@@ -1,5 +1,5 @@
 """Single-owner paper execution state machine; no network order interface exists."""
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -25,10 +25,11 @@ class PaperEngine:
     latency_ms = 500
     participation = D(".01")
 
-    def __init__(self, journal: Journal, policy: Policy, faults: Faults | None = None):
+    def __init__(self, journal: Journal, policy: Policy, faults: Faults | None = None, adaptive=None):
         if faults is not None and journal.get("identity")["evidence"] != "synthetic":
             raise ValueError("fault injection is synthetic-only")
         self.journal, self.policy = journal, policy
+        self.adaptive = adaptive  # AdaptiveSizer for profile pA; None keeps fixed-fraction sizing
         self.faults = faults or Faults()
         self.quotes: dict[str, Quote] = {}
         self.connected = False
@@ -52,6 +53,7 @@ class PaperEngine:
             return
         first = self.journal.get("paused") != "LOSS_BREAKER"
         self.journal.set("paused", "LOSS_BREAKER")
+        if first: self.journal.set("paused_ms", now_ms)
         for o in self.active():
             if D(o["filled"]) > 0 and o["state"] != "CLOSING":
                 self._closing(o, now_ms, "LOSS_BREAKER")
@@ -132,7 +134,17 @@ class PaperEngine:
             self.journal.db.execute("INSERT INTO signals VALUES(?,?)", (signal.signal_id, now_ms))
             self.journal.event(now_ms, "SIGNAL", asdict(signal))
             self.quotes[quote.symbol] = quote
-            decision = evaluate(signal, instrument, quote, self.account(now_ms), self.policy, now_ms)
+            policy = self.policy
+            if self.adaptive is not None:
+                a = self.account(now_ms)
+                fraction, detail = self.adaptive.risk_fraction(signal.strategy_id, a.equity, a.high_water)
+                self.journal.event(now_ms, "ADAPTIVE_SIZING", {"signal_id": signal.signal_id, **detail})
+                if fraction <= 0:
+                    self.journal.event(now_ms, "REJECTED_RISK", {"signal_id": signal.signal_id,
+                                                                 "approved": False, "reason": detail["reason"]})
+                    return None
+                policy = replace(self.policy, risk_fraction=fraction)
+            decision = evaluate(signal, instrument, quote, self.account(now_ms), policy, now_ms)
             self.journal.event(now_ms, "APPROVED" if decision.approved else "REJECTED_RISK",
                                {"signal_id": signal.signal_id, **asdict(decision)})
             if not decision.approved:
@@ -349,11 +361,33 @@ class PaperEngine:
                     self.journal.event(now_ms, "FUNDING", {"id": identity, "amount": str(amount), "funding_ms": observation.time_ms})
             self.enforce_breaker(now_ms)
 
+    def _referee(self, now_ms):
+        """pA only: let the adaptive referee lift a loss-breaker pause when the evidence says bad luck has passed."""
+        if self.journal.get("paused") != "LOSS_BREAKER" or self.active():
+            return
+        since = self.journal.get("paused_ms", now_ms)
+        errors = self.journal.db.execute("SELECT COUNT(*) FROM events WHERE kind='ERROR' AND time_ms>=?",
+                                         (since,)).fetchone()[0]
+        verdict, why = self.adaptive.referee(since, errors)
+        if verdict != self.journal.get("referee_verdict"):
+            self.journal.set("referee_verdict", verdict)
+            self.journal.event(now_ms, "REFEREE", {"verdict": verdict, "reasons": why})
+        if verdict == "AUTO_RESUME":
+            equity = self.account(now_ms).equity
+            for key, value in (("high_water", str(equity)), ("day_equity", str(equity)),
+                               ("auto_resumed_ms", now_ms), ("referee_verdict", None)):
+                self.journal.set(key, value)
+            self.journal.set("paused", False)
+            self.journal.event(now_ms, "AUTO_RESUMED", {"equity": str(equity)})
+
     def tick(self, now_ms, finish=False):
         """Deadlines remain supervised even while public I/O is blocked/offline."""
         if not self.journal.get("reconciled", False):
             return
         with self.journal.transaction():
+            if self.adaptive is not None:
+                self.adaptive.learn(now_ms)
+                self._referee(now_ms)
             for o in self.active():
                 if now_ms >= o["signal"]["expires_ms"] or finish:
                     self._cancel(o, now_ms, "RUN_END" if finish else "ENTRY_TTL")

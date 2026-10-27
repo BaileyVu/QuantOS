@@ -24,6 +24,16 @@ def atomic_json(path: Path, value):
         temporary.unlink(missing_ok=True)
 
 
+def trade_result(journal: Journal, o):
+    """Net PnL (fees+funding), filled entry quantity and planned risk of one closed order."""
+    fills = journal.db.execute("SELECT * FROM fills WHERE order_id=?", (o["id"],)).fetchall()
+    funding_trade = sum((D(r[0]) for r in journal.db.execute("SELECT amount FROM funding WHERE order_id=?", (o["id"],))), D(0))
+    net = sum((D(r["pnl"]) - D(r["fee"]) for r in fills), D(0)) + funding_trade
+    quantity = sum((D(r["quantity"]) for r in fills if r["kind"] == "ENTRY"), D(0))
+    planned_risk = D(o["decision"]["achievable_risk"]) * quantity / D(o["quantity"])
+    return net, quantity, planned_risk
+
+
 def summarize(journal: Journal, start_ms=0, end_ms=2**63-1):
     events = journal.db.execute("SELECT time_ms,kind,payload FROM events WHERE time_ms>=? AND time_ms<? ORDER BY id",
                                 (start_ms, end_ms)).fetchall()
@@ -50,11 +60,7 @@ def summarize(journal: Journal, start_ms=0, end_ms=2**63-1):
     for o in journal.orders():
         if o["state"] != "CLOSED" or not start_ms <= o["closed_ms"] < end_ms:
             continue
-        fills = journal.db.execute("SELECT * FROM fills WHERE order_id=?", (o["id"],)).fetchall()
-        funding_trade = sum((D(r[0]) for r in journal.db.execute("SELECT amount FROM funding WHERE order_id=?", (o["id"],))), D(0))
-        net = sum((D(r["pnl"]) - D(r["fee"]) for r in fills), D(0)) + funding_trade
-        quantity = sum((D(r["quantity"]) for r in fills if r["kind"] == "ENTRY"), D(0))
-        planned_risk = D(o["decision"]["achievable_risk"]) * quantity / D(o["quantity"])
+        net, quantity, planned_risk = trade_result(journal, o)
         trades.append({"order_id": o["id"], "strategy": o["signal"]["strategy_id"],
                        "net_pnl": str(net), "R": str(net / planned_risk) if planned_risk else None,
                        "reason": o["close_reason"], "filled_quantity": str(quantity),
@@ -86,9 +92,12 @@ def write_reports(state: Path, run: dict, day: int | None = None, final=False):
                   "MARKET/STOP: later quote, 500ms minimum latency, adverse size-dependent impact.",
                   "Funding uses published historical timestamps; offline periods can hide price excursions.",
                   "p5 is a 5% risk ceiling; 1x exposure can bind earlier.",
+                  "pA sizes from p1's measured edge in R (quarter Kelly, capped 5%, probe 0.25% for the first 30 trades).",
                   "R divides net trade PnL by cost-inclusive approved risk of the actually filled size."],
               "profiles": {}}
-    for profile in ("p1", "p5"):
+    for profile in ("p1", "p5", "pA"):
+        if profile == "pA" and not (state / "journal_pA.db").is_file():
+            continue  # runs started before the adaptive profile existed
         if not (state / f"journal_{profile}.db").is_file():
             raise ValueError(f"missing {profile} journal; refusing to invent account state")
         j = Journal(state / f"journal_{profile}.db", profile, run["evidence"])

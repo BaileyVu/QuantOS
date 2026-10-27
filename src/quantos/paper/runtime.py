@@ -12,6 +12,7 @@ import sys
 import threading
 import time
 
+from .adaptive import AdaptiveSizer
 from .engine import PaperEngine
 from .journal import Journal
 from .market import PublicMarket, RateLimited
@@ -217,10 +218,12 @@ class Runtime:
                 caffeine = subprocess.Popen(["/usr/bin/caffeinate", "-i", "-s", "-w", str(os.getpid())],
                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             engines = []
-            for profile, fraction in (("p1", ".01"), ("p5", ".05")):
+            for profile, fraction in (("p1", ".01"), ("p5", ".05"), ("pA", ".05")):
                 j = Journal(self.state / f"journal_{profile}.db", profile)
                 journals.append(j)
-                e = PaperEngine(j, Policy(risk_fraction=D(fraction)))
+                # pA learns from p1, which takes every approved signal at a fixed 1%.
+                sizer = AdaptiveSizer(j, journals[0]) if profile == "pA" else None
+                e = PaperEngine(j, Policy(risk_fraction=D(fraction)), adaptive=sizer)
                 e.recover(now); engines.append(e)
                 with j.transaction(): j.event(now, "START" if run["restarts"] == 0 else "RESTART", {"pid": os.getpid()})
             self.record("restart", {}, now)
