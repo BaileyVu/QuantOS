@@ -374,7 +374,7 @@ class AF4BPreregistrationTests(unittest.TestCase):
         self.assertFalse(self.catalog["data_contract"]["network_acquisition_in_this_phase"])
 
     def test_32_docs_000_through_010_unchanged(self):
-        root = Path(af.__file__).resolve().parents[1]
+        root = Path(af.__file__).resolve().parents[2]
         doc_009 = "docs/009_ALPHA_DISCOVERY_FUNNEL_AF1.md"
         doc_009_lf_hash = "ad7803207d6939fd1c60e509fa7fcd6d7edc705a6280add43ec752e5b5c58644"
         actual = {}
@@ -391,14 +391,14 @@ class AF4BPreregistrationTests(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_33_production_code_and_feature_engine_unchanged(self):
-        root = Path(af.__file__).resolve().parents[1]
+        root = Path(af.__file__).resolve().parents[2]
         result = subprocess.run(
-            ["git", "diff", "--quiet", "HEAD", "--", "src/quantos"],
+            ["git", "diff", "--quiet", "HEAD", "--", "legacy_assets/src/quantos"],
             cwd=root,
             check=False,
         )
         self.assertEqual(result.returncode, 0)
-        for path in (root / "src/quantos").rglob("*.py"):
+        for path in (root / "legacy_assets/src/quantos").rglob("*.py"):
             self.assertNotIn(
                 "alpha_funnel_af4b_preregistration",
                 path.read_text(encoding="utf-8"),
@@ -426,7 +426,7 @@ class AF4BPreregistrationTests(unittest.TestCase):
                 af.write_catalog(path)
 
     def test_36_document_matches_catalog_id_family_and_hypotheses(self):
-        root = Path(af.__file__).resolve().parents[1]
+        root = Path(af.__file__).resolve().parents[2]
         document = (root / "docs/011_ALPHA_DISCOVERY_FUNNEL_AF4B_DE1.md").read_text(
             encoding="utf-8"
         )
@@ -436,9 +436,9 @@ class AF4BPreregistrationTests(unittest.TestCase):
             self.assertIn(hypothesis["hypothesis_id"], document)
 
     def test_37_parent_research_hashes_match_authoritative_artifacts(self):
-        root = Path(af.__file__).resolve().parents[1]
+        root = Path(af.__file__).resolve().parents[2]
         for parent in af.PARENT_RESEARCH:
-            value = json.loads((root / parent["path"]).read_bytes())
+            value = json.loads((root / "legacy_assets" / parent["path"]).read_bytes())
             self.assertEqual(
                 af.digest(af.canonical_json_bytes(value)), parent["sha256"]
             )

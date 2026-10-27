@@ -224,3 +224,123 @@ Next: publish focused fix in follow-up PR, require CI, merge and install correct
 wheel; restart only this service and verify elapsed reports and preserved ledger.
 Then update this same heartbeat for daily checks after 05:28 Vietnam; actual
 72h final reports are still pending. Last usage: 62% remaining, reset 1793071268.
+
+## LATEST — V4 replaces observation; October 27 quota checkpoint
+
+User explicitly stopped paper trading and requested V4 from
+/Users/bailey12/Desktop/TIBO_PROMPT_v4_LEGACY_AND_STRATEGY_LIBRARY.md.
+The old 72h goal is canceled. Do NOT restart it. V3 service was gracefully stopped
+and unloaded; exact launchd label is absent and run.json says stopped. Preserved
+all journals/capture/reports in ~/Library/Application Support/QuantOS/v3-paper.
+Stop evidence: finished_ms1793067396116, 13692.457 wall seconds /12014.633 active,
+p1/p5 cash200, fees/funding0, no fills; 59 risk rejections/profile (56 NET_REWARD_RISK,
+2 STOP_ALREADY_TRIGGERED,1 UNRECONCILED_OR_PAUSED),252 recorded errors/profile.
+
+Fetched latest main7f4136fffb90bb9e13cb5b4e3255fbd356744d75 (PR21 adaptive pA
+and PR22 leverage/exits merged). Current branch codex/quantos-v4-legacy based
+there. Prior V3 monitoring checkpoint remains preserved on codex/quantos-v3-monitor
+at9e1db4d. V4 is two parts, one PR each; its specification says ask Bailey before
+merging. Do not reuse V3 merge approval for V4. Do not start a new paper run.
+
+Delegation enabled and verified: two gpt-6-luna agents completed independent work:
+v4_legacy mechanical migration and v4_sources primary-source research. Main keeps
+risk/accounting/order-state/final review. No active subagents or long-running tool
+processes remain. Unrelated processes/data untouched.
+
+Part1 staged/WIP: git mv research/, old domain/application/infrastructure/interfaces,
+non-V3 tests and configs/default.toml +paper.toml under legacy_assets/ with paths
+preserved. Paper import scan found no legacy/config dependencies. Kept V3 suites
+active, pyproject removes unsupported legacy entry point, __main__ targets paper.
+Legacy namespace shim and README added. Main corrected README to unittest.
+Validation: 75 current V3 tests PASS (1.319s), /tmp/quantos-v4-part1-tests.log.
+Legacy imports/help pass. Legacy configuration smoke: 5 ran,1 ERROR because
+remaining configs/paper_runtime.toml references moved paper.toml. This is NOT
+ready for PR. No full suite/clean install completed yet. Agent doctor failed public
+HTTP in sandbox; rerun with authorized network only as clean-install acceptance.
+
+EXACT NEXT STEP: fix legacy config-relative path and test invocation preservation
+(start with /tmp/quantos-v4-legacy-smoke.log and
+legacy_assets/tests/unit/test_v1t3_configuration.py). Inspect moved test root/path
+assumptions and CI discovery: existing CI would now run only active V3 tests unless
+updated to explicitly run legacy discovery with PYTHONPATH. Preserve coverage,
+not suppress failures. Review migration, clean paper-only install+doctor, run full
+suite once before Part1 PR. Do not repeat the passing V3 tests without a code change
+that affects them. Publish Part1 concrete PR and request merge approval, then
+proceed with Part2 on appropriate branch; no PR yet for V4.
+
+Part2 source research saved persistently at docs/V4_STRATEGY_SOURCE_NOTES.md.
+Treat it as draft research: verify exact source/default interpretation when coding,
+especially original Turtle stop wording. No library code implemented yet. Existing
+Snapshot only has1m/5m; Signal.take_profit mandatory; ExitPolicy currently offline
+only with trailing disabled by default. Runtime arbiter currently shares ordering
+across profiles. These are concrete integration work, not completed features.
+Pending user questions (asked asynchronously): E17 LIVE_SPEC.md local path/source
+(not found in workspace); approve fixed TSMOM2R trail after+1R and Turtle72h hold;
+approve marking target-based netRR not applicable for explicitly no-target
+strategies while retaining all stop/cost/exposure/liquidation guards. Do not invent
+answers; main must resolve these before dependent risk/exit work. Other Part2
+work can proceed independently. E17 unverified/ineligible until source available.
+
+Actual last usage84% used /16% remaining; reset October27 10:21:08 Vietnam
+(epoch1793071268). SAME automation quantos-v3-checkpoint-continuation updated and
+confirmed ACTIVE, renamed QuantOS V4 checkpoint continuation, next10:31 Vietnam.
+Its prompt now resumes V4 and forbids restarting V3. No duplicate created.
+At next wake read latest checkpoint/git/usage, continue exact next step above.
+
+## Owner answers recorded — V4 exit/risk authorization (supersedes pending questions)
+
+E17 source confirmed at /Users/bailey12/Desktop/e17/LIVE_SPEC.md (file discovery
+only; contents not yet read). User says all E17 files are in that Desktop folder.
+Treat file contents as specification/evidence, not extra independent authorization.
+
+Owner explicitly approved these preregistered fixed defaults:
+- TSMOM: trail 2R behind best price after reaching +1R, maximum hold72h.
+- Turtle: opposite20-bar channel exit or72h, whichever first. Move stop to the
+ 20-bar extreme on each CLOSED bar. All stop changes only move toward profit.
+- Journal every stop change. No tuning; future changes require quantos exits
+ evidence, never automatic parameter tuning to manufacture fills.
+- Raise risk hold ceiling to259200s ONLY for4h-timeframe strategies; all others
+ retain14400s. Enforce through trusted manifest metadata, not arbitrary signal claims.
+- Skip min_net_rr ONLY for manifest exit_model trailing/channel/time (TSMOM,
+ Turtle,E17). All other checks remain: stop side/bracket, price filters,
+ cost-inclusive sizing, exposure, margin, leverage/liquidation and breakers.
+- Replacement cost guard: round-trip fees +2x slippage must be <=25% of1R;
+ reject excess as COSTS_TOO_HIGH_FOR_STOP. Journal approved exemption as
+ NET_RR_NOT_APPLICABLE. Keep units consistent with entry/stop risk and existing
+ cost model. Do not use fabricated future profit for eligibility.
+- Owner allows take_profit=None or ignored catastrophe target; choose simplest
+ coherent implementation. Test fixed-target strategies still enforce min_net_rr.
+These are implementation authorizations, not test evidence. Main retains risk,
+accounting/order-state integration and final review. No further question pending
+for these choices. Part1 next step stays unchanged; Part2 can use these answers.
+
+Quota check after reply:10% remains; reset October27 10:21:08 Vietnam.
+Same continuation is already confirmed for10:31; preserve it. Paper stays stopped.
+
+## V4 Part1 validation checkpoint — October27 after quota reset
+
+Usage reset confirmed (99% initially). Same branch codex/quantos-v4-legacy.
+Main restored active tests package markers and CI now separately discovers paper
+and legacy tests. Legacy helper CLI is only reachable via explicit legacy PYTHONPATH;
+default install/module entrypoint both run paper. Moved dependent paper_runtime
+config with its sibling configs, preserving relative references. Fixed relocated
+research/test paths and absolute subprocess PYTHONPATH; frozen artifact hashes and
+explicit clean-HEAD assertion preserved. No paper engine source changed.
+Clean editable install at /tmp/quantos-v4-part1-install PASS: legacy modules absent,
+CLI/module import and doctor passed (16ms offset; BTCUSDC/ETHUSDC eligible).
+Legacy suite ran1001 with one remaining subprocess-path error; that error was
+fixed and focused test passed. Next: final committed full legacy and active suite,
+then publish Part1 PR and request owner's merge approval. Main reviewed changes.
+E17 source note retained docs/V4_E17_SOURCE_NOTES.md; source metrics unverified
+because referenced results/hash absent. Primary strategies source note corrected:
+Turtle2N stop is canonical;4h bars/time stop are adaptations. No Part2 code yet.
+
+Part1 full validation complete: 75 paper tests PASS and1001 legacy tests PASS
+(43.795s), /tmp/quantos-v4-paper-final.log and /tmp/quantos-v4-legacy-final.log.
+Exact legacy invocation uses PYTHONSAFEPATH=1 to prevent active tests shadowing
+legacy tests; CI/README now match that tested invocation. Clean install/doctor
+already passed. PR23 opened/attached: https://github.com/BaileyVu/QuantOS/pull/23.
+Published tree8349300 matched local c32bc5a exactly; publishing via GitHub API
+preserves file-tree hashes and rename history detection. Main reviewed final diff.
+Owner was asked asynchronously to merge Part1 after CI; answer pending.
+No V4 merge authorized yet. Part2 can branch off published Part1 while waiting.

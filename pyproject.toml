@@ -20,7 +20,6 @@ research = [
 
 [project.scripts]
 quantos = "quantos.paper.cli:main"
-quantos-legacy = "quantos.interfaces.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

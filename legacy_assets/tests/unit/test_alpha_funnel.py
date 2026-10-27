@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_DOWN, ROUND_UP, localcontext
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -1149,10 +1150,15 @@ assert json.loads(artifact.results_bytes())["run_id"] == artifact.run_id
 print(artifact.run_id)
 '''
         repository = Path(__file__).resolve().parents[2]
+        environment = os.environ.copy()
+        environment["PYTHONPATH"] = os.pathsep.join(
+            (str(repository), str(repository / "src"), environment.get("PYTHONPATH", ""))
+        )
         with TemporaryDirectory() as temporary:
             created = subprocess.run(
                 [sys.executable, "-B", "-c", process_a, temporary],
                 cwd=repository,
+                env=environment,
                 check=True,
                 capture_output=True,
                 text=True,
@@ -1161,6 +1167,7 @@ print(artifact.run_id)
             loaded = subprocess.run(
                 [sys.executable, "-B", "-c", process_b, temporary, run_id],
                 cwd=repository,
+                env=environment,
                 check=True,
                 capture_output=True,
                 text=True,

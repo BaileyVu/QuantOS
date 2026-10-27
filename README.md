@@ -76,11 +76,13 @@ runtime evidence, unresolved work, commits and next action.
 ```bash
 python -m pip install '.[research]'
 python -m unittest discover -s tests -t .
+PYTHONSAFEPATH=1 PYTHONPATH=legacy_assets:legacy_assets/src python -m unittest discover -s legacy_assets/tests -t legacy_assets
 ```
 
 The retained historical research suite requires its pinned optional dependencies.
 One historical preregistration test requires a clean committed production tree;
 run the complete suite after committing reviewed implementation changes.
-The original CLI remains `quantos-legacy` and its documentation is preserved in
-[docs/LEGACY_V1_README.md](docs/LEGACY_V1_README.md). The V3 default CLI imports only
-`quantos.paper`; historical research cannot submit an order through it.
+The frozen V1 implementation and research are preserved in
+[legacy_assets/](legacy_assets/README.md), outside the default installation.
+The historical CLI documentation remains in [docs/LEGACY_V1_README.md](docs/LEGACY_V1_README.md).
+The supported `quantos` and `python -m quantos` entry points run the paper engine.
