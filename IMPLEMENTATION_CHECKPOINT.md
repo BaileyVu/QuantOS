@@ -388,3 +388,5 @@ Paper service remains STOPPED by user request. Existing V3 data preserved; do no
 restart it. No new 72h run authorized; final deliverable includes start commands.
 Last actual quota77% used /23% remaining; reset October27 15:26:22 Vietnam
 (epoch1793089582). SAME continuation confirmed ACTIVE for15:36 after reset, no duplicate.
+Final quota check83% used /17% remaining. Strategy split committed7c5d6cb;
+working tree clean. Continuation15:36 confirmed by automation tool, reset15:26:22.
