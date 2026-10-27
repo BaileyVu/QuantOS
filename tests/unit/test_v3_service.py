@@ -16,7 +16,8 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(plist["Label"], service.LABEL)
         self.assertEqual(plist["ProgramArguments"], [
             os.path.abspath(root/"venv/bin/python"), "-m", "quantos.paper.cli", "start",
-            "--mode", "paper", "--state", str((root/"state/run.db").resolve()), "--hours", "72"])
+            "--mode", "paper", "--state", str((root/"state/run.db").resolve()),
+            "--min-quote-volume", "20000000", "--hours", "72"])
         self.assertTrue(plist["RunAtLoad"])
         self.assertEqual(plist["KeepAlive"], {"SuccessfulExit": False})
         self.assertEqual(plist["ExitTimeOut"], 45)

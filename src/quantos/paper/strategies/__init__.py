@@ -26,3 +26,13 @@ __all__ = [
     "strategy_registry", "_atr", "_bars", "_ceil_tick", "_ema",
     "_floor_tick", "_id", "_signal",
 ]
+
+
+def library():
+    """Preregistered paper strategies; references retain their historical IDs."""
+    from .tsmom_4h import Tsmom4hStrategy
+    from .turtle_55 import Turtle55Strategy
+    from .vol_squeeze_breakout import VolSqueezeBreakoutStrategy
+    from .delist_short_e17 import DelistShortE17Strategy
+    return (EmaAtrLimitStrategy(), DonchianAtrStopStrategy(), Tsmom4hStrategy(),
+            Turtle55Strategy(), VolSqueezeBreakoutStrategy(), DelistShortE17Strategy())

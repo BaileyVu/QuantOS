@@ -14,6 +14,7 @@ from .types import Candle, D, Funding, Instrument, Quote, Trade
 BASE = "https://fapi.binance.com"
 ENDPOINTS = {
     "/fapi/v1/exchangeInfo", "/fapi/v1/time", "/fapi/v1/klines",
+    "/fapi/v1/ticker/24hr",
     "/fapi/v1/ticker/bookTicker", "/fapi/v1/premiumIndex",
     "/fapi/v1/aggTrades", "/fapi/v1/fundingRate",
 }
@@ -135,6 +136,9 @@ class PublicMarket:
                 continue
             by = {f.get("filterType"): f for f in filters if isinstance(f, dict)}
             try:
+                base_asset = item.get("baseAsset", sym[:-4])
+                if not isinstance(base_asset, str) or not base_asset:
+                    continue
                 p, l, ml, mn, pp = (by[x] for x in ("PRICE_FILTER", "LOT_SIZE", "MARKET_LOT_SIZE", "MIN_NOTIONAL", "PERCENT_PRICE"))
                 instrument = Instrument(sym, item["marginAsset"], item["status"],
                     _decimal(p["tickSize"], "tick"), _decimal(l["stepSize"], "step"),
@@ -143,7 +147,8 @@ class PublicMarket:
                     _decimal(p["minPrice"], "minPrice"), _decimal(p["maxPrice"], "maxPrice"),
                     _decimal(ml["stepSize"], "marketStep"), _decimal(ml["minQty"], "marketMinQty"),
                     _decimal(ml["maxQty"], "marketMaxQty"), _decimal(pp["multiplierUp"], "multiplierUp"),
-                    _decimal(pp["multiplierDown"], "multiplierDown"))
+                    _decimal(pp["multiplierDown"], "multiplierDown"),
+                    base_asset)
                 if any(v <= 0 for v in (instrument.tick, instrument.step, instrument.min_qty,
                     instrument.max_qty, instrument.min_notional, instrument.market_step,
                     instrument.market_min_qty, instrument.market_max_qty, instrument.multiplier_up,
@@ -154,16 +159,46 @@ class PublicMarket:
                 continue
         return {s: found[s] for s in sorted(found, key=lambda x: (x not in {"BTCUSDC", "ETHUSDC"}, x))}
 
+    def eligible_instruments(self, min_quote_volume: Decimal = D("20000000")) -> dict[str, Instrument]:
+        """Return TRADING USDC perpetuals meeting the 24h quote-turnover floor."""
+        floor = _decimal(min_quote_volume, "min_quote_volume")
+        if floor < 0:
+            raise ValueError("min_quote_volume must be non-negative")
+        instruments = self.exchange_info()
+        rows = self._get("/fapi/v1/ticker/24hr")
+        if not isinstance(rows, list):
+            raise ValueError("malformed ticker24hr")
+        volumes: dict[str, Decimal] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ValueError("malformed ticker24hr row")
+            symbol = row.get("symbol")
+            if not isinstance(symbol, str) or not symbol:
+                raise ValueError("malformed ticker24hr symbol")
+            volume = _decimal(row.get("quoteVolume"), "quoteVolume")
+            if volume < 0:
+                raise ValueError("negative quoteVolume")
+            if symbol in volumes:
+                raise ValueError("duplicate ticker24hr symbol")
+            volumes[symbol] = volume
+        return {
+            symbol: instrument
+            for symbol, instrument in instruments.items()
+            if instrument.status == "TRADING" and volumes.get(symbol, D(-1)) >= floor
+        }
+
     def server_time(self) -> int:
         data = self._get("/fapi/v1/time")
         return _int(data["serverTime"], "serverTime")
 
     def candles(self, symbol: str, interval: str, now_ms: int, limit: int = 100) -> tuple[Candle, ...]:
-        if interval not in {"1m", "5m"} or not 1 <= limit <= 1500:
+        widths = {"1m": 60_000, "5m": 300_000, "1h": 3_600_000,
+                  "4h": 14_400_000, "1d": 86_400_000}
+        if interval not in widths or not 1 <= limit <= 1000:
             raise ValueError("unsupported candle request")
         rows = self._get("/fapi/v1/klines", {"symbol": symbol, "interval": interval, "limit": limit})
         if not isinstance(rows, list): raise ValueError("malformed klines")
-        width = 60000 if interval == "1m" else 300000
+        width = widths[interval]
         out = []
         now_open = now_ms - (now_ms % width)
         for r in rows:
@@ -185,18 +220,65 @@ class PublicMarket:
     def quote(self, symbol: str) -> Quote:
         b = self._get("/fapi/v1/ticker/bookTicker", {"symbol": symbol})
         m = self._get("/fapi/v1/premiumIndex", {"symbol": symbol})
-        received = self._clock_ms()
+        return self._make_quote(symbol, b, m, self._clock_ms())
+
+    @staticmethod
+    def _make_quote(symbol: str, b: object, m: object, received: int) -> Quote:
+        if not isinstance(b, dict) or not isinstance(m, dict):
+            raise ValueError("malformed quote row")
         if b.get("symbol") != symbol or m.get("symbol") != symbol:
             raise ValueError("quote symbol mismatch")
-        bid, ask = _decimal(b["bidPrice"], "bid"), _decimal(b["askPrice"], "ask")
-        bq, aq = _decimal(b["bidQty"], "bidQty"), _decimal(b["askQty"], "askQty")
-        mark = _decimal(m["markPrice"], "mark")
-        ts = _int(b["time"], "bookTime")
-        mark_ts = _int(m["time"], "markTime")
+        try:
+            bid, ask = _decimal(b["bidPrice"], "bid"), _decimal(b["askPrice"], "ask")
+            bq, aq = _decimal(b["bidQty"], "bidQty"), _decimal(b["askQty"], "askQty")
+            mark = _decimal(m["markPrice"], "mark")
+            ts = _int(b["time"], "bookTime")
+            mark_ts = _int(m["time"], "markTime")
+        except KeyError:
+            raise ValueError("malformed quote row") from None
         if (any(v <= 0 for v in (bid, ask, bq, aq, mark)) or bid > ask
                 or not 0 <= received-ts <= 5000 or not 0 <= received-mark_ts <= 5000):
             raise ValueError("invalid or stale quote")
         return Quote(symbol, ts, received, bid, ask, bq, aq, mark, mark_ts)
+
+    def quotes(self, symbols, *, skip_invalid=False) -> dict[str, Quote]:
+        """Fetch one public book batch and one mark batch, then validate requested quotes."""
+        requested = tuple(symbols)
+        if (not requested or any(not isinstance(symbol, str) or not symbol for symbol in requested)
+                or len(requested) != len(set(requested))):
+            raise ValueError("quote symbols must be non-empty and unique")
+        requested_set = set(requested)
+        books = self._get("/fapi/v1/ticker/bookTicker")
+        marks = self._get("/fapi/v1/premiumIndex")
+        received = self._clock_ms()
+        book_rows = self._requested_quote_rows(books, requested_set, "bookTicker")
+        mark_rows = self._requested_quote_rows(marks, requested_set, "premiumIndex")
+        result = {}
+        for symbol in requested:
+            try:
+                result[symbol] = self._make_quote(symbol, book_rows[symbol], mark_rows[symbol], received)
+            except ValueError:
+                if not skip_invalid:
+                    raise
+        return result
+
+    @staticmethod
+    def _requested_quote_rows(rows: object, requested: set[str], endpoint: str) -> dict[str, dict]:
+        if not isinstance(rows, list):
+            raise ValueError(f"malformed {endpoint} batch")
+        found: dict[str, dict] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            symbol = row.get("symbol")
+            if not isinstance(symbol, str) or symbol not in requested:
+                continue
+            if symbol in found:
+                raise ValueError(f"duplicate {endpoint} symbol")
+            found[symbol] = row
+        if found.keys() != requested:
+            raise ValueError(f"missing {endpoint} symbol")
+        return found
 
     def trades(self, symbol: str, from_id: int | None = None, start_ms: int | None = None) -> tuple[Trade, ...]:
         if (from_id is None) == (start_ms is None): raise ValueError("specify exactly one trade cursor")

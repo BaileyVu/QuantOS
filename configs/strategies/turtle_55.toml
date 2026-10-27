@@ -1,0 +1,10 @@
+[strategy]
+id = "turtle_55"
+version = "1.0.0"
+
+[parameters]
+entry_bars = 55
+exit_bars = 20
+atr_period = 20
+stop_atr = 2
+atr_smoothing = "Wilder"

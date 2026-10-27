@@ -403,3 +403,73 @@ Next step is Part2 manifest/contracts per docs/V4_IMPLEMENTATION_NEXT.md, not
 another Part1 approval or review. Usage12% remaining at start of this approval
 turn; defer further implementation to confirmed15:36 continuation after15:26:22
 Vietnam reset. Paper remains stopped; no active task processes or subagents.
+
+## LATEST — October27 Part2 initial integration, not release-ready
+
+Branch codex/quantos-v4-library; base checkpoint8210583, merged Part1 main5b094311
+retained. Part1 PR23 is merged/approved, do not recheck it unnecessarily. No Part2
+PR yet; user approval needed only after concrete tested Part2 PR exists.
+
+Completed this phase:
+- Main added immutable versioned manifest registry (6 canonical IDs, legacy ref
+ aliases), extended Snapshot1h/4h/1d +DelistEvent/current-minute trade evidence,
+ optional target and regime fields. Existing reference strategy IDs retained.
+- Two lower-cost agents implemented four new strategies (TSMOM/Turtle/squeeze/E17),
+ closed-bar/Wilder helpers, public universe/ticker and batchquotes/CMS adapter,
+ read-only strategies list with actual pA state,6 strict preregistered TOML configs.
+- Main integrated trusted-manifest hold/target rules:72h only4h strategies;
+ no-target cost guard<=25% of raw stop1R; exemption/rejection reasons journaled.
+ Fixed-target min_net_rr remains enforced. Other sizing/filter/liquidation guards
+ retained. Optional target means no fake target/protection.
+- Main implemented durable monotonic stop_price distinct from original risk,
+ +1R activation/2R trailing, closed4h20-bar channel update, STOP_UPDATED events,
+ recovery reconciliation against stop history, no-target exits and Instrument
+ base_asset decoding. Tested long/short, partial fill/restart, corrupt stop state.
+- Main added pA-only mu/sqrt(m2) ordering after learning, hold/id tie breakers,
+ deterministic p1/p5 unchanged, closed daily EMA50 slope +ATR14 percentile90 tags
+ (UNKNOWN if history unavailable, never filters).
+- Main wired schema2 replay extended bars/events and shared scan dispatch, runtime
+ cached bars +4 bounded fetch workers/fresh batchquotes, selected-universe
+ scans, announcement diagnostics,5 subscription feed workers (baselineBTC/ETH
+ plus up to3 held symbols), persisted volume floor and held-symbol recovery.
+ Added configurable volume floor CLI/launchd plumbing. NO service was started.
+
+Validation:112 current V3/V4 paper tests PASS in1.356s,
+/tmp/quantos-v4-integrated-final.log. This includes tests added by agents and main.
+Earlier focused risk+engine38 PASS, runtime/service11 PASS. Initial service fixture
+needed expected new volume-floor args; corrected then full paper subset passed.
+Source tests manually reviewed for selected issues: Turtle corrected to prior55
+boundary +/-tick (completedbreakout confirmation), E17 exactsourceURL/event symbol,
+TSMOM fixedbar-based expiry. New strategies are unproven paper references; E17 is
+FRAGILE_SOURCE_ONLY (provided source results/hash absent). Agents all complete.
+
+EXACT NEXT STEP: finish main financial/integration review, starting with potential
+fill-time cost guard gap: pre-entry no-target cost/stop ratio is checked, but a
+favorable executable-price gap can shorten actual stop distance and raise ratio
+above25% even while fill_risk<=approved. Add deterministic regression and enforce
+COSTS_TOO_HIGH_FOR_STOP before fill without relaxing other checks. Check optional
+stop recovery/corrupt history and trustedmanifest/version handling comprehensively.
+Then finish:
+1. Add scanner tests for cache refresh, fresh batched arbitration, bounded held
+ subscriptions after universe changes/restart, per-symbol stale quote skipping,
+ event polling/diagnostics and rate limits. This runtime path is not yet validated
+ by public observation; do NOT start paper trading. Read-only doctor allowed.
+2. Seeded demo must exercise ALL6 library strategies through risk/entry/protection/
+ exit and account reconciliation; current demo still has original reference/fault
+ scenarios. Add natural-format replay lifecycle tests for new strategies/stopchanges.
+3. Review manifests versus exact implementation constants (including signal
+ windows and alias semantics); review E17 against suppliedspec +V4 overrides.
+ No tuning, no verifiedperformance claim. Read-only listing/config tests pass.
+4. Complete README/acceptance docs, strategy evidence table and NEW state-directory
+ p1/p5/pA run commands. Do not reuse stopped V3 state or launch automatically.
+5. Final main diff/financial review, committed full suites (paper plus legacy),
+ clean install/doctor, one Part2 PR, current-head CI then ask owner before merge.
+No repeat completed Part1 research/tests except required final full-suite gate.
+
+Current staged changes are initial implementation, not final-approved/deployed.
+No active subagents/tool processes or owned paper process. Existing user's V3
+journals/reports remain stopped/preserved, unrelated processes untouched.
+Actual usage80% used/20% remaining five-hour; resets Oct27 20:35:27 Vietnam
+(epoch1793108127). Weekly83% used/17% remaining; resets Nov2 13:51:19 Vietnam
+(epoch1793602279). Check both windows next turn. Same continuation to20:45 after
+five-hour reset; do not create duplicate or revive V3 monitor.

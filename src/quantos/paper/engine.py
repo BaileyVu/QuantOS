@@ -3,10 +3,12 @@ from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 import json
+from decimal import InvalidOperation
 
 from .journal import Journal
 from .risk import Account, Policy, evaluate, valid_quote, quantity_step
 from .types import D, Funding, Instrument, Quote, Signal, Trade, floor_step
+from .strategies.manifest import manifest_for
 
 TERMINAL = {"CLOSED", "CANCELED", "EXPIRED", "REJECTED"}
 
@@ -111,6 +113,20 @@ class PaperEngine:
                         errors.append("AVERAGE_PRICE_MISMATCH")
                         continue
                 if D(o["filled"]) > 0:
+                    # A persisted stop must agree with its durable update history.
+                    latest = self.journal.db.execute(
+                        "SELECT payload FROM events WHERE kind='STOP_UPDATED' "
+                        "AND json_extract(payload,'$.id')=? ORDER BY id DESC LIMIT 1", (o["id"],)).fetchone()
+                    expected = json.loads(latest[0])["new_stop"] if latest else o["signal"]["stop_loss"]
+                    try:
+                        current = D(o.get("stop_price", o["signal"]["stop_loss"]))
+                        valid = (current.is_finite() and current == D(expected)
+                                 and (current-D(o["signal"]["stop_loss"]))*D(o["direction"]) >= 0)
+                    except (InvalidOperation, ValueError, TypeError):
+                        valid = False
+                    if not valid:
+                        errors.append("STOP_STATE_MISMATCH")
+                        continue
                     o["remaining"] = "0"
                     if o["state"] in TERMINAL:
                         errors.append("TERMINAL_WITH_EXPOSURE")
@@ -160,6 +176,8 @@ class PaperEngine:
                                {"signal_id": signal.signal_id, **asdict(decision)})
             if not decision.approved:
                 return None
+            if decision.reason == "NET_RR_NOT_APPLICABLE":
+                self.journal.event(now_ms, decision.reason, {"signal_id": signal.signal_id})
             order_id = hashlib.sha256(f"{self.journal.profile}:{signal.signal_id}".encode()).hexdigest()[:32]
             order = {"id": order_id, "signal": asdict(signal), "instrument": asdict(instrument),
                      "decision": asdict(decision), "quantity": str(decision.quantity),
@@ -169,6 +187,7 @@ class PaperEngine:
                      "eligible_ms": now_ms + self.latency_ms, "first_fill_ms": None,
                      "last_trade_id": -1, "queue": str(decision.quantity),
                      "stop_active": False, "target_active": False,
+                     "stop_price": str(signal.stop_loss),
                      "last_mark": str(quote.mark), "trigger_ms": None}
             self.journal.save(order)
             self.journal.event(now_ms, "CREATED", {"id": order_id})
@@ -187,16 +206,65 @@ class PaperEngine:
         return order_id
 
     def _protect(self, o, now_ms):
-        if self.faults.reject_stop or self.faults.reject_target:
+        has_target = o["signal"]["take_profit"] is not None
+        if self.faults.reject_stop or (has_target and self.faults.reject_target):
             o["stop_active"] = o["target_active"] = False
             self.journal.set("paused", "PROTECTION_REJECTED")
             self.journal.event(now_ms, "PROTECTION_REJECTED", {"id": o["id"]})
             self._closing(o, now_ms, "PROTECTION_FAILURE")
         else:
-            o["stop_active"] = o["target_active"] = True
+            o["stop_active"] = True
+            o["target_active"] = has_target
             o["state"] = "PROTECTED"
             self.journal.event(now_ms, "PROTECTED", {"id": o["id"], "quantity": o["filled"],
-                                                     "stop_id": o["id"] + "-sl", "target_id": o["id"] + "-tp"})
+                                                     "stop_id": o["id"] + "-sl",
+                                                     "target_id": o["id"] + "-tp" if has_target else None})
+
+    def _tighten_stop(self, o, candidate, now_ms, reason, bar_ms=None):
+        tick = D(o["instrument"]["tick"])
+        long = o["direction"] == "1"
+        candidate = floor_step(candidate, tick) if long else -floor_step(-candidate, tick)
+        old = D(o.get("stop_price", o["signal"]["stop_loss"]))
+        if (not candidate.is_finite()
+                or not D(o["instrument"]["min_price"]) <= candidate <= D(o["instrument"]["max_price"])
+                or (candidate-old)*D(o["direction"]) <= 0):
+            return
+        o["stop_price"] = str(candidate)
+        self.journal.event(now_ms, "STOP_UPDATED", {"id": o["id"], "old_stop": str(old),
+            "new_stop": str(candidate), "reason": reason, "closed_bar_ms": bar_ms})
+
+    def channel_stops(self, snapshot, now_ms):
+        """Only completed, contiguous 4h bars can tighten a channel protection."""
+        from .strategies.indicators import closed_bars
+        bars = closed_bars(snapshot, "4h", 20)
+        if bars is None or snapshot.at_ms > now_ms or not self.journal.get("reconciled", False):
+            return
+        with self.journal.transaction():
+            for o in self.active():
+                s = o["signal"]
+                m = manifest_for(s["strategy_id"], s["strategy_version"])
+                if (s["symbol"] != snapshot.instrument.symbol or not m or m.exit_model != "channel"
+                        or D(o["filled"]) <= 0 or o["state"] == "CLOSING"
+                        or bars[-1].close_ms <= o.get("channel_bar_ms", o["first_fill_ms"])):
+                    continue
+                price = min(c.low for c in bars[-20:]) if s["side"] == "LONG" else max(c.high for c in bars[-20:])
+                self._tighten_stop(o, price, now_ms, "CHANNEL", bars[-1].close_ms)
+                o["channel_bar_ms"] = bars[-1].close_ms
+                self.journal.save(o)
+
+    def _trailing_stop(self, o, q, now_ms):
+        s = o["signal"]
+        m = manifest_for(s["strategy_id"], s["strategy_version"])
+        if not m or m.exit_model != "trailing":
+            return
+        direction, entry = D(o["direction"]), D(o["average"])
+        risk = abs(entry-D(s["stop_loss"]))
+        price = q.bid if direction > 0 else q.ask
+        best = D(o.get("best_exit_price", o["average"]))
+        best = max(best, price) if direction > 0 else min(best, price)
+        o["best_exit_price"] = str(best)
+        if risk > 0 and (best-entry)*direction >= risk:
+            self._tighten_stop(o, best-direction*D(2)*risk, now_ms, "TRAILING")
 
     def _entry_fill(self, o, quantity, price, now_ms, source, maker):
         quantity = min(quantity, D(o["remaining"]))
@@ -240,7 +308,7 @@ class PaperEngine:
                     o["queue"] = str(max(D(0), queue - available))
                     available = max(D(0), available - queue)
                     filters = o["instrument"]
-                    ins = Instrument(**{k: v if k in {"symbol", "margin_asset", "status"} else D(v)
+                    ins = Instrument(**{k: v if k in {"symbol", "margin_asset", "status", "base_asset"} else D(v)
                                         for k, v in filters.items()})
                     quantity = floor_step(available, quantity_step(ins))
                     self._entry_fill(o, quantity, D(s["entry_price"]), now_ms, f"trade-{trade.trade_id}", True)
@@ -315,8 +383,10 @@ class PaperEngine:
                     self._exit(o, q, now_ms)
                 elif D(o["filled"]) > 0 and o["state"] != "CLOSING":
                     long = s["side"] == "LONG"
-                    stop = q.mark <= D(s["stop_loss"]) if long else q.mark >= D(s["stop_loss"])
-                    target = q.bid >= D(s["take_profit"]) if long else q.ask <= D(s["take_profit"])
+                    self._trailing_stop(o, q, now_ms)
+                    level = D(o.get("stop_price", s["stop_loss"]))
+                    stop = q.mark <= level if long else q.mark >= level
+                    target = s["take_profit"] is not None and (q.bid >= D(s["take_profit"]) if long else q.ask <= D(s["take_profit"]))
                     if stop or target or now_ms >= o["first_fill_ms"] + s["maximum_hold_seconds"] * 1000:
                         self._closing(o, now_ms, "SL" if stop else "TP" if target else "TIME_EXIT")
                 elif (self.entry_allowed() and o["state"] not in TERMINAL and D(o["remaining"]) > 0

@@ -1,0 +1,11 @@
+[strategy]
+id = "ema_atr_ref"
+version = "1.0.0"
+
+[parameters]
+fast_ema = 20
+slow_ema = 50
+atr_period = 14
+pullback_atr = 0.25
+stop_atr = 1.5
+target_atr = 2.0
