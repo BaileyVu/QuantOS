@@ -484,3 +484,27 @@ all6 library demo:18 profile cases,15 closed/3 pA minimum-size rejections, exact
 cash/fill/stop-update replay comparisons. Main-reviewed newsource,111+ paper tests
 and final scanner tests ready; final committed tests next. Docs V4_ACCEPTANCE.md
 maps claims totests. Part2 not published yet. No task/service processes remain.
+
+## V4 Part2 ready for PR — October27 evening validation complete
+
+Main financial/final review complete. Favorable-fill cost bypass closed; newentry
+universe/spread gates no longer block held channelstop maintenance. Added explicit
+shutdown cancellation between cached frame requests (commit697eead) so queued
+warmup tasks do not drain after stop. All117 paper tests PASS (1.916s) on697eead;
+1001 legacy tests PASS (43.588s) on precedingbd6c982; legacy unchanged since then.
+Logs /tmp/quantos-v4-release-paper.log, /tmp/quantos-v4-release-legacy.log.
+Clean archive install at /tmp/quantos-v4-release.rsZ8nB passed doctor(-12ms),
+package isolation and all6 synthetic/replay lifecycle demo onbd6c982. Final source
+adds only the tested scanner shutdown guard; no repeat networkdoctor necessary.
+Demo18 library profile cases:15 closed and3 pA exchange-minimum rejections; no
+risk/strategy parameters relaxed. p1/p5 complete all6, pA reference/squeeze/E17
+probe rejections honest. Original fault scenarios retained. Stop changes replay
+exactly. README and docs/V4_ACCEPTANCE.md updated with evidence/commands/limits.
+
+Next: publish one Part2 PR from current branch, confirm remote tree matches local,
+attach PR, require current-head CI success, ask owner before merge. No new paper
+run: user must use new V4 state directory from documented commands. Canceled V3
+remains stopped and preserved. No active agents/processes owned by this task.
+Current usage75% used/25% remaining five-hour; weekly96% used/4% remaining. Check
+actual usage before further work. Same continuation must stay useful until PR
+approval/merge; no duplicates. Weekly limit may bind before next five-hour reset.
