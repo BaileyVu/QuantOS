@@ -76,7 +76,7 @@ runtime evidence, unresolved work, commits and next action.
 ```bash
 python -m pip install '.[research]'
 python -m unittest discover -s tests -t .
-PYTHONPATH=legacy_assets:legacy_assets/src python -m unittest discover -s legacy_assets/tests -t legacy_assets
+PYTHONSAFEPATH=1 PYTHONPATH=legacy_assets:legacy_assets/src python -m unittest discover -s legacy_assets/tests -t legacy_assets
 ```
 
 The retained historical research suite requires its pinned optional dependencies.

@@ -16,6 +16,7 @@ jobs:
       - run: python -m unittest discover -s tests -t .
       - name: Validate preserved legacy research and V1 tests
         env:
+          PYTHONSAFEPATH: '1'
           PYTHONPATH: legacy_assets:legacy_assets/src
         run: python -m unittest discover -s legacy_assets/tests -t legacy_assets
       - run: quantos demo --state "$RUNNER_TEMP/quantos-demo"

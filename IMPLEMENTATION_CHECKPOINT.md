@@ -334,3 +334,13 @@ then publish Part1 PR and request owner's merge approval. Main reviewed changes.
 E17 source note retained docs/V4_E17_SOURCE_NOTES.md; source metrics unverified
 because referenced results/hash absent. Primary strategies source note corrected:
 Turtle2N stop is canonical;4h bars/time stop are adaptations. No Part2 code yet.
+
+Part1 full validation complete: 75 paper tests PASS and1001 legacy tests PASS
+(43.795s), /tmp/quantos-v4-paper-final.log and /tmp/quantos-v4-legacy-final.log.
+Exact legacy invocation uses PYTHONSAFEPATH=1 to prevent active tests shadowing
+legacy tests; CI/README now match that tested invocation. Clean install/doctor
+already passed. PR23 opened/attached: https://github.com/BaileyVu/QuantOS/pull/23.
+Published tree8349300 matched local c32bc5a exactly; publishing via GitHub API
+preserves file-tree hashes and rename history detection. Main reviewed final diff.
+Owner was asked asynchronously to merge Part1 after CI; answer pending.
+No V4 merge authorized yet. Part2 can branch off published Part1 while waiting.
