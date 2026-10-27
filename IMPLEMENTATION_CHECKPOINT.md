@@ -508,3 +508,35 @@ remains stopped and preserved. No active agents/processes owned by this task.
 Current usage75% used/25% remaining five-hour; weekly96% used/4% remaining. Check
 actual usage before further work. Same continuation must stay useful until PR
 approval/merge; no duplicates. Weekly limit may bind before next five-hour reset.
+
+## Quota deferral — October27 final validation saved
+
+Branch codex/quantos-v4-library; source697eead, validation/checkpoint48c071a.
+All final validation above remains valid:117 paper +1001 legacy passing, clean
+install/doctor and all6 synthetic lifecycle/replay complete. Do not rerun without
+source changes/failure. No active agents, shell processes or paper service owned
+by this task. V3 remains stopped; no Part2 PR or remote mutation completed yet.
+
+Actual quota87% used/13% remaining five-hour; resets October28 01:40:55 Vietnam
+(epoch1793126455). Weekly98% used/2% remaining; resets November2 13:51:19 Vietnam
+(epoch1793602279). Five-hour reset does not replenish weekly quota. Continue at
+01:50 Vietnam after checking BOTH windows; respect binding weekly exhaustion.
+
+EXACT NEXT STEP: publish tested Part2 as one PR, verify remote tree, attach PR,
+inspect current-head CI and ask Bailey for Part2 merge approval. No approval yet.
+Normal git push stalled in macOS credential helper; use connected GitHub git-data
+API. No need to retry keychain. Prepared /tmp/quantos-v4-publish-tree.py computes
+changed entries against main5b094311ba90a8df10d6a41575e5f81e8790ba5f; run with that
+base and HEAD, redirect JSON to /tmp/quantos-v4-publish-final.json. Previous JSON
+contains43 changed entries/42 content blobs and tree of48c071a; REGENERATE after
+this checkpoint commit. Never print full JSON (output truncates). Read metadata
+without content; for each content entry read individually, create_blob UTF8, then
+replace content with returned SHA. create_tree(base_tree_sha, entries), assert
+returned SHA equals local git HEAD tree. create_commit with main as parent and
+verified tree, create_branch codex/quantos-v4-library (remote absent), then PR to
+main. Attach PR with app tool. Preserve local history; API commit SHA will differ
+but exact source tree must match. GitHub connector tools have typed schemas in
+ALL_TOOLS. Helper/JSON are temporary convenience; can reconstruct using git
+ls-tree/diff and git show HEAD:path if absent. After publication update checkpoint
+with remote commit/PR/CI and request owner approval before merging. No automatic
+paper launch; README includes new V4 p1/p5/pA state commands.
