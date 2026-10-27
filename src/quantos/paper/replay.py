@@ -4,6 +4,7 @@ import gzip
 import json
 from pathlib import Path
 
+from .adaptive import AdaptiveSizer
 from .engine import PaperEngine
 from .journal import Journal
 from .report import atomic_json, write_reports
@@ -32,8 +33,9 @@ def replay(paths, state: Path, strategy="all"):
     strategies = [s for s in (EmaAtrLimitStrategy(), DonchianAtrStopStrategy())
                   if strategy in {"all", s.strategy_id}]
     if not strategies: raise ValueError("unknown strategy")
-    journals = [Journal(state/f"journal_{p}.db", p, "replay") for p in ("p1", "p5")]
-    engines = [PaperEngine(j, Policy(risk_fraction=D(f))) for j, f in zip(journals, (".01", ".05"))]
+    journals = [Journal(state/f"journal_{p}.db", p, "replay") for p in ("p1", "p5", "pA")]
+    engines = [PaperEngine(j, Policy(risk_fraction=D(f)), adaptive=AdaptiveSizer(j, journals[0]) if p == "pA" else None)
+               for j, p, f in zip(journals, ("p1", "p5", "pA"), (".01", ".05", ".05"))]
     first = previous = None
     try:
         for path in paths:
