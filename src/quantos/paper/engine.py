@@ -11,6 +11,17 @@ from .types import D, Funding, Instrument, Quote, Signal, Trade, floor_step
 TERMINAL = {"CLOSED", "CANCELED", "EXPIRED", "REJECTED"}
 
 
+def record_path(o, q: Quote, limit=480):
+    """Keep a 1-minute mark-price OHLC path while a position is open, for offline exit (TP/SL) studies."""
+    minute, price = q.time_ms // 60000, str(q.mark)
+    path = o.setdefault("path", [])
+    if path and path[-1][0] == minute:
+        bar = path[-1]
+        bar[1], bar[2], bar[3] = str(max(D(bar[1]), q.mark)), str(min(D(bar[2]), q.mark)), price
+    elif len(path) < limit:
+        path.append([minute, price, price, price])
+
+
 @dataclass
 class Faults:
     """Deterministic fake exchange failure switches, never used by natural runtime."""
@@ -296,6 +307,8 @@ class PaperEngine:
                 if s["symbol"] != q.symbol:
                     continue
                 o["last_mark"] = str(q.mark)
+                if D(o["filled"]) > 0:
+                    record_path(o, q)
                 if now_ms >= s["expires_ms"] and D(o["remaining"]) > 0:
                     self._cancel(o, now_ms, "ENTRY_TTL")
                 if o["state"] == "CLOSING" and q.time_ms >= o["exit_after_ms"]:
