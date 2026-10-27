@@ -390,3 +390,16 @@ Last actual quota77% used /23% remaining; reset October27 15:26:22 Vietnam
 (epoch1793089582). SAME continuation confirmed ACTIVE for15:36 after reset, no duplicate.
 Final quota check83% used /17% remaining. Strategy split committed7c5d6cb;
 working tree clean. Continuation15:36 confirmed by automation tool, reset15:26:22.
+
+## Part1 merge approved and completed — October27
+
+Owner explicitly answered: "Merge Part 1 after CI passes". Rechecked exact
+ed54df0 head and both CI checks successful, then merged PR23 as
+5b094311ba90a8df10d6a41575e5f81e8790ba5f. Fetched main and verified identical
+tree to tested PR head; incorporated main into codex/quantos-v4-library while
+preserving Part2 source/checkpoint. No test rerun needed for identical tree.
+Part1 approval is satisfied; Part2 still requires its own future merge approval.
+Next step is Part2 manifest/contracts per docs/V4_IMPLEMENTATION_NEXT.md, not
+another Part1 approval or review. Usage12% remaining at start of this approval
+turn; defer further implementation to confirmed15:36 continuation after15:26:22
+Vietnam reset. Paper remains stopped; no active task processes or subagents.
