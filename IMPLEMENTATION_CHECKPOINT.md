@@ -592,3 +592,111 @@ NEXT STEP (owner optional): install merged source into a new .paper-v4-venv and
 start a NEW state directory using README commands; start runs p1/p5/pA together.
 Do not reuse V3 state. No automatic trading launch is authorized or scheduled.
 Final user report includes both PRs, validation/evidence and new72h commands.
+
+## Portfolio research started — October28 (new user task)
+
+User requested /Users/bailey12/Desktop/research_tibo.md, separate candidate
+portfolio research, no real orders/API keys and no interruption of any soak.
+Branch codex/quantos-portfolio-research from826987b (merged V4 sourcec2bf791).
+Prior V4 COMPLETE; do not repeat its scans/research/tests without source changes.
+Current usage69% five-hour/95% weekly remaining. New continuation not yet needed;
+previous V4 continuation was deleted. At20% primary remaining commit/checkpoint
+and create ONE thread heartbeat after actual reset, then update same thereafter.
+Operational checkpoint must remain local (prior auto-review prohibited export).
+
+Delegation verified and two lower-cost gpt-6-luna agents running:
+portfolio_data owns public archive data/cache/parser/tests/source notes;
+portfolio_candidates owns causal feature helpers/tests, awaiting candidate rules.
+Main owns risk/accounting/order integration and finalreview. No trading started.
+
+Pending user answers (asked once):
+1. Freeze strategy/hold/sizing on2022-24; OOS2025+ once, best OOS sweep labelled
+ exploratory vs literal OOSselection with disclosed bias.
+2.25% catastrophe stops for meaningful risk sizing in isolated research profile
+ (USDT,72h,3positions,50%DD), versus stop-free notional sizing separate fromrisk.
+3.Original alt/EMA source versus explicit720hcalibration, confirmed2hpivots,
+ .25ATRzone/stopbuffer adaptations (prior performance not reproduced claims).
+Do not run historical outcome evaluations or freeze those choices withoutanswers.
+
+Next: finish archive coverage/source audit and causal scaffolding; resolve answers,
+preregister universe/costs/execution/hold/quantile grids/calibration selection and
+seal hash BEFORE opening2025+ outcome results. New strategy signals/manifests/
+configs/tests; shared risk manager opt-in portfolio profile without changing V4
+baseline. One combined account, real funding, MTM drawdowns and portfolio caps;
+no synthetic replacement of unavailable event/trade data. Include existing six
+rules as-is where historical inputs exist, qualify missing E17/event and USDC
+coverage. Deterministic baseline,delay/slippage sensitivity,1000MC/dayblocks;
+report result honestly even if combined loses or data blocks inference.
+Only one new PR requested; merge not authorized by this new request.
+
+## Portfolio checkpoint1 — October28, quota boundary
+
+Branch codex/quantos-portfolio-research from V4 complete826987b. This is staged
+research scaffolding, NOT release-ready, NOT deployed, no new PR, no outcomes run.
+Both gpt-6-luna agents completed and idle; no owned processes or trading service.
+Use .venv/bin/python (3.12); systempython3 is3.9 and fails existingcore uniontypes.
+
+User confirmed:
+- Select strategies/holds/sizing only2022-24, freeze,2025+ evaluatedonce. Frozenpick
+ is recommendation; best2025+sweepcell exploratory. Earlier alt/crash work already
+ saw2025-26, so testwindow not fullyuntouched; disclose inreport.
+- Crash/dip25% catastrophe stop+sizing, primarytimeexit. Isolatedresearch USDT,
+ <=72h,3positions,50%drawdown. Extend crash/dip risk sweep1/2/4/6/8%;15%stop ONLY
+ sensitivity, notselection. Keep liquidationchecks. Existingtwice-stop buffer
+ retained, maycap effectiveleverage1x with25%stop; tolduser (no silentweakening).
+- Actual sourceattachments /Users/bailey12/Desktop/{strategy.py,optimize.py,
+ backtest_edge.py,simple_baseline.py,wf.py,features2.py}. Readtextonly, NEVERrun
+ theirtop-levelscripts (wouldconsumeOOS). Hashes/rules in source notes.
+- ALT pooledcoin-hour24hreturns, quarterfixedthreshold,q0.5/1%,90dcalibration;
+ source actuallyembargoeslast3days. NewEMA requested12/26+.25ATRtouch/stop1.5R.
+
+Two follow-up questions pending; do notaskagain:
+1.OriginalEMA9/20,3%stop/crossexit sourceaudit separatefrom requested12/26zone
+ candidate versususearchivedcandidate; sourcefilesdiffer includingFib/swingfilters.
+2.Missing fetch1h.py contains29UNIVERSE: userprovidefile/list or approvefixed9majors
+ +20highestDec2024quotevolumeUSDTcontractswith>=90dpriorhistory (pre2025only).
+Answers arrivinglateroverridependingstatushere.
+
+Completed newcode:
+- research/data.py immutablechecksummedpublicarchivecache/strictparsers for1h/5m,
+ markbars,metrics,funding; rawquotevolume retained.6focusedtests/compilepass.
+ -Actualmetadataaudit9USDT+9USDC:USDT covers2022start;USDC mostly2024+,ADAMar2025.
+ -Dailyklines/metrics listedthroughOct27;monthlythroughSep2026.Only3smallZIPs
+ inspected/checksummatched. Fullrowcontinuity NOTaudited. CurrentOctoberfunding
+ needspublicfundinghistoryAPI (no dailyarchive);do notomitcosts silently.
+ -OImetrics source labeltimestampambiguous inclJun2026changeissues; +1hproxy
+ explicitnotproofofrealavailability. Rawlabelsimmutable;mustauditbeforeinference.
+- candidate_features causalresampling/quantile/OI/pivot helpers; crash_flush_e2
+ andalt_dip modules exist,10focusedtests pass. EMApendingchoice, manifests NOT
+ registeredyet (only added default status='library' field). Librarydefaultsunchanged.
+- MainaddedSnapshot2h/OIavailability/quartercutofffields+replaydecode.
+- ResearchPolicy opt-in8%/50%/3positions/USDT/.05%sidefees;defaultPolicyunchanged.
+ Accountaggregatepending+filledmargin/gross/initialrisk; same-directioncap2risk
+ <=16%,total3risk<=24%,onecoinperslot;free-marginandgross sizingreuseexistinggate.
+ Main6risktests pass;39existing V3engine/V4risk regressiontests passed;10candidate
+ tests plus6datatests =61focusedtests cumulativelypassed. No fullsuitererun.
+ Test-onlyinitialfailures corrected(journalidentityandtransactionwrapper),not
+ hiddenruntimefixes. gitdiffcheckpass. No historicalresults/evaluationperformed.
+
+EXACT NEXT STEP:
+1.Readpendinguseranswers,sourceauditnotes; don'trepeatcoveragequery orsourcehunt.
+2.Mainreview causalavailabilitybugrisk: crashrequires latestOIlabel==currenthour
+ open but filtersavailable_ms<=bar.close_ms. Withlabel+1hproxy thebarboundary is
+ 1mslater andmaymakeallsignalsimpossible. Define decisionatclose+1 withproper
+ proxyavailabilityandconcreteboundarytest;don'tremoveavailabilityguardtofilltrades.
+3.FinishEMA/sourcecomparison,quartercalibration/universeprereg;wirecandidate
+ manifests+configs/statusandconstructorgrid; enforcecooldownpercoinholdinghorizon.
+ Crashholdvariants24/48/72 missingcurrently. CandidateResearchPolicy notwiredinto
+ runtime/CLI/journalidentityyet;mustnotreusep1existingstateswithdifferentpolicy.
+4.Mainfinancialreview: aggregatecaps atfilltime (currentquotehandlerchecksone
+ orderagainstgrosscap; needsaggregateincludingotherpending/fills andfees), exposure
+ recovery andstop/hold handling; gapscanbreach50%threshold so don'tpromisehardbound.
+5.Build sharedrisk paperportfolio OHLCreplay with explicitbarfilluncertainty,
+ funding/markjoins, singlecashaccount/MTM drawdown, existing6as-is whereinputsexist
+ (don'tinventhistoricalE17announcements orUSDC2022data). Trainingselection sealed
+ hash beforeoneOOSwave. Allrequestedstats/baselines/delay/doubleslip/15%stoprow,
+ Kellytrainingonlyhalf-limit,1000trade/dayblockMC. No ML.
+6.Acquirefrozenuniversearchives resumed/checksummed, runtrainingandfreeze,thenOOS
+ oncewithpartialcontaminationdisclosure; report/docs/config/PR afterfullreview.
+No previouslycompletedV4audits/fulltests exceptnewchangesjustifyregressiontests.
+Persistentcheckpointstayslocal perpriorauto-review;neverexportindirectly.
