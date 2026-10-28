@@ -6,7 +6,7 @@ import json
 from decimal import InvalidOperation
 
 from .journal import Journal
-from .risk import Account, Policy, evaluate, valid_quote, quantity_step
+from .risk import portfolio_risk_caps, Account, Policy, evaluate, valid_quote, quantity_step
 from .types import D, Funding, Instrument, Quote, Signal, Trade, floor_step
 from .strategies.manifest import manifest_for
 
@@ -315,6 +315,12 @@ class PaperEngine:
             if (equity_after <= 0 or gross_after > equity_after*self.policy.gross_fraction
                     or margin_after > equity_after):
                 self._cancel(o, now_ms, "FILL_EXCEEDS_PORTFOLIO_CAP")
+                return
+            direction_cap, total_cap = portfolio_risk_caps(self.policy)
+            used_direction = account.long_risk if D(o["direction"]) > 0 else account.short_risk
+            if (used_direction > equity_after * direction_cap
+                    or account.long_risk + account.short_risk > equity_after * total_cap):
+                self._cancel(o, now_ms, "FILL_EXCEEDS_PORTFOLIO_RISK_CAP")
                 return
         old = D(o["filled"])
         o["average"] = str((D(o["average"]) * old + price * quantity) / (old + quantity))

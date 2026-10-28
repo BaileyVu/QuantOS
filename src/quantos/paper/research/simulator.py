@@ -7,16 +7,19 @@ LIMIT/STOP entry or order-book liquidity. No performance selection occurs here.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Iterable, Mapping
 
-from ..risk import Account, Decision, ResearchPolicy, evaluate
+from ..risk import Account, Decision, ResearchPolicy, evaluate, portfolio_risk_caps
 from ..types import D, Instrument, Quote, Signal
 from .data import Bar, FundingRate
 
 HOUR = 3_600_000
 DAY = 24 * HOUR
+# Source funding timestamps have 1–31 ms jitter; allow at most one second.
+# This tolerance validates cadence, never rewrites the event timestamp.
+FUNDING_JITTER_MS = 1000
 
 
 class IncompleteHistory(ValueError):
@@ -57,7 +60,8 @@ class SimulationResult:
         "stop/liquidation triggers use mark OHLC; exit at adverse trade-bar extreme plus slippage",
         "stop beats target on ambiguous bars; targets fill at target plus adverse slippage",
         "funding uses actual event rate and causal mark-hour open proxy, not future close",
-        "non-boundary funding precedes any intrabar exit in this scenario",
+        "settlement within first second uses positions held before boundary exits/new entries",
+        "later funding precedes any intrabar exit in this scenario",
         "daily/drawdown breakers use hourly opening/closing MTM, permanently pause new entries",
         "adverse_points are simultaneous mark extremes, a stress bound separate from observed MTM",
         "historical instrument filters require separately declared provenance",
@@ -77,12 +81,22 @@ class Simulator:
                  marks: Mapping[str, Mapping[int, Bar]],
                  funding: Mapping[str, Iterable[FundingRate]],
                  instruments: Mapping[str, Instrument], policy: ResearchPolicy,
-                 *, initial_cash: Decimal = D(200), participation: Decimal = D(".01")):
+                 *, initial_cash: Decimal = D(200), participation: Decimal = D(".01"),
+                 risk_by_strategy: Mapping[str, Decimal] | None = None):
         if not isinstance(policy, ResearchPolicy): raise ValueError("explicit research policy required")
         if initial_cash <= 0 or not initial_cash.is_finite(): raise ValueError("invalid cash")
         if not 0 < participation <= D(".01"): raise ValueError("invalid liquidity proxy")
         self.bars, self.marks, self.instruments = bars, marks, instruments
-        self.policy, self.initial_cash, self.participation = policy, initial_cash, participation
+        self.risk_by_strategy = dict(risk_by_strategy or {})
+        for name, value in self.risk_by_strategy.items():
+            if name not in {"crash_flush_e2", "alt_dip_reversal", "ema_level_2h"}:
+                raise ValueError("unknown risk-map strategy")
+            ceiling = D(".03") if name == "ema_level_2h" else D(".08")
+            if not isinstance(value, Decimal) or not value.is_finite() or not 0 < value <= ceiling:
+                raise ValueError("invalid per-strategy risk")
+        cap = max([policy.portfolio_risk_fraction, policy.risk_fraction, *self.risk_by_strategy.values()])
+        self.policy = replace(policy, portfolio_risk_fraction=cap) if self.risk_by_strategy else policy
+        self.initial_cash, self.participation = initial_cash, participation
         self.funding = {s: tuple(sorted(rows, key=lambda r: r.event_ms)) for s, rows in funding.items()}
         self.cash = initial_cash
         self.positions: dict[str, Position] = {}
@@ -186,7 +200,8 @@ class Simulator:
                   max(previous.volume, D(".00000001")), max(previous.volume, D(".00000001")), mark.open)
         prices[signal.symbol] = mark.open
         account = self._account(prices)
-        decision = evaluate(signal, ins, q, account, self.policy, time)
+        entry_policy = replace(self.policy, risk_fraction=self.risk_by_strategy[signal.strategy_id]) if signal.strategy_id in self.risk_by_strategy else self.policy
+        decision = evaluate(signal, ins, q, account, entry_policy, time)
         if not decision.approved:
             reject[decision.reason] += 1; return
         direction = D(1) if signal.side == "LONG" else D(-1)
@@ -199,6 +214,8 @@ class Simulator:
                               + signal.stop_loss * (self.policy.taker_fee + self.policy.slippage))
         equity_after = account.equity - fee + quantity * (mark.open - price) * direction
         reserve_notional = quantity * max(mark.open, signal.entry_price, price)
+        direction_cap, total_cap = portfolio_risk_caps(self.policy)
+        used_direction = account.long_risk if direction > 0 else account.short_risk
         if quantity > previous.volume * self.participation:
             reason = "INSUFFICIENT_PROXY_LIQUIDITY"
         elif abs(price - signal.entry_price) > signal.entry_price * self.policy.slippage * 2:
@@ -214,6 +231,9 @@ class Simulator:
         elif (equity_after <= 0 or account.gross_notional + reserve_notional > equity_after*self.policy.gross_fraction
               or account.margin_used + reserve_notional/decision.leverage > equity_after):
             reason = "FILL_EXCEEDS_PORTFOLIO_CAP"
+        elif (used_direction + decision.achievable_risk > equity_after * direction_cap
+              or account.long_risk + account.short_risk + decision.achievable_risk > equity_after * total_cap):
+            reason = "FILL_EXCEEDS_PORTFOLIO_RISK_CAP"
         elif (decision.leverage * (2 * (distance/price + self.policy.slippage) + self.policy.maintenance_buffer) > 1):
             reason = "LIQUIDATION_BUFFER"
         else:
@@ -239,12 +259,16 @@ class Simulator:
                     raise IncompleteHistory(f"invalid funding for {symbol}")
                 if start <= row.event_ms < end: events[row.event_ms // HOUR * HOUR].append(row)
             relevant = [r for r in rows if start - 8*HOUR <= r.event_ms <= end + 8*HOUR]
-            if not relevant or relevant[0].event_ms > start or relevant[-1].event_ms < end - 8*HOUR:
+            if (not relevant or relevant[0].event_ms > start + FUNDING_JITTER_MS
+                    or relevant[-1].event_ms < end - 8*HOUR - FUNDING_JITTER_MS):
                 raise IncompleteHistory(f"funding boundary coverage absent for {symbol}")
-            # A changed interval is accepted only when actual adjacent timestamps
-            # match the newly reported event interval; absence is never zero cost.
+            # At a reported schedule switch, either adjacent declared interval
+            # can describe this boundary. Bounded jitter preserves actual times;
+            # missing settlements cannot be replaced with zero rates.
             for a, b in zip(relevant, relevant[1:]):
-                if b.event_ms - a.event_ms != b.interval_hours * HOUR:
+                delta = b.event_ms - a.event_ms
+                expected = {a.interval_hours * HOUR, b.interval_hours * HOUR}
+                if min(abs(delta - interval) for interval in expected) > FUNDING_JITTER_MS:
                     raise IncompleteHistory(f"funding gap/irregular interval for {symbol}@{b.event_ms}")
         return events
 
@@ -271,7 +295,7 @@ class Simulator:
             if self.day != time // DAY:
                 self.day = time // DAY; self.day_start = self._equity(opened_marks)
             hour_events = sorted(events.get(time, ()), key=lambda r: (r.event_ms, r.symbol))
-            boundary = [r for r in hour_events if r.event_ms == time]
+            boundary = [r for r in hour_events if r.event_ms - time <= FUNDING_JITTER_MS]
             self._fund(boundary, time, opened_marks)
             self._breaker(opened_marks, opened_trade, time)
             # Gaps and deadlines are handled before new entries at the same time.
@@ -292,7 +316,7 @@ class Simulator:
             bars = {s: self._bar(s, time) for s in self.positions}
             marks = {s: self._bar(s, time, mark=True) for s in self.positions}
             mark_opens = {s: b.open for s, b in marks.items()}
-            self._fund([r for r in hour_events if r.event_ms != time], time, mark_opens)
+            self._fund([r for r in hour_events if r.event_ms - time > FUNDING_JITTER_MS], time, mark_opens)
             worst_marks = {s: (b.low if self.positions[s].direction > 0 else b.high) for s, b in marks.items()}
             self.result.adverse_points.append((time+HOUR-1, self._equity(worst_marks)))
             for symbol in sorted(tuple(self.positions)):

@@ -2,10 +2,11 @@ from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from quantos.paper.engine import PaperEngine
 from quantos.paper.journal import Journal
-from quantos.paper.risk import Account, Policy, ResearchPolicy, evaluate
+from quantos.paper.risk import Account, Policy, ResearchPolicy, evaluate, portfolio_risk_caps
 from quantos.paper.types import D
 from tests.unit.test_v3_engine import INS, T, quote, signal
 
@@ -36,6 +37,22 @@ class ResearchRiskTests(unittest.TestCase):
         self.assertTrue(evaluate(*short, a, ResearchPolicy(), T).approved)
         self.assertEqual(evaluate(*short, replace(a, active_orders=3), ResearchPolicy(), T).reason,
                          "EXISTING_EXPOSURE")
+
+    def test_mixed_profile_caps_are_fixed_before_signal_order(self):
+        low = ResearchPolicy(risk_fraction=D(".01"), portfolio_risk_fraction=D(".08"))
+        high = replace(low, risk_fraction=D(".08"))
+        self.assertEqual(portfolio_risk_caps(low), (D(".16"), D(".24")))
+        self.assertEqual(portfolio_risk_caps(low), portfolio_risk_caps(high))
+        a = Account(D(200), D(200), D(200), active_orders=1,
+                    gross_notional=D(50), margin_used=D(50), long_risk=D(12),
+                    open_symbols=("ETHUSDT",))
+        decision = evaluate(*inputs(), a, low, T)
+        self.assertTrue(decision.approved, decision.reason)
+        self.assertLessEqual(decision.requested_risk, D(2))
+        with self.assertRaises(ValueError):
+            ResearchPolicy(risk_fraction=D(".08"), portfolio_risk_fraction=D(".01"))
+        with self.assertRaises(ValueError):
+            ResearchPolicy(portfolio_risk_fraction=D(".081"))
 
     def test_existing_symbol_and_incomplete_exposure_are_rejected(self):
         a = Account(D(200), D(200), D(200), active_orders=1)
@@ -88,6 +105,27 @@ class ResearchRiskTests(unittest.TestCase):
                 PaperEngine(j, ResearchPolicy(risk_fraction=D(".02")))
             j.close()
             with self.assertRaises(ValueError): Journal(path, "p1", "synthetic")
+
+    def test_fill_fee_cannot_push_reserved_risk_over_portfolio_cap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            j = Journal(Path(tmp) / "risk-cap.db", "pR", "synthetic")
+            try:
+                e = PaperEngine(j, ResearchPolicy())
+                e.recover(T); e.connection(True, T)
+                self.assertIsNotNone(e.propose(*inputs(), T))
+                order = e.active()[0]
+                with j.transaction():
+                    account = e.account(T)
+                    # A fully reserved 2% direction bucket fits before the fee;
+                    # execution must not spend any of its cost reserve as risk.
+                    exact_boundary = replace(account, long_risk=account.equity*D(".02"))
+                    with patch.object(e, "account", return_value=exact_boundary):
+                        e._entry_fill(order, D(order["remaining"]), D(100), T+1000, "fee-boundary", False)
+                self.assertEqual(j.db.execute("SELECT count(*) FROM fills").fetchone()[0], 0)
+                reasons = [r[0] for r in j.db.execute(
+                    "SELECT json_extract(payload,'$.reason') FROM events WHERE kind='CANCELED'")]
+                self.assertIn("FILL_EXCEEDS_PORTFOLIO_RISK_CAP", reasons)
+            finally: j.close()
 
     def test_other_pending_orders_are_counted_again_at_fill(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -52,11 +52,26 @@ class ResearchPolicy(Policy):
     taker_fee: Decimal = D(".0005")
     maker_fee: Decimal = D(".0005")  # conservative taker charge on all research fills
 
+    # Zero retains the original homogeneous-risk caps. Mixed research cells
+    # freeze this to their largest configured per-strategy risk before the run.
+    portfolio_risk_fraction: Decimal = D(0)
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.portfolio_risk_fraction and not self.risk_fraction <= self.portfolio_risk_fraction <= D(".08"):
+            raise ValueError("portfolio risk cap must cover configured risk and stay <=8%")
+
     risk_ceiling = ".08"
     drawdown_ceiling = ".50"
     max_positions = 3
     margin_asset = "USDT"
     candidates_enabled = True
+
+
+def portfolio_risk_caps(policy: Policy) -> tuple[Decimal, Decimal]:
+    """Frozen same-direction and total fractions; independent of signal order."""
+    base = getattr(policy, "portfolio_risk_fraction", D(0)) or policy.risk_fraction
+    return min(2 * base, D(".16")), min(3 * base, D(".24"))
 
 
 @dataclass(frozen=True)
@@ -197,8 +212,9 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
         # All same-direction positions share a risk bucket, even if a noisy
         # historical correlation estimate would call them independent.
         used = account.long_risk if signal.side == "LONG" else account.short_risk
-        direction_budget = account.equity * min(2 * policy.risk_fraction, D(".16")) - used
-        total_budget = account.equity * min(3 * policy.risk_fraction, D(".24")) - account.long_risk - account.short_risk
+        direction_cap, total_cap = portfolio_risk_caps(policy)
+        direction_budget = account.equity * direction_cap - used
+        total_budget = account.equity * total_cap - account.long_risk - account.short_risk
         budget = min(budget, direction_budget, total_budget)
         if budget <= 0:
             return reject("PORTFOLIO_RISK_CAP")

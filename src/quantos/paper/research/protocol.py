@@ -14,13 +14,20 @@ def fingerprint(value: object) -> str:
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
-def _exclusive_json(path: Path, value: dict) -> None:
+def _exclusive_json(path: Path, value: object) -> None:
+    """Publish a complete durable payload atomically, without overwriting a cell."""
+    import os
+    import tempfile
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("x", encoding="utf-8") as out:
-        out.write(canonical(value).decode() + "\n")
-        out.flush()
-        import os
-        os.fsync(out.fileno())
+    fd, temp = tempfile.mkstemp(prefix=".pending-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as out:
+            out.write(canonical(value) + b"\n")
+            out.flush()
+            os.fsync(out.fileno())
+        os.link(temp, path)  # exclusive destination creation on the same filesystem
+    finally:
+        Path(temp).unlink(missing_ok=True)
 
 
 def seal(path: Path, plan: dict, training_selection: dict, *,

@@ -71,7 +71,10 @@ absent. No USDT/USDC history splicing is allowed.
   stop/liquidation trigger occurred, exits at its level with adverse slippage.
 - Actual funding events are charged at their recorded timestamps. Because the
   archive does not include the event's exact mark, the most recent hourly mark
-  open is a causal proxy. Boundary funding applies before exits/new entries;
+  open is a causal proxy. Settlement events within one second of a boundary apply to positions held
+  before exits/new entries, modeling execution after settlement; original event
+  timestamps remain unchanged. Cadence validation allows at most one second
+  of jitter and the old/new reported interval at a schedule transition. Other
   later funding within the hour applies before that hour's modeled protection
   exits. This ordering is an assumption and is retained in the event ledger.
 - Held positions exit at their time deadline, or at the final observation close
@@ -99,8 +102,13 @@ sensitivity only. Their risk grid is 1/2/4/6/8%; EMA/library risk grid is
 0.5/1/2/3%, each with leverage ceilings 1/2/3. Hold/quantile grids remain the
 owner-approved ones. Training Kelly estimates are descriptive and any chosen
 risk must be no more than half the estimate; undefined/no-loss estimates cannot
-justify a higher risk. Portfolio aggregation must retain the same caps as
-individual tests; mixing risk fractions needs an explicitly fixed cap rule.
+justify a higher risk. Portfolio aggregation retains the shared risk authority. For a mixed cell,
+the cap base is frozen before simulation to the largest configured strategy
+risk (or an explicitly higher existing policy cap), at most 8%. Same-direction
+and total reserved initial risk cannot exceed twice/three times that base
+respectively, capped at 16%/24% of current equity. Each entry still has its own
+strategy risk budget. The cap never changes with incoming signal order; costs
+and immediate MTM are included in the fill-time recheck.
 
 All recommendations require completed training selection, sealed provenance,
 actual held-out results and reconciliation. No recommendation can be inferred

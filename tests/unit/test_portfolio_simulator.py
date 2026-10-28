@@ -92,6 +92,33 @@ class SimulatorTests(unittest.TestCase):
         data[2]["BTCUSDT"] = tuple(r for r in data[2]["BTCUSDT"] if r.event_ms != START+8*HOUR)
         with self.assertRaises(IncompleteHistory): run(data)
 
+    def test_funding_timestamp_jitter_is_preserved_without_phantom_entry_charge(self):
+        data = inputs()
+        data[2]["BTCUSDT"] = tuple(replace(r, event_ms=r.event_ms+31) for r in data[2]["BTCUSDT"])
+        result = run(data)
+        self.assertEqual(len(result.funding_events), 1)
+        event = result.funding_events[0]
+        self.assertEqual(event["time_ms"], START+8*HOUR+31)
+        self.assertEqual(event["mark_proxy_ms"], START+8*HOUR)
+        self.assertEqual(result.final_cash, D(200)+result.trades[0]["net_pnl"])
+
+    def test_reported_funding_schedule_switch_is_valid_but_missing_event_is_not(self):
+        data = inputs()
+        stamps = [(START-8*HOUR, 8), (START, 8), (START+4*HOUR, 4),
+                  (START+8*HOUR, 4), (START+12*HOUR, 4),
+                  (START+16*HOUR, 8), (START+24*HOUR, 8)]
+        data[2]["BTCUSDT"] = tuple(FundingRate("BTCUSDT", t+7, h, D(".001")) for t,h in stamps)
+        result = run(data)
+        self.assertEqual(len(result.funding_events), 3)  # settlement before 12h time exit
+        data[2]["BTCUSDT"] = tuple(r for r in data[2]["BTCUSDT"] if r.event_ms != START+8*HOUR+7)
+        with self.assertRaises(IncompleteHistory): run(data)
+
+    def test_unexplained_funding_drift_remains_invalid(self):
+        data = inputs()
+        data[2]["BTCUSDT"] = tuple(replace(r, event_ms=r.event_ms+5000)
+            if r.event_ms == START+8*HOUR else r for r in data[2]["BTCUSDT"])
+        with self.assertRaises(IncompleteHistory): run(data)
+
     def test_funding_mark_is_causal_open_not_future_close(self):
         data = inputs()
         t = START+8*HOUR
@@ -159,6 +186,21 @@ class SimulatorTests(unittest.TestCase):
     def test_full_slippage_cannot_exceed_approved_short_risk(self):
         result = run(signals=[signal(side="SHORT", stop_loss=D(125))])
         self.assertEqual(result.rejections["FILL_EXCEEDS_APPROVED_RISK"], 1)
+
+    def test_mixed_strategy_risk_keeps_frozen_caps_and_individual_budgets(self):
+        data = inputs(("BTCUSDT", "ETHUSDT"))
+        sim = Simulator(*data, ResearchPolicy(), risk_by_strategy={
+            "alt_dip_reversal": D(".08"), "ema_level_2h": D(".01")})
+        self.assertEqual(sim.policy.portfolio_risk_fraction, D(".08"))
+        result = sim.run([signal(), signal("ETHUSDT", strategy_id="ema_level_2h",
+                          stop_loss=D(90), take_profit=D(115))],
+                         start_ms=START, end_ms=START+24*HOUR)
+        trades = {t["strategy_id"]: t for t in result.trades}
+        self.assertEqual(set(trades), {"alt_dip_reversal", "ema_level_2h"})
+        for name, risk in (("alt_dip_reversal", D(".08")), ("ema_level_2h", D(".01"))):
+            self.assertLessEqual(trades[name]["initial_risk"], trades[name]["entry_equity"]*risk)
+        with self.assertRaises(ValueError):
+            Simulator(*data, ResearchPolicy(), risk_by_strategy={"ema_level_2h": D(".08")})
 
     def test_duplicate_signals_and_second_run_rejected(self):
         sim = Simulator(*inputs(), ResearchPolicy())
