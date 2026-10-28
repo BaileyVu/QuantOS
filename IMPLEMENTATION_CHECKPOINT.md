@@ -564,3 +564,31 @@ Then final under-one-page report: PR23/24, counts/evidence table, honest skipped
 pA minimum-size cases and unreproduced E17 evidence, new p1/p5/pA run commands.
 Delete continuation only when this work is complete; automation currently PAUSED
 in saved configuration, preserve that state if updating before completion.
+
+## V4 COMPLETE — October28, after explicit Part2 merge approval
+
+Part1 PR23 merged5b094311ba90a8df10d6a41575e5f81e8790ba5f.
+Part2 PR24 mergedc2bf79191cca8bfe34b9e82d891d4a3857639116 after BOTH validation
+checks succeeded on approved headbd7cb61d2313580a4b8edd2019126fbd5d712cb8.
+Fetched main and verified tree d3741c4bebcda6946e8479be6aeeea68b6dd35c0 exactly
+matches expected publication; source/config/tests/docs match tested local source.
+Current branch codex/quantos-v4-library incorporates main in merge fec5b1936b2d1a315bbddd83bae05bf6f1ae14dc.
+Only this local operational checkpoint differs from merged main. Local history
+preserved. Publication excluded checkpoint per automatic approval review; do not
+upload it indirectly or retry. No further implementation/review/merge work remains.
+
+Validation retained:117 paper tests +1001 legacy tests, clean archive install,
+public-data doctor, isolation and all6 lifecycle/replay. No repeated test run on
+identical source.18 synthetic profile cases:15 closed,3 pA exchange-minimum
+rejections. E17 supplied performance not independently reproduced. No natural V4
+observation or profitability evidence; no real/authenticated order execution.
+
+launchctl confirms gui/501/com.quantos.v3.paper is absent. Canceled V3 state and
+journals preserved. No task-owned active agents, shell sessions or trading process.
+Continuation quantos-v3-checkpoint-continuation DELETED, confirmed by app tool.
+Actual usage74% five-hour /96% weekly remaining at completion.
+
+NEXT STEP (owner optional): install merged source into a new .paper-v4-venv and
+start a NEW state directory using README commands; start runs p1/p5/pA together.
+Do not reuse V3 state. No automatic trading launch is authorized or scheduled.
+Final user report includes both PRs, validation/evidence and new72h commands.
