@@ -797,3 +797,99 @@ Quota:89%five-hourused/11%remaining, resetsOct29 00:31:54 Vietnam(epoch179320871
 
 Confirmed: same research heartbeat updated ACTIVE to00:41 Vietnam after
 Oct29 00:31:54 reset. Source045f54b, checkpoint2db3076 before this schedule note.
+
+## Portfolio checkpoint3 — October29 01:00 Vietnam (LATEST)
+
+Branch codex/quantos-portfolio-research. Main simulator commit7ccb8bc; nextsource
+commit contains dataset/signals/universe (use gitlog for exactSHA). UNRELEASED,
+main financial/final review still pending. No outcomes/selection/OOS/PR/trading.
+Prior userchoices remain authoritative; no new questionsneeded.
+
+Completed:
+- Original downloader26506 FINISHED:13597downloaded,0failed,488knownpreavailability
+ OI partitions. Do not rerun. Trainingmanifest unchanged path ascheckpoint2.
+- Two lower-cost gpt-6-luna agents enabled and used:research_data_audit and
+ research_signal_cache, bothfinished. No otheragents ortradinglaunched.
+- DatasetIndex inresearch/dataset.py:verifiedcache -> bars/marks/funding/metrics
+ per-symboltuples, exactbar_by_open_ms/mark_by_open_ms maps, contenthash/audit.
+ Rejectout-of-manifest rows andduplicatebar timestamps beforedictconstruction.
+ Alltaskstatuses hash includingpending. Parsernowacceptsactualheaderlessklines;
+ missingoptionalmetricsvalues remainmissing,notzero. Audited4,691,701rows,
+ no duplicates,20klinegaps/67markgaps. Persistedignored evidence:
+ data/portfolio/audits/train_2021-10-01_to_2024-12-31.json.
+ Thisaudit's contenthash predates strengthenedstatushash; refreshprovenancewhen
+ re-indexingforrepair, notunnecessarilyrerunfullrawauditbeforethen.
+- IMPORTANTrealgaps:10symbols(FIL,LTC,MANA,NEAR,SAND,SOL,TRX,VET,XLM,XRP) miss
+ Feb26–28 andApr1–2 2022klines;all29missOct2 2022/Feb24 2023markdays;9also
+ missJul31 2022markday. Needactualdailyarchiveoverlay,notimputation.
+ DailyprobeBTCUSDT mark2022-10-02 SUCCESS:24hourrows, SHA
+ e7126ba8c0cf0be7fac7072aeb7bfdade421d69ebb92ab966aa69b61be1350c8,
+ cachedunderdata/portfolio/raw/sha256/<SHA>/BTCUSDT-1h-2022-10-02.zip.
+- Signalcache callsCURRENTcandidateclasses, perparam/source/filter/datahashes;
+ bounded25price/725OIwindows preventancientgaps poisoninglaterdecisions.
+ EMAcrossprefilter computes sourceEMAseed once, callsclassatcrosses, butEMA
+ fullhistorygap behavior stillneedsmainreview/repair. NO fullcachegeneratedor
+ benchmarked. LatestavailableexacthourOIlabel mustbe t ort−1h, unavailablefuture
+ blocked; oi_lag_hoursfeature. Archiveavailabilityproxylabel+1h meanslag1,
+ explicitlyadaptation,notexactpriorOIreproduction. 0hlagvalidwhenactuallyavailable.
+ ALTstrictpooled29coinquartercalibration unchanged; cachedoesnotcomputePnL.
+- Simulatorresearch/simulator.py usesSAMErisk.evaluate withsinglecash/MTM,
+ aggregatecaps,fill-timecost/riskchecks, cooldowns, actualfundingratewithcausal
+ hourlymarkOPENproxy,fees/slip,permanentdaily/DDbreakers, time/end/gapexits.
+ Only3MARKETcandidates supported. Stop/liqtriggerusesmarkOHLC,exitadversetrade
+ extreme+slip(pessimisticuncertainty); stopbeatsambiguousTP. No inventedTTLfills.
+ Empty/missingoccupiedbar/mark orfundinggap invalidatescell. Intrabaradverse
+ markstress separatefromhourlyMTMpath. Docs/PORTFOLIO_EXECUTION_PROTOCOL.md
+ recordsassumptions BEFOREoutcomes. Broaderfinancialreview/driverstillpending.
+ ShortflatfillsmayrejectFILL_EXCEEDS_APPROVED_RISK underfull15bpsslippage;
+ don'tweakenapprovedrisktoforceentries. Syntheticacceptedshorttestusesfavorable
+ openinggap;bothaccepted/rejectedpaths tested.
+- Extractedmarket.parse_exchange_info(data,margin_asset='USDC') pureparser;
+ oldruntimeUSDCdefaultunchanged, explicitUSDTresearch. All29currentUSDTfilters
+ retainedviaBinanceconnector inignoreddata/portfolio/filters/current_usdt_proxy_20261029.json.
+ CurrentfiltersarehistoricalPROXY,notpointintime; publicserverTime1793178073022.
+- Universeutilityresearch/universe.py, resumedict-progressbugfixedandtested.
+ Publicpre2025metadata/Dec2024turnoverrunCOMPLETED, formerPID42880verifiedEXITED.
+ Manifestdata/portfolio/manifests/robustness_dec2024.json hasstatuscomplete BUT
+ strict90d rowhistoryNOTvalidated: usesSep-Decmetadata+full744Decrowsproxy.
+ 836acceptedASCIIsymbols,356tasks,302downloaded,0archiveerrors. Listingalsohas
+ nonASCII/longnamesexcludedbyparser; scopebiasneedsresolution/disclosurebefore
+ claimingwholemarket top20. Provisionalothers:1000PEPE,SUI,HBAR,WIF,ENA,1000SHIB,
+ UXLINK,NEIRO,LTC,WLD,1MBABYDOGE,AAVE,TRX,XLM,CRV,DOT,FIL,SAND,UNI,ONDO(allUSDT).
+ Noextra3yearcohortdownloadstarted; no activeownedprocesses remain.
+
+Testsretained:main16simulator tests PASS (cash/fees/funding/shorts/time/stopgap/
+ missingdata/cooldown/caps/TTL/fillguard/breakers),2USDTfiltertestsPASS,12existing
+ V3markettestsPASS afterpureparserextraction. Integratedportfolio72testsPASS
+ 0.426s beforelastsmallagentwindow/lagcorrection; agentfinal11crash/cachetestsPASS
+ 0.073s aftercorrection. Agentdataset+universe7PASS; parser/acquire/dataset13PASS
+ earlierbeforestrictindexfollowup. DiffwhitespacePASS. No fullsuite repeated.
+
+EXACT NEXT STEP:
+1.Checkusage/gitlatest; no downloadrunning. Repairactualmissingdays usingdaily
+ ArchiveStore.fetch(dataset,symbol,YYYY-MM-DD,'1h'), preserveoriginalmonthlyraw,
+ immutableSHA/manifestoverlay. Probeabove provesonedayavailable; fillONLYaudited
+ missingtimestampsthatactualsourceprovides, conflictingduplicatesfailclosed.
+ Mergeoverlayintodataset/contenthash, re-auditaffectedseries +fundinginterval/
+ exacttimestampcoverage (notyetdone). Nooutcomesuntildatausableorhonestinvalid.
+2.Finalmainreviewdataset/cache/simulatorintegration; sourcebenchmarkfullcausal
+ cache afterrepair. ReviewfullEMAseed/gapbehavior; testinstrumentfilterproxyand
+ explicitno-bookOHLC modelwithoutassertingruntimefillparity. Crash-only/random
+ baselines anddelayeddecision/2xslip/15%stopsensitivities notimplementedyet.
+3.Verifyactualfirstrows >=90d forprovisionalrobustnesseligiblecandidates; fixor
+ discloseexcludednonASCII/longnames beforefinalranking. PreserveDecvolume work,
+ don'trepeatmetadata scan. Acquiremissingcohorttraininghistory onlyafterfreeze.
+4.ShortarchivedEMAauditperformance stillnotrun, separatefromcandidate. Finish
+ prereggridselectionobjective, mixedstrategy riskcaprule, trainrunner andKelly
+ <=halfconstraint. Existing6strategies as-is onlywherehistoricalinputssupport,
+ notinventE17events/USDC2022/bookTTL. No modeltuningfrom2025+.
+5.Run2022–24trainingONLY, freezeactualcode/data/grid/selection; thenONE2025+
+ wave exploratorygrid/sensitivities/baselines/1000MC. PriorOOSexposure/survivorbias/
+ venuemismatch explicit. Reportallrequestedmetrics/rejections/exclusions; final
+ financialreview/fulltests/cleaninstall whenready, supportedconfig+onePR; NOmerge
+ authorizationandNOautomaticpaperlaunch. Localcheckpointmustneverbeexported.
+
+Quotafinalcheck:92%five-hourused/8%remaining,resetOct29 05:43:46Vietnam
+ (1793227426); weekly45%used/55%remaining,resetNov4 14:17:38(1793776658).
+ SAMEheartbeatquantos-portfolio-research-continuation confirmedACTIVE05:53Vietnam
+ afterreset. Promptupdatedthisstage; neverduplicate/reviveoldV3automation.
