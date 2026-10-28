@@ -700,3 +700,10 @@ EXACT NEXT STEP:
  oncewithpartialcontaminationdisclosure; report/docs/config/PR afterfullreview.
 No previouslycompletedV4audits/fulltests exceptnewchangesjustifyregressiontests.
 Persistentcheckpointstayslocal perpriorauto-review;neverexportindirectly.
+
+Quota deferral finalized: source cd7df18, checkpoint e17ad55, clean branch
+codex/quantos-portfolio-research. Actual allowance7% primary,85% weekly remains.
+Primary reset October28 19:17:38 Vietnam (1793189858); weekly reset November4
+14:17:38 Vietnam (1793776658). Confirmed ACTIVE heartbeat
+quantos-portfolio-research-continuation at19:27 Vietnam; update THIS ID next time,
+never recreate old V3 automation. No active task processes/agents or trading.
