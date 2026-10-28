@@ -4,6 +4,7 @@ from decimal import Decimal
 from math import ceil, floor, lcm
 
 from .types import D, Instrument, Quote, Signal, floor_step
+from .strategies.manifest import manifest_for
 
 
 @dataclass(frozen=True)
@@ -110,15 +111,25 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
         return reject("INSUFFICIENT_LIQUIDITY")
     if not signal.observed_ms <= now_ms < signal.expires_ms or now_ms - signal.observed_ms > 120000:
         return reject("EXPIRED_SIGNAL")
-    if not 1 <= signal.maximum_hold_seconds <= 14400:
+    manifest = manifest_for(signal.strategy_id, signal.strategy_version)
+    hold_ceiling = 259200 if manifest and manifest.timeframe == "4h" else 14400
+    no_target = bool(manifest and manifest.exit_model in {"trailing", "channel", "time"})
+    if not 1 <= signal.maximum_hold_seconds <= hold_ceiling:
         return reject("INVALID_HOLD")
     if signal.side not in {"LONG", "SHORT"} or signal.entry_type not in {"LIMIT", "MARKET", "STOP"}:
         return reject("INVALID_SIGNAL")
     entry, stop, target = signal.entry_price, signal.stop_loss, signal.take_profit
+    if (target is None) != no_target:
+        return reject("INVALID_BRACKET")
+    if manifest and signal.entry_type != manifest.entry_type:
+        return reject("INVALID_SIGNAL")
+    prices = (entry, stop) if no_target else (entry, stop, target)
     if not all(x.is_finite() and instrument.min_price <= x <= instrument.max_price
-               and x % instrument.tick == 0 for x in (entry, stop, target)):
+               and x % instrument.tick == 0 for x in prices):
         return reject("PRICE_FILTER")
-    if not (stop < entry < target if signal.side == "LONG" else target < entry < stop):
+    if not (stop < entry if signal.side == "LONG" else stop > entry):
+        return reject("INVALID_BRACKET")
+    if not no_target and not (entry < target if signal.side == "LONG" else target < entry):
         return reject("INVALID_BRACKET")
     if not quote.mark * instrument.multiplier_down <= entry <= quote.mark * instrument.multiplier_up:
         return reject("PERCENT_PRICE_FILTER")
@@ -135,7 +146,9 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     entry_fee = policy.maker_fee if signal.entry_type == "LIMIT" else policy.taker_fee
     costs = entry * (entry_fee + policy.taker_fee + 2 * policy.slippage)
     unit_loss = distance + costs
-    if (abs(target - entry) - costs) / unit_loss < policy.min_net_rr:
+    if no_target and costs > D(".25") * distance:
+        return reject("COSTS_TOO_HIGH_FOR_STOP")
+    if not no_target and (abs(target - entry) - costs) / unit_loss < policy.min_net_rr:
         return reject("NET_REWARD_RISK")
     budget = account.equity * policy.risk_fraction
     # Reserve both adverse price movement and entry costs inside the gross cap.
@@ -153,6 +166,7 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     # Leverage decision, step 2: the lowest leverage that fits the margin budget, so unused leverage
     # never shortens the distance to liquidation and free margin stays available.
     leverage = min(safe, max(D(1), D(ceil(notional / (account.equity * policy.margin_fraction)))))
-    return Decision(True, "APPROVED", quantity, budget, quantity * unit_loss, notional,
+    return Decision(True, "NET_RR_NOT_APPLICABLE" if no_target else "APPROVED",
+                    quantity, budget, quantity * unit_loss, notional,
                     notional / leverage, leverage,
                     notional / account.equity, binding)

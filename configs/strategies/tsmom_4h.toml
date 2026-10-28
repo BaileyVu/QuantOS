@@ -1,0 +1,12 @@
+[strategy]
+id = "tsmom_4h"
+version = "1.0.0"
+
+[parameters]
+return_bars = 180
+ema_period = 50
+atr_period = 14
+stop_atr = 2
+trail_activate_r = 1
+trail_distance_r = 2
+atr_smoothing = "Wilder"

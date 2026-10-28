@@ -1,28 +1,35 @@
 """Public-data-only paper CLI; deliberately has no live/testnet order command."""
 import argparse
 from dataclasses import asdict
+from decimal import Decimal, InvalidOperation
 import json
 from pathlib import Path
+import sqlite3
 import sys
 import time
+import tomllib
 
+from .adaptive import AdaptiveSizer
 from .demo import run_demo
 from .journal import Journal
 from .market import PublicMarket
 from .report import write_reports
 from .runtime import Runtime
-from .strategies import strategy_registry
-from .types import dumps
+from .strategies import library
+from .strategies.manifest import manifest_for
+from .types import D, dumps
 
 
 def parser():
     p = argparse.ArgumentParser(prog="quantos", description="Unauthenticated Binance Futures paper engine")
     sub = p.add_subparsers(dest="command", required=True)
-    default = Path.home() / "Library" / "Application Support" / "QuantOS" / "v3-paper"
+    default = Path.home() / "Library" / "Application Support" / "QuantOS" / "v4-paper"
     for name in ("start", "status", "journal", "report", "stop", "install-service", "exits"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--state", type=Path, default=default)
         if name in {"start", "install-service"}: cmd.add_argument("--hours", type=float, default=72)
+        if name in {"start", "install-service"}:
+            cmd.add_argument("--min-quote-volume", type=_quote_volume, default=D("20000000"))
         if name == "start": cmd.add_argument("--mode", choices=["paper"], default="paper")
         if name == "report": cmd.add_argument("--day", type=int, choices=[1, 2, 3])
         if name == "exits": cmd.add_argument("--profile", choices=["p1", "p5", "pA"], default="p1")
@@ -31,12 +38,134 @@ def parser():
             cmd.add_argument("--limit", type=int, default=50)
     sub.add_parser("doctor")
     cmd = sub.add_parser("strategies"); cmd.add_argument("action", choices=["list"])
+    cmd.add_argument("--state", type=Path, default=default)
     cmd = sub.add_parser("demo"); cmd.add_argument("--state", required=True, type=Path)
     cmd = sub.add_parser("backtest")
     cmd.add_argument("--input", nargs="+", required=True, type=Path)
     cmd.add_argument("--state", required=True, type=Path)
-    cmd.add_argument("--strategy", default="all")
+    selection = cmd.add_mutually_exclusive_group()
+    selection.add_argument("--strategy", default="all")
+    selection.add_argument("--config", type=Path)
     return p
+
+
+def _quote_volume(value: str) -> Decimal:
+    try:
+        parsed = D(value)
+    except (InvalidOperation, ValueError):
+        raise argparse.ArgumentTypeError("quote volume must be a decimal") from None
+    if not parsed.is_finite() or parsed < 0:
+        raise argparse.ArgumentTypeError("quote volume must be finite and non-negative")
+    return parsed
+
+
+class _ReadOnlyMeta:
+    def __init__(self, db=None):
+        self.db = db
+
+    def get(self, key, default=None):
+        if self.db is None:
+            return default
+        row = self.db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        return default if row is None else json.loads(row[0])
+
+
+def _read_pa_profile(state: Path, strategy_id: str) -> dict:
+    """Read pA sizing state with SQLite read-only mode; never initializes or writes a journal."""
+    path = state / "journal_pA.db"
+    db = None
+    try:
+        if path.exists():
+            db = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
+            db.row_factory = sqlite3.Row
+            journal = _ReadOnlyMeta(db)
+            identity = journal.get("identity")
+            if not isinstance(identity, dict) or identity.get("profile") != "pA":
+                raise ValueError("pA journal identity mismatch")
+            equity = D("200")
+            for row in db.execute("SELECT fee,pnl FROM fills"):
+                equity += D(row["pnl"]) - D(row["fee"])
+            for row in db.execute("SELECT amount FROM funding"):
+                equity += D(row[0])
+            for (payload,) in db.execute("SELECT payload FROM orders ORDER BY rowid"):
+                order = json.loads(payload)
+                if order.get("state") not in {"CLOSED", "CANCELED", "EXPIRED", "REJECTED"}:
+                    filled = D(order.get("filled", "0"))
+                    if filled > 0:
+                        equity += filled * (D(order["last_mark"]) - D(order["average"])) * D(order["direction"])
+            high_water = max(D(journal.get("high_water", "200")), equity)
+            sizer = AdaptiveSizer(journal, journal)
+            risk, detail = sizer.risk_fraction(strategy_id, equity, high_water)
+            if journal.get("paused", False):
+                risk = D(0)
+            observed = detail["n"] > 0
+            source = "persisted" if observed else "persisted_no_observations"
+        else:
+            journal = _ReadOnlyMeta()
+            sizer = AdaptiveSizer(journal, journal)
+            risk, detail = sizer.risk_fraction(strategy_id, D("200"), D("200"))
+            observed = False
+            source = "default_probe_no_observations"
+        percent = risk * D(100)
+        return {
+            "state": detail["state"], "n": detail["n"], "mu_R": detail["mu_R"],
+            "risk_fraction": risk, "risk_percent": percent,
+            "observations": "available" if observed else "none",
+            "source": source, "sizing_mode": detail["mode"],
+        }
+    except sqlite3.Error:
+        raise ValueError("unable to read pA journal safely") from None
+    finally:
+        if db is not None:
+            db.close()
+
+
+def _strategy_listing(state: Path) -> list[dict]:
+    rows = []
+    for strategy in library():
+        manifest = manifest_for(strategy.strategy_id, strategy.version)
+        if manifest is None:
+            raise ValueError(f"strategy has no preregistered manifest: {strategy.strategy_id}")
+        rows.append({
+            "manifest": asdict(manifest),
+            "evidence_status": manifest.evidence_status,
+            "pA": _read_pa_profile(state, strategy.strategy_id),
+        })
+    return rows
+
+
+def _strategy_from_config(path: Path) -> str:
+    try:
+        with path.open("rb") as stream:
+            config = tomllib.load(stream)
+    except (OSError, tomllib.TOMLDecodeError):
+        raise ValueError("invalid backtest config") from None
+    if set(config) != {"strategy", "parameters"}:
+        raise ValueError("backtest config must contain only [strategy] and [parameters]")
+    strategy = config["strategy"]
+    if not isinstance(strategy, dict) or set(strategy) != {"id", "version"}:
+        raise ValueError("invalid strategy declaration in backtest config")
+    if not isinstance(strategy["id"], str) or not isinstance(strategy["version"], str):
+        raise ValueError("strategy id and version must be strings")
+    manifest = manifest_for(strategy["id"], strategy["version"])
+    if manifest is None:
+        raise ValueError("unknown strategy or version in backtest config")
+    parameters = config["parameters"]
+    if not isinstance(parameters, dict) or set(parameters) != {key for key, _ in manifest.parameters}:
+        raise ValueError("backtest parameters must exactly match the preregistered manifest")
+    for key, expected in manifest.parameters:
+        value = parameters[key]
+        if _parameter_string(value) != expected:
+            raise ValueError(f"parameter {key} differs from the preregistered manifest")
+    return manifest.strategy_id
+
+
+def _parameter_string(value: object) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (str, int, float, Decimal)):
+        return str(value)
+    return ""
 
 
 def main(argv=None):
@@ -50,18 +179,22 @@ def main(argv=None):
             if abs(offset) > 2000 or not eligible: raise RuntimeError("clock or margin compatibility check failed")
             result = {"mode": "paper", "keys_required": False, "clock_offset_ms": offset,
                       "eligible_symbols": eligible, "python": sys.version.split()[0]}
-        elif args.command == "strategies": result = [asdict(s) for s in strategy_registry()]
+        elif args.command == "strategies": result = _strategy_listing(args.state)
         elif args.command == "demo":
             report = run_demo(args.state)
             result = {"evidence": "synthetic", "report": str(args.state / "reports" / "final.json"),
-                      "scenarios": report["run"]["scenarios"]}
+                      "scenarios": report["run"]["scenarios"], "library": report["run"]["library"]}
         elif args.command == "backtest":
             from .replay import replay
-            result = replay(args.input, args.state, args.strategy)
-        elif args.command == "start": return Runtime(args.state, args.hours).run()
+            selected_strategy = _strategy_from_config(args.config) if args.config else args.strategy
+            result = replay(args.input, args.state, selected_strategy)
+        elif args.command == "start": return Runtime(
+            args.state, args.hours, min_quote_volume=args.min_quote_volume).run()
         elif args.command == "install-service":
             from .service import install_service
-            result = {"plist": str(install_service(Path(sys.executable), args.state, args.hours))}
+            result = {"plist": str(install_service(
+                Path(sys.executable), args.state, args.hours,
+                min_quote_volume=args.min_quote_volume))}
         elif args.command == "stop":
             if not (args.state / "run.json").exists(): raise ValueError("no paper run in this state directory")
             (args.state / "stop.request").touch()

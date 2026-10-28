@@ -10,12 +10,13 @@ from .journal import Journal
 from .report import atomic_json, write_reports
 from .risk import Policy
 from .runtime import arbitrate, dispatch
-from .strategies import EmaAtrLimitStrategy, DonchianAtrStopStrategy
-from .types import D, Candle, Funding, Instrument, Quote, Snapshot, Trade
+from .strategies import library
+from .strategies.manifest import manifest_for
+from .types import D, Candle, DelistEvent, Funding, Instrument, Quote, Snapshot, Trade
 
 
 def decode(cls, data):
-    text = {"symbol", "margin_asset", "status"}
+    text = {"symbol", "margin_asset", "status", "base_asset"}
     integers = {"time_ms", "received_ms", "mark_time_ms", "open_ms", "close_ms", "trade_id"}
     return cls(**{f.name: (data[f.name] if f.name in text | integers | {"buyer_maker"}
                           else D(data[f.name])) for f in fields(cls) if f.name in data})
@@ -24,14 +25,21 @@ def decode(cls, data):
 def snapshot(data):
     return Snapshot(data["at_ms"], decode(Instrument, data["instrument"]), decode(Quote, data["quote"]),
                     tuple(decode(Candle, c) for c in data["candles_1m"]),
-                    tuple(decode(Candle, c) for c in data["candles_5m"]))
+                    tuple(decode(Candle, c) for c in data["candles_5m"]),
+                    **{key: tuple(decode(Candle, c) for c in data.get(key, ()))
+                       for key in ("candles_1h", "candles_4h", "candles_1d")},
+                    delist_events=tuple(DelistEvent(**e) for e in data.get("delist_events", ())),
+                    recent_trade_ms=data.get("recent_trade_ms"),
+                    recent_trade_volume=D(data.get("recent_trade_volume", "0")),
+                    entry_eligible=data.get("entry_eligible", True))
 
 
 def replay(paths, state: Path, strategy="all"):
     if state.exists(): raise ValueError("replay output must be a new directory")
     state.mkdir(parents=True)
-    strategies = [s for s in (EmaAtrLimitStrategy(), DonchianAtrStopStrategy())
-                  if strategy in {"all", s.strategy_id}]
+    selected = manifest_for(strategy)
+    strategies = [s for s in library() if strategy == "all" or s.strategy_id == strategy
+                  or (selected and manifest_for(s.strategy_id) == selected)]
     if not strategies: raise ValueError("unknown strategy")
     journals = [Journal(state/f"journal_{p}.db", p, "replay") for p in ("p1", "p5", "pA")]
     engines = [PaperEngine(j, Policy(risk_fraction=D(f)), adaptive=AdaptiveSizer(j, journals[0]) if p == "pA" else None)
@@ -68,16 +76,7 @@ def replay(paths, state: Path, strategy="all"):
                                 if kind == "quote": e.connection(True, now)
                                 getattr(e, kind)(data, now)
                         elif kind == "snapshots":
-                            snapshots = [snapshot(s) for s in value]
-                            lookup = {s.instrument.symbol: s for s in snapshots}
-                            signals = [v for s in snapshots for strategy_impl in strategies
-                                       if (v := strategy_impl.evaluate(s)) is not None]
-                            proposals, _ = arbitrate(signals)
-                            for proposal in proposals:
-                                s = lookup[proposal.symbol]
-                                for e in engines:
-                                    q = max((s.quote, e.quotes.get(proposal.symbol, s.quote)), key=lambda q:q.time_ms)
-                                    e.propose(proposal, s.instrument, q, now)
+                            dispatch(engines, "scan", [snapshot(s) for s in value], now, strategies=strategies)
                         elif kind == "disconnected":
                             for e in engines: e.connection(False, now, str(value))
                         else: raise ValueError(f"unknown replay record: {kind}")

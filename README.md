@@ -1,4 +1,4 @@
-# QuantOS V3 paper engine
+# QuantOS V4 paper strategy library
 
 A local, public-data-only Binance USD-M Futures paper engine. No API keys, real
 orders, transfers or account changes. Reference strategies demonstrate mechanics;
@@ -14,20 +14,20 @@ python3 -m venv .paper-venv
 .paper-venv/bin/quantos doctor
 .paper-venv/bin/quantos strategies list
 .paper-venv/bin/quantos demo --state /tmp/quantos-new-synthetic-demo
-.paper-venv/bin/quantos start --mode paper --hours 72
+.paper-venv/bin/quantos start --mode paper --hours 72 --state "$HOME/Library/Application Support/QuantOS/v4-new-run"
 ```
 
 `start` runs in the foreground. After acceptance, use the macOS supervisor:
 
 ```bash
-.paper-venv/bin/quantos install-service --hours 72
+.paper-venv/bin/quantos install-service --hours 72 --state "$HOME/Library/Application Support/QuantOS/v4-new-run"
 .paper-venv/bin/quantos status
 .paper-venv/bin/quantos journal --profile p1 --limit 50
 .paper-venv/bin/quantos report --day 1
 .paper-venv/bin/quantos stop
 ```
 
-Default state is `~/Library/Application Support/QuantOS/v3-paper`. Every stateful
+Default state is `~/Library/Application Support/QuantOS/v4-paper`. Every stateful
 command accepts `--state PATH`. Use a fresh directory for a new observation;
 restarting an existing one retains its original deadline and account history.
 `stop` requests graceful local closure, preserving unresolved exposure when the
@@ -45,13 +45,19 @@ restart recovery preserves known protection and cancels stale entry remainders.
 
 ## Behavior and evidence
 
-- Independent $200 USDC accounts: p1 (1%) and p5 (5% risk ceiling), sharing signals.
-- 1x equity gross exposure, <=3x leverage, one active position, 10% daily loss
-  breaker and 25% drawdown pause. p5 often sizes below 5% due to the exposure cap.
-- EMA20/50 ATR14 LIMIT pullback and Donchian20 ATR14 continuation STOP, completed
-  5-minute bars only; 1-minute data is also collected. No parameter optimization.
-- E17 is ineligible, with unverified source metadata. An announcement monitor is
-  not yet running. Other imported research is deferred in LATER.md.
+- Independent $200 USDC profiles: p1 (1%), p5 (5% ceiling), and pA (adaptive).
+  pA probes at 0.25% for 30 trades, learns from p1, then uses the existing edge
+  estimator. SHADOW strategies do not trade. Only pA ranks competing signals by
+  `mu / sqrt(m2)`; p1/p5 keep deterministic ordering and one position per profile.
+- Existing per-trade leverage logic: gross ceiling 3x equity, leverage <=3x,
+  50% margin budget, 10% daily loss breaker and 25% drawdown pause. Actual sizing
+  may be smaller than the requested risk and can fall below exchange minimums.
+- The universe uses TRADING USDC perpetuals and 24h quote volume >=20M USDC,
+  configurable with `--min-quote-volume`; BTCUSDC/ETHUSDC remain default baseline
+  feeds but are not exempt from liquidity/freshness gates. Candle caches and
+  bounded workers avoid a feed worker for every discovered market.
+- Six preregistered strategies are listed below. Daily trend/volatility regime
+  tags are recorded for analysis and never filter entries. No parameter tuning.
 - LIMIT fills require strict public trade-through, 1% participation after a
   queue allowance. Touch alone never fills. MARKET/STOP uses a later quote,
   latency, adverse slippage and size impact; large gaps/depth shortages reject.
@@ -62,8 +68,40 @@ restart recovery preserves known protection and cancels stale entry remainders.
 - Daily and final JSON/Markdown/CSV reports live under the state `reports/` folder.
   Signals, risk approvals, fills, no-fill/expiry causes, costs and R are separate.
 
+| Strategy/config ID | Rule and exits | Evidence |
+|---|---|---|
+| `ema_atr_ref` | Existing 5m EMA20/50, ATR14 LIMIT | PAPER_REFERENCE |
+| `donchian_atr_ref` | Existing 5m Donchian20 continuation STOP | PAPER_REFERENCE |
+| `tsmom_4h` | 30-day return + EMA50 slope, 2 ATR14 stop; +1R activates 2R trail; 72h max | UNPROVEN_REFERENCE |
+| `turtle_55` | Closed 4h breakout, STOP at prior 55-bar boundary; 2 ATR20 stop, opposite 20-bar channel or 72h | UNPROVEN_REFERENCE |
+| `vol_squeeze_breakout` | 1h BB20/2 inside EMA20 Keltner/1.5 ATR20, release-range breakout STOP; 2R, 4h max | UNPROVEN_REFERENCE |
+| `delist_short_e17` | Verified-format Binance CMS delist <=5m, USDC perp only; short, 25% stop, 4h | FRAGILE_SOURCE_ONLY |
+
+Reference aliases retain historical journal IDs. Manifests and matching TOMLs in
+`configs/strategies/` fix parameters before observation. New bar strategies emit
+only in the first 90 seconds after a close; already-crossed STOP triggers are
+rejected, never backfilled. No-target manifests replace target-based net RR with
+round-trip costs <=25% of raw stop risk, including a fill-time check. Fixed-target
+strategies retain minimum net RR. All stops tighten only and every change is
+journaled and reconciled on restart. Only 4h strategies may hold up to 72h.
+
+E17 requires a valid CMS source URL/release timestamp, a traded prior UTC day and
+positive current-minute trades. Missing USDC contracts log `SKIPPED_NO_USDC_PERP`.
+Its supplied performance results/hash were absent and its edge remains fragile.
+Source account sizing/live permissions do not override these paper profiles.
+
+`quantos strategies list --state NEW_DIRECTORY` reads actual pA state without
+writing journals. `quantos demo` retains fault scenarios and adds all-six strategy
+lifecycles for p1/p5, pA decisions, and exact replay checks; minimum-size probe
+rejections remain explicit. Demonstrations are synthetic, not profitability evidence.
+
+Use a **new state directory** for V4. The canceled V3 run is preserved and must not
+be resumed. The default state is now `~/Library/Application Support/QuantOS/v4-paper`.
+No V4 natural run has been launched or claimed complete.
+
 `quantos backtest --input recorded.jsonl.gz --state NEW_DIRECTORY --strategy all`
-replays recorded inputs through the same logic without network. It leaves any
+replays recorded inputs through the same logic without network. Use
+`--config configs/strategies/tsmom_4h.toml` to select one frozen configuration. It leaves any
 end-of-input position open; it does not invent a final quote or missing events.
 Synthetic demo, replay and natural journals have distinct immutable identities.
 
