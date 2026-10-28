@@ -15,6 +15,7 @@ class Manifest:
     parameters: tuple[tuple[str, str], ...]
     evidence_status: str
     aliases: tuple[str, ...] = ()
+    status: str = "library"
 
 
 MANIFESTS = (

@@ -91,6 +91,14 @@ class DelistEvent:
 
 
 @dataclass(frozen=True)
+class OpenInterestValue:
+    """Source label and conservative availability time are distinct."""
+    time_ms: int
+    available_ms: int
+    value: Decimal
+
+
+@dataclass(frozen=True)
 class Snapshot:
     at_ms: int
     instrument: Instrument
@@ -104,6 +112,10 @@ class Snapshot:
     recent_trade_ms: int | None = None
     recent_trade_volume: Decimal = D(0)
     entry_eligible: bool = True
+    candles_2h: tuple[Candle, ...] = ()
+    oi_values: tuple[OpenInterestValue, ...] = ()
+    quarterly_return_cutoff: Decimal | None = None
+    calibration_end_ms: int | None = None
 
 
 @dataclass(frozen=True)

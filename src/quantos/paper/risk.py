@@ -26,13 +26,37 @@ class Policy:
         for name, value in vars(self).items():
             if not isinstance(value, Decimal) or not value.is_finite() or value < 0:
                 raise ValueError(f"invalid policy {name}")
-        for name, ceiling in (("risk_fraction", ".05"), ("daily_loss", ".10"),
-                              ("drawdown", ".25"), ("gross_fraction", "3"),
+        for name, ceiling in (("risk_fraction", self.risk_ceiling), ("daily_loss", ".10"),
+                              ("drawdown", self.drawdown_ceiling), ("gross_fraction", "3"),
                               ("leverage", "3"), ("margin_fraction", "1")):
             if not 0 < getattr(self, name) <= D(ceiling):
                 raise ValueError(f"hard ceiling: {name}")
         if self.leverage < 1 or self.slippage < D(".0015"):
             raise ValueError("invalid leverage or execution cost allowance")
+
+    risk_ceiling = ".05"
+    drawdown_ceiling = ".25"
+    max_positions = 1
+    margin_asset = "USDC"
+    candidates_enabled = False
+
+
+@dataclass(frozen=True)
+class ResearchPolicy(Policy):
+    """Explicit candidate profile; existing p1/p5/pA defaults stay frozen.
+
+    50% is a breaker threshold, not a promise that gaps cannot exceed it.
+    Leverage remains subject to the existing twice-stop liquidation buffer.
+    """
+    drawdown: Decimal = D(".50")
+    taker_fee: Decimal = D(".0005")
+    maker_fee: Decimal = D(".0005")  # conservative taker charge on all research fills
+
+    risk_ceiling = ".08"
+    drawdown_ceiling = ".50"
+    max_positions = 3
+    margin_asset = "USDT"
+    candidates_enabled = True
 
 
 @dataclass(frozen=True)
@@ -43,6 +67,11 @@ class Account:
     active_orders: int = 0
     reconciled: bool = True
     paused: bool = False
+    gross_notional: Decimal = D(0)
+    margin_used: Decimal = D(0)
+    long_risk: Decimal = D(0)
+    short_risk: Decimal = D(0)
+    open_symbols: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -81,8 +110,17 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
         return Decision(False, reason)
     if account.paused or not account.reconciled:
         return reject("UNRECONCILED_OR_PAUSED")
-    if account.active_orders:
+    if account.active_orders >= policy.max_positions:
         return reject("EXISTING_EXPOSURE")
+    if account.active_orders < 0:
+        return reject("INVALID_EXPOSURE")
+    exposure = (account.gross_notional, account.margin_used, account.long_risk, account.short_risk)
+    if (any(not value.is_finite() or value < 0 for value in exposure)
+            or (account.active_orders and (account.gross_notional <= 0
+                or account.margin_used <= 0 or len(account.open_symbols) != account.active_orders))):
+        return reject("INVALID_EXPOSURE")
+    if signal.symbol in account.open_symbols:
+        return reject("EXISTING_SYMBOL_EXPOSURE")
     if not all(x.is_finite() and x > 0 for x in
                (account.equity, account.day_start_equity, account.high_water)):
         return reject("INVALID_EQUITY")
@@ -90,7 +128,7 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
         return reject("DAILY_LOSS_BREAKER")
     if account.equity <= account.high_water * (1 - policy.drawdown):
         return reject("DRAWDOWN_BREAKER")
-    if instrument.margin_asset != "USDC":
+    if instrument.margin_asset != policy.margin_asset:
         return reject("INCOMPATIBLE_MARGIN_ASSET")
     if instrument.status != "TRADING" or signal.symbol != instrument.symbol or quote.symbol != signal.symbol:
         return reject("INVALID_INSTRUMENT")
@@ -112,7 +150,11 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     if not signal.observed_ms <= now_ms < signal.expires_ms or now_ms - signal.observed_ms > 120000:
         return reject("EXPIRED_SIGNAL")
     manifest = manifest_for(signal.strategy_id, signal.strategy_version)
+    if manifest and manifest.status == "candidate" and not policy.candidates_enabled:
+        return reject("CANDIDATE_RESEARCH_ONLY")
     hold_ceiling = 259200 if manifest and manifest.timeframe == "4h" else 14400
+    if manifest and manifest.status == "candidate" and policy.candidates_enabled:
+        hold_ceiling = min(259200, manifest.maximum_hold_seconds)
     no_target = bool(manifest and manifest.exit_model in {"trailing", "channel", "time"})
     if not 1 <= signal.maximum_hold_seconds <= hold_ceiling:
         return reject("INVALID_HOLD")
@@ -151,11 +193,22 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     if not no_target and (abs(target - entry) - costs) / unit_loss < policy.min_net_rr:
         return reject("NET_REWARD_RISK")
     budget = account.equity * policy.risk_fraction
+    if policy.candidates_enabled:
+        # All same-direction positions share a risk bucket, even if a noisy
+        # historical correlation estimate would call them independent.
+        used = account.long_risk if signal.side == "LONG" else account.short_risk
+        direction_budget = account.equity * min(2 * policy.risk_fraction, D(".16")) - used
+        total_budget = account.equity * min(3 * policy.risk_fraction, D(".24")) - account.long_risk - account.short_risk
+        budget = min(budget, direction_budget, total_budget)
+        if budget <= 0:
+            return reject("PORTFOLIO_RISK_CAP")
     # Reserve both adverse price movement and entry costs inside the gross cap.
     max_entry = entry * (1 + policy.slippage)
+    margin_capacity = max(D(0), min(account.equity * policy.margin_fraction,
+                                   account.equity - account.margin_used))
     bounds = {"risk": budget / unit_loss,
-              "gross_notional": account.equity * policy.gross_fraction / (max_entry * (1 + entry_fee)),
-              "margin": account.equity * policy.margin_fraction / (max_entry / safe + costs),
+              "gross_notional": max(D(0), account.equity * policy.gross_fraction - account.gross_notional) / (max_entry * (1 + entry_fee)),
+              "margin": margin_capacity / (max_entry / safe + costs),
               "exchange_max": min(instrument.max_qty, instrument.market_max_qty)}
     binding = min(bounds, key=bounds.get)
     quantity = floor_step(bounds[binding], quantity_step(instrument))
@@ -165,7 +218,11 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     notional = quantity * entry
     # Leverage decision, step 2: the lowest leverage that fits the margin budget, so unused leverage
     # never shortens the distance to liquidation and free margin stays available.
-    leverage = min(safe, max(D(1), D(ceil(notional / (account.equity * policy.margin_fraction)))))
+    leverage_capacity = (margin_capacity - quantity * costs if policy.candidates_enabled
+                         else account.equity * policy.margin_fraction)
+    if leverage_capacity <= 0:
+        return reject("INSUFFICIENT_MARGIN")
+    leverage = min(safe, max(D(1), D(ceil(notional / leverage_capacity))))
     return Decision(True, "NET_RR_NOT_APPLICABLE" if no_target else "APPROVED",
                     quantity, budget, quantity * unit_loss, notional,
                     notional / leverage, leverage,

@@ -77,11 +77,23 @@ class PaperEngine:
 
     def account(self, now_ms):
         equity = self.journal.cash()
+        gross = margin = long_risk = short_risk = D(0)
+        symbols = []
         for o in self.active():
             q = self.quotes.get(o["signal"]["symbol"])
+            mark = q.mark if q else D(o["last_mark"])
             if D(o["filled"]) > 0:
-                mark = q.mark if q else D(o["last_mark"])
                 equity += D(o["filled"]) * (mark - D(o["average"])) * D(o["direction"])
+            # Pending entries reserve capital too. Initial risk is retained
+            # until quantity leaves the account, even after a stop tightens.
+            reserved_qty = D(o["filled"]) + D(o["remaining"])
+            notional = reserved_qty * max(mark, D(o["signal"]["entry_price"]))
+            gross += notional
+            margin += notional / D(o["decision"]["leverage"])
+            reserved_risk = D(o["decision"]["achievable_risk"]) * reserved_qty / D(o["quantity"])
+            if o["signal"]["side"] == "LONG": long_risk += reserved_risk
+            else: short_risk += reserved_risk
+            symbols.append(o["signal"]["symbol"])
         day = datetime.fromtimestamp(now_ms / 1000, timezone.utc).date().isoformat()
         high = max(D(self.journal.get("high_water", "200")), equity)
         self.journal.set("high_water", str(high))
@@ -90,7 +102,8 @@ class PaperEngine:
             self.journal.set("day_equity", str(equity))
         return Account(equity, D(self.journal.get("day_equity")), high,
                        len(self.active()), self.connected and self.journal.get("reconciled", False),
-                       bool(self.journal.get("paused", False)))
+                       bool(self.journal.get("paused", False)),
+                       gross, margin, long_risk, short_risk, tuple(symbols))
 
     def recover(self, now_ms):
         """Verify durable fill totals and restore known protection before new entries."""

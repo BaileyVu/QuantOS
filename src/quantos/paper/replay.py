@@ -12,7 +12,7 @@ from .risk import Policy
 from .runtime import arbitrate, dispatch
 from .strategies import library
 from .strategies.manifest import manifest_for
-from .types import D, Candle, DelistEvent, Funding, Instrument, Quote, Snapshot, Trade
+from .types import D, Candle, DelistEvent, Funding, Instrument, OpenInterestValue, Quote, Snapshot, Trade
 
 
 def decode(cls, data):
@@ -27,11 +27,16 @@ def snapshot(data):
                     tuple(decode(Candle, c) for c in data["candles_1m"]),
                     tuple(decode(Candle, c) for c in data["candles_5m"]),
                     **{key: tuple(decode(Candle, c) for c in data.get(key, ()))
-                       for key in ("candles_1h", "candles_4h", "candles_1d")},
+                       for key in ("candles_1h", "candles_4h", "candles_1d", "candles_2h")},
                     delist_events=tuple(DelistEvent(**e) for e in data.get("delist_events", ())),
                     recent_trade_ms=data.get("recent_trade_ms"),
                     recent_trade_volume=D(data.get("recent_trade_volume", "0")),
-                    entry_eligible=data.get("entry_eligible", True))
+                    entry_eligible=data.get("entry_eligible", True),
+                    oi_values=tuple(OpenInterestValue(v["time_ms"], v["available_ms"], D(v["value"]))
+                                    for v in data.get("oi_values", ())),
+                    quarterly_return_cutoff=(D(data["quarterly_return_cutoff"])
+                                             if data.get("quarterly_return_cutoff") is not None else None),
+                    calibration_end_ms=data.get("calibration_end_ms"))
 
 
 def replay(paths, state: Path, strategy="all"):
