@@ -707,3 +707,90 @@ Primary reset October28 19:17:38 Vietnam (1793189858); weekly reset November4
 14:17:38 Vietnam (1793776658). Confirmed ACTIVE heartbeat
 quantos-portfolio-research-continuation at19:27 Vietnam; update THIS ID next time,
 never recreate old V3 automation. No active task processes/agents or trading.
+
+## Portfolio checkpoint2 — October28 evening
+
+Branch codex/quantos-portfolio-research; implementation advanced fromcd7df18.
+All user clarifications RESOLVED, do not ask again:
+- Archived backtest_edge.py variant gets a SHORT separate source audit; report
+ mismatch, never chase/tune. UTC/exchange timestamp2h bars, never row counts.
+ User says oldREADME firstresults misaligned, corrected12/26 WF1.12-1.27x;
+ this remains supplied claim. Candidate12/26 uses sourcecausalS/R+flip zones,
+ .25ATRtouch/.25stop,1.5R; no optionalFibonacci/context filter. ALT3dembargo kept.
+- /Users/bailey12/Desktop/fetch1h.py supplied, read notexecuted. Original29 names
+ retained in candidate_features.ALT_SOURCE_UNIVERSE and acquisitionmanifest.
+ Universe hindsight-selected survivors: disclose. Sourcefetch uses SPOT, current
+ evaluationUSD-M; cannotclaim exactpriorperformance reproduction. Dec2024volume
+ top20other+9major universe remains REQUIRED separatelylabelledrobustnessrow,
+ notyetbuilt. Sevenprovidedsourcefiles hash documented, no further sourcehunt.
+
+Completed checkpoint2:
+- Agent candidates: EMA12/26 UTC2h sourcezone logic, causalconfirmation, source
+ ATR14EMA, pivots5,lookback288,two distincttouches/leave1ATR,retest12,near1ATR,
+ .25touch/.25stop,1.5R,72h; optionalsourceFibfilterexcluded. Allthreeversions
+ research-1.0.0. Crash24/48/72h,ALT12/24/72h+q.005/.01,25%normal/15%sensitivity.
+ OIavailability boundaryfixed toactualdecisionatclose+1;futureavailabilitytests.
+ Quarterlycalibration usesclose-exclusive returns,[S-90d,S-3d), requirescomplete
+ 2088hourvaluespercoin (strictfailclosed);noimputation. Agent15tests passed.
+ -New manifests/statuscandidate,threeTOMLconfigs,opt-inlibrary(True);default6
+ unchanged. CLIstrategieslist --include-candidates marks pA RESEARCH_ONLY/risk0.
+ -MainisolatedpRjournalUSDT,ResearchPolicy persisted/frozen perstate; cannotreuse
+ p1/p5/pA orchange policyinexistingpR. --research backtest opt-in usespR and
+ correctreports; snapshotnewfieldsroundtriptested. No naturalpRrunner yet.
+ -Wholeportfolio fill-timegross/margincaps include pendingorders andentryfee/MTM;
+ candidateentrycooldown durablystartsfirstfill (crash24h,ALToriginalhold).
+ -research/protocol.py immutablepreregseal/oneOOSclaim/cellresults, metrics.py
+ MTMdrawdown/calendarwindows/PF/top5/catastrophestats/trainingKelly/1000MC helpers.
+ Notyetwired intoend-to-endhistoricalsim; do notclaim frozenplan/evaluationdone.
+
+Tests:41 NEW portfolio tests PASS in0.163s as one integrateddiscovery run,
+ /tmp/quantos-portfolio-phase2-tests.log. Existing39 V3engine/V4risk tests passed
+ afterengine/journalchanges; existing6V4CLI passed afterconfigs/opt-in change,
+ 4V4runtime passed duringsame focusedintegration (beforetrivialCLIcall/countfix).
+ No repeated fullsuite; sourcechangedsofocusedregressionsjustified.
+ Allnewtests included (candidate15,data/acquire10,risk8,protocol2,metrics3,replay3).
+ gitdiffcheckpass. No performance results, trainselection, OOS or PR yet.
+
+ACTIVE PROCESS (preserve): PID26506 verifiedalive via scopedps aftersandbox
+ escalation. Public training-only downloader; agent-ownedexecsession60295 cannot
+ be polled byroot (Unknownprocess), so inspectmanifest/progress andscopedps.
+ .venv/bin/python -m quantos.paper.research.acquire download --manifest
+ data/portfolio/manifests/train_2021-10-01_to_2024-12-31.json --limit14000 --workers4
+ (ActualCLI needs spaces: --limit 14000 --workers 4.) No trading process.
+ Manifest summary last996downloaded,12601available,0failed,488missing.14,085
+ plannedpartitions~167.5MiB;488missing=8coins*61preavailabilityOct-Nov2021days,
+ ZEROinternal2022-24OI listinggaps.96samplearchives passedSHAchecks beforefullrun.
+ Rawdata ignored in data/portfolio/raw/sha256; JSONLprogress besidemanifest.
+ Checkpoints every100outcomes. Old sandboxblocked downloader26015 terminated,
+ only26506 remains. Bothlowercostagents finished; downloadskeepgoing independently.
+ iter_cached_archives verifiespathandSHA forpreprocessing. NoOOSarchivesrequested.
+
+EXACT NEXT STEP:
+1.Readfreshmanifest/progress; do NOT duplicate runningdownloader. Oncompleted
+ process withavailable/error tasks resume sameCLI only. Auditrow-levelcoverage,
+ no forwardfill. Build datasetindex/bar+mark+fundingjoins andcausal signalcache.
+ Do not rerunmetadataaudit/sourcehunt orpassingtestsabsentchangedcode.
+2.Mainimplement historicalportfolio simulator using SAME risk.evaluate and
+ currentcandidateclasses; no duplicatedsignalrules. Need explicit OHLCfill/
+ 90secondTTL limitations foroldLIMIT/STOPrefs, realisticexecutionatnextavailable
+ price, fees+slippage+actualfunding,MTM/catastrophe/gaps/liquidation,aggregatecaps,
+ cooldowns andsame-directionrisk. ExistingE17eventhistorymissingnotinventable;
+ existingUSDCstart2024not2022. Choosehonestnot-evaluable status whereinputsabsent,
+ do notspliceUSDT/USDCorpretend OHLC provesbook/trade-through. Currentfilterproxy
+ vs historicalfilters needs documentedhandling; public exchangeInfo current
+ helper defaultsUSDC only, canaddexplicitUSDT opt-in preservingdefault.
+3.Finishsourceaudit short andseparate, buildDec2024volumeuniverse robustness,
+ preregister fullgrid/cost/baselines/selectionobjective andreportdataassumptions.
+ Baseline matchedbars/randomseed frozen; crash-onlydropsOI. Train2022-24 ONLY,
+ chooseholds/quantiles/sizing andhalfoftrainingKellylimit; recommendfrozenpick.
+ Then seal actualcodeSHA/datahash/grid beforeONE2025+wave (includingexploratory
+ bestgridcell,sensitivities+1bar/2xslip/15%stop,1000MC). Earlier2025-26exposure
+ andsurvivorbias mustappearreport. Sealhelpersneedactualrunnerenforcement.
+4.Completepaper-readyportfolio config/isolatednaturalrunner if supported by
+ evidence, doNOTlaunch; fullreview/suites onlywhenready, reportallrequestedstats
+ docs/PORTFOLIO_EVAL_<date>.md, onePR. No merge authorization thisnewtask.
+
+Quota:89%five-hourused/11%remaining, resetsOct29 00:31:54 Vietnam(epoch1793208714).
+ Weekly30%used/70%remaining, resetsNov4 14:17:38 Vietnam(epoch1793776658).
+ Update SAME quantos-portfolio-research-continuation for00:41,neverduplicate.
+ Localoperationalcheckpoint mustnot beexported perpriorauto-reviewrejection.
