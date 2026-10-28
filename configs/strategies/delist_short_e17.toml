@@ -1,0 +1,9 @@
+[strategy]
+id = "delist_short_e17"
+version = "1.0.0"
+
+[parameters]
+maximum_latency_ms = 300000
+stop_fraction = 0.25
+poll_seconds = 30
+margin_asset = "USDC"

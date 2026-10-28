@@ -14,24 +14,29 @@ import plistlib
 import shutil
 import subprocess
 import tempfile
+from decimal import Decimal
 
 LABEL = "com.quantos.v3.paper"
 
 
 def build_plist(python: Path, state: Path, logdir: Path,
-                duration_hours: int = 72) -> dict:
+                duration_hours: int = 72, *, min_quote_volume=Decimal("20000000")) -> dict:
     # Keep the venv executable's lexical path; resolving its symlink can select
     # the base interpreter and lose the venv's installed package environment.
     python = Path(os.path.abspath(os.path.expanduser(os.fspath(python))))
     state, logdir = (Path(p).expanduser().resolve() for p in (state, logdir))
     if not 0 < duration_hours <= 72:
         raise ValueError("duration_hours must be between 1 and 72")
+    min_quote_volume = Decimal(min_quote_volume)
+    if not min_quote_volume.is_finite() or min_quote_volume < 0:
+        raise ValueError("invalid quote volume floor")
     logs = logdir / "quantos-v3-paper.log"
     errors = logdir / "quantos-v3-paper.err.log"
     return {
         "Label": LABEL,
         "ProgramArguments": [str(python), "-m", "quantos.paper.cli", "start", "--mode", "paper",
-                             "--state", str(state), "--hours", str(duration_hours)],
+                             "--state", str(state), "--min-quote-volume", str(min_quote_volume),
+                             "--hours", str(duration_hours)],
         "RunAtLoad": True,
         "KeepAlive": {"SuccessfulExit": False},
         # The runtime uses up to 25 seconds for graceful checkpoint/close.
@@ -58,7 +63,7 @@ def _domain() -> str:
     return f"gui/{os.getuid()}"
 
 
-def install_service(python: Path, state: Path, duration_hours: int = 72) -> Path:
+def install_service(python: Path, state: Path, duration_hours: int = 72, *, min_quote_volume=Decimal("20000000")) -> Path:
     launchctl = _launchctl()
     python = Path(os.path.abspath(os.path.expanduser(os.fspath(python))))
     if not python.is_file() or not os.access(python, os.X_OK):
@@ -71,7 +76,7 @@ def install_service(python: Path, state: Path, duration_hours: int = 72) -> Path
         raise RuntimeError("could not confirm paper service is stopped")
     path = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
     logdir = Path(state).expanduser().resolve() / "logs"
-    plist = build_plist(python, state, logdir, duration_hours)
+    plist = build_plist(python, state, logdir, duration_hours, min_quote_volume=min_quote_volume)
     path.parent.mkdir(parents=True, exist_ok=True)
     logdir.mkdir(parents=True, exist_ok=True)
     logdir.chmod(0o700)

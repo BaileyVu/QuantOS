@@ -1,0 +1,13 @@
+[strategy]
+id = "vol_squeeze_breakout"
+version = "1.0.0"
+
+[parameters]
+period = 20
+bb_std = 2
+kc_atr = 1.5
+kc_basis = "EMA"
+atr_smoothing = "Wilder"
+target_r = 2
+range = "consecutive squeeze bars"
+trigger = "first closed squeeze-off bar beyond range; stop beyond its extreme"

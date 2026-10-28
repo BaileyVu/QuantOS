@@ -35,6 +35,7 @@ class Instrument:
     market_max_qty: Decimal = D("100000000")
     multiplier_up: Decimal = D("1.05")
     multiplier_down: Decimal = D("0.95")
+    base_asset: str = ""
 
 
 @dataclass(frozen=True)
@@ -80,12 +81,29 @@ class Funding:
 
 
 @dataclass(frozen=True)
+class DelistEvent:
+    symbol: str
+    release_ms: int
+    observed_ms: int
+    article_id: str
+    title: str
+    source_url: str
+
+
+@dataclass(frozen=True)
 class Snapshot:
     at_ms: int
     instrument: Instrument
     quote: Quote
     candles_1m: tuple[Candle, ...]
     candles_5m: tuple[Candle, ...]
+    candles_1h: tuple[Candle, ...] = ()
+    candles_4h: tuple[Candle, ...] = ()
+    candles_1d: tuple[Candle, ...] = ()
+    delist_events: tuple[DelistEvent, ...] = ()
+    recent_trade_ms: int | None = None
+    recent_trade_volume: Decimal = D(0)
+    entry_eligible: bool = True
 
 
 @dataclass(frozen=True)
@@ -100,10 +118,12 @@ class Signal:
     entry_type: Literal["LIMIT", "MARKET", "STOP"]
     entry_price: Decimal
     stop_loss: Decimal
-    take_profit: Decimal
+    take_profit: Decimal | None
     maximum_hold_seconds: int
     reason: str
     features: tuple[tuple[str, Decimal], ...] = ()
+    trend_regime: str = "UNKNOWN"
+    vol_regime: str = "UNKNOWN"
 
 
 class Strategy(Protocol):
