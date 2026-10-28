@@ -118,46 +118,7 @@ class PublicMarket:
         raise RuntimeError("public API request failed")
 
     def exchange_info(self) -> dict[str, Instrument]:
-        data = self._get("/fapi/v1/exchangeInfo")
-        if not isinstance(data, dict) or not isinstance(data.get("symbols"), list):
-            raise ValueError("malformed exchangeInfo")
-        found = {}
-        for item in data["symbols"]:
-            if not isinstance(item, dict):
-                raise ValueError("malformed instrument")
-            if (item.get("quoteAsset") != "USDC" or item.get("marginAsset") != "USDC"
-                    or item.get("contractType") != "PERPETUAL"):
-                continue
-            sym = item.get("symbol")
-            if not isinstance(sym, str) or not sym.endswith("USDC"):
-                continue
-            filters = item.get("filters")
-            if not isinstance(filters, list):
-                continue
-            by = {f.get("filterType"): f for f in filters if isinstance(f, dict)}
-            try:
-                base_asset = item.get("baseAsset", sym[:-4])
-                if not isinstance(base_asset, str) or not base_asset:
-                    continue
-                p, l, ml, mn, pp = (by[x] for x in ("PRICE_FILTER", "LOT_SIZE", "MARKET_LOT_SIZE", "MIN_NOTIONAL", "PERCENT_PRICE"))
-                instrument = Instrument(sym, item["marginAsset"], item["status"],
-                    _decimal(p["tickSize"], "tick"), _decimal(l["stepSize"], "step"),
-                    _decimal(l["minQty"], "minQty"), _decimal(l["maxQty"], "maxQty"),
-                    _decimal(mn.get("notional", mn.get("minNotional")), "minNotional"),
-                    _decimal(p["minPrice"], "minPrice"), _decimal(p["maxPrice"], "maxPrice"),
-                    _decimal(ml["stepSize"], "marketStep"), _decimal(ml["minQty"], "marketMinQty"),
-                    _decimal(ml["maxQty"], "marketMaxQty"), _decimal(pp["multiplierUp"], "multiplierUp"),
-                    _decimal(pp["multiplierDown"], "multiplierDown"),
-                    base_asset)
-                if any(v <= 0 for v in (instrument.tick, instrument.step, instrument.min_qty,
-                    instrument.max_qty, instrument.min_notional, instrument.market_step,
-                    instrument.market_min_qty, instrument.market_max_qty, instrument.multiplier_up,
-                    instrument.multiplier_down)) or instrument.min_price < 0 or instrument.max_price <= instrument.min_price:
-                    continue
-                found[sym] = instrument
-            except (KeyError, ValueError, TypeError):
-                continue
-        return {s: found[s] for s in sorted(found, key=lambda x: (x not in {"BTCUSDC", "ETHUSDC"}, x))}
+        return parse_exchange_info(self._get("/fapi/v1/exchangeInfo"))
 
     def eligible_instruments(self, min_quote_volume: Decimal = D("20000000")) -> dict[str, Instrument]:
         """Return TRADING USDC perpetuals meeting the 24h quote-turnover floor."""
@@ -322,3 +283,48 @@ class PublicMarket:
             if nxt <= cursor: raise ValueError("funding pagination stalled")
             cursor = nxt
         return tuple(sorted(out, key=lambda x:x.time_ms))
+
+
+def parse_exchange_info(data: dict, margin_asset: str = "USDC") -> dict[str, Instrument]:
+    """Parse public filters without I/O; historical callers must declare provenance."""
+    if margin_asset not in {"USDC", "USDT"}:
+        raise ValueError("unsupported margin asset")
+    if not isinstance(data, dict) or not isinstance(data.get("symbols"), list):
+        raise ValueError("malformed exchangeInfo")
+    found = {}
+    for item in data["symbols"]:
+        if not isinstance(item, dict):
+            raise ValueError("malformed instrument")
+        if (item.get("quoteAsset") != margin_asset or item.get("marginAsset") != margin_asset
+                or item.get("contractType") != "PERPETUAL"):
+            continue
+        sym = item.get("symbol")
+        if not isinstance(sym, str) or not sym.endswith(margin_asset):
+            continue
+        filters = item.get("filters")
+        if not isinstance(filters, list):
+            continue
+        by = {f.get("filterType"): f for f in filters if isinstance(f, dict)}
+        try:
+            base_asset = item.get("baseAsset", sym[:-4])
+            if not isinstance(base_asset, str) or not base_asset:
+                continue
+            p, l, ml, mn, pp = (by[x] for x in ("PRICE_FILTER", "LOT_SIZE", "MARKET_LOT_SIZE", "MIN_NOTIONAL", "PERCENT_PRICE"))
+            instrument = Instrument(sym, item["marginAsset"], item["status"],
+                _decimal(p["tickSize"], "tick"), _decimal(l["stepSize"], "step"),
+                _decimal(l["minQty"], "minQty"), _decimal(l["maxQty"], "maxQty"),
+                _decimal(mn.get("notional", mn.get("minNotional")), "minNotional"),
+                _decimal(p["minPrice"], "minPrice"), _decimal(p["maxPrice"], "maxPrice"),
+                _decimal(ml["stepSize"], "marketStep"), _decimal(ml["minQty"], "marketMinQty"),
+                _decimal(ml["maxQty"], "marketMaxQty"), _decimal(pp["multiplierUp"], "multiplierUp"),
+                _decimal(pp["multiplierDown"], "multiplierDown"),
+                base_asset)
+            if any(v <= 0 for v in (instrument.tick, instrument.step, instrument.min_qty,
+                instrument.max_qty, instrument.min_notional, instrument.market_step,
+                instrument.market_min_qty, instrument.market_max_qty, instrument.multiplier_up,
+                instrument.multiplier_down)) or instrument.min_price < 0 or instrument.max_price <= instrument.min_price:
+                continue
+            found[sym] = instrument
+        except (KeyError, ValueError, TypeError):
+            continue
+    return {s: found[s] for s in sorted(found, key=lambda x: (x not in {"BTC" + margin_asset, "ETH" + margin_asset}, x))}
