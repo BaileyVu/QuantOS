@@ -69,15 +69,18 @@ class CrashFlushE2Strategy:
         if price_change_4h >= 0 or current.close > high_24h * (1 - PRICE_DRAWDOWN):
             return None
 
-        # Snapshot time is the exclusive candle-close boundary. The final OI
-        # archive label may land exactly at that boundary and be available then.
+        # Metrics archive rows are conservatively available one hour after
+        # their raw label. Use the latest exact hourly observation available at
+        # this decision boundary; retain its original label and expose the lag.
         oi = _oi_observations(snapshot.oi_values, snapshot.at_ms)
         current_oi_label = current.open_ms + HOUR_MS
-        if oi is None or oi[-1].time_ms != current_oi_label:
+        if (oi is None or oi[-1].time_ms not in
+                (current_oi_label - HOUR_MS, current_oi_label)):
             return None
         scores = oi_value_4h_change_zscore(oi, window_hours=720)
-        if not scores or scores[-1].time_ms != current_oi_label or scores[-1].value >= OI_Z_THRESHOLD:
+        if not scores or scores[-1].time_ms != oi[-1].time_ms or scores[-1].value >= OI_Z_THRESHOLD:
             return None
+        oi_lag_hours = D(current_oi_label - oi[-1].time_ms) / D(HOUR_MS)
 
         entry = current.close
         return make_signal(
@@ -90,6 +93,7 @@ class CrashFlushE2Strategy:
             (("price_change_4h", price_change_4h),
              ("drawdown_from_24h_high", current.close / high_24h - 1),
              ("oi_value_change_4h_z", scores[-1].value),
+             ("oi_lag_hours", oi_lag_hours),
              ("catastrophe_stop_fraction", self.stop_fraction),
              ("holding_hours", D(self.holding_hours))),
         )

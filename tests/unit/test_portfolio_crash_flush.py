@@ -8,15 +8,15 @@ from quantos.paper.strategies.candidate_features import HOUR_MS
 
 
 def crash_snapshot(symbol="BTCUSDT"):
-    # 725 hourly OI labels are required for four-hour changes plus 720 prior
-    # hourly changes. The final value contains a large, causal shock.
+    # 725 hourly archive labels include one unavailable-at-decision row; the
+    # latest available label is one hour before the bar boundary.
     oi = []
-    for i in range(725):
+    for i in range(726):
         value = D(1000 + i % 7)
         if i == 724:
             value = D(700)
-        stamp = (i + 1) * HOUR_MS
-        oi.append(OpenInterestValue(stamp, stamp, value))
+        stamp = i * HOUR_MS
+        oi.append(OpenInterestValue(stamp, stamp + HOUR_MS, value))
     bars = []
     closes = [D(100)] * 20 + [D(100), D(99), D(98), D(96), D(90)]
     start = 700 * HOUR_MS
@@ -62,12 +62,27 @@ class CrashFlushCandidateTests(unittest.TestCase):
         snapshot = crash_snapshot()
         base = strategy.evaluate(snapshot)
         self.assertEqual(base.observed_ms, snapshot.at_ms)
-        # A measurement labeled and available at the exclusive bar-close
-        # boundary is valid for this decision.
-        self.assertEqual(snapshot.oi_values[-1].available_ms, snapshot.at_ms)
+        # The newest archived label at the decision time is one hour stale by
+        # label and available exactly at the decision boundary.
+        self.assertEqual(snapshot.oi_values[-2].time_ms, snapshot.at_ms - HOUR_MS)
+        self.assertEqual(snapshot.oi_values[-2].available_ms, snapshot.at_ms)
+        self.assertEqual(dict(base.features)["oi_lag_hours"], D(1))
         future = OpenInterestValue(726 * HOUR_MS, 726 * HOUR_MS + HOUR_MS, D(1))
         changed = strategy.evaluate(replace(snapshot, oi_values=snapshot.oi_values + (future,)))
         self.assertEqual(base, changed)
+
+    def test_latest_contemporaneous_available_oi_is_allowed_with_zero_lag(self):
+        snapshot = crash_snapshot()
+        rows = snapshot.oi_values
+        # Move the synthetic shock to a row labeled at the decision boundary
+        # and make it available then; retain its exact source label.
+        rows = rows[:-2] + (
+            replace(rows[-2], value=D(1000)),
+            replace(rows[-1], available_ms=snapshot.at_ms, value=D(700)),
+        )
+        signal = CrashFlushE2Strategy().evaluate(replace(snapshot, oi_values=rows))
+        self.assertIsNotNone(signal)
+        self.assertEqual(dict(signal.features)["oi_lag_hours"], D(0))
 
     def test_hold_and_stop_sensitivity_are_explicit_variants(self):
         snapshot = crash_snapshot()
@@ -84,9 +99,16 @@ class CrashFlushCandidateTests(unittest.TestCase):
     def test_late_or_gapped_oi_fails_closed(self):
         strategy = CrashFlushE2Strategy()
         snapshot = crash_snapshot()
-        late = snapshot.oi_values[:-1] + (replace(snapshot.oi_values[-1],
-                                                available_ms=snapshot.at_ms + 1),)
+        late = snapshot.oi_values[:-2] + (replace(snapshot.oi_values[-2],
+                                                available_ms=snapshot.at_ms + 1), snapshot.oi_values[-1])
         self.assertIsNone(strategy.evaluate(replace(snapshot, oi_values=late)))
+        # Once the newest two observations are unavailable, the remaining
+        # observation is more than one hour stale and must fail closed.
+        stale = snapshot.oi_values[:-2] + (
+            replace(snapshot.oi_values[-2], available_ms=snapshot.at_ms + 1),
+            replace(snapshot.oi_values[-1], available_ms=snapshot.at_ms + 1),
+        )
+        self.assertIsNone(strategy.evaluate(replace(snapshot, oi_values=stale)))
         gap = snapshot.oi_values[:-2] + snapshot.oi_values[-1:]
         self.assertIsNone(strategy.evaluate(replace(snapshot, oi_values=gap)))
 

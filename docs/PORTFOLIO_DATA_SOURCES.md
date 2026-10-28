@@ -203,3 +203,21 @@ coverage = ArchiveStore().coverage(
 print(coverage.first_period, coverage.last_period, len(coverage.periods))
 PY
 ```
+
+## Dec-2024 robustness cohort
+
+`quantos.paper.research.universe` builds an ignored evidence manifest at
+`data/portfolio/manifests/robustness_dec2024.json`. It enumerates USD-M USDT
+symbols from public monthly kline archive prefixes (including symbols whose
+archives remain listed after delisting), then ranks the 20 non-major markets by
+the sum of all 744 December 2024 1h `quote_volume` rows, descending with symbol
+ascending as the deterministic tie-break. The nine majors are included
+separately. Selection is explicitly retrospective as of 2024-12-31 and uses the
+full month, so it is not a point-in-time universe for an October start.
+
+Eligibility requires metadata partitions for Sep–Dec 2024, a first listed
+monthly archive no later than Sep 2024, and exactly 744 contiguous December
+rows. Only December 1h archives are fetched; Sep–Nov evidence is object-name
+metadata, not row-level continuity. The manifest records that limitation and
+resumes safely after interruption. This is a calibration robustness cohort,
+not a performance result or an out-of-sample universe.

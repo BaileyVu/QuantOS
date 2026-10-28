@@ -125,6 +125,17 @@ has been run on data not used to develop or inspect them.
   excluding the current change. First availability is after 724 hours of
   observations. This denominator convention is provisional pending source-data
   documentation.
+- The archive adapter retains each raw `create_time` label and uses
+  `label + 1h` only as a conservative availability proxy. The crash-flush
+  signal cache selects only raw labels exactly aligned to UTC hours from the
+  metrics archive; it does not aggregate or nearest-join 5m rows. Missing exact
+  hourly samples remain gaps. The crash-flush strategy therefore evaluates the
+  latest hourly OI label available at the close boundary, permitting a label
+  at the current boundary or one hour behind; it records the actual lag as
+  `oi_lag_hours`. Under the archive proxy, the newest label is normally one
+  hour behind. This is a causal archive-timing adaptation, not evidence that
+  the source intended a one-hour-lag signal; unavailable current-label OI is
+  never used.
 - Hold variants: 24h primary, plus 48h and 72h; 25% catastrophe stop is primary,
   with the 15% stop for sensitivity only.
 - Risk sizing sweep is controlled by the portfolio harness: 1%, 2%, 4%, 6%, 8%.

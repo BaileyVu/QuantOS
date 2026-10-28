@@ -100,6 +100,7 @@ class OpenInterestMetric:
     sum_open_interest: Decimal
     sum_open_interest_value: Decimal
     other_fields: tuple[tuple[str, Decimal], ...]
+    missing_fields: tuple[str, ...] = ()
 
     @property
     def conservative_available_ms(self) -> int:
@@ -359,10 +360,11 @@ def _atomic_write(path: Path, content: bytes) -> None:
             pass
 
 
-def _csv_rows(source: str | Path | bytes) -> Iterator[dict[str, str]]:
+def _csv_rows(source: str | Path | bytes,
+              headerless_schema: tuple[str, ...] | None = None) -> Iterator[dict[str, str]]:
     if isinstance(source, bytes):
         if not source.startswith(b"PK\x03\x04"):
-            yield from _dict_rows(io.TextIOWrapper(io.BytesIO(source), encoding="utf-8-sig", newline=""))
+            yield from _dict_rows(io.TextIOWrapper(io.BytesIO(source), encoding="utf-8-sig", newline=""), headerless_schema)
             return
         raw = io.BytesIO(source)
         with zipfile.ZipFile(raw) as archive:
@@ -371,7 +373,7 @@ def _csv_rows(source: str | Path | bytes) -> Iterator[dict[str, str]]:
             if len(members) != 1:
                 raise ValueError("archive must contain exactly one CSV")
             stream = io.TextIOWrapper(archive.open(members[0]), encoding="utf-8-sig", newline="")
-            yield from _dict_rows(stream)
+            yield from _dict_rows(stream, headerless_schema)
         return
     path = Path(source)
     if path.suffix.lower() == ".zip":
@@ -381,13 +383,29 @@ def _csv_rows(source: str | Path | bytes) -> Iterator[dict[str, str]]:
             if len(members) != 1:
                 raise ValueError("archive must contain exactly one CSV")
             with archive.open(members[0]) as raw:
-                yield from _dict_rows(io.TextIOWrapper(raw, encoding="utf-8-sig", newline=""))
+                yield from _dict_rows(io.TextIOWrapper(raw, encoding="utf-8-sig", newline=""), headerless_schema)
     else:
         with path.open(encoding="utf-8-sig", newline="") as stream:
-            yield from _dict_rows(stream)
+            yield from _dict_rows(stream, headerless_schema)
 
 
-def _dict_rows(stream) -> Iterator[dict[str, str]]:
+def _dict_rows(stream, headerless_schema: tuple[str, ...] | None = None) -> Iterator[dict[str, str]]:
+    if headerless_schema is not None:
+        reader = csv.reader(stream)
+        first = next(reader, None)
+        if first is None:
+            return
+        if tuple(first) == headerless_schema:
+            first = next(reader, None)
+        if first is not None:
+            if len(first) != len(headerless_schema):
+                raise ValueError("malformed CSV row")
+            yield dict(zip(headerless_schema, first))
+        for values in reader:
+            if len(values) != len(headerless_schema):
+                raise ValueError("malformed CSV row")
+            yield dict(zip(headerless_schema, values))
+        return
     reader = csv.DictReader(stream)
     if not reader.fieldnames:
         raise ValueError("CSV is missing a header")
@@ -407,11 +425,9 @@ def parse_klines(source: str | Path | bytes, symbol: str,
     expected_header = ["open_time", "open", "high", "low", "close", "volume",
                        "close_time", "quote_volume", "count", "taker_buy_volume",
                        "taker_buy_quote_volume", "ignore"]
-    rows = iter(_csv_rows(source))
+    rows = iter(_csv_rows(source, tuple(expected_header)))
     # DictReader has consumed its header; the row keys expose source schema.
     for row in rows:
-        if list(row) != expected_header:
-            raise ValueError("unexpected USD-M kline CSV schema")
         opened = _integer(row["open_time"], "open time")
         closed = _integer(row["close_time"], "close time")
         if opened % width or closed != opened + width - 1:
@@ -467,12 +483,16 @@ def parse_metrics(source: str | Path | bytes,
         except ValueError:
             raise ValueError("invalid metrics label time") from None
         fields = []
+        missing_fields = []
         for name, value in row.items():
             if name not in required:
-                fields.append((name, _decimal(value, name)))
+                if value == "":
+                    missing_fields.append(name)
+                else:
+                    fields.append((name, _decimal(value, name)))
         result.append(OpenInterestMetric(
             expected_symbol, int(timestamp.timestamp() * 1000),
             _decimal(row["sum_open_interest"], "sum_open_interest", nonnegative=True),
             _decimal(row["sum_open_interest_value"], "sum_open_interest_value", nonnegative=True),
-            tuple(fields)))
+            tuple(fields), tuple(missing_fields)))
     return tuple(result)
