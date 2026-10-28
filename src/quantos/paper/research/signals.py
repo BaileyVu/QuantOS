@@ -11,7 +11,10 @@ from bisect import bisect_right
 import hashlib
 import importlib
 import json
+import gzip
+import os
 from pathlib import Path
+import tempfile
 from typing import Iterable
 
 from ..strategies.alt_dip_reversal import (
@@ -22,7 +25,7 @@ from ..strategies.alt_dip_reversal import (
 )
 from ..strategies.candidate_features import (
     ALT_SOURCE_UNIVERSE, HOUR_MS, TimedValue, calibrate_quarterly_return_cutoff,
-    rolling_24h_return,
+    resample_hourly, rolling_24h_return,
 )
 from ..strategies.crash_flush_e2 import (
     CrashFlushE2Strategy, MAJORS as CRASH_MAJORS,
@@ -35,7 +38,9 @@ from ..strategies.ema_level_2h import (
     TARGET_R, MAX_HOLD_SECONDS,
 )
 from ..types import Candle, Instrument, OpenInterestValue, Quote, Signal, Snapshot
+from ..market import parse_exchange_info
 from .data import Bar, OpenInterestMetric
+from .dataset import DatasetIndex
 
 D = Decimal
 TRAINING_START_MS = 1_633_046_400_000  # 2021-10-01T00:00:00Z
@@ -79,12 +84,133 @@ class SignalCache:
         return iter(self.records)
 
 
+def _strategy_source_hash() -> str:
+    modules = (
+        "quantos.paper.strategies.alt_dip_reversal",
+        "quantos.paper.strategies.candidate_features",
+        "quantos.paper.strategies.crash_flush_e2",
+        "quantos.paper.strategies.ema_level_2h",
+        "quantos.paper.strategies.indicators",
+    )
+    digest = hashlib.sha256()
+    for module_name in modules:
+        module_path = Path(importlib.import_module(module_name).__file__)
+        digest.update(module_name.encode() + b"\0" + module_path.read_bytes())
+    return digest.hexdigest()
+
+
+def _canonical(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"),
+                      allow_nan=False).encode("utf-8")
+
+
+def _record_payload(record: SignalRecord) -> dict:
+    signal = record.signal
+    return {
+        "decision_ms": record.decision_ms,
+        "parameters": list(record.parameters),
+        "signal": {
+            "strategy_id": signal.strategy_id, "strategy_version": signal.strategy_version,
+            "signal_id": signal.signal_id, "symbol": signal.symbol, "side": signal.side,
+            "observed_ms": signal.observed_ms, "expires_ms": signal.expires_ms,
+            "entry_type": signal.entry_type, "entry_price": str(signal.entry_price),
+            "stop_loss": str(signal.stop_loss),
+            "take_profit": None if signal.take_profit is None else str(signal.take_profit),
+            "maximum_hold_seconds": signal.maximum_hold_seconds, "reason": signal.reason,
+            "features": [[name, str(value)] for name, value in signal.features],
+            "trend_regime": signal.trend_regime, "vol_regime": signal.vol_regime,
+        },
+    }
+
+
+def _record_from_payload(row: dict) -> SignalRecord:
+    from ..types import Signal
+    raw = row["signal"]
+    signal = Signal(
+        raw["strategy_id"], raw["strategy_version"], raw["signal_id"], raw["symbol"],
+        raw["side"], int(raw["observed_ms"]), int(raw["expires_ms"]), raw["entry_type"],
+        D(raw["entry_price"]), D(raw["stop_loss"]),
+        None if raw["take_profit"] is None else D(raw["take_profit"]),
+        int(raw["maximum_hold_seconds"]), raw["reason"],
+        tuple((str(name), D(value)) for name, value in raw["features"]),
+        raw["trend_regime"], raw["vol_regime"],
+    )
+    return SignalRecord(int(row["decision_ms"]), signal,
+                        tuple((str(k), str(v)) for k, v in row["parameters"]))
+
+
+def save_signal_cache(cache: SignalCache, path: str | Path) -> str:
+    """Atomically create an immutable JSON or .gz cache without overwriting."""
+    target = Path(path)
+    payload = {
+        "schema": 1, "training_window": list(cache.training_window),
+        "provenance": {"source_hash": cache.source_hash, "data_hash": cache.data_hash,
+                       "filter_hash": cache.filter_hash, "strategy_hash": cache.strategy_hash,
+                       "parameter_hash": cache.parameter_hash},
+        "records": [_record_payload(record) for record in cache.records],
+    }
+    serialized = _canonical(payload)
+    envelope = _canonical({"payload": payload,
+                           "sha256": hashlib.sha256(serialized).hexdigest()}) + b"\n"
+    content = gzip.compress(envelope, mtime=0) if target.suffix == ".gz" else envelope
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(prefix=".signal-cache-", dir=target.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        # A hard-link publication is atomic and fails if target already exists.
+        os.link(temp_name, target)
+        directory_fd = os.open(target.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+        return hashlib.sha256(serialized).hexdigest()
+    finally:
+        try:
+            os.unlink(temp_name)
+        except FileNotFoundError:
+            pass
+
+
+def load_signal_cache(path: str | Path, *, expected_data_hash: str,
+                      expected_filter_hash: str, expected_parameter_hash: str,
+                      expected_strategy_hash: str | None = None) -> SignalCache:
+    """Load a cache only when current data, rules, filters, and params match."""
+    source_path = Path(path)
+    content = source_path.read_bytes()
+    raw = gzip.decompress(content) if source_path.suffix == ".gz" else content
+    envelope = json.loads(raw)
+    payload = envelope["payload"]
+    if (payload.get("schema") != 1
+            or hashlib.sha256(_canonical(payload)).hexdigest() != envelope.get("sha256")):
+        raise ValueError("signal cache checksum or schema mismatch")
+    provenance = payload["provenance"]
+    strategy_hash = expected_strategy_hash or _strategy_source_hash()
+    required = {
+        "data_hash": expected_data_hash, "filter_hash": expected_filter_hash,
+        "parameter_hash": expected_parameter_hash, "strategy_hash": strategy_hash,
+    }
+    for name, expected in required.items():
+        if provenance.get(name) != expected:
+            raise ValueError(f"signal cache {name} is stale")
+    cache = SignalCache(tuple(_record_from_payload(row) for row in payload["records"]),
+                        tuple(int(x) for x in payload["training_window"]),
+                        provenance["source_hash"], provenance["data_hash"],
+                        provenance["filter_hash"], provenance["strategy_hash"],
+                        provenance["parameter_hash"])
+    if cache.training_window != (TRAINING_START_MS, TRAINING_END_MS):
+        raise ValueError("signal cache training window is invalid")
+    if any(not TRAINING_START_MS <= record.decision_ms < TRAINING_END_MS
+           for record in cache.records):
+        raise ValueError("signal cache contains an out-of-window decision")
+    return cache
+
+
 def _candles(rows: tuple[Bar, ...]) -> tuple[Candle, ...]:
     return tuple(row.to_candle() for row in rows)
-
-
-def _instrument(symbol: str) -> Instrument:
-    return Instrument(symbol, "USDT", "TRADING", _TICK, _TICK, D(0), D("1e20"), D(0))
 
 
 def _quarter_start_ms(time_ms: int) -> int:
@@ -124,19 +250,14 @@ def _params(strategy) -> tuple[tuple[str, str], ...]:
     return tuple(values)
 
 
-def _quarter_cutoffs(bars_by_symbol: dict[str, tuple[Bar, ...]],
+def _quarter_cutoffs(returns_by_symbol: dict[str, tuple[TimedValue, ...]],
                      start_ms: int, quantiles: tuple[Decimal, ...]) -> dict[tuple[int, Decimal], Decimal | None]:
     """Build frozen ALT thresholds; any incomplete member makes that quarter unusable."""
     cache: dict[tuple[int, Decimal], Decimal | None] = {}
-    if not set(ALT_SOURCE_UNIVERSE).issubset(bars_by_symbol):
+    if not set(ALT_SOURCE_UNIVERSE).issubset(returns_by_symbol):
         return {(start_ms, q): None for q in quantiles}
-    returns = {}
-    for symbol in ALT_SOURCE_UNIVERSE:
-        hourly = _candles(bars_by_symbol[symbol])
-        series = rolling_24h_return(hourly)
-        returns[symbol] = series or ()
     for quantile in quantiles:
-        calibrated = calibrate_quarterly_return_cutoff(returns, start_ms, quantile)
+        calibrated = calibrate_quarterly_return_cutoff(returns_by_symbol, start_ms, quantile)
         cache[(start_ms, quantile)] = calibrated.threshold if calibrated else None
     return cache
 
@@ -162,12 +283,12 @@ def build_signal_cache(index, *, alt_quantiles: Iterable[Decimal] = tuple(sorted
     filter_payload = json.loads(filter_bytes)
     if "not point-in-time" not in filter_payload.get("note", ""):
         raise ValueError("instrument filter snapshot must be declared as a current historical proxy")
-    current_symbols = {item.get("symbol") for item in filter_payload.get("symbols", ())
-                       if item.get("status") == "TRADING" and item.get("marginAsset") == "USDT"
-                       and item.get("quoteAsset") == "USDT" and item.get("contractType") == "PERPETUAL"}
+    current_instruments = parse_exchange_info(filter_payload, margin_asset="USDT")
+    current_instruments = {symbol: item for symbol, item in current_instruments.items()
+                           if item.status == "TRADING"}
     wanted = set(symbols) if symbols is not None else None
     by_bars: dict[str, tuple[Bar, ...]] = index.bars
-    selected = sorted((wanted or set(by_bars)) & set(by_bars) & current_symbols)
+    selected = sorted((wanted or set(by_bars)) & set(by_bars) & set(current_instruments))
     alt_qs, alt_hs = tuple(alt_quantiles), tuple(alt_holds)
     stop_grid = (ALT_STOP, ALT_STOP_SENS) if include_stop_sensitivity else (ALT_STOP,)
     crash_stops = (CRASH_STOP, CRASH_STOP_SENS) if include_stop_sensitivity else (CRASH_STOP,)
@@ -178,39 +299,28 @@ def build_signal_cache(index, *, alt_quantiles: Iterable[Decimal] = tuple(sorted
     oi_cache = {symbol: _oi_values(index.metrics.get(symbol, ())) for symbol in selected}
     oi_available = {symbol: tuple(value.available_ms for value in values)
                     for symbol, values in oi_cache.items()}
-    instruments = {symbol: _instrument(symbol) for symbol in selected}
+    instruments = {symbol: current_instruments[symbol] for symbol in selected}
 
     for symbol in selected:
         raw = by_bars[symbol]
         hourly = _candles(raw)
         hourly_cache[symbol] = hourly
-        # Hourly rows begin on hour boundaries, hence this aggregation is epoch-aligned.
-        two_hour_cache[symbol] = tuple(
-            Candle(hourly[i].open_ms, hourly[i + 1].close_ms, hourly[i].open,
-                   max(hourly[i].high, hourly[i + 1].high),
-                   min(hourly[i].low, hourly[i + 1].low), hourly[i + 1].close,
-                   hourly[i].volume + hourly[i + 1].volume)
-            for i in range(0, len(hourly) - 1, 2)
-            if hourly[i].open_ms % (2 * HOUR_MS) == 0
-            and hourly[i + 1].open_ms == hourly[i].open_ms + HOUR_MS
-        )
+        # Bucket by UTC epoch timestamps, and omit incomplete or gapped groups.
+        resampled = resample_hourly(hourly, 2, as_of_ms=hourly[-1].close_ms) if hourly else None
+        two_hour_cache[symbol] = resampled or ()
 
     # Quarterly calibration is prepared once per quarter and per quantile.
     if include_alt:
-        for symbol in selected:
-            for row in hourly_cache[symbol]:
-                if TRAINING_START_MS <= row.close_ms + 1 < TRAINING_END_MS:
-                    quarter = _quarter_start_ms(row.close_ms + 1)
-                    if quarter not in quarters:
-                        quarters[quarter] = _quarter_cutoffs(by_bars, quarter, alt_qs)
-                    break
+        returns_by_symbol = {}
+        for symbol in ALT_SOURCE_UNIVERSE:
+            if symbol in by_bars:
+                returns_by_symbol[symbol] = rolling_24h_return(_candles(by_bars[symbol])) or ()
         # Ensure later quarters are calibrated even if this symbol has a gap.
         all_times = sorted({_quarter_start_ms(row.close_ms + 1)
                             for values in hourly_cache.values() for row in values
                             if TRAINING_START_MS <= row.close_ms + 1 < TRAINING_END_MS})
         for quarter in all_times:
-            if quarter not in quarters:
-                quarters[quarter] = _quarter_cutoffs(by_bars, quarter, alt_qs)
+            quarters[quarter] = _quarter_cutoffs(returns_by_symbol, quarter, alt_qs)
 
     for symbol in selected:
         hourly = hourly_cache[symbol]
@@ -282,18 +392,7 @@ def build_signal_cache(index, *, alt_quantiles: Iterable[Decimal] = tuple(sorted
                     records.append(SignalRecord(at_ms, signal, _EMA_PARAMETERS))
     records.sort(key=lambda row: (row.decision_ms, row.signal.symbol,
                                   row.signal.strategy_id, row.parameters, row.signal.signal_id))
-    strategy_modules = (
-        "quantos.paper.strategies.alt_dip_reversal",
-        "quantos.paper.strategies.candidate_features",
-        "quantos.paper.strategies.crash_flush_e2",
-        "quantos.paper.strategies.ema_level_2h",
-        "quantos.paper.strategies.indicators",
-    )
-    strategy_digest = hashlib.sha256()
-    for module_name in strategy_modules:
-        module_path = Path(importlib.import_module(module_name).__file__)
-        strategy_digest.update(module_name.encode() + b"\0" + module_path.read_bytes())
-    strategy_hash = strategy_digest.hexdigest()
+    strategy_hash = _strategy_source_hash()
     filter_hash = hashlib.sha256(filter_bytes).hexdigest()
     parameter_payload = {
         "alt_quantiles": sorted(map(str, alt_qs)), "alt_holds": sorted(alt_hs),
@@ -301,8 +400,7 @@ def build_signal_cache(index, *, alt_quantiles: Iterable[Decimal] = tuple(sorted
         "include_crash": include_crash, "include_ema": include_ema,
         "symbols": selected, "training_window": [TRAINING_START_MS, TRAINING_END_MS],
     }
-    parameter_hash = hashlib.sha256(json.dumps(parameter_payload, sort_keys=True,
-        separators=(",", ":")).encode()).hexdigest()
+    parameter_hash = hashlib.sha256(_canonical(parameter_payload)).hexdigest()
     composite = hashlib.sha256((index.content_hash + filter_hash + strategy_hash + parameter_hash).encode()).hexdigest()
     return SignalCache(tuple(records), (TRAINING_START_MS, TRAINING_END_MS), composite,
                        index.content_hash, filter_hash, strategy_hash, parameter_hash)

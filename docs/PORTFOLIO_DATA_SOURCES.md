@@ -215,9 +215,40 @@ ascending as the deterministic tie-break. The nine majors are included
 separately. Selection is explicitly retrospective as of 2024-12-31 and uses the
 full month, so it is not a point-in-time universe for an October start.
 
-Eligibility requires metadata partitions for Sep–Dec 2024, a first listed
-monthly archive no later than Sep 2024, and exactly 744 contiguous December
-rows. Only December 1h archives are fetched; Sep–Nov evidence is object-name
-metadata, not row-level continuity. The manifest records that limitation and
-resumes safely after interruption. This is a calibration robustness cohort,
-not a performance result or an out-of-sample universe.
+Initial eligibility requires metadata partitions for Sep–Dec 2024, a first
+listed monthly archive no later than Sep 2024, and exactly 744 contiguous
+December rows. After ranking, the first row from each selected symbol's earliest
+listed monthly archive was fetched and checksum-verified. All 29 first rows are
+at least 90 days before 2025-01-01; the latest is 2024-09-16 11:00 UTC
+(106.54 days before year start). Only those 29 earliest archives and December
+2024 archives were fetched; Sep–Nov row continuity is not claimed. The
+manifest resumes safely after interruption. This is a calibration cohort, not
+a performance result or an out-of-sample universe.
+
+Run `quantos.paper.research.universe --audit-scope` to compare the current raw
+USDT archive-prefix catalog with parser-supported symbols. The audit checks
+only whether each excluded symbol has a December 2024 1h archive object; it
+does not read excluded archive contents or later outcomes. The raw prefix scan
+found 900 USDT names. Fourteen valid short-base symbols with December archives
+were added before final ranking. The remaining 50 names had no December
+archive: 45 are parser-supported symbols and five are non-ASCII names outside
+the parser's symbol contract.
+
+## Daily gap repair overlay
+
+`quantos.paper.research.repair` derives a bounded daily-archive manifest from
+the saved row-gap audit and downloads only the UTC days containing missing 1h
+rows (maximum four workers). Daily archives are SHA-256 checked and kept as
+separate content-addressed blobs; source monthly ZIPs are never rewritten. The
+dataset index accepts `overlay_manifest=...`, verifies the manifest's base
+content hash and archive digests, and adds only exact audited missing timestamps.
+Unexpected rows, duplicate timestamps, or conflicting duplicate OHLC values
+fail closed. Rebuild the saved row audit after applying an overlay; the new
+audit hash identifies the combined monthly-plus-daily research input.
+
+The saved training audit found 50 missing kline days (10 symbols across
+2022-02-26–28 and 2022-04-01–02) and 67 missing mark-price days (29 symbols on
+2022-10-02 and 2023-02-24, plus nine on 2022-07-31). The completed overlay
+contains 117 verified daily archives and restores 2,808 exact rows; the repaired
+audit reports no remaining kline or mark-price gap pairs. The 488 pre-first
+metrics partitions remain unavailable and are unchanged by this repair.

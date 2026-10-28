@@ -60,3 +60,23 @@ After a training-period configuration is frozen and supplied with immutable
 No archived script, optimizer, or OOS evaluation was executed for this source
 review. In particular, do not run the top-level `backtest_edge.py` or
 `optimize.py` while completing candidate selection.
+
+## Controlled wrapper status
+
+`research/archived_ema.py` now parses the attached source files with Python AST
+and compiles only the reviewed pure strategy definitions plus the isolated
+`outcome`/`portfolio` scorer definitions. It verifies the source-level CFG,
+level parameter overrides, fee, warmup, and 60-bar path, and records hashes for
+`strategy.py`, `optimize.py`, and `backtest_edge.py`. It never imports either
+archived module. Candidate construction uses current USD-M filter metadata and
+strict UTC epoch-aligned complete 2h bars; the decision window is 2022-01-01
+through 2024-12-31. The earliest available 2021 training bars seed the source
+EMA recurrence. This venue and timestamp adaptation is a controlled audit, not
+an exact reproduction of the archived Spot run. It uses only the optimizer's
+literal nine-symbol `COINS` universe. Candidate timestamps are the completed
+2h close boundary, while the archived scorer orders trades by source candle
+open time; this source clock convention is retained for the score path.
+
+The wrapper and its tests do not load historical bars or score outcomes.
+`score_archived_candidates` is a separately callable, source-extracted scorer;
+it requires main-agent review before any controlled audit results are computed.

@@ -1,17 +1,20 @@
 from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal as D
+from pathlib import Path
+import tempfile
 import unittest
 
 from quantos.paper.research.data import Bar, OpenInterestMetric
 from quantos.paper.research.dataset import DatasetIndex
 from quantos.paper.research.signals import (
     TRAINING_END_MS, TRAINING_START_MS, SignalRecord, _quarter_cutoffs,
-    _oi_values, build_signal_cache,
+    _candles, _oi_values, build_signal_cache, load_signal_cache, save_signal_cache,
 )
 from quantos.paper.strategies.candidate_features import ALT_SOURCE_UNIVERSE, HOUR_MS, TimedValue
 from quantos.paper.strategies.crash_flush_e2 import CrashFlushE2Strategy
 from quantos.paper.types import OpenInterestValue
+from quantos.paper.market import parse_exchange_info
 from quantos.paper.strategies.indicators import make_signal
 from quantos.paper.types import Instrument, Quote, Snapshot
 
@@ -72,26 +75,35 @@ class PortfolioSignalCacheTests(unittest.TestCase):
     def test_cache_signal_matches_current_crash_strategy_at_causal_boundary(self):
         symbol = "BTCUSDT"
         start = TRAINING_START_MS
-        prices = [D(100)] * 745 + [D(100), D(99), D(98), D(96), D(90)]
+        prices = [D(10000)] * 745 + [D(10000), D(9900), D(9800), D(9600), D(9000)]
         bars = []
         prior = prices[0]
         for i, close in enumerate(prices):
-            if i == 5:  # An old hourly candle gap must age out of the 25-bar input.
-                continue
             opened = start + i * HOUR_MS
             bars.append(Bar(symbol, "1h", opened, opened + HOUR_MS - 1,
-                            prior, max(prior, close, D(101)), min(prior, close, D(99)),
+                            prior, max(prior, close, D(10100)), min(prior, close, D(9900)),
                             close, D(1)))
             prior = close
         metrics = []
         for i in range(len(bars) + 1):
-            if i == 5:  # An old OI gap must age out of the 725-sample window.
-                continue
             label = start + i * HOUR_MS
             value = D(700) if i == len(prices) - 1 else D(1000 + i % 7)
             metrics.append(OpenInterestMetric(symbol, label, D(1), value, ()))
         index = _index({symbol: tuple(bars)})
         index = replace(index, metrics={symbol: tuple(metrics)})
+        expected_at = start + len(prices) * HOUR_MS
+        from quantos.paper.research.signals import _snapshot
+        import json
+        filter_data = json.loads(Path("data/portfolio/filters/current_usdt_proxy_20261029.json").read_text())
+        instrument = parse_exchange_info(filter_data, "USDT")[symbol]
+        eligible = [row for row in metrics if row.conservative_available_ms <= expected_at]
+        direct_oi = tuple(OpenInterestValue(row.label_ms, row.conservative_available_ms,
+                                            row.sum_open_interest_value)
+                          for row in eligible[-725:])
+        direct_snapshot = _snapshot(symbol, expected_at, instrument,
+                                     tuple(row.to_candle() for row in bars[-25:]), (), direct_oi)
+        direct_signal = CrashFlushE2Strategy().evaluate(direct_snapshot)
+        self.assertIsNotNone(direct_signal)
         cache = build_signal_cache(index, include_alt=False, include_ema=False,
                                    include_stop_sensitivity=False, symbols=(symbol,))
         matched = [row for row in cache if row.signal.strategy_id == "crash_flush_e2"
@@ -100,15 +112,40 @@ class PortfolioSignalCacheTests(unittest.TestCase):
         record = matched[0]
         self.assertEqual(record.decision_ms, start + len(prices) * HOUR_MS)
         self.assertEqual(dict(record.signal.features)["oi_lag_hours"], D(1))
+        self.assertEqual(record.signal.entry_price % instrument.tick, D(0))
         hourly = tuple(row.to_candle() for row in bars[-25:])
         available_rows = [row for row in metrics
                           if row.conservative_available_ms <= record.decision_ms]
         available_oi = tuple(OpenInterestValue(row.label_ms, row.conservative_available_ms,
                                                 row.sum_open_interest_value)
                              for row in available_rows[-725:])
-        from quantos.paper.research.signals import _instrument, _snapshot
-        snap = _snapshot(symbol, record.decision_ms, _instrument(symbol), hourly, (), available_oi)
+        snap = _snapshot(symbol, record.decision_ms, instrument, hourly, (), available_oi)
         self.assertEqual(record.signal, CrashFlushE2Strategy().evaluate(snap))
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_path = Path(tmp) / "signals.json.gz"
+            save_signal_cache(cache, cache_path)
+            loaded = load_signal_cache(
+                cache_path, expected_data_hash=cache.data_hash,
+                expected_filter_hash=cache.filter_hash,
+                expected_parameter_hash=cache.parameter_hash,
+            )
+            self.assertEqual(loaded, cache)
+            with self.assertRaises(FileExistsError):
+                save_signal_cache(cache, cache_path)
+            with self.assertRaisesRegex(ValueError, "data_hash is stale"):
+                load_signal_cache(
+                    cache_path, expected_data_hash="stale",
+                    expected_filter_hash=cache.filter_hash,
+                    expected_parameter_hash=cache.parameter_hash,
+                )
+
+    def test_timestamp_resampling_rejects_gap_without_rephasing_pairs(self):
+        rows = tuple(Bar("BTCUSDT", "1h", i * HOUR_MS, (i + 1) * HOUR_MS - 1,
+                         D(100), D(101), D(99), D(100), D(1))
+                     for i in (0, 1, 3, 4, 5, 6))
+        from quantos.paper.strategies.candidate_features import resample_hourly
+        result = resample_hourly(_candles(rows), 2, as_of_ms=rows[-1].close_ms)
+        self.assertIsNone(result)
 
     def test_signal_record_requires_exact_decision_boundary(self):
         instrument = Instrument("BTCUSDT", "USDT", "TRADING", D("0.01"), D("0.001"),
