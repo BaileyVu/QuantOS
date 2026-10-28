@@ -24,7 +24,7 @@ def dip_snapshot(return_24h=D("-0.10"), *, calibration_offset_hours=-72):
                      D("10000"), D("5"), base_asset="SOL")
     quote = Quote(ins.symbol, last.close_ms, last.close_ms, last.close - 1,
                   last.close + 1, D(2), D(2), last.close)
-    return Snapshot(last.close_ms, ins, quote, (), (), candles_1h=tuple(bars),
+    return Snapshot(last.close_ms + 1, ins, quote, (), (), candles_1h=tuple(bars),
                     quarterly_return_cutoff=D("-0.08"),
                     calibration_end_ms=quarter_start + calibration_offset_hours * HOUR_MS)
 
@@ -39,6 +39,8 @@ class AltDipCandidateTests(unittest.TestCase):
                          ("alt_dip_reversal", "LONG", 12 * 3600))
         self.assertEqual(signal.stop_loss, signal.entry_price * D("0.75"))
         self.assertEqual(dict(signal.features)["cutoff_quantile"], D("0.005"))
+        sensitivity = AltDipReversalStrategy(D("0.005"), 12, D("0.15")).evaluate(snap)
+        self.assertEqual(sensitivity.stop_loss, signal.entry_price * D("0.85"))
 
         # At the exact threshold, the rule is inclusive.
         equal = strategy.evaluate(dip_snapshot(D("-0.08")))
@@ -52,6 +54,8 @@ class AltDipCandidateTests(unittest.TestCase):
             AltDipReversalStrategy(D("0.02"), 12)
         with self.assertRaises(ValueError):
             AltDipReversalStrategy(D("0.005"), 48)
+        with self.assertRaises(ValueError):
+            AltDipReversalStrategy(D("0.005"), 12, D("0.20"))
 
     def test_calibration_boundary_and_invalid_quarter_inputs_fail_closed(self):
         strategy = AltDipReversalStrategy(D("0.005"), 24)

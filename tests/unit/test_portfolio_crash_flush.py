@@ -15,8 +15,8 @@ def crash_snapshot(symbol="BTCUSDT"):
         value = D(1000 + i % 7)
         if i == 724:
             value = D(700)
-        stamp = i * HOUR_MS
-        oi.append(OpenInterestValue(stamp, stamp + HOUR_MS - 1, value))
+        stamp = (i + 1) * HOUR_MS
+        oi.append(OpenInterestValue(stamp, stamp, value))
     bars = []
     closes = [D(100)] * 20 + [D(100), D(99), D(98), D(96), D(90)]
     start = 700 * HOUR_MS
@@ -31,7 +31,7 @@ def crash_snapshot(symbol="BTCUSDT"):
     ins = Instrument(symbol, "USDT", "TRADING", D("0.01"), D("0.001"), D("0.001"),
                      D("1000"), D("5"), base_asset=symbol[:-4])
     quote = Quote(symbol, last.close_ms, last.close_ms, D(89), D(91), D(2), D(2), D(90))
-    return Snapshot(last.close_ms, ins, quote, (), (), candles_1h=tuple(bars),
+    return Snapshot(last.close_ms + 1, ins, quote, (), (), candles_1h=tuple(bars),
                     oi_values=tuple(oi))
 
 
@@ -61,9 +61,25 @@ class CrashFlushCandidateTests(unittest.TestCase):
         strategy = CrashFlushE2Strategy()
         snapshot = crash_snapshot()
         base = strategy.evaluate(snapshot)
-        future = OpenInterestValue(725 * HOUR_MS, 725 * HOUR_MS + HOUR_MS, D(1))
+        self.assertEqual(base.observed_ms, snapshot.at_ms)
+        # A measurement labeled and available at the exclusive bar-close
+        # boundary is valid for this decision.
+        self.assertEqual(snapshot.oi_values[-1].available_ms, snapshot.at_ms)
+        future = OpenInterestValue(726 * HOUR_MS, 726 * HOUR_MS + HOUR_MS, D(1))
         changed = strategy.evaluate(replace(snapshot, oi_values=snapshot.oi_values + (future,)))
         self.assertEqual(base, changed)
+
+    def test_hold_and_stop_sensitivity_are_explicit_variants(self):
+        snapshot = crash_snapshot()
+        for hours in (24, 48, 72):
+            signal = CrashFlushE2Strategy(holding_hours=hours).evaluate(snapshot)
+            self.assertEqual(signal.maximum_hold_seconds, hours * 3600)
+        sensitivity = CrashFlushE2Strategy(stop_fraction=D("0.15")).evaluate(snapshot)
+        self.assertEqual(sensitivity.stop_loss, D("76.50"))
+        with self.assertRaises(ValueError):
+            CrashFlushE2Strategy(holding_hours=36)
+        with self.assertRaises(ValueError):
+            CrashFlushE2Strategy(stop_fraction=D("0.20"))
 
     def test_late_or_gapped_oi_fails_closed(self):
         strategy = CrashFlushE2Strategy()

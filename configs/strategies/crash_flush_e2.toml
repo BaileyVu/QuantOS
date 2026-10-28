@@ -1,0 +1,15 @@
+[strategy]
+id = "crash_flush_e2"
+version = "research-1.0.0"
+
+[parameters]
+oi_change_hours = "4"
+oi_z_window_hours = "720"
+oi_z_threshold = "-2"
+drawdown_24h = "0.08"
+stop_fraction = "0.25"
+holding_hours = "24"
+holding_grid_hours = "24,48,72"
+cooldown_hours = "24"
+stop_sensitivity_only = "0.15"
+margin_asset = "USDT"

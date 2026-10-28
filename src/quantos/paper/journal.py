@@ -10,7 +10,7 @@ from .types import D, dumps
 
 class Journal:
     def __init__(self, path: Path, profile: str, evidence: str = "natural"):
-        if profile not in {"p1", "p5", "pA"} or evidence not in {"natural", "synthetic", "replay"}:
+        if profile not in {"p1", "p5", "pA", "pR"} or evidence not in {"natural", "synthetic", "replay"}:
             raise ValueError("invalid journal identity")
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path, self.profile = path, profile
@@ -33,7 +33,7 @@ class Journal:
         ''')
         with self.transaction():
             identity = {"profile": profile, "evidence": evidence, "schema": 1,
-                        "initial_balance": "200", "margin_asset": "USDC"}
+                        "initial_balance": "200", "margin_asset": "USDT" if profile == "pR" else "USDC"}
             previous = self.get("identity")
             if previous is not None and previous != identity:
                 raise ValueError("journal identity mismatch")

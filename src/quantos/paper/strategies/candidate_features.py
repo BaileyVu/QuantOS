@@ -6,12 +6,22 @@ semantics. Inputs are immutable closed candles or timestamped observations.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Mapping
 
 from ..types import Candle
 
 D = Decimal
 HOUR_MS = 3_600_000
+DAY_MS = 24 * HOUR_MS
+ALT_SOURCE_UNIVERSE = (
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT",
+    "ADAUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT", "LTCUSDT", "BCHUSDT",
+    "TRXUSDT", "ATOMUSDT", "NEARUSDT", "UNIUSDT", "FILUSDT", "ETCUSDT",
+    "AAVEUSDT", "XLMUSDT", "ALGOUSDT", "SANDUSDT", "MANAUSDT", "AXSUSDT",
+    "CRVUSDT", "RUNEUSDT", "THETAUSDT", "VETUSDT", "GALAUSDT",
+)
 
 
 @dataclass(frozen=True)
@@ -30,6 +40,19 @@ class SwingPivot:
     price: Decimal
 
 
+@dataclass(frozen=True)
+class QuarterlyReturnCutoff:
+    """Threshold and explicit provenance for a frozen quarter calibration."""
+
+    threshold: Decimal
+    quantile: Decimal
+    quarter_start_ms: int
+    calibration_start_ms: int
+    calibration_end_ms: int  # exclusive; last three days are embargoed
+    symbols: tuple[str, ...]
+    sample_count: int
+
+
 def _valid_hourly(bars: tuple[Candle, ...]) -> bool:
     previous = None
     for bar in bars:
@@ -43,6 +66,19 @@ def _valid_hourly(bars: tuple[Candle, ...]) -> bool:
             return False
         previous = bar.open_ms
     return bool(bars)
+
+
+def closed_hourly_bars(bars: tuple[Candle, ...], as_of_ms: int,
+                       minimum: int) -> tuple[Candle, ...] | None:
+    """Validate and return contiguous closed 1h bars available by an exclusive as-of."""
+    if (isinstance(as_of_ms, bool) or not isinstance(as_of_ms, int)
+            or minimum <= 0):
+        return None
+    eligible = tuple(bar for bar in bars if bar.close_ms + 1 <= as_of_ms)
+    if len(eligible) < minimum or not _valid_hourly(eligible):
+        return None
+    expected_close = (as_of_ms // HOUR_MS) * HOUR_MS - 1
+    return eligible if eligible[-1].close_ms == expected_close else None
 
 
 def resample_hourly(bars: tuple[Candle, ...], hours: int, *,
@@ -79,11 +115,58 @@ def resample_hourly(bars: tuple[Candle, ...], hours: int, *,
 
 
 def rolling_24h_return(bars: tuple[Candle, ...]) -> tuple[TimedValue, ...] | None:
-    """Return close-to-close 24h fractional returns, timestamped at bar close."""
+    """Return fractional 24h close-to-close returns at close-exclusive times."""
     if not _valid_hourly(bars) or len(bars) <= 24:
         return None
-    return tuple(TimedValue(bar.close_ms, bar.close / bars[i - 24].close - 1)
+    return tuple(TimedValue(bar.close_ms + 1, bar.close / bars[i - 24].close - 1)
                  for i, bar in enumerate(bars) if i >= 24)
+
+
+def calibrate_quarterly_return_cutoff(
+    returns_by_symbol: Mapping[str, tuple[TimedValue, ...]], quarter_start_ms: int,
+    quantile: Decimal, symbols: tuple[str, ...] = ALT_SOURCE_UNIVERSE,
+) -> QuarterlyReturnCutoff | None:
+    """Pool prior closed hourly 24h returns over `[S-90d, S-3d)`.
+
+    `TimedValue.time_ms` is the exclusive UTC boundary after a closed 1h bar.
+    Every requested symbol must have all 2088 hourly values for the 87-day
+    interval; missing data fails closed. Only the return series is accepted,
+    so forward returns cannot enter this calibration path.
+    """
+    if (isinstance(quarter_start_ms, bool) or not isinstance(quarter_start_ms, int)
+            or quarter_start_ms % DAY_MS != 0 or not quantile.is_finite()
+            or quantile not in (D("0.005"), D("0.01")) or not symbols
+            or len(set(symbols)) != len(symbols) or set(returns_by_symbol) != set(symbols)):
+        return None
+    quarter = datetime.fromtimestamp(quarter_start_ms / 1000, timezone.utc)
+    if quarter.day != 1 or quarter.month not in (1, 4, 7, 10):
+        return None
+    start = quarter_start_ms - 90 * DAY_MS
+    end = quarter_start_ms - 3 * DAY_MS
+    expected_times = tuple(range(start, end, HOUR_MS))
+    if len(expected_times) != 2088:
+        return None
+    pooled: list[Decimal] = []
+    for symbol in symbols:
+        rows = returns_by_symbol[symbol]
+        previous = None
+        for row in rows:
+            if (row.time_ms % HOUR_MS != 0 or not row.value.is_finite()
+                    or previous is not None and row.time_ms <= previous):
+                return None
+            previous = row.time_ms
+        by_time = {row.time_ms: row.value for row in rows
+                   if start <= row.time_ms < end}
+        if tuple(sorted(by_time)) != expected_times:
+            return None
+        pooled.extend(by_time[t] for t in expected_times)
+    ordered = sorted(pooled)
+    rank = quantile * D(len(ordered) - 1)
+    lower, upper = int(rank), min(int(rank) + 1, len(ordered) - 1)
+    fraction = rank - D(lower)
+    threshold = ordered[lower] * (1 - fraction) + ordered[upper] * fraction
+    return QuarterlyReturnCutoff(threshold, quantile, quarter_start_ms, start, end,
+                                 tuple(symbols), len(ordered))
 
 
 def prior_rolling_quantile(values: tuple[Decimal, ...], window: int,

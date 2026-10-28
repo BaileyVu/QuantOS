@@ -1,10 +1,12 @@
 from decimal import Decimal as D
+from datetime import datetime, timezone
 import unittest
 
 from quantos.paper.types import Candle
 from quantos.paper.strategies.candidate_features import (
-    HOUR_MS, TimedValue, confirmed_swing_pivots, oi_value_4h_change_zscore,
-    prior_rolling_quantile, resample_hourly, rolling_24h_return,
+    ALT_SOURCE_UNIVERSE, HOUR_MS, TimedValue, calibrate_quarterly_return_cutoff,
+    confirmed_swing_pivots, oi_value_4h_change_zscore, prior_rolling_quantile,
+    resample_hourly, rolling_24h_return,
 )
 
 
@@ -34,13 +36,39 @@ class PortfolioFeatureTests(unittest.TestCase):
     def test_rolling_24h_return_is_timestamped_and_future_changes_do_not_rewrite_past(self):
         bars = hourly(30)
         values = rolling_24h_return(bars)
-        self.assertEqual(values[0].time_ms, bars[24].close_ms)
+        self.assertEqual(values[0].time_ms, bars[24].close_ms + 1)
         self.assertEqual(values[0].value, bars[24].close / bars[0].close - 1)
         changed_future = bars[:27] + (Candle(bars[27].open_ms, bars[27].close_ms, D(500),
                                D(502), D(499), D(501), D(3)),) + bars[28:]
         changed = rolling_24h_return(changed_future)
         self.assertEqual(values[:3], changed[:3])
         self.assertIsNone(rolling_24h_return(bars[:24]))
+
+    def test_quarter_cutoff_uses_only_29_symbol_prequarter_closed_hour_returns(self):
+        quarter_start = int(datetime(2024, 4, 1, tzinfo=timezone.utc).timestamp() * 1000)
+        start, end = quarter_start - 90 * 24 * HOUR_MS, quarter_start - 3 * 24 * HOUR_MS
+        times = tuple(range(start, end, HOUR_MS))
+        history = {
+            symbol: tuple(TimedValue(t, D(i) / D(100_000) + D(j % 997) / D(1_000_000))
+                          for j, t in enumerate(times))
+            for i, symbol in enumerate(ALT_SOURCE_UNIVERSE)
+        }
+        cutoff = calibrate_quarterly_return_cutoff(history, quarter_start, D("0.005"))
+        self.assertIsNotNone(cutoff)
+        self.assertEqual(cutoff.calibration_start_ms, start)
+        self.assertEqual(cutoff.calibration_end_ms, end)
+        self.assertEqual(cutoff.sample_count, 29 * 2088)
+        self.assertEqual(cutoff.symbols, ALT_SOURCE_UNIVERSE)
+
+        # Values at and after the embargo boundary never affect the frozen cutoff.
+        future = {symbol: rows + (TimedValue(quarter_start, D("999")),)
+                  for symbol, rows in history.items()}
+        self.assertEqual(cutoff, calibrate_quarterly_return_cutoff(
+            future, quarter_start, D("0.005")))
+        missing = dict(history)
+        missing[ALT_SOURCE_UNIVERSE[0]] = missing[ALT_SOURCE_UNIVERSE[0]][:-1]
+        self.assertIsNone(calibrate_quarterly_return_cutoff(missing, quarter_start, D("0.005")))
+        self.assertIsNone(calibrate_quarterly_return_cutoff(history, quarter_start, D("0.02")))
 
     def test_prior_quantile_excludes_current_value_and_future(self):
         vals = tuple(map(D, (1, 2, 3, 4, 100)))

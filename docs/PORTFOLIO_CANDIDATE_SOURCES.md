@@ -25,6 +25,7 @@ root; these were read as text only and were not imported or executed:
 | `simple_baseline.py` | `ddc132b942e11fc5de4b65d5bfaf6692a23e1f74d39bf8f8fa22ac289512988a` |
 | `features2.py` | `e2edc5e3cc2281e0fedc2aff3071168ef562f9bdea36cbc5c76271f4a27f5128` |
 | `wf.py` | `a11a44bb621ed1fa75053dce75bc6c57b8363e92430bde9054dba20fe9243ec7` |
+| `fetch1h.py` | `ad6d3ad0ea452432fcad61922fd3dfec3dec47106f5f7aa83c7663a43b810a6f` |
 
 No source files for `crash_flush_e2` were attached or found; its rule remains
 based on the owner-supplied candidate description and adaptation approval.
@@ -51,12 +52,24 @@ touches, 1 ATR leave spacing, 0.2 ATR stop buffer, and 1.5R target. The archived
 cross exit, four slots, and 1x leverage. It is distinct from the requested
 12/26, ATR-zone-stop, 1.5R candidate.
 
-The user-approved adaptation currently specifies 2h 12/26 crosses,
-confirmed swing-pivot levels, 0.25 ATR touch tolerance, two prior distinct
-touches, 0.25 ATR stop buffer, and 1.5R target. These approved parameters
-conflict with source defaults and with the optimizer's overrides. Whether to
-keep flip zones and the major-swing/Fibonacci context filter is not specified by
-the adaptation and must be resolved before finalizing the candidate rule.
+The owner-reported source README says its original 2h bars were misaligned and
+that a corrected 12/26 walk-forward grew 1.12–1.27x. That README was not among
+the attached files, and those growth figures were not independently reproduced.
+`backtest_edge.py` is treated as a separate archived-source audit, not as
+candidate selection. Its timestamp-bucket resampler accepts partial buckets
+and does not reject missing-hour gaps, so it does not establish complete causal
+2h coverage. The candidate requires complete, contiguous, UTC epoch-aligned 2h
+candles.
+
+The candidate preregistration uses 2h 12/26 crosses, EMA-smoothed ATR(14),
+five bars on each side for confirmed pivot levels, 288-bar level lookback,
+0.25 ATR pivot-cluster/touch tolerance, two prior distinct pivot touches,
+1 ATR separation between prior touches, 12-bar current retest window, 1 ATR
+maximum close distance beyond the zone, 0.25 ATR stop buffer, 1.5R target, and
+72h maximum hold. Same-side support/resistance and opposite-side flip zones are
+kept. Zone-body expansion is off, matching the source default. The major-swing
+Fibonacci filter is omitted because it is a separate source `context_ok` step
+and is not part of this level-cross candidate.
 
 ### ALT source baseline
 
@@ -65,10 +78,13 @@ calibration interval `[quarter_start - 90 days, quarter_start - 3 days)`. It
 tests bottom-quantile cutoffs of 0.5% and 1%, with 12h, 24h, and 72h holding
 horizons, and blocks a coin from another entry until its prior horizon ends.
 The candidate module uses that original three-day embargo endpoint as a
-source-faithful provisional preregistration; the adaptation's “90 days before
-each quarter” could instead mean ending calibration at quarter start. The exact
-cutoff boundary still needs final preregistration. The `fetch1h.UNIVERSE` list
-was not among the attached files, so the exact 29-symbol cohort is unresolved.
+source-faithful preregistration. `fetch1h.UNIVERSE` is BTCUSDT, ETHUSDT, SOLUSDT,
+BNBUSDT, XRPUSDT, DOGEUSDT, ADAUSDT, AVAXUSDT, LINKUSDT, DOTUSDT, LTCUSDT,
+BCHUSDT, TRXUSDT, ATOMUSDT, NEARUSDT, UNIUSDT, FILUSDT, ETCUSDT, AAVEUSDT,
+XLMUSDT, ALGOUSDT, SANDUSDT, MANAUSDT, AXSUSDT, CRVUSDT, RUNEUSDT, THETAUSDT,
+VETUSDT, and GALAUSDT. `fetch1h.py` downloads Binance Spot `/api/v3/klines`;
+the current research adapter uses USD-M archive data. This venue mismatch is a
+known data-source gap; the Spot cohort is not verified as a USD-M universe.
 The file calculates one comparator from each test
 quarter's realized per-coin mean forward return, which is not a valid
 pre-decision random-entry baseline and is not adopted as evaluation evidence.
@@ -109,8 +125,8 @@ has been run on data not used to develop or inspect them.
   excluding the current change. First availability is after 724 hours of
   observations. This denominator convention is provisional pending source-data
   documentation.
-- Primary exit: 24h time exit. A 25% catastrophe stop is approved; the 15% stop
-  is a sensitivity run only.
+- Hold variants: 24h primary, plus 48h and 72h; 25% catastrophe stop is primary,
+  with the 15% stop for sensitivity only.
 - Risk sizing sweep is controlled by the portfolio harness: 1%, 2%, 4%, 6%, 8%.
 
 ### `alt_dip_reversal`
@@ -120,9 +136,9 @@ has been run on data not used to develop or inspect them.
   threshold for that entire quarter. Do not use a rolling 720h cutoff.
 - Candidate cutoffs: bottom 0.5% and bottom 1% (separate preregistered variants).
 - Holding-period variants: 12h, 24h, and 72h.
-- A 25% catastrophe stop is approved. The 15% stop is a sensitivity run only.
-- Exact coin-universe membership and tie/threshold-boundary handling remain to
-  be recorded before evaluation.
+- A 25% catastrophe stop is primary. The 15% stop is a sensitivity run only.
+- Use the original 29-symbol Spot cohort from `fetch1h.UNIVERSE`, subject to the
+  documented Spot/USD-M venue gap. The bottom-quantile boundary is inclusive.
 
 ### `ema_level_2h`
 
@@ -132,15 +148,16 @@ has been run on data not used to develop or inspect them.
   stop buffer is 0.25 ATR beyond the zone; target is 1.5R.
 - Entry requires the EMA cross at a level with two prior distinct touches, so
   the signal is on the third distinct touch.
-- Pivot left/right widths, ATR lookback and smoothing, zone clustering, and
-  touch-separation semantics still require explicit preregistration. No implicit
-  defaults should be used for these rules.
+- Five-bar pivot half-width, EMA-smoothed ATR(14), 288-bar lookback, 0.25 ATR
+  clustering/touch tolerance, 1 ATR separation, 12-bar retest, and 1 ATR
+  maximum close distance are fixed from source defaults or the explicit user
+  decision. The major-swing/Fibonacci filter is a separate omitted source step.
 
 ## Feature helper conventions
 
-`quantos.paper.strategies.candidate_features` provides causal primitives only:
+`quantos.paper.strategies.candidate_features` provides causal primitives:
 hourly-to-2h/4h aggregation by UTC epoch bucket with an explicit `as_of_ms`,
-24h close-to-close fractional returns, prior-only rolling quantiles using linear
-interpolation, prior-only OI-change z-scores, and swing pivots carrying both the
-pivot time and the time the pivot became confirmed. It does not specify entry
-rules, universe selection, calibration policy, stop behavior, or zone semantics.
+24h close-to-close fractional returns, quarterly 29-symbol cutoff calculation
+over `[S-90d,S-3d)` with timestamp and sample-count provenance, prior-only
+rolling quantiles using linear interpolation, prior-only OI-change z-scores,
+and swing pivots carrying both pivot time and confirmation time.

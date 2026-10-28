@@ -8,7 +8,7 @@ from .adaptive import AdaptiveSizer
 from .engine import PaperEngine
 from .journal import Journal
 from .report import atomic_json, write_reports
-from .risk import Policy
+from .risk import Policy, ResearchPolicy
 from .runtime import arbitrate, dispatch
 from .strategies import library
 from .strategies.manifest import manifest_for
@@ -39,16 +39,18 @@ def snapshot(data):
                     calibration_end_ms=data.get("calibration_end_ms"))
 
 
-def replay(paths, state: Path, strategy="all"):
+def replay(paths, state: Path, strategy="all", *, research=False):
     if state.exists(): raise ValueError("replay output must be a new directory")
     state.mkdir(parents=True)
     selected = manifest_for(strategy)
-    strategies = [s for s in library() if strategy == "all" or s.strategy_id == strategy
+    strategies = [s for s in library(research) if strategy == "all" or s.strategy_id == strategy
                   or (selected and manifest_for(s.strategy_id) == selected)]
     if not strategies: raise ValueError("unknown strategy")
-    journals = [Journal(state/f"journal_{p}.db", p, "replay") for p in ("p1", "p5", "pA")]
-    engines = [PaperEngine(j, Policy(risk_fraction=D(f)), adaptive=AdaptiveSizer(j, journals[0]) if p == "pA" else None)
-               for j, p, f in zip(journals, ("p1", "p5", "pA"), (".01", ".05", ".05"))]
+    profiles = ("pR",) if research else ("p1", "p5", "pA")
+    journals = [Journal(state/f"journal_{p}.db", p, "replay") for p in profiles]
+    engines = ([PaperEngine(journals[0], ResearchPolicy())] if research else
+               [PaperEngine(j, Policy(risk_fraction=D(f)), adaptive=AdaptiveSizer(j, journals[0]) if p == "pA" else None)
+                for j, p, f in zip(journals, profiles, (".01", ".05", ".05"))])
     first = previous = None
     try:
         for path in paths:
@@ -89,6 +91,7 @@ def replay(paths, state: Path, strategy="all"):
         if first is None: raise ValueError("empty replay")
         run = {"started_ms": first, "finished_ms": previous, "evidence": "replay",
                "status": "replay_finished", "strategy": strategy,
+               "profiles": list(profiles),
                "warning": "Open end-of-input positions remain open; no synthetic closing quotes added."}
         atomic_json(state/"run.json", run)
     finally:

@@ -46,6 +46,15 @@ class PaperEngine:
         self.faults = faults or Faults()
         self.quotes: dict[str, Quote] = {}
         self.connected = False
+        if (journal.profile == "pR") != policy.candidates_enabled:
+            raise ValueError("research policy requires a separate pR journal")
+        if policy.candidates_enabled:
+            frozen = json.loads(json.dumps(asdict(policy), default=str, sort_keys=True))
+            with journal.transaction():
+                previous = journal.get("research_policy")
+                if previous is not None and previous != frozen:
+                    raise ValueError("research policy changed; use a new state directory")
+                journal.set("research_policy", frozen)
 
     def active(self):
         return [o for o in self.journal.orders() if o["state"] not in TERMINAL]
@@ -173,6 +182,11 @@ class PaperEngine:
                 return None
             self.journal.db.execute("INSERT INTO signals VALUES(?,?)", (signal.signal_id, now_ms))
             self.journal.event(now_ms, "SIGNAL", asdict(signal))
+            cooldowns = self.journal.get("entry_cooldowns", {})
+            if now_ms < cooldowns.get(f"{signal.strategy_id}:{signal.symbol}", 0):
+                self.journal.event(now_ms, "REJECTED_RISK", {
+                    "signal_id": signal.signal_id, "approved": False, "reason": "ENTRY_COOLDOWN"})
+                return None
             self.quotes[quote.symbol] = quote
             policy = self.policy
             if self.adaptive is not None:
@@ -286,12 +300,33 @@ class PaperEngine:
         fill_id = f"{o['id']}:ENTRY:{source}"
         if self.journal.db.execute("SELECT 1 FROM fills WHERE id=?", (fill_id,)).fetchone():
             return
+        fee = price * quantity * (self.policy.maker_fee if maker else self.policy.taker_fee)
+        if self.policy.candidates_enabled:
+            # Recheck the *whole* reserved portfolio at execution, including
+            # pending intents and immediate entry fee/mark-to-market loss.
+            account = self.account(now_ms)
+            q = self.quotes.get(o["signal"]["symbol"])
+            mark = q.mark if q else D(o["last_mark"])
+            reserve_price = max(mark, D(o["signal"]["entry_price"]))
+            extra = quantity * max(D(0), price-reserve_price)
+            equity_after = account.equity-fee + quantity*(mark-price)*D(o["direction"])
+            gross_after = account.gross_notional + extra
+            margin_after = account.margin_used + extra/D(o["decision"]["leverage"])
+            if (equity_after <= 0 or gross_after > equity_after*self.policy.gross_fraction
+                    or margin_after > equity_after):
+                self._cancel(o, now_ms, "FILL_EXCEEDS_PORTFOLIO_CAP")
+                return
         old = D(o["filled"])
         o["average"] = str((D(o["average"]) * old + price * quantity) / (old + quantity))
         o["filled"] = str(old + quantity)
         o["remaining"] = str(D(o["remaining"]) - quantity)
         o["first_fill_ms"] = o["first_fill_ms"] or now_ms
-        fee = price * quantity * (self.policy.maker_fee if maker else self.policy.taker_fee)
+        if old == 0 and o["signal"]["strategy_id"] in {"crash_flush_e2", "alt_dip_reversal"}:
+            cooldowns = self.journal.get("entry_cooldowns", {})
+            seconds = (86400 if o["signal"]["strategy_id"] == "crash_flush_e2"
+                       else o["signal"]["maximum_hold_seconds"])
+            cooldowns[f'{o["signal"]["strategy_id"]}:{o["signal"]["symbol"]}'] = now_ms + seconds*1000
+            self.journal.set("entry_cooldowns", cooldowns)
         self.journal.db.execute("INSERT INTO fills VALUES(?,?,?,?,?,?,?,?)",
                                (fill_id, o["id"], now_ms, "ENTRY", str(quantity), str(price), str(fee), "0"))
         o["state"] = "FILLED" if D(o["remaining"]) == 0 else "PARTIAL"

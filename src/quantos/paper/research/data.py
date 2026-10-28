@@ -118,6 +118,7 @@ class ArchiveRef:
     period: str
     url: str
     interval: str | None = None
+    size_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -251,8 +252,11 @@ class ArchiveStore:
     def list_archives(self, dataset: str, symbol: str,
                       interval: str | None = None,
                       start: date | None = None,
-                      end: date | None = None) -> tuple[ArchiveRef, ...]:
+                      end: date | None = None,
+                      granularity: str = "both") -> tuple[ArchiveRef, ...]:
         """List archive partitions from public S3 metadata, without fetching data."""
+        if granularity not in {"both", "monthly", "daily"}:
+            raise ValueError("granularity must be both, monthly, or daily")
         if dataset not in DATASETS or not _SYMBOL.fullmatch(symbol):
             raise ValueError("unsupported dataset or invalid symbol")
         if dataset in {"klines", "markPriceKlines"}:
@@ -272,7 +276,14 @@ class ArchiveStore:
             daily_prefix = None
         token = None
         refs: list[ArchiveRef] = []
-        for listing_prefix in (prefix, daily_prefix):
+        if dataset == "metrics":
+            prefixes = (prefix,) if granularity in {"both", "daily"} else ()
+        elif dataset == "fundingRate":
+            prefixes = (prefix,) if granularity in {"both", "monthly"} else ()
+        else:
+            prefixes = ((prefix, daily_prefix) if granularity == "both" else
+                        (prefix,) if granularity == "monthly" else (daily_prefix,))
+        for listing_prefix in prefixes:
             if listing_prefix is None:
                 continue
             token = None
@@ -291,8 +302,9 @@ class ArchiveStore:
                     raise ValueError("S3 listing response exceeded limit")
                 root = ET.fromstring(body)
                 ns = {"s3": "http://s3.amazonaws.com/doc/2006-03-01/"}
-                for node in root.findall("s3:Contents/s3:Key", ns):
-                    key = node.text or ""
+                for content_node in root.findall("s3:Contents", ns):
+                    node = content_node.find("s3:Key", ns)
+                    key = node.text if node is not None and node.text else ""
                     if not key.endswith(".zip"):
                         continue
                     name = key.rsplit("/", 1)[-1]
@@ -310,7 +322,9 @@ class ArchiveStore:
                     if end and period_date > end:
                         continue
                     url = f"{BASE_URL}/{key.removeprefix('data/futures/um/')}"
-                    refs.append(ArchiveRef(dataset, symbol, date_token, url, interval))
+                    size_text = content_node.findtext("s3:Size", namespaces=ns)
+                    size = int(size_text) if size_text and size_text.isdigit() else None
+                    refs.append(ArchiveRef(dataset, symbol, date_token, url, interval, size))
                 truncated = root.findtext("s3:IsTruncated", namespaces=ns) == "true"
                 token = root.findtext("s3:NextContinuationToken", namespaces=ns)
                 if not truncated:

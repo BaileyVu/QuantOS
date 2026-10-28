@@ -60,7 +60,7 @@ class ResearchRiskTests(unittest.TestCase):
 
     def test_engine_reserves_pending_orders_before_any_fill(self):
         with tempfile.TemporaryDirectory() as tmp:
-            j = Journal(Path(tmp) / "research.db", "p1", "synthetic")
+            j = Journal(Path(tmp) / "research.db", "pR", "synthetic")
             try:
                 e = PaperEngine(j, ResearchPolicy())
                 e.recover(T); e.connection(True, T)
@@ -75,6 +75,39 @@ class ResearchRiskTests(unittest.TestCase):
                 # Rounding leaves a tiny budget which cannot meet exchange minimums.
                 self.assertIsNone(e.propose(*inputs("SOLUSDT"), T))
                 self.assertEqual(len(e.active()), 2)
+            finally:
+                j.close()
+
+    def test_research_state_cannot_reuse_baseline_or_change_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "research.db"
+            j = Journal(path, "pR", "synthetic")
+            PaperEngine(j, ResearchPolicy())
+            with self.assertRaises(ValueError): PaperEngine(j, Policy())
+            with self.assertRaises(ValueError):
+                PaperEngine(j, ResearchPolicy(risk_fraction=D(".02")))
+            j.close()
+            with self.assertRaises(ValueError): Journal(path, "p1", "synthetic")
+
+    def test_other_pending_orders_are_counted_again_at_fill(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            j = Journal(Path(tmp) / "research.db", "pR", "synthetic")
+            try:
+                e = PaperEngine(j, ResearchPolicy())
+                e.recover(T); e.connection(True, T)
+                for sym in ("BTCUSDT", "ETHUSDT"):
+                    self.assertIsNotNone(e.propose(*inputs(sym), T))
+                # The other pending obligation is repriced before this fill.
+                # A check of BTC alone would still pass the 3x gross limit.
+                e.quotes["ETHUSDT"] = replace(quote("10000"), symbol="ETHUSDT")
+                order = e.active()[0]
+                with j.transaction():
+                    e._entry_fill(order, D(order["remaining"]), D(100), T+1000, "cap-test", True)
+                self.assertEqual(j.db.execute("SELECT count(*) FROM fills").fetchone()[0], 0)
+                self.assertEqual(e.query_order(order["id"])["state"], "CANCELED")
+                reasons = [row[0] for row in j.db.execute(
+                    "SELECT json_extract(payload,'$.reason') FROM events WHERE kind='CANCELED'")]
+                self.assertIn("FILL_EXCEEDS_PORTFOLIO_CAP", reasons)
             finally:
                 j.close()
 

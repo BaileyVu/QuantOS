@@ -121,6 +121,76 @@ print(path)
 PY
 ```
 
+## Training acquisition manifest
+
+The supplied [`fetch1h.py`](</Users/bailey12/Desktop/fetch1h.py>) defines the
+exact round-4 29-symbol cohort. Its source hash is
+`ad6d3ad0ea452432fcad61922fd3dfec3dec47106f5f7aa83c7663a43b810a6f`; the file
+describes the original data as Binance **Spot** klines. The research acquisition
+uses USD-M Futures klines, mark-price candles, and funding, so the USD-M archive
+is a different venue/instrument view and must not be described as a replication
+of the original Spot data. The original 29 are a hindsight survivor cohort;
+they are reported as such. The separate robustness cohort is to use the top 20
+non-major USDT symbols by December 2024 calibration-period quote volume, each
+with 90 days of prior history. No 2025/2026 performance data is used to select
+that cohort.
+
+The metadata-only acquisition plan for **2021-10-01 through 2024-12-31** found:
+
+| Dataset | Planned partitions | Listed | Missing | Listed bytes |
+| --- | ---: | ---: | ---: | ---: |
+| USD-M 1h klines, 29 symbols | 1,131 | 1,131 | 0 | 37,505,026 |
+| USD-M mark-price 1h, 29 symbols | 1,131 | 1,131 | 0 | 19,855,933 |
+| USD-M funding, 29 symbols | 1,131 | 1,131 | 0 | 974,090 |
+| USD-M daily metrics, 9 majors | 10,692 | 10,204 | 488 | 117,297,864 |
+| **Total** | **14,085** | **13,597** | **488** | **175,632,913** |
+
+The 488 missing entries are daily OI metric partitions and stay marked missing
+in the manifest; they are not silently skipped or filled. The full listed
+training set is about 167.5 MiB compressed. The exact 488 are pre-availability
+warmup dates, not gaps inside available OI history: BTC has coverage before the
+window, and each other major's metrics begin on 2021-12-01, leaving Oct 1–Nov
+30 unavailable for those eight symbols. The manifest classifies these as
+`before_first_partition` rather than internal gaps. No in-window internal OI
+gaps were found by the listing audit. A small checksum-verified sample of 96
+training archives (one December 2024 month for all 29 across the three monthly
+datasets, plus one OI day for the nine majors) has been downloaded; the rest of
+the training set remains resumable and unrequested for this sample batch.
+The manifest records source SHA-256, each expected archive URL, availability,
+object byte size, cache path, download checksum, and errors. It is stored under
+ignored `data/portfolio/manifests/` and can be resumed. Download workers are
+capped at four.
+
+To regenerate the S3 listing audit and resumable plan from the supplied source:
+
+```sh
+.venv/bin/python -m quantos.paper.research.acquire plan \
+  --universe-file /Users/bailey12/Desktop/fetch1h.py \
+  --start 2021-10-01 --end 2024-12-31 --workers 4
+```
+
+To fetch a small training sample for all original cohort symbols and all three
+monthly archive types, then one OI day for the nine majors:
+
+```sh
+.venv/bin/python -m quantos.paper.research.acquire download \
+  --manifest data/portfolio/manifests/train_2021-10-01_to_2024-12-31.json \
+  --dataset klines --dataset markPriceKlines --dataset fundingRate \
+  --period 2024-12 --limit 100 --workers 4
+
+.venv/bin/python -m quantos.paper.research.acquire download \
+  --manifest data/portfolio/manifests/train_2021-10-01_to_2024-12-31.json \
+  --dataset metrics --period 2024-12-31 --limit 9 --workers 4
+```
+
+Continue a bounded pull by omitting filters and raising `--limit` to the next
+reviewed batch size. `status --manifest <path>` prints the current counts. The
+acquisition plan is explicitly capped at 2024-12-31; it cannot fetch OOS
+partitions. A JSONL progress journal is stored beside the manifest. Downstream
+preprocessing can iterate verified paths with
+`iter_cached_archives(manifest_path, dataset="klines", interval="1h")`; it
+checks each cached SHA-256 before yielding the manifest row and path.
+
 Inspect actual available partitions without downloading them:
 
 ```sh
