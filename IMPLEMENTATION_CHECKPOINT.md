@@ -893,3 +893,15 @@ Quotafinalcheck:92%five-hourused/8%remaining,resetOct29 05:43:46Vietnam
  (1793227426); weekly45%used/55%remaining,resetNov4 14:17:38(1793776658).
  SAMEheartbeatquantos-portfolio-research-continuation confirmedACTIVE05:53Vietnam
  afterreset. Promptupdatedthisstage; neverduplicate/reviveoldV3automation.
+
+Late audit finding (nextsteppriority): cachedfunding source has103431events/29symbols;
+43780timestamps have1–31ms UTC-hourjitter;3fundingintervalschedule-switchboundaries.
+Comparingadjacent timestamps against eitheradjacentinterval shows0unexplained
+>60secondgaps. Main simulator _validate_funding currentlyrequiresexacthourdelta,
+so it wouldincorrectlyinvalidatethesecells. Fix with boundedtimestampjitter
+validationwhilePRESERVINGactualeventtimestamps; accept documentedintervalswitch
+atboundarywithoutinventingrates. Addregressiontests forjitter/switch/missingevent.
+Need explicitlysettlementordering forsignalsat t versusfundingat t+fewms: current
+intrahourfunding chargesnewentry; this isamodelchoice, notexactfilltimeevidence.
+Dataagent checkedcachedfundingSHA only; nofundingdatawerewrittenoraligned.
+Finalsource848366a, checkpoint13d8256 beforethisauditnote. Workingtreeclean.
