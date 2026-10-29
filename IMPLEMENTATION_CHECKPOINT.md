@@ -1098,3 +1098,7 @@ Exact next steps:
 Quota check:22% five-hour remaining, resetOctober29 16:09:04Vietnam
  (1793264944);26% weekly remains, resetNovember4 14:17:38(1793776658).
  SAME heartbeat confirmed ACTIVE for16:19Vietnam. No duplicate automation.
+
+Post-save confirmation: training provenance checks passed and the process log
+now contains completed primary cells. Outcomes ARE in progress; the earlier
+"before outcome cells" status above is superseded. Do not rerun completed cells.
