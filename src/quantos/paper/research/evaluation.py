@@ -131,16 +131,56 @@ def run_job(index, cache, filters, job):
         "assumptions": result.assumptions, "diagnostic": notes})
 
 
+def filter_unavailability(sealed, filter_paths):
+    """Evidence-bound full-cohort status, fixed before outcomes; never drop coins."""
+    unavailable = {}
+    for cohort in ("primary", "verified_volume"):
+        expected_hash = sealed["payload"]["plan"]["filter_hashes"][cohort]
+        if filter_snapshot_hash(filter_paths[cohort]) != expected_hash:
+            raise ValueError("filter proxy changed after seal")
+        raw = json.loads(Path(filter_paths[cohort]).read_text())
+        instruments = parse_exchange_info(raw, "USDT")
+        problems = [{"symbol": symbol, "status": instruments[symbol].status if symbol in instruments
+                     else "MISSING_FILTER"}
+                    for symbol in sealed["payload"]["selection"][cohort + "_symbols"]
+                    if symbol not in instruments or instruments[symbol].status != "TRADING"]
+        if problems:
+            unavailable[cohort] = {"status": "NOT_EVALUABLE", "metrics": None,
+                "reason": "Complete frozen cohort lacks usable current historical filter proxies; no symbol replacement or status fabrication",
+                "filter_sha256": expected_hash, "symbol_evidence": problems}
+    if unavailable != sealed["payload"]["plan"].get("filter_unavailability", {}):
+        raise ValueError("filter-unavailability evidence differs from preregistration")
+    return unavailable
+
+
+def require_complete_prices(index, symbols):
+    """Missing leading/trailing history is also a gap; require complete rows."""
+    warmup_start = 1727740800000  # 2024-10-01 UTC
+    count = (END - warmup_start) // 3_600_000
+    for dataset in (index.bars, index.marks):
+        for symbol in symbols:
+            rows = dataset.get(symbol, ())
+            if (len(rows) != count or not rows or rows[0].open_ms != warmup_start
+                    or rows[-1].close_ms + 1 != END
+                    or any(b.open_ms != a.close_ms + 1 for a, b in zip(rows, rows[1:]))):
+                raise ValueError(f"incomplete price/mark history requires source repair: {symbol}")
+
+
 def validate_inputs(sealed, indexes, caches, filter_paths):
     if fingerprint(sealed["payload"]) != sealed["sha256"]:
         raise ValueError("modified seal")
     if experiment.source_content_hash() != sealed["payload"]["code_sha"]:
         raise ValueError("evaluation source differs from pre-outcome seal")
-    for cohort in ("primary", "verified_volume"):
+    unavailable = filter_unavailability(sealed, filter_paths)
+    expected_cohorts = {"primary", "verified_volume"} - set(unavailable)
+    if set(indexes) != expected_cohorts or set(caches) != expected_cohorts:
+        raise ValueError("indexes/caches must exactly match evaluable cohorts")
+    for cohort in sorted(expected_cohorts):
         index, cache = indexes[cohort], caches[cohort]
         symbols = sealed["payload"]["selection"][cohort + "_symbols"]
         if tuple(index.window) != ("2024-10-01", "2026-10-28") or set(index.bars) != set(symbols):
             raise ValueError("wrong evaluation index scope")
+        require_complete_prices(index, symbols)
         if cache.training_window != (START, END) or cache.data_hash != index.content_hash:
             raise ValueError("cache has wrong data/window")
         expected = evaluation_parameter_hash(sealed, cohort, symbols,
@@ -158,11 +198,12 @@ def validate_inputs(sealed, indexes, caches, filter_paths):
         expected_filter = sealed["payload"]["plan"]["filter_hashes"][cohort]
         if cache.filter_hash != expected_filter:
             raise ValueError("filter proxy changed after seal")
+    return unavailable
 
 
 def run_wave(sealed, indexes, caches, filter_paths, output):
     """Resume exact saved jobs only. All completed cells are checksum-verified."""
-    validate_inputs(sealed, indexes, caches, filter_paths)
+    unavailable = validate_inputs(sealed, indexes, caches, filter_paths)
     jobs = sealed["payload"]["plan"]["evaluation_jobs"]
     if jobs != wave_jobs(sealed["payload"]["selection"]):
         raise ValueError("frozen jobs differ from preregistered grid/diagnostics")
@@ -170,7 +211,8 @@ def run_wave(sealed, indexes, caches, filter_paths, output):
     claim = {"schema": 1, "seal_sha256": sealed["sha256"],
         "data": {k: v.content_hash for k, v in indexes.items()},
         "caches": {k: v.source_hash for k, v in caches.items()},
-        "code_sha": sealed["payload"]["code_sha"], "jobs_sha256": fingerprint(jobs)}
+        "code_sha": sealed["payload"]["code_sha"], "jobs_sha256": fingerprint(jobs),
+        "unavailable_cohorts": unavailable}
     claim_path = output / "evaluation_claim.json"
     if claim_path.exists():
         if json.loads(claim_path.read_text()) != claim:
@@ -189,7 +231,8 @@ def run_wave(sealed, indexes, caches, filter_paths, output):
             if experiment.source_content_hash() != claim["code_sha"]:
                 raise ValueError("source changed during evaluation; no further outcomes permitted")
             cohort = job["cohort"]
-            result = run_job(indexes[cohort], caches[cohort], filters[cohort], job)
+            result = (unavailable[cohort] if cohort in unavailable else
+                      run_job(indexes[cohort], caches[cohort], filters[cohort], job))
             payload = {"job": job, "claim": fingerprint(claim), "result": result}
             row = {"payload": payload, "sha256": fingerprint(payload)}
             _exclusive_json(path, row)

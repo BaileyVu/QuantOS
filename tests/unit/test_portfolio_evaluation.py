@@ -101,3 +101,62 @@ class EvaluationTests(unittest.TestCase):
         with patch.object(evaluation.experiment,"source_content_hash",return_value="new"):
             with self.assertRaisesRegex(ValueError,"source differs"):
                 evaluation.run_wave(s,{}, {}, {}, "unused")
+
+class EvaluationResumeTests(unittest.TestCase):
+    def test_resume_reuses_cells_and_keeps_frozen_pick_separate_from_oos_winner(self):
+        from types import SimpleNamespace
+        c1={"members":[{"strategy_id":"crash_flush_e2","risk_fraction":"0.01","parameters":{}}],"leverage":"1"}
+        c2={**c1,"leverage":"2"}
+        jobs=[{"cohort":"primary","kind":"base","cell":c} for c in (c1,c2)]
+        jobs.append({"cohort":"verified_volume","kind":"base","cell":c1})
+        selection={"pick":{"cell":c1}}
+        unavailable={"verified_volume":{"status":"NOT_EVALUABLE","metrics":None,"reason":"fixture filter evidence"}}
+        payload={"code_sha":"runtime","plan":{"evaluation_jobs":jobs},"selection":selection}
+        sealed={"payload":payload,"sha256":fingerprint(payload)}
+        result1={"status":"COMPLETE","metrics":{"cagr":-.1},"points":[],"trades":[]}
+        result2={"status":"COMPLETE","metrics":{"cagr":.9},"points":[],"trades":[]}
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp);f=p/'filters.json';f.write_text('{}')
+            kwargs=dict(sealed=sealed,indexes={"primary":SimpleNamespace(content_hash="data")},
+                caches={"primary":SimpleNamespace(source_hash="cache")},filter_paths={"primary":f},output=p/'out')
+            with patch.object(evaluation,"validate_inputs",return_value=unavailable), \
+                 patch.object(evaluation,"wave_jobs",return_value=jobs), \
+                 patch.object(evaluation.experiment,"source_content_hash",return_value="runtime"), \
+                 patch.object(evaluation,"monte_carlo",return_value={"test":True}), \
+                 patch.object(evaluation,"run_job",side_effect=[result1,result2]) as runner:
+                first=evaluation.run_wave(**kwargs)
+                self.assertEqual(runner.call_count,2)
+                second=evaluation.run_wave(**kwargs)
+                self.assertEqual(runner.call_count,2)
+                self.assertEqual(first,second)
+                self.assertEqual(first['frozen_pick'],c1)
+                self.assertEqual(first['exploratory_best_key'],fingerprint(jobs[1]))
+                self.assertEqual(first['invalid_jobs'],[fingerprint(jobs[2])])
+                cell_path=p/'out'/'cells'/(fingerprint(jobs[0])+'.json')
+                content=json.loads(cell_path.read_text());content['payload']['result']['metrics']['cagr']=99
+                cell_path.write_text(json.dumps(content))
+                with self.assertRaisesRegex(ValueError,'modified evaluation result'):
+                    evaluation.run_wave(**kwargs)
+
+    def test_filter_blocker_requires_exact_sealed_evidence(self):
+        from quantos.paper.research.signals import filter_snapshot_hash
+        inst=instruments();inst['BTCUSDT']=replace(inst['BTCUSDT'],status='SETTLING')
+        with tempfile.TemporaryDirectory() as tmp:
+            f=Path(tmp)/'filters.json';f.write_text('{}');s=seal()
+            s['payload']['plan']['filter_hashes']={k:filter_snapshot_hash(f) for k in ('primary','verified_volume')}
+            paths={'primary':f,'verified_volume':f}
+            evidence={k:{'status':'NOT_EVALUABLE','metrics':None,
+                'reason':'Complete frozen cohort lacks usable current historical filter proxies; no symbol replacement or status fabrication',
+                'filter_sha256':filter_snapshot_hash(f),'symbol_evidence':[{'symbol':'BTCUSDT','status':'SETTLING'}]}
+                for k in paths}
+            s['payload']['plan']['filter_unavailability']=evidence
+            with patch.object(evaluation,'parse_exchange_info',return_value=inst):
+                self.assertEqual(evaluation.filter_unavailability(s,paths),evidence)
+                s['payload']['plan']['filter_unavailability']={}
+                with self.assertRaisesRegex(ValueError,'differs from preregistration'):
+                    evaluation.filter_unavailability(s,paths)
+
+    def test_missing_edge_history_is_not_misclassified_as_gapless(self):
+        i=index()
+        with self.assertRaisesRegex(ValueError,'incomplete price/mark'):
+            evaluation.require_complete_prices(i,ALT_SOURCE_UNIVERSE)

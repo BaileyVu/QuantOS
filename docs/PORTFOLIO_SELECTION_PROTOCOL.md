@@ -82,3 +82,27 @@ the new fill. Crash stops are 25% below delayed entry; EMA zone sensitivities
 retain the original structural stop and place the 1.5R target from delayed
 entry when the geometry remains valid. These helpers generate signals only;
 they do not change risk, accounting, exposure, cooldown, or execution rules.
+
+## Held-out execution and unavailable-cohort rule
+
+Before opening held-out data, freeze the 2022–2024 selection, all 159 exploratory
+cells, the diagnostic job list, both exact 29-symbol cohorts, current filter
+snapshots and runtime source hash. The evaluation is 2025-01-01 through
+2026-10-28 UTC inclusive, with Q4 2024 warmup. A completed result is immutable;
+resume verifies its checksum and never resimulates it. The held-out sweep winner
+is labelled exploratory and cannot replace the training-selected candidate.
+
+The current volume-cohort filter snapshot contains UXLINK in SETTLING status.
+Under this study's existing current-filter proxy rule, its full frozen cohort
+cannot be executed faithfully. Seal the exact symbol/status/filter-hash evidence
+as NOT_EVALUABLE, retain the requested rows without numerical performance, and
+continue valid primary-cohort evaluation. Do not drop or replace the contract,
+change its status, or pretend unavailable performance is zero. Historical data
+acquisition still records that cohort's availability for the report; this rule
+is determined without held-out returns.
+
+Known missing trade/mark rows require checksummed daily-source repairs. Leading
+and trailing coverage count as missing history too. An overlay must bind to its
+original manifest/audit and supply exactly requested timestamps without
+conflicting existing rows. Unexplained funding gaps are not zero costs or
+invented funding-interval changes. No tuning is permitted after these checks.

@@ -3,12 +3,15 @@ from __future__ import annotations
 import json
 import hashlib
 from pathlib import Path
+import socket
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from quantos.paper.research.protocol import fingerprint
 from quantos.paper.research.evaluation_data import (
     validate_seal, validate_seal_from_plan, build_evaluation_plan,
+    download_evaluation_batch, run_evaluation_acquisition, _evaluation_run_lock,
 )
 
 
@@ -96,6 +99,72 @@ class EvaluationDataTests(unittest.TestCase):
                           if task["id"] == "metrics:BTCUSDT:-:2024-10-01")
             self.assertEqual(oi_row["status"], "downloaded")
             self.assertEqual(oi_row["sha256"], metric_digest)
+
+    def test_run_lock_blocks_active_owner_and_recovers_dead_local_pid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "evaluation.json"
+            lock = Path(str(manifest) + ".lock")
+            with _evaluation_run_lock(manifest, "a" * 64):
+                self.assertTrue(lock.is_file())
+                with self.assertRaisesRegex(RuntimeError, "already active"):
+                    with _evaluation_run_lock(manifest, "a" * 64):
+                        pass
+            self.assertFalse(lock.exists())
+            lock.write_text(json.dumps({"pid": 2**30, "pid_start": "gone",
+                                        "host": socket.gethostname(), "token": "stale"}))
+            with _evaluation_run_lock(manifest, "a" * 64):
+                self.assertTrue(lock.is_file())
+            self.assertFalse(lock.exists())
+
+    def test_download_attempts_are_bounded_and_persisted_without_network(self):
+        class EmptyListingStore:
+            def list_archives(self, *args, **kwargs): return ()
+        class FailingStore:
+            def __init__(self, root):
+                self.root, self.max_archive_bytes, self.calls = Path(root), 1000, 0
+            def _get(self, url, limit):
+                self.calls += 1
+                raise RuntimeError("offline test failure")
+        with tempfile.TemporaryDirectory() as tmp:
+            seal_path = Path(tmp) / "seal.json"
+            seal_path.write_text(json.dumps(sealed_value()))
+            manifest_path = Path(tmp) / "evaluation.json"
+            plan = build_evaluation_plan(seal_path, store=EmptyListingStore(),
+                                         warmup_manifest_path=Path(tmp) / "no-training-manifest")
+            manifest_path.write_text(json.dumps(plan))
+            fake_store = FailingStore(Path(tmp) / "cache")
+            for _ in range(3):
+                download_evaluation_batch(seal_path, manifest_path, limit=1,
+                                          workers=1, store=fake_store)
+            result = json.loads(manifest_path.read_text())
+            failed = next(t for t in result["tasks"] if t["id"].startswith("fundingRate-api:"))
+            self.assertEqual(failed["attempts"], 3)
+            self.assertEqual(failed["status"], "error")
+            self.assertIn("maximum 3 attempts", failed["error"])
+            self.assertEqual(fake_store.calls, 3)
+            progress = Path(str(manifest_path) + ".progress.jsonl").read_text().splitlines()
+            self.assertEqual(len(progress), 3)
+
+    def test_cli_runner_resumes_existing_exact_manifest_without_relisting(self):
+        class EmptyListingStore:
+            def list_archives(self, *args, **kwargs): return ()
+        with tempfile.TemporaryDirectory() as tmp:
+            seal_path = Path(tmp) / "seal.json"
+            seal_path.write_text(json.dumps(sealed_value()))
+            manifest_path = Path(tmp) / "evaluation.json"
+            manifest = build_evaluation_plan(seal_path, store=EmptyListingStore(),
+                                             warmup_manifest_path=Path(tmp) / "no-training-manifest")
+            for task in manifest["tasks"]:
+                if task["evaluation_source"] == "public_funding_api":
+                    task.update(status="downloaded", cached_path=str(Path(tmp) / "api.json"),
+                                sha256="b" * 64, actual_bytes=2)
+            manifest_path.write_text(json.dumps(manifest))
+            with patch("quantos.paper.research.evaluation_data.build_evaluation_plan",
+                       side_effect=AssertionError("existing sealed manifest must not be rebuilt")):
+                result = run_evaluation_acquisition(seal_path, manifest_path,
+                    workers=1, cache_root=Path(tmp) / "cache")
+            self.assertEqual(result["seal_sha256"], manifest["seal_sha256"])
+            self.assertEqual(len(result["tasks"]), len(manifest["tasks"]))
 
     def test_manifest_task_cannot_escape_window_or_sealed_symbols(self):
         class EmptyListingStore:

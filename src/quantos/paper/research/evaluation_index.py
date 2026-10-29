@@ -100,6 +100,19 @@ def _task_rows(manifest: dict) -> tuple[dict, ...]:
     return tuple(tasks)
 
 
+def _index_content_hash(manifest: dict, accepted: list[dict],
+                        training_sha: str | None, overlay_hash: str | None) -> str:
+    manifest_fingerprint = hashlib.sha256(json.dumps(manifest, sort_keys=True,
+        separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    content = hashlib.sha256()
+    content.update(manifest_fingerprint.encode())
+    content.update(json.dumps(sorted(accepted, key=lambda x: x["id"]), sort_keys=True,
+        separators=(",", ":")).encode())
+    content.update((training_sha or "").encode())
+    content.update((overlay_hash or "").encode())
+    return content.hexdigest()
+
+
 def _verify_warmup(task: dict, training_manifest: dict, training_sha: str) -> dict:
     if task.get("warmup_source_manifest_sha256") != training_sha:
         raise ValueError("warmup archive does not bind to the supplied training manifest")
@@ -118,6 +131,7 @@ def _verify_warmup(task: dict, training_manifest: dict, training_sha: str) -> di
 def build_evaluation_index(manifest_path: str | Path, *,
                            training_manifest_path: str | Path | None = None,
                            training_overlay_manifest: str | Path | None = None,
+                           evaluation_overlay_manifest: str | Path | None = None,
                            symbols: tuple[str, ...] | None = None) -> DatasetIndex:
     """Build immutable evaluation rows from the exact evaluation manifest.
 
@@ -267,6 +281,74 @@ def build_evaluation_index(manifest_path: str | Path, *,
         overlay_hash = repair_digest.hexdigest()
         overlay_path = str(overlay_file.resolve())
 
+    # Evaluation gaps use the same exact-row overlay contract as training,
+    # bound to this manifest and to the pre-repair row audit's index hash.
+    if evaluation_overlay_manifest is not None:
+        repair_path = Path(evaluation_overlay_manifest)
+        repair = json.loads(repair_path.read_text(encoding="utf-8"))
+        if repair.get("status") != "complete":
+            raise ValueError("evaluation daily repair overlay is not complete")
+        if repair.get("window") != [window["start"], window["end"]]:
+            raise ValueError("evaluation repair overlay window differs from evaluation manifest")
+        if repair.get("base_content_hash") != manifest_content_hash(manifest):
+            raise ValueError("evaluation repair overlay belongs to a different manifest")
+        expected_audit_hash = _index_content_hash(manifest, accepted, training_sha, overlay_hash)
+        if repair.get("source_audit_hash") != expected_audit_hash:
+            raise ValueError("evaluation repair overlay belongs to a different row audit")
+        seen_ids = set()
+        overlay_digest = hashlib.sha256()
+        q_lo, q_hi = bounds
+        for row in sorted(repair.get("tasks", []), key=lambda x: x.get("id", "")):
+            if row.get("id") in seen_ids:
+                raise ValueError("evaluation repair manifest has duplicate task IDs")
+            seen_ids.add(row.get("id"))
+            symbol, dataset = row.get("symbol"), row.get("dataset")
+            if symbol not in wanted or dataset not in {"klines", "markPriceKlines"}:
+                raise ValueError("evaluation repair task is outside selected trade/mark inputs")
+            expected_times = set(row.get("missing_open_ms", ()))
+            if not expected_times or any(isinstance(t, bool) or not isinstance(t, int)
+                                         or not q_lo <= t < q_hi for t in expected_times):
+                raise ValueError(f"evaluation repair task has invalid missing timestamps: {row.get('id')}")
+            if row.get("status") != "downloaded":
+                unavailable.append({"id": row.get("id"), "dataset": dataset, "symbol": symbol,
+                                    "period": row.get("period"), "status": row.get("status"),
+                                    "phase": "evaluation_repair", "error": row.get("error")})
+                continue
+            cached = Path(row.get("cached_path") or "")
+            if not cached.is_file():
+                raise FileNotFoundError(f"evaluation repair archive missing: {cached}")
+            digest = _sha(cached)
+            if digest != row.get("sha256"):
+                raise ValueError(f"evaluation repair checksum mismatch: {row.get('id')}")
+            if row.get("interval") != "1h":
+                raise ValueError(f"evaluation repair must be hourly: {row.get('id')}")
+            bars = parse_klines(cached, symbol, "1h")
+            day_start = int(datetime.combine(date.fromisoformat(row["period"]),
+                datetime.min.time(), timezone.utc).timestamp() * 1000)
+            current = {bar.open_ms: bar for bar in grouped[dataset].get(symbol, [])}
+            additions, found = [], set()
+            for bar in bars:
+                if not day_start <= bar.open_ms < day_start + 24 * HOUR_MS:
+                    raise ValueError(f"evaluation repair row outside its UTC day: {row.get('id')}")
+                if bar.open_ms in expected_times:
+                    if bar.open_ms in current:
+                        raise ValueError(f"evaluation repair duplicates base row: {symbol}@{bar.open_ms}")
+                    additions.append(bar)
+                    found.add(bar.open_ms)
+                elif bar.open_ms in current:
+                    if current[bar.open_ms] != bar:
+                        raise ValueError(f"conflicting evaluation repair row: {symbol}@{bar.open_ms}")
+                else:
+                    raise ValueError(f"evaluation repair contains an unaudited row: {symbol}@{bar.open_ms}")
+            if found != expected_times:
+                raise ValueError(f"evaluation repair omitted audited timestamps: {row.get('id')}")
+            grouped[dataset][symbol].extend(additions)
+            overlay_rows += len(additions)
+            overlay_digest.update(f"{row.get('id')}:{digest}\n".encode())
+        evaluation_overlay_hash = overlay_digest.hexdigest()
+        overlay_hash = hashlib.sha256(f"{overlay_hash or ''}\nevaluation:{evaluation_overlay_hash}".encode()).hexdigest()
+        overlay_path = ";".join(x for x in (overlay_path, str(repair_path.resolve())) if x)
+
     audits: list[SeriesAudit] = []
     for dataset, by_symbol in grouped.items():
         for symbol, rows in by_symbol.items():
@@ -282,14 +364,7 @@ def build_evaluation_index(manifest_path: str | Path, *,
             rows.sort(key=lambda x: x.open_ms if hasattr(x, "open_ms") else
                       x.event_ms if hasattr(x, "event_ms") else x.label_ms)
 
-    manifest_fingerprint = hashlib.sha256(json.dumps(manifest, sort_keys=True,
-        separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
-    content = hashlib.sha256()
-    content.update(manifest_fingerprint.encode())
-    content.update(json.dumps(sorted(accepted, key=lambda x: x["id"]), sort_keys=True,
-        separators=(",", ":")).encode())
-    content.update((training_sha or "").encode())
-    content.update((overlay_hash or "").encode())
+    content_hash = _index_content_hash(manifest, accepted, training_sha, overlay_hash)
     # Keep ambiguous duplicate timestamps visible in audit, and absent from O(1)
     # lookup so no row is silently selected by dict insertion order.
     def unique_map(values: dict[str, list[Bar]]) -> dict[str, dict[int, Bar]]:
@@ -305,6 +380,6 @@ def build_evaluation_index(manifest_path: str | Path, *,
         metrics={k: tuple(v) for k, v in grouped["metrics"].items()},
         audit=tuple(audits), bar_by_open_ms=unique_map(grouped["klines"]),
         mark_by_open_ms=unique_map(grouped["markPriceKlines"]),
-        window=(EVAL_START, EVAL_END), content_hash=content.hexdigest(),
+        window=(EVAL_START, EVAL_END), content_hash=content_hash,
         unavailable_partitions=tuple(unavailable), overlay_manifest=overlay_path,
         overlay_hash=overlay_hash, overlay_rows=overlay_rows)

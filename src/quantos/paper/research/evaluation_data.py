@@ -6,12 +6,19 @@ and symbol cohorts. It uses only public Binance USD-M endpoints.
 """
 from __future__ import annotations
 
+import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import socket
+import subprocess
+import tempfile
+import uuid
 from urllib.parse import urlencode
 
 from . import acquire
@@ -22,6 +29,7 @@ WARMUP_START = "2024-10-01T00:00:00Z"
 EVALUATION_START = "2025-01-01T00:00:00Z"
 EVALUATION_END_EXCLUSIVE = "2026-10-29T00:00:00Z"
 MAX_WORKERS = 4
+MAX_ATTEMPTS = 3
 MAJORS = acquire.MAJORS
 OCTOBER_FUNDING_API = "https://fapi.binance.com/fapi/v1/fundingRate"
 
@@ -135,6 +143,93 @@ def _period_is(period: object, pattern: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def _pid_start_token(pid: int) -> str | None:
+    try:
+        result = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)],
+                                capture_output=True, text=True, timeout=2, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    token = result.stdout.strip()
+    return token if result.returncode == 0 and token else None
+
+
+def _publish_lock(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix=".eval-lock-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(value, stream, sort_keys=True)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(name, path)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+@contextmanager
+def _evaluation_run_lock(manifest_path: str | Path, seal_sha256: str):
+    """Take an exclusive process lock; recover only a provably dead local PID."""
+    path = Path(str(manifest_path) + ".lock")
+    recovery = Path(str(path) + ".recovery")
+    token = uuid.uuid4().hex
+    owner = {"pid": os.getpid(), "pid_start": _pid_start_token(os.getpid()),
+             "host": socket.gethostname(),
+             "token": token, "seal_sha256": seal_sha256,
+             "created_utc": datetime.now(timezone.utc).isoformat()}
+    try:
+        _publish_lock(path, owner)
+    except FileExistsError:
+        # Serialize stale-lock recovery. Malformed, remote-host, permission-
+        # ambiguous, and live-PID locks are preserved and fail closed.
+        try:
+            recovery_fd = os.open(recovery, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError as exc:
+            raise RuntimeError(f"evaluation lock recovery is already active: {recovery}") from exc
+        try:
+            os.close(recovery_fd)
+            stat_before = path.stat()
+            stale = json.loads(path.read_text(encoding="utf-8"))
+            if stale.get("host") != socket.gethostname():
+                raise RuntimeError(f"evaluation lock belongs to another host: {path}")
+            pid = stale.get("pid")
+            if not isinstance(pid, int) or pid <= 0:
+                raise RuntimeError(f"evaluation lock has an invalid PID: {path}")
+            if _pid_alive(pid):
+                start_token = _pid_start_token(pid)
+                stale_start = stale.get("pid_start")
+                if not start_token or not stale_start or start_token == stale_start:
+                    raise RuntimeError(f"evaluation acquisition is already active: {path}")
+            stat_after = path.stat()
+            if (stat_before.st_ino, stat_before.st_mtime_ns) != (stat_after.st_ino, stat_after.st_mtime_ns) or \
+                    json.loads(path.read_text(encoding="utf-8")) != stale:
+                raise RuntimeError(f"evaluation lock changed during stale check: {path}")
+            path.unlink()
+            _publish_lock(path, owner)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise RuntimeError(f"cannot safely recover evaluation lock: {path}") from exc
+        finally:
+            recovery.unlink(missing_ok=True)
+    try:
+        yield
+    finally:
+        try:
+            current = json.loads(path.read_text(encoding="utf-8"))
+            if current.get("token") == token and current.get("pid") == os.getpid():
+                path.unlink()
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
 
 
 def build_evaluation_plan(seal_path: str | Path, *, primary_symbols=None,
@@ -359,9 +454,20 @@ def download_evaluation_batch(seal_path: str | Path, manifest_path: str | Path, 
         raise ValueError("invalid batch bounds")
     validate_seal_from_plan(manifest)
     store = store or ArchiveStore()
+    for task in manifest["tasks"]:
+        if task.get("status") in {"available", "error"} and \
+                int(task.get("attempts", 0)) >= MAX_ATTEMPTS:
+            task["status"] = "error"
+            task["error"] = f"maximum {MAX_ATTEMPTS} attempts exhausted"
     pending = [task for task in manifest["tasks"]
-               if task.get("status") in {"available", "error"}]
+               if task.get("status") in {"available", "error"}
+               and int(task.get("attempts", 0)) < MAX_ATTEMPTS]
     batch = pending[:limit]
+    # Count a try before starting it so interruption cannot create an
+    # unbounded retry loop across CLI restarts.
+    for task in batch:
+        task["attempts"] = int(task.get("attempts", 0)) + 1
+    acquire._write_json(path, manifest)
 
     def fetch(task):
         try:
@@ -398,6 +504,78 @@ def download_evaluation_batch(seal_path: str | Path, manifest_path: str | Path, 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(fetch, task): task for task in batch}
         for future in as_completed(futures):
-            futures[future].update(future.result())
+            task = futures[future]
+            result = future.result()
+            task.update(result)
+            if result["status"] == "error" and task["attempts"] >= MAX_ATTEMPTS:
+                task["error"] = f"maximum {MAX_ATTEMPTS} attempts exhausted: {task['error']}"
             acquire._write_json(path, manifest)
+            progress = Path(str(path) + ".progress.jsonl")
+            progress.parent.mkdir(parents=True, exist_ok=True)
+            with progress.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps({"id": task["id"], "attempt": task["attempts"],
+                                         "status": task["status"], "error": task.get("error")},
+                                        sort_keys=True) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
     return manifest
+
+
+def run_evaluation_acquisition(seal_path: str | Path, manifest_path: str | Path, *,
+                               workers: int = MAX_WORKERS, batch_size: int = 32,
+                               cache_root: str | Path = "data/portfolio/raw") -> dict:
+    """Build once or resume the exact sealed plan, then download bounded batches."""
+    sealed, _, _ = validate_seal(seal_path)
+    if not 1 <= workers <= MAX_WORKERS or batch_size < 1:
+        raise ValueError("workers must be 1 to 4 and batch size must be positive")
+    path = Path(manifest_path)
+    with _evaluation_run_lock(path, sealed["sha256"]):
+        if path.exists():
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+            if manifest.get("seal_sha256") != sealed["sha256"]:
+                raise ValueError("existing manifest belongs to a different seal; refusing to rebuild")
+            validate_seal_from_plan(manifest)
+        else:
+            manifest = build_evaluation_plan(seal_path)
+            save_evaluation_plan(path, manifest)
+        store = ArchiveStore(root=cache_root, retries=1)
+        while True:
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+            pending = [task for task in manifest["tasks"]
+                       if task.get("status") in {"available", "error"}
+                       and int(task.get("attempts", 0)) < MAX_ATTEMPTS]
+            if not pending:
+                # Mark interrupted tasks with exhausted budgets terminal.
+                for task in manifest["tasks"]:
+                    if task.get("status") in {"available", "error"} and \
+                            int(task.get("attempts", 0)) >= MAX_ATTEMPTS:
+                        task["status"] = "error"
+                        task["error"] = f"maximum {MAX_ATTEMPTS} attempts exhausted"
+                acquire._write_json(path, manifest)
+                return manifest
+            download_evaluation_batch(seal_path, path, limit=batch_size,
+                                      workers=workers, store=store)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--seal", required=True, help="verified local evaluation protocol seal")
+    parser.add_argument("--manifest", required=True, help="resumable evaluation acquisition manifest")
+    parser.add_argument("--workers", type=int, default=MAX_WORKERS)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--cache-root", default="data/portfolio/raw")
+    args = parser.parse_args(argv)
+    manifest = run_evaluation_acquisition(args.seal, args.manifest, workers=args.workers,
+                                          batch_size=args.batch_size, cache_root=args.cache_root)
+    counts = {}
+    for task in manifest["tasks"]:
+        counts[task["status"]] = counts.get(task["status"], 0) + 1
+    print(json.dumps({"seal_sha256": manifest["seal_sha256"],
+                      "tasks": len(manifest["tasks"]), "status_counts": counts,
+                      "manifest": str(Path(args.manifest))}, sort_keys=True))
+    return 0 if not any(t["status"] in {"error", "missing", "unverified"}
+                        for t in manifest["tasks"]) else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

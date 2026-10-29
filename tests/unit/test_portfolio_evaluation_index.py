@@ -12,6 +12,7 @@ from quantos.paper.research.evaluation_index import (
     EVALUATION_END_EXCLUSIVE, EVALUATION_START, _funding_api_rows,
     _funding_audit, _task_rows, _validate_window, build_evaluation_index,
 )
+from quantos.paper.research.dataset import manifest_content_hash
 from quantos.paper.research.protocol import fingerprint
 
 
@@ -66,28 +67,40 @@ class EvaluationIndexTests(unittest.TestCase):
             "selection": selection, "code_sha": "a" * 64, "training_data_sha": "b" * 64}
         seal = {"payload": payload, "sha256": fingerprint(payload)}
         archive_path = "/virtual/V000USDT-1h-2024-10.csv"
+        repair_path = "/virtual/V000USDT-1h-2024-10-01.csv"
+        repair_manifest_path = "/virtual/evaluation-repair.json"
         opened = int(datetime(2024, 10, 1, tzinfo=timezone.utc).timestamp() * 1000)
         close = opened + 3_600_000 - 1
         csv_bytes = ("open_time,open,high,low,close,volume,close_time,quote_volume,count,"
                     "taker_buy_volume,taker_buy_quote_volume,ignore\n"
-                    f"{opened},100,101,99,100,10,{close},1000,1,5,500,0\n").encode()
+                    f"{opened},100,101,99,100,10,{close},1000,1,5,500,0\n"
+                    f"{opened + 2*3_600_000},102,103,101,102,10,{close + 2*3_600_000},1000,1,5,500,0\n").encode()
+        repaired_open = opened + 3_600_000
+        repair_bytes = ("open_time,open,high,low,close,volume,close_time,quote_volume,count,"
+                        "taker_buy_volume,taker_buy_quote_volume,ignore\n"
+                        f"{repaired_open},101,102,100,101,10,{repaired_open + 3_600_000 - 1},1000,1,5,500,0\n").encode()
         class ListingOnly:
             def list_archives(self, *args, **kwargs):
                 return ()
         plan_path, seal_path = "/virtual/evaluation.json", "/virtual/seal.json"
+        repair_manifest = None
         old_read_text, old_open, old_is_file = Path.read_text, Path.open, Path.is_file
         def read_text(path, *args, **kwargs):
             if str(path) == seal_path:
                 return json.dumps(seal)
             if str(path) == plan_path:
                 return json.dumps(plan)
+            if str(path) == repair_manifest_path:
+                return json.dumps(repair_manifest)
             return old_read_text(path, *args, **kwargs)
         def open_file(path, mode="r", *args, **kwargs):
             if str(path) == archive_path:
                 return BytesIO(csv_bytes) if "b" in mode else StringIO(csv_bytes.decode("utf-8-sig"))
+            if str(path) == repair_path:
+                return BytesIO(repair_bytes) if "b" in mode else StringIO(repair_bytes.decode("utf-8-sig"))
             return old_open(path, mode, *args, **kwargs)
         def is_file(path):
-            if str(path) == archive_path:
+            if str(path) in {archive_path, repair_path}:
                 return True
             return False
         with patch.object(Path, "read_text", read_text), patch.object(Path, "open", open_file), \
@@ -101,8 +114,27 @@ class EvaluationIndexTests(unittest.TestCase):
                          "sha256": hashlib.sha256(csv_bytes).hexdigest(),
                          "actual_bytes": len(csv_bytes), "error": None})
             index = build_evaluation_index(plan_path)
+            self.assertEqual(len(index.audit[0].gaps), 1)
+            repair_manifest = {"status": "complete", "window": ["2024-10-01", "2026-10-28"],
+                "base_content_hash": manifest_content_hash(plan),
+                "source_audit_hash": index.content_hash,
+                "tasks": [{"id": "klines:V000USDT:1h:2024-10-01", "dataset": "klines",
+                    "symbol": "V000USDT", "interval": "1h", "period": "2024-10-01",
+                    "missing_open_ms": [repaired_open], "status": "downloaded",
+                    "cached_path": repair_path, "sha256": hashlib.sha256(repair_bytes).hexdigest()}]}
+            repaired_index = build_evaluation_index(plan_path,
+                evaluation_overlay_manifest=repair_manifest_path)
+            self.assertEqual(repaired_index.overlay_rows, 1)
+            self.assertEqual(repaired_index.audit[0].gaps, ())
+            repair_manifest["source_audit_hash"] = "0" * 64
+            with self.assertRaisesRegex(ValueError, "different row audit"):
+                build_evaluation_index(plan_path, evaluation_overlay_manifest=repair_manifest_path)
+            repair_manifest["source_audit_hash"] = index.content_hash
+            repair_manifest["base_content_hash"] = "0" * 64
+            with self.assertRaisesRegex(ValueError, "different manifest"):
+                build_evaluation_index(plan_path, evaluation_overlay_manifest=repair_manifest_path)
         self.assertEqual(index.window, ("2024-10-01", "2026-10-28"))
-        self.assertEqual(len(index.bars["V000USDT"]), 1)
+        self.assertEqual(len(index.bars["V000USDT"]), 2)
         self.assertEqual(index.bar_by_open_ms["V000USDT"][opened].close, D(100))
         self.assertTrue(any(row.get("phase") == "evaluation" for row in index.unavailable_partitions))
 
