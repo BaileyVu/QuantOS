@@ -1014,3 +1014,87 @@ Quota:91%5hused/9%remaining,resetOct29 10:54:57Vietnam(epoch1793246097);
  weekly61%used/39%remaining,resetNov4 14:17:38(1793776658).
  SAMEheartbeatquantos-portfolio-research-continuation CONFIRMED ACTIVE11:04Vietnam
  afterreset. Latestpromptcheckpoint4; don'tduplicateautomation.
+
+## Portfolio checkpoint5 — October29 11:25 Vietnam (LATEST)
+
+Branch `codex/quantos-portfolio-research`, source `834e30b`. Training batch now
+runs independently; no OOS, selection seal, trading or PR yet. Read this section
+before older checkpoints. Keep the operational checkpoint local.
+
+Completed this stage:
+- Trusted schema-2 signal cache: 97,888 records, full record/payload checksums,
+  before/after generator and strategy hashes, data/filter/grid checks. Path:
+  `data/portfolio/signals/train_2022-01-01_to_2024-12-31_trusted_71fad258_v2.json.gz`.
+  Payload SHA `5a28c92c0170acba1e71e5a8ff49e4cca4a3740b3e8882aef72e23c47d889c6b`.
+  Generator SHA starts275c7f93; strategy fb2b626f; record digest bf16f5bd;
+  full provenance retained in artifact. Data hash remains71fad258…80083.
+  PID74497 completed, no cache process remains. ALT entry checks now evaluate
+  one primary per quantile, then sibling hold/stop settings only on signals.
+  Tiny parity and checksum/tampering tests passed. Old diagnostic cache preserved.
+- IMPORTANT: the cache includes Q4 2021 warmup decisions. This is intentional
+  cached indicator history, NOT training account outcomes. `run_cell` explicitly
+  filters2022-01-01 <= observed_ms <2025-01-01. Do not invalidate/regenerate this
+  valid cache merely to remove unused warmup records.
+- Baselines in `src/quantos/paper/research/baselines.py`: shared crash price gate,
+  OI-free price-only signals, seeded symbol/month count-matched random signals,
+  separate one-hour-delayed intents (no TTL extension). Future candles cannot
+  change baseline entry; duplicate random opportunities reject; ALT/crash25%
+  stop resets to delayed entry, EMA retains zone stop and computes1.5R from NEW
+  entry. These are helpers, not yet portfolio-run diagnostics. Initial misplaced
+  root research/baselines.py was moved into the installed package; no other file
+  was deleted. Ten baseline/crash tests passed after main-found fixes.
+- Controlled source EMA audit completed ONCE, file
+  `data/portfolio/audits/ema_source_2022_2024.json`. Nine majors, archived9/20,
+  3%stop/cross exit/four slots1x. 5,314 crosses /1,465 level-qualified signals
+  (NOT executed trade count). Original fee-only scorer $200->$290.434373,
+  realized-equity DD0.32562866. No funding/slippage/MTM; source open-labelled
+  clock retained, USD-M venue differs from Spot. Not comparable to supplied
+  12/26 walk-forward claim, not new candidate evidence. No tuning/chasing.
+  docs/PORTFOLIO_EMA_ARCHIVED_AUDIT.md updated; source audit process74216 finished.
+- `experiment.py` CLI validates current cache provenance and freezes actual
+  source content before waiting/claiming. Selection also requires conservative
+  adverse-bar stress DD<50%, fixed BEFORE outcomes; standard hourly MTM gate
+  remains. Atomic cell ledger and exact resume.23 focused experiment/baseline/
+  crash/cache tests passed0.220s; earlier5 selector tests passed. No full-suite
+  rerun. Main reviewed execution/accounting and selector for initial TRAIN run;
+  final financial/result review still required before release.
+
+ACTIVE JOB — DO NOT DUPLICATE OR EDIT PAPER PYTHON SOURCES WHILE RUNNING:
+- PID75066, root exec session25268. Command:
+  `.venv/bin/python -u -m quantos.paper.research.experiment --cache data/portfolio/signals/train_2022-01-01_to_2024-12-31_trusted_71fad258_v2.json.gz --output data/portfolio/training/primary_20261029_v1`
+- Log `data/portfolio/training/primary_20261029_v1.process.log`.
+- Source hash `07316395a5824f404de5febc0412090beab800b30e1908b77170ef7bda3cffbb`.
+- At last check it was rebuilding the verified index, before outcome cells.
+  It runs147 individual and up to12 derived combinations, persists each cell,
+  and writes selection.json. No OOS or automatic paper launch/selection seal.
+- First attempt PID74800 exited BEFORE outcomes: cache agent unnecessarily
+  changed warmup-start metadata while it loaded, triggering generator mismatch.
+  Main interrupted that agent, restored ONLY its exact two-line edit to the
+  committed version, confirmed clean source, and restarted identical batch.
+  Failed log retained as `primary_20261029_v1.attempt1-stale-cache.log`.
+  No v3 cache generation started; no other task process seen. Do not repeat
+  completed outcome cells if the new batch already finished. Cache agent should
+  remain idle; all agents were asked to stop source edits.
+
+Exact next steps:
+1. Inspect job/log/cell ledger and actual usage. If running, preserve it; if
+   completed, read selection and compact metrics/rejections, reconcile trade
+   fees/funding/equity. Do not rerun successful cells or rescan source data.
+2. Integrate baseline and sensitivity helpers into portfolio diagnostics under
+   the same engine: price-only and matched random(seed28102026), delay one bar,
+   doubled slippage,15% stop sensitivity. Keep results outside selection. Review
+   selection scientifically; no settings changed using later outcomes.
+3. Freeze actual code/data/grid/training pick; then extend guarded data/signal/
+   evaluation pipeline to ONE2025+wave. No OOS acquisition has begun. Volume
+   robustness uses verified cohort and frozen primary settings; don't invent
+   unavailable early listing/quarter calibration. Existing6 library full-window
+   entries require explicit status: ema_atr_ref LIMIT5m, donchian_atr_ref STOP5m,
+   tsmom_4h MARKET4h, turtle_55 STOP4h, vol_squeeze_breakout STOP1h,
+   delist_short_e17 MARKET/event. Historical USDC2022/event/book-TTL inputs are
+   absent; not evaluable is different from zero return or a USDT adaptation.
+4. All metrics/1000MC, honest report/config if supported, final review/full tests/
+   clean install, one PR. No merge authorization and no trading launch.
+
+Quota check:22% five-hour remaining, resetOctober29 16:09:04Vietnam
+ (1793264944);26% weekly remains, resetNovember4 14:17:38(1793776658).
+ SAME heartbeat confirmed ACTIVE for16:19Vietnam. No duplicate automation.
