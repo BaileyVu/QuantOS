@@ -1206,3 +1206,69 @@ Final wrapup confirmation: SAME heartbeat update confirmed ACTIVE at21:33Vietnam
 after21:23:35 reset. Actual final allowance16%fivehour/11%weekly remains; resets
 unchanged. Working tree was clean at2334fc0 before this local confirmation.
 All work stopped for quota; exact next step remains evaluation integration review.
+
+## Portfolio checkpoint 7 — 2026-10-29, weekly reserve and sealed acquisition
+
+LATEST. User explicitly set WEEKLY stop threshold to **2% remaining**: checkpoint
+and stop agent work before spending that reserve; resume after weekly reset.
+Five-hour stop remains20%. Check BOTH windows; weekly takes precedence. Start
+wrapup near3% to preserve reserve. Branch codex/quantos-portfolio-research,
+source9d14f81. All prior training/diagnostics remain complete and unchanged.
+
+Completed this turn:
+- Main added exact seal-bound filter-unavailability evidence, so volume rows
+  report NOT_EVALUABLE for UXLINK SETTLING without numerical returns or changing
+  the frozen29. Validprimary continues. Added completeleading/trailingpricechecks.
+- Resume tests prove completedcells neverresimulate, checksummedresulttampering
+  fails, frozenpick unchanged even when anotherOOSfixturewins. NoactualOOS PnL.
+- Lower-cost agent added acquisitionCLI/exclusivePID-start-tokenlock, bounded4
+  workers, persistent3attemptbudget/progressJSONL. Otheragent reviewedcausality
+  and added evaluation_overlay_manifest: exactdailyrows boundtosourceaudit/base
+  hash, no conflictingduplicates/imputation. Mainreview complete;22 integrated
+  evaluation/data/index tests pass. No passingtrainingtests/outcomes repeated.
+- Committed9d14f81; runtimehash
+  e4f94baea5fedce905946a5e14066f0d5ab7c29aa4380ac4bd950aa317d540f5.
+- Actual immutable selectionseal now EXISTS:
+  data/portfolio/protocol/selection_20261029_v1.json
+  SHA4368181fdc4c8e8dc03697174d24e11b59b5db69a69a3dfbeea921a341d41084.
+  Includes actualtrainingselection/grid/claim/source, original29+verifiedvolume29,
+  filterhashes,176evaluationjobs, dates2025Jan1..2026Oct28 andOct2024warmup,
+  conditionalMC1000/seed28102026, volumeNOT_EVALUABLEfilterevidence. No retuning.
+  Do NOT recreate seal or edit paper Python: run_wave sourceguard binds above.
+  Ignored prepare_seal.py records construction; do not execute again.
+
+ACTIVE PUBLIC-DATA ACQUISITION — inspect before any resume, do not duplicate:
+- PID3150, rootexec20464, launched21:42:59VietnamOctober29. Lock confirms PID/start.
+- `.venv/bin/python -u -m quantos.paper.research.evaluation_data --seal data/portfolio/protocol/selection_20261029_v1.json --manifest data/portfolio/manifests/evaluation_2025_to_20261028_v1.json`
+- Log data/portfolio/manifests/evaluation_2025_to_20261028_v1.process.log;
+  lock same manifest+.lock; perfile progress same manifest+.progress.jsonl.
+- Atlatestcheck boundedlisting wasactive, manifest notyetpublished; logempty,
+  nofailureobserved. The process is independent of agent quota. No outcomes/trading.
+- Agents research_data_audit/research_signal_cache done/idle; no furtherdelegation.
+
+EXACT NEXT STEP after weeklyreset:
+1. Readthissection/git/bothusage. Inspect PID3150/log/manifestprogress. Ifdone,
+   summarizeavailability/errors; ifactiveleaveit. Do not restartcompletedfetches.
+   CLI resumesexactmanifest, max3taskattempts; no outcomeaccess yet.
+2. Build primary evaluationindex with symbols=sealedprimary29,
+   training_manifest_path=originaltrainmanifest,
+   training_overlay_manifest=originaldailyrepairs. Saveaudit. Ifconcretepricegaps,
+   generic repair.build_repair_manifest supportsnewwindow; bind tothisprimaryaudit
+   and evaluationmanifest, then build with evaluation_overlay_manifest. Keep
+   symbolscopeidentical betweenauditandrepair; overlayhash rejectsothercohort.
+   Auditfullleading/trailingcoverage; fundinggapsnotzero/cadenceinvention.
+3. Preserve volume unavailable rows, do not needvolumecache. Forprimary:
+   evaluation_signals.build_evaluation_signal_cache(index,sealed=read_seal(...),
+   cohort='primary',symbols=primary29,filter_snapshot_path=originalprimaryfilter),
+   save_signal_cache immutable. No trainingcache regeneration. Thenrun_wave with
+   indexes/caches={'primary':...},filter_paths={'primary':original,
+   'verified_volume':volumeproxy}, exactsealedsource. This is ONEwave176jobs
+   including4honestvolumeNOT_EVALUABLErows; no reselecting afterOOS. Ledgerresume.
+4. Mainfinalaccounting/resultreview, fullmetrics/report/supportedconfig/clean
+   install/finaltests/onePR. Originalresearch hasNOmergeauthorization. Operational
+   checkpoint staysLOCAL; previousapprovalreviewprohibitedexport. No tradinglaunch.
+
+Latestallowance beforewrap:51%fivehour,3%weekly. WeeklyresetNov4 2026
+14:17:38Vietnam(1793776658). Schedule SAMEheartbeat Nov4 14:27Vietnam;
+weeklyWednesday14:27 recurrence is nextNov4, notearlierdailywake. Fivehourreset
+1793302484doesnotrestoreweekly. Stopagentwork now toretain2%reserve.
