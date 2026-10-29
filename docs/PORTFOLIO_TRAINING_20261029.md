@@ -79,3 +79,32 @@ not point-in-time rules. Hourly synthetic market fills, conservative stop/mark
 stress, lagged archive OI availability and funding mark-open proxies are scenario
 assumptions documented in `PORTFOLIO_EXECUTION_PROTOCOL.md`. No actual trading
 performance, profitability guarantee or paper launch is implied by these results.
+
+## Completed training diagnostics
+
+Seventeen saved jobs comprise four reused primary results and thirteen new
+non-selection runs. Their 2,296 trades also reconcile fees/funding/net PnL and
+final equity without discrepancies. The selected portfolio settings remain
+unchanged.
+
+| Fixed-setting diagnostic | Final equity | CAGR | Hourly MTM DD | Trades |
+|---|---:|---:|---:|---:|
+| Pick, doubled slippage (0.30% each side) | $349.31 | 20.42% | 15.14% | 332 |
+| Pick, one-hour delayed new intents | $377.17 | 23.54% | 15.40% | 344 |
+| Pick, 15% catastrophe stop only | $185.74 | −2.43% | 18.25% | 39 |
+| Crash settings, price-only baseline | $197.33 | −0.45% | 30.60% | 454 |
+| Crash settings, symbol/month matched random | $244.24 | 6.89% | 18.84% | 272 |
+
+The 15% stop runs triggered the retained permanent daily-loss breaker: the ALT
+and crash individual runs paused in January 2022, and the combination paused in
+May 2022. Remaining calendar time is cash, with open positions still managed;
+these are not full-period continuously trading strategies. Stops and risk
+fractions were not retuned afterward. A narrower stop changes position sizing
+and exposure under percent-risk sizing, so this sensitivity does not isolate
+stop placement alone.
+
+Matched randomness matches **generated event counts**, not executed trade
+counts: different signals meet different cooldown, exposure and portfolio
+conditions. Its higher executed count therefore is not a matching defect.
+This single fixed seed is a benchmark, not a significance test proving the OI
+filter adds value. All comparisons in this section are training-only.

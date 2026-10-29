@@ -1102,3 +1102,102 @@ Quota check:22% five-hour remaining, resetOctober29 16:09:04Vietnam
 Post-save confirmation: training provenance checks passed and the process log
 now contains completed primary cells. Outcomes ARE in progress; the earlier
 "before outcome cells" status above is superseded. Do not rerun completed cells.
+
+## Portfolio checkpoint 6 — 2026-10-29, training and diagnostics complete
+
+LATEST section. Branch `codex/quantos-portfolio-research`; new source commit
+`64e321e`, preliminary training report commit `0e7676c` (plus this checkpoint).
+No OOS data acquisition, selection seal, evaluation outcome, PR or trading launch.
+Operational checkpoint stays LOCAL; exclude it from eventual publication.
+
+Completed:
+- Primary batch PID75066/session25268 FINISHED,159 COMPLETE/0 invalid. Do not
+  rerun. `data/portfolio/training/primary_20261029_v1/selection.json` selects
+  ALT q0.005/24h/25%stop/4%risk + crash48h/25%stop/4%risk, common1x ceiling.
+  Pick key ff17ca540d737dc6df6189e612e34e723df070038b848a3f93f905ef004d504b.
+  Training $200->$373.174296, CAGR23.1043%, hourlyDD15.8272%, adverse16.1720%,
+  336trades,PF1.52924; six catastrophe exits net−$61.60. No tuning.
+- Main reconciled159 saved cells/22,320trades: gross-fees+funding=net, all funding
+  events assigned, risk budgets/leverage respected, finalequity=200+net.
+  Zero discrepancies. `data/portfolio/audits/primary_training_ledger_20261029.json`.
+  Training MC1000 seed28102026: trade reshuffle0/1000, seven-day block1/1000
+  DD50%, conditional historical stress only; primary_training_mc_20261029.json.
+- Training diagnostics PID89742/rootexec41193 EXIT0, no active job. Source
+  fingerprint was frozen at64e321e. All17jobs done (4reused+13new), persisted
+  `data/portfolio/diagnostics/train_20261029_v1`; log
+  `data/portfolio/training/diagnostics_20261029_v1.process.log`. Main reconciled
+  2,296diagnostictrades, zero discrepancies, audit
+  `data/portfolio/audits/training_diagnostics_ledger_20261029.json`.
+  Pick doubledslip final349.3083/CAGR20.4226%;1hdelay377.1686/23.5419%;
+  15%stop185.7406/−2.4348%,39trades, permanentbreakerMay2022.
+  Individual15%stop ALT/crash pauseJan2022; don't reset them/rerun.
+  Crash priceonly197.3261/−0.4475%/DD30.60%,454trades;
+  matchedrandom244.2365/6.8859%/DD18.84%,272trades. Matching is generated
+  symbol/month signal counts, not filled counts. Source original crash pick
+  280.4325/CAGR11.9236%. Fixed seed is not a significance test.
+- EMA candidate chosen diagnostic cell has4signals,zero fills:3NET_REWARD_RISK,
+  1BELOW_EXCHANGE_MINIMUM. Not eligible, not retuned. Existing6library remains
+  unsupportedfullwindow, distinct from actualEMA zero-fill outcome.
+- docs/PORTFOLIO_TRAINING_20261029.md contains preliminary metrics, limitations
+  and diagnostics. This is NOT the final report or held-out recommendation.
+- Two lower-cost reused agents enabled/completed, now idle: research_data_audit
+  (diagnostics/evaluationindex) and research_signal_cache (guardedacquisition).
+  Main reviewed/fixed diagnostics tuple-key JSON, iterable exhaustion, full
+  runtimehash guard, paths. Agents made no outcomes/network calls.
+- New evaluation_data.py: valid seal mandatory before any network; exact full
+  ledger, fixed2025Jan1..2026Oct28, Oct2024warmup fullprimary+volumeunion.
+  Reuse original verified warmuptrade/mark/funding+9majorOI; fetch only missing
+  warmup. Grouped boundedlistings/max4workers, fullerrors/missing ledger.
+  Monthly2025Jan..2026Sep, dailyOcttrade/mark/metrics; OctfundingpublicAPI raw
+  SHA withSeptintervalseed. No synthetic missing funding or newcadenceinference.
+- evaluation_index.py: validates actualplan/seal, checksums, exactQ42024repair
+  overlay, actualrows/funding, audits gaps/duplicates (duplicates excludedlookup).
+  Newlyacquiredrobustnesswarmup doesn't require primarymanifestsourcebinding;
+  reused archives do. Offline realplan->indexintegration test covers schema.
+- evaluation_signals.py main: separateadapter copies original causaltraining
+  generationloop, fixedheldoutwindow+explicit29ALTcohort+newprovenance.
+  Original signals.py/strategies/risk/simulator unchanged. Noheldoutgeneration.
+  Requires fullcohortfilterproxies; price/markgaps reject before generation.
+  Existing calibration/resampling helpers reject entiregappedhistory: repair
+  first or reportNOT_EVALUABLE, don't silently suppress laterquarters.
+- evaluation.py main: one sealboundfull159grid + chosenindividual/pick delay,
+  2xslip,15%stop,volume rows +crashbaselines; immutablechecksumcells/resume,
+  code/data/cache/filterhash guards. Frozenpick retained; bestOOSexploratory.
+  Implementation scaffolding stillneeds mainintegration/finalreview beforeseal.
+- New focused integration24tests passed; agent subsets31diagnostic/core,
+  17index/diagnostic/baseline,5acquisition passed. No rerun ofprimaryoutcomes,
+  trustedcache,completeddataaudit or fullsuite. Newsource64e321e diffclean.
+- Currentpublicfilter snapshot `data/portfolio/filters/volume_usdt_proxy_20261029.json`
+  SHA2f08e2670c7cd5cb9dd9598eed77ad0c432549b834a48a5de18c097bcb259cbc,
+  primarysymbols preservedexactoriginalfilters. All29volumecontracts found;
+  UXLINKstatusSETTLING,28TRADING. Preservecohort; don'tdrop/swap/fakestatus.
+
+EXACT NEXT STEP:
+1. Read this section/git/usage, preserve allcompletedoutcomes. Finish main
+   integrationreview/tests of evaluation.py/signals.py/data.py/index.py. No
+   selection seal exists. Need robust run_wave resumetests and process CLI or
+   checkedoneoff orchestration. Do not alterfinancialsim/strategy rules without
+   concretebug and explaining validity of alreadycompletedtraining.
+2. Resolve how to report unsupported volume cohort (UXLINKSETTLING/currentproxy
+   and possible historicaldelistinggap). Current validate_inputs requires BOTH
+   completecohorts andfilters; missingvolume would block otherwisevalidprimary.
+   Add explicit evidence-bound NOT_EVALUABLE rows rather than changinguniverse
+   or assigningzeroreturn. Allow validprimaryevaluation while retaining honest
+   requiredvolume row. No OOS PnL needed to make this policy decision.
+3. Freeze seal with actualsource_content_hash, trainingdata71fad...80083,
+   selection/evaluation_grid/individual_choices, originalprimary29,
+   verifiedvolume29 from frozenrobustnessmanifest, actualfilterhashes, jobs,
+   fixedwarmup2024-10-01/eval2025-01-01/end_exclusive2026-10-29. Preserve original
+   primarytraining source834e30b separately from newevaluationruntime64e321e+.
+   Seal path suggested data/portfolio/protocol/selection_20261029_v1.json.
+4. ONLY AFTER review/seal: invoke guarded acquisition, save/resume manifest,
+   build/auditindex, source-onlyrepairifactualgaps, generatecausalcaches percohort,
+   ONEheldoutwave, fullgridexploratory+frozenpickdiagnostics/MC. No data/outcomes
+   acquiredyet. Seal codeguard means noeditingpaperPythonwhilejobsactive.
+5. Finalallmetrics/report/supportedconfig/cleaninstall/fulltests/onePR,exclude
+   operationalcheckpoint. NO researchmergeauthorization. NOtradinglaunch.
+
+Atwrapup22%fivehour/12%weeklyremain. ResetOct29 21:23:35Vietnam1793283815;
+weeklyNov4 14:17:38Vietnam1793776658. UpdateSAMEheartbeat21:33Vietnam, confirm.
+Weeklyquota is binding separately; 5hreset doesnotrestoreweekly. All acquisition,
+training,diagnostics,sourceaudit processes completed; agentsidle. No activejob.
