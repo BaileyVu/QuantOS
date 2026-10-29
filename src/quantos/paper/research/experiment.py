@@ -16,6 +16,7 @@ from ..types import D, dumps
 from .metrics import summarize, kelly_fraction, max_drawdown
 from .protocol import _exclusive_json, fingerprint
 from .simulator import Simulator, IncompleteHistory
+from .signals import validate_cache_provenance, expected_signal_parameter_hash
 
 TRAIN_START = 1_640_995_200_000  # 2022-01-01 UTC
 TRAIN_END = 1_735_689_600_000    # 2025-01-01 UTC
@@ -101,6 +102,7 @@ def eligible(result: dict) -> bool:
     metrics, kelly = result["metrics"], result["kelly"]
     half = kelly.get("half_fraction")
     return (metrics["net_return"] > 0 and metrics["max_drawdown"] < .50
+            and metrics.get("adverse_bar_stress_drawdown", metrics["max_drawdown"]) < .50
             and half is not None and half > 0
             and all(float(m["risk_fraction"]) <= half for m in result["cell"]["members"]))
 
@@ -166,7 +168,7 @@ def source_content_hash() -> str:
     return digest.hexdigest()
 
 
-def run_training(index, cache, filter_path: Path, directory: Path, *, code_hash: str | None = None) -> dict:
+def run_training(index, cache, filter_path: Path, directory: Path, *, code_hash: str | None = None, progress=None) -> dict:
     """Resume exact cells only when all causal data/code/filter inputs match.
 
     This stores full accounting evidence locally. It never seals a recommendation
@@ -177,6 +179,8 @@ def run_training(index, cache, filter_path: Path, directory: Path, *, code_hash:
     raw = filter_path.read_bytes()
     if hashlib.sha256(raw).hexdigest() != cache.filter_hash:
         raise ValueError("cache filter provenance mismatch")
+    validate_cache_provenance(cache, data_hash=index.content_hash,
+        filter_hash=hashlib.sha256(raw).hexdigest(), parameter_hash=expected_signal_parameter_hash(index))
     actual_hash = source_content_hash()
     if code_hash is not None and code_hash != actual_hash: raise ValueError("source content hash mismatch")
     code_hash = actual_hash
@@ -186,7 +190,7 @@ def run_training(index, cache, filter_path: Path, directory: Path, *, code_hash:
              "data_hash": index.content_hash, "cache_hash": cache.source_hash,
              "filters_hash": cache.filter_hash, "source_content_hash": code_hash,
              "individual_grid": grid, "selection_rule": "max_CAGR_then_min_DD_risk_leverage_ID",
-             "constraints": "positive net, MTM DD<50%, risk<=half empirical training Kelly; mixed members also individually eligible",
+             "constraints": "positive net, MTM and adverse-bar stress DD<50%, risk<=half empirical training Kelly; mixed members also individually eligible",
              "combined_rule": "training-selected individual settings; subsets of2/3; ceilings1/2/3",
              "cash_alternative": True}
     path = directory / "training_claim.json"
@@ -202,6 +206,7 @@ def run_training(index, cache, filter_path: Path, directory: Path, *, code_hash:
             return result
         result = run_cell(index, cache, filters, cell)
         _exclusive_json(target, result)
+        if progress is not None: progress({"cell": cell_key(cell), "status": result["status"]})
         return result
     results = [execute(cell) for cell in grid]
     individuals = select_individuals(results)
@@ -224,3 +229,43 @@ def run_training(index, cache, filter_path: Path, directory: Path, *, code_hash:
         if json.loads(summary_path.read_text()) != summary: raise ValueError("selection changed")
     else: _exclusive_json(summary_path, summary)
     return summary
+
+
+def main(argv=None):
+    import argparse
+    import os
+    import time
+    from .dataset import build_index
+    from .signals import load_signal_cache, filter_snapshot_hash
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--manifest", default="data/portfolio/manifests/train_2021-10-01_to_2024-12-31.json")
+    parser.add_argument("--overlay", default="data/portfolio/manifests/daily_repairs_2021-10-01_to_2024-12-31.json")
+    parser.add_argument("--filters", default="data/portfolio/filters/current_usdt_proxy_20261029.json")
+    parser.add_argument("--cache", required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--wait-cache-seconds", type=int, default=0)
+    args = parser.parse_args(argv)
+    if not 0 <= args.wait_cache_seconds <= 7200: parser.error("cache wait must be0..7200seconds")
+    code = source_content_hash()
+    print(json.dumps({"event": "TRAIN_PROCESS_STARTED", "pid": os.getpid(), "source_hash": code}), flush=True)
+    deadline = time.monotonic()+args.wait_cache_seconds
+    while not Path(args.cache).is_file():
+        if time.monotonic() >= deadline: raise FileNotFoundError(args.cache)
+        time.sleep(5)
+    # Fail rather than silently resume against code edited during the wait.
+    if code != source_content_hash(): raise ValueError("source changed while waiting for cache")
+    index = build_index(args.manifest, overlay_manifest=args.overlay)
+    cache = load_signal_cache(args.cache, expected_data_hash=index.content_hash,
+        expected_filter_hash=filter_snapshot_hash(args.filters),
+        expected_parameter_hash=expected_signal_parameter_hash(index), filter_snapshot_path=args.filters)
+    print(json.dumps({"event": "TRAIN_INPUTS_VALIDATED", "signals": len(cache.records),
+                     "data_hash": index.content_hash}), flush=True)
+    summary = run_training(index, cache, Path(args.filters), Path(args.output), code_hash=code,
+        progress=lambda row: print(json.dumps({"event": "TRAIN_CELL_COMPLETE", **row}), flush=True))
+    print(json.dumps({"event": "TRAIN_FINISHED", "completed": summary["completed_cells"],
+        "invalid": summary["invalid_cells"], "selection_status": summary["selection"]["status"],
+        "output": args.output}), flush=True)
+    return 0
+
+
+if __name__ == "__main__": raise SystemExit(main())

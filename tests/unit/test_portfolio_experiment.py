@@ -34,6 +34,8 @@ class ExperimentTests(unittest.TestCase):
                      [result(grid[0], half=.005)], [result(grid[0], dd=.5)]):
             pick = recommendation(rows, select_individuals(rows))
             self.assertEqual(pick["status"], "NO_ELIGIBLE_TRAINING_PORTFOLIO")
+        stress = result(grid[0]); stress["metrics"]["adverse_bar_stress_drawdown"] = .55
+        self.assertIsNone(recommendation([stress], {})["cell"])
         pick = recommendation([result(grid[0])], {})
         self.assertEqual(pick["cell"], grid[0])
 
@@ -66,7 +68,7 @@ class ExperimentTests(unittest.TestCase):
             cache = SimpleNamespace(data_hash="d", source_hash="s", filter_hash=hashlib.sha256(filters.read_bytes()).hexdigest())
             index = SimpleNamespace(content_hash="d")
             def fake(index, cache, filters, cell): return result(cell)
-            with patch("quantos.paper.research.experiment.source_content_hash", return_value="a"*64), patch(
+            with patch("quantos.paper.research.experiment.validate_cache_provenance"), patch("quantos.paper.research.experiment.expected_signal_parameter_hash", return_value="p"), patch("quantos.paper.research.experiment.source_content_hash", return_value="a"*64), patch(
                     "quantos.paper.research.experiment.run_cell", side_effect=fake) as run:
                 first = run_training(index, cache, filters, root / "out")
                 self.assertEqual(run.call_count, 159)

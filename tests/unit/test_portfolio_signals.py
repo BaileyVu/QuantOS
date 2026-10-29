@@ -1,6 +1,9 @@
 from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal as D
+import gzip
+import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,9 +12,12 @@ from quantos.paper.research.data import Bar, OpenInterestMetric
 from quantos.paper.research.dataset import DatasetIndex
 from quantos.paper.research.signals import (
     TRAINING_END_MS, TRAINING_START_MS, SignalRecord, _quarter_cutoffs,
-    _candles, _oi_values, build_signal_cache, load_signal_cache, save_signal_cache,
+    _candles, _evaluate_variants, _oi_values, build_signal_cache,
+    expected_signal_parameter_hash, load_signal_cache, save_signal_cache,
+    validate_cache_provenance,
 )
 from quantos.paper.strategies.candidate_features import ALT_SOURCE_UNIVERSE, HOUR_MS, TimedValue
+from quantos.paper.strategies.alt_dip_reversal import AltDipReversalStrategy
 from quantos.paper.strategies.crash_flush_e2 import CrashFlushE2Strategy
 from quantos.paper.types import OpenInterestValue
 from quantos.paper.market import parse_exchange_info
@@ -28,6 +34,21 @@ def _index(bars, *, window=("2021-10-01", "2024-12-31")):
 
 
 class PortfolioSignalCacheTests(unittest.TestCase):
+    def test_alt_variant_gate_matches_independent_current_strategy_calls(self):
+        from tests.unit.test_portfolio_alt_dip import dip_snapshot
+        snapshot = dip_snapshot()
+        variants = tuple(AltDipReversalStrategy(q, hold, stop)
+                         for q in (D("0.005"),)
+                         for hold in (12, 24, 72)
+                         for stop in (D("0.25"), D("0.15")))
+        gated = _evaluate_variants(variants, snapshot)
+        independent = tuple((strategy, strategy.evaluate(snapshot)) for strategy in variants)
+        self.assertEqual(gated, independent)
+        self.assertEqual(len(gated), 6)
+        non_signal = tuple(AltDipReversalStrategy(D("0.005"), hold)
+                           for hold in (12, 24, 72))
+        self.assertEqual(_evaluate_variants(non_signal, dip_snapshot(D("-0.01"))), ())
+
     def test_cache_is_training_only_and_emits_no_future_decisions(self):
         # Deliberately include a future row in the input; its timestamp must not
         # create a training signal or extend the approved cache window.
@@ -106,6 +127,12 @@ class PortfolioSignalCacheTests(unittest.TestCase):
         self.assertIsNotNone(direct_signal)
         cache = build_signal_cache(index, include_alt=False, include_ema=False,
                                    include_stop_sensitivity=False, symbols=(symbol,))
+        expected_params = expected_signal_parameter_hash(
+            index, include_alt=False, include_ema=False,
+            include_stop_sensitivity=False, symbols=(symbol,))
+        validate_cache_provenance(cache, data_hash=index.content_hash,
+                                  filter_hash=cache.filter_hash,
+                                  parameter_hash=expected_params)
         matched = [row for row in cache if row.signal.strategy_id == "crash_flush_e2"
                    and dict(row.parameters).get("holding_hours") == "24"]
         self.assertEqual(len(matched), 1)
@@ -135,6 +162,20 @@ class PortfolioSignalCacheTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "data_hash is stale"):
                 load_signal_cache(
                     cache_path, expected_data_hash="stale",
+                    expected_filter_hash=cache.filter_hash,
+                    expected_parameter_hash=cache.parameter_hash,
+                )
+            envelope = json.loads(gzip.decompress(cache_path.read_bytes()))
+            envelope["payload"]["records"][0]["signal"]["entry_price"] = "1"
+            canonical_payload = json.dumps(envelope["payload"], sort_keys=True,
+                                           separators=(",", ":"), allow_nan=False).encode()
+            envelope["sha256"] = hashlib.sha256(canonical_payload).hexdigest()
+            tampered = Path(tmp) / "tampered.json.gz"
+            tampered.write_bytes(gzip.compress(json.dumps(envelope, sort_keys=True,
+                separators=(",", ":")).encode(), mtime=0))
+            with self.assertRaisesRegex(ValueError, "record checksum mismatch"):
+                load_signal_cache(
+                    tampered, expected_data_hash=cache.data_hash,
                     expected_filter_hash=cache.filter_hash,
                     expected_parameter_hash=cache.parameter_hash,
                 )

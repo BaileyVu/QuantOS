@@ -13,7 +13,8 @@ Stage one has 147 individual primary cells:
   (0.5/1/2/3%), three leverage ceilings (1/2/3).
 
 A selection-eligible cell must have positive net training account growth,
-observed hourly MTM drawdown below 50%, and configured risk no greater than
+observed hourly MTM drawdown and the conservative adverse-bar stress envelope
+both below 50%, and configured risk no greater than
 half its empirical training Kelly estimate. Undefined/no-loss Kelly estimates
 are insufficient to establish eligibility. These estimates are conditional on
 the observed sample; there is no claim of a reliable population Kelly value.
@@ -45,8 +46,8 @@ doubled slippage, volume-cohort robustness, crash-only and matched-random
 baselines remain separately labelled diagnostics, not selection options.
 Matched randomness uses seed 28102026 and compares eligible crash-price bars
 within the same symbol/calendar month without using subsequent returns. The
-sampling protocol must be finalized in code before either window's baseline
-outcomes; no baseline or sensitivity has run yet.
+sampling protocol is implemented in `quantos.paper.research.baselines` before either
+window's baseline outcomes; no baseline or sensitivity has run yet.
 
 Existing V4 library entries must be listed with their actual evaluation status.
 The main comparison cannot invent pre-listing USDC history, delisting events or
@@ -57,3 +58,27 @@ Completed cells are reused only under an identical experiment claim. Changed
 source or input data require a separate diagnostic run with its reason retained,
 not an overwrite of prior results. No selection seal exists yet; final review,
 baseline implementation and the data/source limitations remain outstanding.
+
+## Crash baselines (frozen before outcomes)
+
+The crash-price-only baseline uses the candidate's exact closed-hourly price
+predicate: negative four-close change and a close at least 8% below the trailing
+24-bar high. It drops only the open-interest gate. It keeps the 25% catastrophe
+stop and 24/48/72-hour holds. Signals retain the trusted `crash_flush_e2`
+strategy identity for the existing risk path and carry a distinct baseline
+identity in their signal IDs and reason. No exposure or cooldown selection is
+performed in baseline generation; execution belongs to the shared engine.
+
+The matched-random control samples without replacement from those same eligible
+crash-price bars. It matches the actual candidate event count per symbol and UTC
+calendar month using fixed seed 28102026. The sampler accepts only counts and
+as-of snapshots, never subsequent prices or returns, and fails closed if a
+stratum has too few eligible bars.
+
+The one-hour delay sensitivity retains each original decision as a separate
+record and emits a new intent only at the next completed hourly boundary. It
+does not extend the original 90-second intent expiry. The hold timer runs from
+the new fill. Crash stops are 25% below delayed entry; EMA zone sensitivities
+retain the original structural stop and place the 1.5R target from delayed
+entry when the geometry remains valid. These helpers generate signals only;
+they do not change risk, accounting, exposure, cooldown, or execution rules.

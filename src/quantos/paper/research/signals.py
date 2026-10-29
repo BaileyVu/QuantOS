@@ -78,7 +78,9 @@ class SignalCache:
     data_hash: str
     filter_hash: str
     strategy_hash: str
+    generator_hash: str
     parameter_hash: str
+    records_hash: str
 
     def __iter__(self):
         return iter(self.records)
@@ -97,6 +99,54 @@ def _strategy_source_hash() -> str:
         module_path = Path(importlib.import_module(module_name).__file__)
         digest.update(module_name.encode() + b"\0" + module_path.read_bytes())
     return digest.hexdigest()
+
+
+def _generator_source_hash() -> str:
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
+def filter_snapshot_hash(path: str | Path =
+                         "data/portfolio/filters/current_usdt_proxy_20261029.json") -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _parameter_hash(selected: Iterable[str], alt_quantiles: Iterable[Decimal],
+                    alt_holds: Iterable[int], include_stop_sensitivity: bool,
+                    include_alt: bool, include_crash: bool, include_ema: bool) -> str:
+    payload = {
+        "alt_quantiles": sorted(map(str, alt_quantiles)),
+        "alt_holds": sorted(alt_holds),
+        "stop_sensitivity": include_stop_sensitivity, "include_alt": include_alt,
+        "include_crash": include_crash, "include_ema": include_ema,
+        "symbols": sorted(selected), "training_window": [TRAINING_START_MS, TRAINING_END_MS],
+    }
+    return hashlib.sha256(_canonical(payload)).hexdigest()
+
+
+def expected_signal_parameter_hash(index, *, alt_quantiles: Iterable[Decimal] =
+                                   tuple(sorted(ALT_CUTOFF_QUANTILES)),
+                                   alt_holds: Iterable[int] = tuple(sorted(ALT_HOLDING_HOURS)),
+                                   include_stop_sensitivity: bool = True,
+                                   include_crash: bool = True, include_alt: bool = True,
+                                   include_ema: bool = True,
+                                   filter_snapshot_path: str | Path =
+                                   "data/portfolio/filters/current_usdt_proxy_20261029.json",
+                                   symbols: Iterable[str] | None = None) -> str:
+    """Recompute the requested grid fingerprint without evaluating any bars."""
+    payload = json.loads(Path(filter_snapshot_path).read_text(encoding="utf-8"))
+    instruments = parse_exchange_info(payload, margin_asset="USDT")
+    instruments = {symbol: item for symbol, item in instruments.items() if item.status == "TRADING"}
+    wanted = set(symbols) if symbols is not None else set(index.bars)
+    selected = sorted(wanted & set(index.bars) & set(instruments))
+    return _parameter_hash(selected, tuple(alt_quantiles), tuple(alt_holds),
+                           include_stop_sensitivity, include_alt, include_crash, include_ema)
+
+
+def _source_hash(data_hash: str, filter_hash: str, strategy_hash: str,
+                 generator_hash: str, parameter_hash: str) -> str:
+    return hashlib.sha256(_canonical({"data": data_hash, "filter": filter_hash,
+        "strategy": strategy_hash, "generator": generator_hash,
+        "parameters": parameter_hash})).hexdigest()
 
 
 def _canonical(value: object) -> bytes:
@@ -123,6 +173,10 @@ def _record_payload(record: SignalRecord) -> dict:
     }
 
 
+def _records_hash(records: Iterable[SignalRecord]) -> str:
+    return hashlib.sha256(_canonical([_record_payload(record) for record in records])).hexdigest()
+
+
 def _record_from_payload(row: dict) -> SignalRecord:
     from ..types import Signal
     raw = row["signal"]
@@ -143,12 +197,20 @@ def save_signal_cache(cache: SignalCache, path: str | Path) -> str:
     """Atomically create an immutable JSON or .gz cache without overwriting."""
     target = Path(path)
     payload = {
-        "schema": 1, "training_window": list(cache.training_window),
+        "schema": 2, "training_window": list(cache.training_window),
         "provenance": {"source_hash": cache.source_hash, "data_hash": cache.data_hash,
                        "filter_hash": cache.filter_hash, "strategy_hash": cache.strategy_hash,
-                       "parameter_hash": cache.parameter_hash},
+                       "generator_hash": cache.generator_hash,
+                       "parameter_hash": cache.parameter_hash,
+                       "records_hash": cache.records_hash},
         "records": [_record_payload(record) for record in cache.records],
     }
+    actual_records_hash = hashlib.sha256(_canonical(payload["records"])).hexdigest()
+    if actual_records_hash != cache.records_hash:
+        raise ValueError("signal cache records changed after generation")
+    if cache.source_hash != _source_hash(cache.data_hash, cache.filter_hash,
+            cache.strategy_hash, cache.generator_hash, cache.parameter_hash):
+        raise ValueError("signal cache provenance hash mismatch")
     serialized = _canonical(payload)
     envelope = _canonical({"payload": payload,
                            "sha256": hashlib.sha256(serialized).hexdigest()}) + b"\n"
@@ -177,36 +239,123 @@ def save_signal_cache(cache: SignalCache, path: str | Path) -> str:
 
 def load_signal_cache(path: str | Path, *, expected_data_hash: str,
                       expected_filter_hash: str, expected_parameter_hash: str,
-                      expected_strategy_hash: str | None = None) -> SignalCache:
+                      expected_strategy_hash: str | None = None,
+                      expected_generator_hash: str | None = None,
+                      filter_snapshot_path: str | Path =
+                      "data/portfolio/filters/current_usdt_proxy_20261029.json") -> SignalCache:
     """Load a cache only when current data, rules, filters, and params match."""
     source_path = Path(path)
     content = source_path.read_bytes()
     raw = gzip.decompress(content) if source_path.suffix == ".gz" else content
     envelope = json.loads(raw)
     payload = envelope["payload"]
-    if (payload.get("schema") != 1
+    if (payload.get("schema") != 2
             or hashlib.sha256(_canonical(payload)).hexdigest() != envelope.get("sha256")):
         raise ValueError("signal cache checksum or schema mismatch")
     provenance = payload["provenance"]
+    if filter_snapshot_hash(filter_snapshot_path) != expected_filter_hash:
+        raise ValueError("requested filter hash does not match the current filter snapshot")
     strategy_hash = expected_strategy_hash or _strategy_source_hash()
+    generator_hash = expected_generator_hash or _generator_source_hash()
     required = {
         "data_hash": expected_data_hash, "filter_hash": expected_filter_hash,
         "parameter_hash": expected_parameter_hash, "strategy_hash": strategy_hash,
+        "generator_hash": generator_hash,
     }
     for name, expected in required.items():
         if provenance.get(name) != expected:
             raise ValueError(f"signal cache {name} is stale")
-    cache = SignalCache(tuple(_record_from_payload(row) for row in payload["records"]),
+    records = tuple(_record_from_payload(row) for row in payload["records"])
+    records_hash = hashlib.sha256(_canonical(payload["records"])).hexdigest()
+    if records_hash != provenance.get("records_hash"):
+        raise ValueError("signal cache record checksum mismatch")
+    cache = SignalCache(records,
                         tuple(int(x) for x in payload["training_window"]),
                         provenance["source_hash"], provenance["data_hash"],
                         provenance["filter_hash"], provenance["strategy_hash"],
-                        provenance["parameter_hash"])
+                        provenance["generator_hash"], provenance["parameter_hash"],
+                        provenance["records_hash"])
     if cache.training_window != (TRAINING_START_MS, TRAINING_END_MS):
         raise ValueError("signal cache training window is invalid")
     if any(not TRAINING_START_MS <= record.decision_ms < TRAINING_END_MS
            for record in cache.records):
         raise ValueError("signal cache contains an out-of-window decision")
+    if cache.source_hash != _source_hash(cache.data_hash, cache.filter_hash,
+            cache.strategy_hash, cache.generator_hash, cache.parameter_hash):
+        raise ValueError("signal cache provenance checksum mismatch")
     return cache
+
+
+def attest_legacy_signal_cache(path: str | Path, target: str | Path, *,
+                               expected_data_hash: str, expected_filter_hash: str,
+                               expected_strategy_hash: str, expected_parameter_hash: str,
+                               verified_generator_hash: str, generator_revision: str,
+                               filter_snapshot_path: str | Path =
+                               "data/portfolio/filters/current_usdt_proxy_20261029.json"
+                               ) -> SignalCache:
+    """Upgrade a v1 cache only after caller verifies its generating source revision.
+
+    The v1 envelope already checksums the complete record payload. The caller
+    must provide the generator SHA derived from the recorded Git revision and
+    confirm the generation command ran with those unchanged source bytes.
+    """
+    if len(verified_generator_hash) != 64 or not generator_revision:
+        raise ValueError("legacy generator provenance needs a source revision and SHA-256")
+    if filter_snapshot_hash(filter_snapshot_path) != expected_filter_hash:
+        raise ValueError("legacy cache filter hash differs from the current snapshot")
+    source_path = Path(path)
+    raw = gzip.decompress(source_path.read_bytes()) if source_path.suffix == ".gz" else source_path.read_bytes()
+    envelope = json.loads(raw)
+    payload = envelope.get("payload", {})
+    if (payload.get("schema") != 1
+            or hashlib.sha256(_canonical(payload)).hexdigest() != envelope.get("sha256")):
+        raise ValueError("legacy cache checksum or schema mismatch")
+    old = payload["provenance"]
+    for name, expected in (("data_hash", expected_data_hash),
+                           ("filter_hash", expected_filter_hash),
+                           ("strategy_hash", expected_strategy_hash),
+                           ("parameter_hash", expected_parameter_hash)):
+        if old.get(name) != expected:
+            raise ValueError(f"legacy cache {name} does not match the verified source")
+    old_source_hash = hashlib.sha256((expected_data_hash + expected_filter_hash
+        + expected_strategy_hash + expected_parameter_hash).encode()).hexdigest()
+    if old.get("source_hash") != old_source_hash:
+        raise ValueError("legacy cache composite source hash mismatch")
+    records = tuple(_record_from_payload(row) for row in payload["records"])
+    window = tuple(int(x) for x in payload["training_window"])
+    if window != (TRAINING_START_MS, TRAINING_END_MS) or any(
+            not TRAINING_START_MS <= record.decision_ms < TRAINING_END_MS for record in records):
+        raise ValueError("legacy cache includes an invalid training window")
+    records_hash = _records_hash(records)
+    source_hash = _source_hash(expected_data_hash, expected_filter_hash,
+        expected_strategy_hash, verified_generator_hash, expected_parameter_hash)
+    upgraded = SignalCache(records, window, source_hash, expected_data_hash,
+        expected_filter_hash, expected_strategy_hash, verified_generator_hash,
+        expected_parameter_hash, records_hash)
+    save_signal_cache(upgraded, target)
+    return upgraded
+
+
+def validate_cache_provenance(cache: SignalCache, *, data_hash: str,
+                              filter_hash: str, parameter_hash: str) -> None:
+    """Fail closed unless a loaded cache matches the current research inputs/code."""
+    expected_strategy = _strategy_source_hash()
+    expected_generator = _generator_source_hash()
+    if cache.data_hash != data_hash:
+        raise ValueError("signal cache data hash is stale")
+    if cache.filter_hash != filter_hash:
+        raise ValueError("signal cache filter hash is stale")
+    if cache.parameter_hash != parameter_hash:
+        raise ValueError("signal cache parameter grid is stale")
+    if cache.strategy_hash != expected_strategy:
+        raise ValueError("signal cache strategy source is stale")
+    if cache.generator_hash != expected_generator:
+        raise ValueError("signal cache generator source is stale")
+    if _records_hash(cache.records) != cache.records_hash:
+        raise ValueError("signal cache records were modified")
+    if cache.source_hash != _source_hash(cache.data_hash, cache.filter_hash,
+            cache.strategy_hash, cache.generator_hash, cache.parameter_hash):
+        raise ValueError("signal cache provenance checksum mismatch")
 
 
 def _candles(rows: tuple[Bar, ...]) -> tuple[Candle, ...]:
@@ -250,6 +399,21 @@ def _params(strategy) -> tuple[tuple[str, str], ...]:
     return tuple(values)
 
 
+def _evaluate_variants(variants, snapshot):
+    """Evaluate a parameter group once for entry, then materialize exact sibling signals."""
+    if not variants:
+        return ()
+    primary = variants[0].evaluate(snapshot)
+    if primary is None:
+        return ()
+    result = [(variants[0], primary)]
+    for strategy in variants[1:]:
+        signal = strategy.evaluate(snapshot)
+        if signal is not None:
+            result.append((strategy, signal))
+    return tuple(result)
+
+
 def _quarter_cutoffs(returns_by_symbol: dict[str, tuple[TimedValue, ...]],
                      start_ms: int, quantiles: tuple[Decimal, ...]) -> dict[tuple[int, Decimal], Decimal | None]:
     """Build frozen ALT thresholds; any incomplete member makes that quarter unusable."""
@@ -278,6 +442,8 @@ def build_signal_cache(index, *, alt_quantiles: Iterable[Decimal] = tuple(sorted
     """
     if tuple(index.window) != ("2021-10-01", "2024-12-31"):
         raise ValueError("signal generation is restricted to the 2021-10-01..2024-12-31 training index")
+    generator_hash_before = _generator_source_hash()
+    strategy_hash_before = _strategy_source_hash()
     filter_path = Path(filter_snapshot_path)
     filter_bytes = filter_path.read_bytes()
     filter_payload = json.loads(filter_bytes)
@@ -365,13 +531,18 @@ def build_signal_cache(index, *, alt_quantiles: Iterable[Decimal] = tuple(sorted
                 # Candidate code validates calibration_end_ms against S-3d.
                 cal_end = qstart - 3 * 24 * HOUR_MS
                 cutoffs = quarters.get(qstart, {})
+                by_quantile: dict[Decimal, list[AltDipReversalStrategy]] = {}
                 for strategy in alt_strategies:
-                    cutoff = cutoffs.get((qstart, strategy.cutoff_quantile))
+                    by_quantile.setdefault(strategy.cutoff_quantile, []).append(strategy)
+                for quantile, variants in by_quantile.items():
+                    cutoff = cutoffs.get((qstart, quantile))
                     if cutoff is None:
                         continue
-                    signal = strategy.evaluate(_snapshot(symbol, at_ms, instrument,
-                        h_prefix, t_prefix, oi_prefix, cutoff, cal_end))
-                    if signal:
+                    alt_snapshot = _snapshot(symbol, at_ms, instrument,
+                        h_prefix, t_prefix, oi_prefix, cutoff, cal_end)
+                    # Entry predicates do not depend on hold or stop settings;
+                    # sibling classes are still called to construct each exact signal.
+                    for strategy, signal in _evaluate_variants(variants, alt_snapshot):
                         records.append(SignalRecord(at_ms, signal, _params(strategy)))
             latest_oi_matches = bool(oi_prefix and oi_prefix[-1].time_ms == at_ms - HOUR_MS)
             if crash_strategies and history_valid and latest_oi_matches:
@@ -393,14 +564,17 @@ def build_signal_cache(index, *, alt_quantiles: Iterable[Decimal] = tuple(sorted
     records.sort(key=lambda row: (row.decision_ms, row.signal.symbol,
                                   row.signal.strategy_id, row.parameters, row.signal.signal_id))
     strategy_hash = _strategy_source_hash()
+    generator_hash = _generator_source_hash()
+    if strategy_hash != strategy_hash_before:
+        raise RuntimeError("candidate strategy source changed during signal-cache generation")
+    if generator_hash != generator_hash_before:
+        raise RuntimeError("signal-cache generator source changed during generation")
     filter_hash = hashlib.sha256(filter_bytes).hexdigest()
-    parameter_payload = {
-        "alt_quantiles": sorted(map(str, alt_qs)), "alt_holds": sorted(alt_hs),
-        "stop_sensitivity": include_stop_sensitivity, "include_alt": include_alt,
-        "include_crash": include_crash, "include_ema": include_ema,
-        "symbols": selected, "training_window": [TRAINING_START_MS, TRAINING_END_MS],
-    }
-    parameter_hash = hashlib.sha256(_canonical(parameter_payload)).hexdigest()
-    composite = hashlib.sha256((index.content_hash + filter_hash + strategy_hash + parameter_hash).encode()).hexdigest()
+    parameter_hash = _parameter_hash(selected, alt_qs, alt_hs, include_stop_sensitivity,
+                                     include_alt, include_crash, include_ema)
+    composite = _source_hash(index.content_hash, filter_hash, strategy_hash,
+                             generator_hash, parameter_hash)
+    frozen_records = tuple(records)
     return SignalCache(tuple(records), (TRAINING_START_MS, TRAINING_END_MS), composite,
-                       index.content_hash, filter_hash, strategy_hash, parameter_hash)
+                       index.content_hash, filter_hash, strategy_hash, generator_hash,
+                       parameter_hash, _records_hash(frozen_records))

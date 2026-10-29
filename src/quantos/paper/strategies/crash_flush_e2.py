@@ -22,6 +22,22 @@ OI_Z_THRESHOLD = D("-2")
 PRICE_DRAWDOWN = D("0.08")
 
 
+def crash_price_gate(bars):
+    """Return the crash-price measurements, or None when price is ineligible.
+
+    `bars` must already be the validated, causal 24-bar hourly window.
+    Kept pure so price-only controls use the exact candidate predicate.
+    """
+    if len(bars) < 24:
+        return None
+    current = bars[-1]
+    change = current.close / bars[-5].close - 1
+    high = max(bar.high for bar in bars[-24:])
+    if change >= 0 or current.close > high * (1 - PRICE_DRAWDOWN):
+        return None
+    return current, change, high
+
+
 def _oi_observations(values: tuple[OpenInterestValue, ...], cutoff_ms: int
                      ) -> tuple[TimedValue, ...] | None:
     """Keep only measurements available at the decision time; validate ordering."""
@@ -62,12 +78,11 @@ class CrashFlushE2Strategy:
         bars = closed_hourly_bars(snapshot.candles_1h, snapshot.at_ms, 24)
         if bars is None:
             return None
-        current = bars[-1]
         # Exactly four hourly close-to-close intervals and a trailing 24-bar high.
-        price_change_4h = current.close / bars[-5].close - 1
-        high_24h = max(bar.high for bar in bars[-24:])
-        if price_change_4h >= 0 or current.close > high_24h * (1 - PRICE_DRAWDOWN):
+        price_gate = crash_price_gate(bars)
+        if price_gate is None:
             return None
+        current, price_change_4h, high_24h = price_gate
 
         # Metrics archive rows are conservatively available one hour after
         # their raw label. Use the latest exact hourly observation available at

@@ -80,3 +80,19 @@ open time; this source clock convention is retained for the score path.
 The wrapper and its tests do not load historical bars or score outcomes.
 `score_archived_candidates` is a separately callable, source-extracted scorer;
 it requires main-agent review before any controlled audit results are computed.
+
+## Controlled 2022–2024 source run (October 29)
+
+The reviewed pure source functions were run once on the repaired nine-major
+USD-M panel, using the archived 9/20, 3% stop, cross exit, four-slot/1x config.
+The 5,314 crossover candidates contained 1,465 level-qualified signals; this is
+not the number of executed portfolio trades. The source scorer ended at
+$290.43 from $200 (+45.22%), with 32.56% **realized-equity** drawdown.
+
+This is a fee-only source audit, with no funding or slippage and no intratrade
+MTM drawdown. It retains the source's open-labelled entry/exit clock. It is not
+the requested 12/26 candidate, not the claimed walk-forward test period, and
+uses a different venue; the supplied 1.12–1.27x claim therefore remains
+unverified and is not directly comparable. No settings were searched or tuned
+in response. The local audit ledger retains source/data/wrapper hashes and
+signal returns separately from candidate evaluation.
