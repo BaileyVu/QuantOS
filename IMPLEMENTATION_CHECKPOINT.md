@@ -77,8 +77,7 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   + after actions). Restarting demo (04:08) and then paper (04:11) closed the PEPE position in both (RUN_END on
   SIGTERM; demo -0.089 gross, paper -0.030 gross; exchange flattened, no orphan stops). Fix 16d2b25: live50
   SIGTERM/SIGINT now SUSPENDS (status "suspended", positions kept, restored on restart). Both runs now on 16d2b25
-  code (paper app-v4/16d2b25, demo app-v4/8e340ce -> demo still has OLD signal handling until its next restart;
-  do NOT restart demo with an open position without first restarting it flat).
+  code (both app-v4/16d2b25 after a flat demo restart at 04:14).
 - Usage 81% at 04:13 UTC, 5h window resets 06:50 UTC.
 
 ### Next step
