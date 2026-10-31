@@ -10,7 +10,7 @@ from .types import D, dumps
 
 class Journal:
     def __init__(self, path: Path, profile: str, evidence: str = "natural", initial_balance=None):
-        if profile not in {"p1", "p5", "pA", "pR", "pL"} or evidence not in {"natural", "synthetic", "replay"}:
+        if profile not in {"p1", "p5", "pA", "pR", "pL", "pL5"} or evidence not in {"natural", "synthetic", "replay"}:
             raise ValueError("invalid journal identity")
         if initial_balance is not None and (not D(str(initial_balance)).is_finite() or D(str(initial_balance)) <= 0):
             raise ValueError("invalid initial balance")

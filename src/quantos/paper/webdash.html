@@ -83,7 +83,7 @@ function ago(s){if(s==null)return "?";s=Math.round(s);if(s<90)return s+"s";if(s<
 function table(heads,rows,emptyMsg){var w=el("div","tw"),t=el("table"),h=el("tr");heads.forEach(function(x){h.appendChild(el("th",x[1]?"n":"",x[0]))});t.appendChild(h);
  rows.forEach(function(r){var tr=el("tr");r.forEach(function(c,i){var td=el("td",(heads[i]&&heads[i][1]?"n":"")+(heads[i]&&heads[i][2]?" wrap":""));add(td,c==null?"-":c);tr.appendChild(td)});t.appendChild(tr)});
  w.appendChild(t);if(!rows.length){w.appendChild(el("div","empty",emptyMsg||"Nothing here yet"))}return w}
-function isDemo(r){return r.name==="demo"||r.mirror!=null}
+function isDemo(r){return String(r.name).indexOf("demo")===0||r.mirror!=null}
 function eng(r){return ((r.status||{}).engines||[{}])[0]||{}}
 function worst(a,b){var o={ok:0,off:0,warn:1,bad:2};return (o[b]||0)>(o[a]||0)?b:a}
 

@@ -110,7 +110,8 @@ def install_dashboard():
     (QOS / "dashboard-logs").mkdir(exist_ok=True)
     plist = {"Label": label, "RunAtLoad": True, "KeepAlive": True, "ThrottleInterval": 10,
              "ProgramArguments": [str(python()), "-m", "quantos.paper.webdash",
-                                  "--run", f"paper={QOS / 'v4-live50'}", "--run", f"demo={QOS / 'v4-live50-demo'}",
+                                  "--run", f"paper 2%={QOS / 'v4-live50'}#pL", "--run", f"paper 5%={QOS / 'v4-live50'}#pL5",
+                                  "--run", f"demo 2%={QOS / 'v4-live50-demo'}#pL",
                                   "--sentibot", str(SB / "app"), "--port", "8787"],
              "EnvironmentVariables": {"PYTHONPATH": str(app)}, "WorkingDirectory": str(QOS),
              "StandardOutPath": str(QOS / "dashboard-logs" / "out.log"),

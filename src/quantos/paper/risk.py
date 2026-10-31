@@ -26,7 +26,7 @@ class Policy:
         for name, value in vars(self).items():
             if not isinstance(value, Decimal) or not value.is_finite() or value < 0:
                 raise ValueError(f"invalid policy {name}")
-        for name, ceiling in (("risk_fraction", self.risk_ceiling), ("daily_loss", ".10"),
+        for name, ceiling in (("risk_fraction", self.risk_ceiling), ("daily_loss", self.daily_loss_ceiling),
                               ("drawdown", self.drawdown_ceiling), ("gross_fraction", "3"),
                               ("leverage", "3"), ("margin_fraction", "1")):
             if not 0 < getattr(self, name) <= D(ceiling):
@@ -35,6 +35,7 @@ class Policy:
             raise ValueError("invalid leverage or execution cost allowance")
 
     risk_ceiling = ".05"
+    daily_loss_ceiling = ".10"
     drawdown_ceiling = ".25"
     max_positions = 1
     margin_asset = "USDC"
@@ -107,6 +108,21 @@ class LivePolicy(Policy):
             raise ValueError("hard ceiling: bump or portfolio risk")
         if sum(n for _, n in self.slots) != self.max_positions:
             raise ValueError("slots must add up to max_positions")
+
+
+@dataclass(frozen=True)
+class LiveR5Policy(LivePolicy):
+    """Owner's aggressive profile: 5% of current equity at risk per trade (1/10 of a 50% drawdown
+    budget). Breakers scale with it: 15% daily loss stop, 35% drawdown pause. Same strategies, slots,
+    leverage cap and minimum-notional rule; portfolio caps 10% same-direction / 15% total risk."""
+    risk_fraction: Decimal = D(".05")
+    daily_loss: Decimal = D(".15")
+    drawdown: Decimal = D(".35")
+    bump_max_risk: Decimal = D(".05")
+    portfolio_risk_fraction: Decimal = D(".05")
+
+    daily_loss_ceiling = ".15"
+    drawdown_ceiling = ".35"
 
 
 def portfolio_risk_caps(policy: Policy) -> tuple[Decimal, Decimal]:

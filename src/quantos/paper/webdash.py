@@ -45,14 +45,20 @@ def _price(p: dict) -> str:
         return ""
 
 
-def run_view(name: str, state: Path, now_ms: int) -> dict:
+def run_view(name: str, state: Path, now_ms: int, profile: str = "pL") -> dict:
     view = {"name": name, "state": str(state), "run": _json(state / "run.json", {}),
             "status": _json(state / "dashboard" / "status.json", {}),
             "heartbeat": _json(state / "heartbeat.json", {}), "alerts": _tail(state / "alerts.jsonl", 50),
             "mirror": _json(state / "mirror.json")}
     hb = view["heartbeat"].get("updated_ms")
     view["heartbeat_age_s"] = None if hb is None else round((now_ms - hb) / 1000, 1)
-    db_path = state / "journal_pL.db"
+    # One status.json holds every profile of a run; show only this profile's engine.
+    status = view["status"]
+    if status.get("engines"):
+        status = view["status"] = {**status, "engines": [e for e in status["engines"] if e.get("profile") == profile]
+                                   or status["engines"][:1]}
+    view["profile"] = profile
+    db_path = state / f"journal_{profile}.db"
     if not db_path.exists():
         return view
     db = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
@@ -127,7 +133,7 @@ def snapshot(runs, sentibot) -> dict:
     bots = None if sentibot is None else {
         "perp": sentibot_view(sentibot / "paper_perp_signals.jsonl", now),
         "spot": sentibot_view(sentibot / "paper_signals.jsonl", now)}
-    return {"time_ms": now, "runs": [run_view(n, s, now) for n, s in runs], "sentibot": bots}
+    return {"time_ms": now, "runs": [run_view(n, s, now, *p) for n, s, *p in runs], "sentibot": bots}
 
 
 PAGE = (Path(__file__).with_name("webdash.html"))
@@ -158,7 +164,11 @@ def main(argv=None):
     p.add_argument("--sentibot", type=Path, help="sentibot app folder")
     p.add_argument("--port", type=int, default=8787)
     a = p.parse_args(argv)
-    runs = [(r.split("=", 1)[0], Path(r.split("=", 1)[1]).expanduser()) for r in a.run]
+    runs = []
+    for r in a.run:  # NAME=STATE or NAME=STATE#PROFILE
+        name, rest = r.split("=", 1)
+        path, _, profile = rest.partition("#")
+        runs.append((name, Path(path).expanduser(), *([profile] if profile else [])))
     serve(runs, a.sentibot.expanduser() if a.sentibot else None, a.port)
 
 

@@ -30,7 +30,7 @@ from .engine import PaperEngine
 from .journal import Journal
 from .market import PublicMarket, RateLimited
 from .report import atomic_json, write_reports
-from .risk import LivePolicy, Policy, valid_quote
+from .risk import LivePolicy, LiveR5Policy, Policy, valid_quote
 from .strategies import library
 from .announcements import BinanceAnnouncements
 from .types import D, Instrument, Snapshot, dumps
@@ -298,6 +298,10 @@ class Runtime:
                 choices = sorted(self.watched_symbols.intersection(self.instruments))
                 selected = (choices[requested_symbol] if requested_symbol < len(choices) else None) if isinstance(requested_symbol, int) else requested_symbol
                 symbols = (selected,) if selected in choices else ()
+                if self.portfolio == "live50":
+                    # One batched quote call for every watched symbol (two profiles can hold more symbols
+                    # than per-symbol workers); same request weight as five single-symbol workers.
+                    symbols = tuple(choices) if requested_symbol == 0 else ()
             if not symbols:
                 self.shutdown.wait(1); continue
             try:
@@ -320,7 +324,12 @@ class Runtime:
                         if fund and self.emit("funding", fund):
                             funding_since[symbol] = fund[-1].time_ms + 1
                     # Quote last so trade/funding request latency cannot stale it.
-                    records.insert(0, ("quote", market.quote(symbol)))
+                    if self.portfolio != "live50":
+                        records.insert(0, ("quote", market.quote(symbol)))
+                if self.portfolio == "live50":
+                    batch = market.quotes(symbols, skip_invalid=True)
+                    if len(batch) != len(symbols): raise ValueError("invalid or stale quote")
+                    records[0:0] = [("quote", batch[s]) for s in symbols]
                 if now >= next_funding: next_funding = now + 60000
                 self.emit("feed", records)
                 backoff = 2
@@ -354,6 +363,8 @@ class Runtime:
                 raise ValueError("existing run has a different quote volume floor")
             if run.get("portfolio", "legacy") != self.portfolio:
                 raise ValueError("existing run has a different portfolio")
+            if self.portfolio == "live50":
+                run["profiles"] = ["pL", "pL5"] if self.execution == "paper" else ["pL"]
             run["min_quote_volume"] = str(self.min_quote_volume)
             if (self.state / "stop.request").exists():
                 (self.state / "stop.request").unlink()
@@ -365,13 +376,15 @@ class Runtime:
                 caffeine = subprocess.Popen(["/usr/bin/caffeinate", "-i", "-s", "-w", str(os.getpid())],
                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             engines = []
-            profiles = ((("pL", None),) if self.portfolio == "live50"
+            # The demo mirror can only follow one profile (positions would net on one account).
+            profiles = ((("pL", None),) + ((("pL5", None),) if self.execution == "paper" else ())
+                        if self.portfolio == "live50"
                         else (("p1", ".01"), ("p5", ".05"), ("pA", ".05")))
             for profile, fraction in profiles:
-                if profile == "pL":
-                    j = Journal(self.state / "journal_pL.db", "pL", initial_balance="50")
+                if profile in ("pL", "pL5"):
+                    j = Journal(self.state / f"journal_{profile}.db", profile, initial_balance="50")
                     journals.append(j)
-                    e = PaperEngine(j, LivePolicy())
+                    e = PaperEngine(j, LivePolicy() if profile == "pL" else LiveR5Policy())
                     e.recover(now); engines.append(e)
                     with j.transaction(): j.event(now, "START" if run["restarts"] == 0 else "RESTART", {"pid": os.getpid()})
                     continue

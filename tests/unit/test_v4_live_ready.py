@@ -146,3 +146,26 @@ class CapitalTests(unittest.TestCase):
                 self.assertEqual((a.equity, a.high_water), (D(50), D(50)))
             finally:
                 j.close()
+
+
+class R5Tests(unittest.TestCase):
+    def test_five_percent_profile_takes_twenty_dollar_minimum_it_used_to_skip(self):
+        from quantos.paper.risk import LiveR5Policy
+        ins = replace(INS, min_notional=D(20))
+        self.assertEqual(evaluate(event(), ins, quote(), account(), LivePolicy(), T).reason, "BELOW_EXCHANGE_MINIMUM")
+        # 5% of $50 = $2.50 risk at a 25% stop buys ~$9.7: still below $20 -> skipped with reason
+        self.assertEqual(evaluate(event(), ins, quote(), account(), LiveR5Policy(), T).reason, "BELOW_EXCHANGE_MINIMUM")
+        d = evaluate(event(), INS, quote(), account(), LiveR5Policy(), T)
+        self.assertTrue(d.approved)
+        self.assertEqual(d.binding_constraint, "risk")          # no bump needed at 5%
+        self.assertLessEqual(d.achievable_risk, D("2.50"))
+        self.assertGreater(d.notional, D(9))
+
+    def test_breakers_scaled(self):
+        from quantos.paper.risk import LiveR5Policy
+        self.assertEqual(evaluate(event(), INS, quote(), account(equity=D("42.5")), LiveR5Policy(), T).reason,
+                         "DAILY_LOSS_BREAKER")
+        self.assertTrue(evaluate(event(), INS, quote(), account(equity=D("43"), day_start_equity=D(43), high_water=D(50)),
+                                 LiveR5Policy(), T).approved)
+        with self.assertRaises(ValueError):
+            LiveR5Policy(daily_loss=D(".20"))
