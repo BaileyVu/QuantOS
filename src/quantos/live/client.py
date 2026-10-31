@@ -11,7 +11,25 @@ from pathlib import Path
 from typing import Callable
 from urllib.error import HTTPError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import HTTPSHandler, Request, build_opener
+import http.client
+import socket
+
+
+class _IPv4HTTPSConnection(http.client.HTTPSConnection):
+    """Binance key whitelists are IPv4; never let a dual-stack Mac send a signed request over IPv6."""
+    def connect(self):
+        address = socket.getaddrinfo(self.host, self.port, socket.AF_INET, socket.SOCK_STREAM)[0][4]
+        self.sock = self._context.wrap_socket(socket.create_connection(address, self.timeout),
+                                              server_hostname=self.host)
+
+
+class _IPv4Handler(HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(_IPv4HTTPSConnection, req, context=self._context)
+
+
+_OPENER = build_opener(_IPv4Handler())
 
 BASES = {"testnet": "https://testnet.binancefuture.com", "mainnet": "https://fapi.binance.com"}
 CONFIRM_LINE = "I CONFIRM MAINNET QUANTOS"
@@ -89,7 +107,7 @@ class SignedClient:
     @staticmethod
     def _urlopen(request, timeout):
         try:
-            with urlopen(request, timeout=timeout) as r:
+            with _OPENER.open(request, timeout=timeout) as r:
                 return r.status, r.read(), r.headers
         except HTTPError as e:
             return e.code, e.read(), e.headers
