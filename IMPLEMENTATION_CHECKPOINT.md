@@ -65,6 +65,13 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
 - Stop all: `../QuantOS/.venv/bin/python scripts/deploy_three.py uninstall` (graceful SIGTERM). Kill switch for one
   run: `touch "<state>/KILL"`. Mainnet never configured.
 
+- 02:57 restart on fc3bead (live50 skips aggTrades: two runs exceeded IP weight limit; LivePolicy refuses LIMIT).
+  0 rate-limit errors after. Known: occasional fail-closed "invalid or stale quote" feed rejections (~1 per 2-3 min,
+  quiet USDC books > 5s), auto-recover; kept as safety rule.
+- Dashboard b05008d/8b358ef: `src/quantos/paper/webdash.py` + `webdash.html`, launchd com.quantos.dashboard,
+  http://localhost:8787 (/api/state), read-only, no Binance calls. Install/redeploy:
+  `scripts/deploy_three.py install-dashboard`. Stop: `launchctl bootout gui/$(id -u)/com.quantos.dashboard`.
+
 ### Next step
 Periodic health check (heartbeat, alerts.jsonl, ERROR events, mirror.json on demo); report fills. Optional T8.
 
