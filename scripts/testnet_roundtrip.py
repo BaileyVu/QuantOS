@@ -8,7 +8,7 @@ import json
 import os
 import sys
 
-from quantos.live.client import SignedClient
+from quantos.live.client import SignedClient, UnknownOrder
 from quantos.live.keys import load_keys
 from quantos.live.orders import client_order_id, place_with_protection, reduce_only_close, submit
 from quantos.live.reconcile import reconcile
@@ -24,6 +24,9 @@ def main(symbol="BTCUSDC"):
     if ins is None:
         raise SystemExit(f"{symbol} not tradable on testnet")
     mark = D(str(client.position_risk(symbol)[0]["markPrice"]))
+    if mark <= 0:  # no position -> no mark; test hosts track the public mainnet mark closely
+        from quantos.paper.market import PublicMarket
+        mark = PublicMarket().quote(symbol).mark
     step = max(ins.step, ins.market_step)
     qty = max(ins.min_qty, -floor_step(-(ins.min_notional * D("1.1") / mark), step))
     run, sig = "tn", f"rt{abs(hash(mark)) % 10**8}"
@@ -34,11 +37,16 @@ def main(symbol="BTCUSDC"):
     filled = D(str(placed.entry.get("executedQty", qty)))
     first = reconcile(client, {symbol: filled}, {stop_cid})
     close = submit(client, reduce_only_close(symbol, "SELL", filled, client_order_id(run, sig, "close"), ins))
-    client.cancel_algo_order(stop_cid) if client.conditional_api == "algo" else client.cancel_order(symbol, stop_cid)
+    try:  # a closePosition stop is auto-cancelled by Binance once the position is flat
+        client.cancel_algo_order(stop_cid) if client.conditional_api == "algo" else client.cancel_order(symbol, stop_cid)
+        stop_after_close = "cancelled"
+    except UnknownOrder:
+        stop_after_close = "already gone (auto-cancelled)"
+    open_algo = [o.get("clientAlgoId") for o in client.open_algo_orders(symbol)]
     final = reconcile(client, {}, set())
     print(json.dumps({"symbol": symbol, "qty": str(qty), "entry_status": placed.entry.get("status"),
                       "stop_client_id": stop_cid, "reconcile_open_ok": first.ok,
-                      "close_status": close.get("status"), "reconcile_flat_ok": final.ok,
+                      "close_status": close.get("status"), "stop_after_close": stop_after_close, "open_algo_after": open_algo, "reconcile_flat_ok": final.ok,
                       "flat_report": {k: v for k, v in final.__dict__.items() if v and k != "ok"}}, default=str))
 
 

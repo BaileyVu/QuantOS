@@ -47,8 +47,12 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   fresh state `.../QuantOS/v4-live50` (empty, nothing started). Status JSON: `<state>/dashboard/status.json`,
   heartbeat `<state>/heartbeat.json`, alerts `<state>/alerts.jsonl`, arch doc `docs/ARCHITECTURE_V4.md`.
 
+- Testnet DONE 2026-10-31 ~02:35 UTC on Binance Demo futures (QUANTOS_TESTNET_HOST=demo, key file
+  `QuantOS-Secrets/binance-futures-testnet.env`): 0.002 BTCUSDC market entry FILLED, algo STOP_MARKET
+  (closePosition) placed, reconcile OK, reduce-only close, stop auto-cancelled by Binance, reconcile flat OK.
+
 ### Remaining / exact next step
-1. When the futures key file exists: `QUANTOS_KEY_FILE=<file> [QUANTOS_TESTNET_HOST=demo] PYTHONPATH=src
+1. (done) testnet round trip: `QUANTOS_KEY_FILE=<file> [QUANTOS_TESTNET_HOST=demo] PYTHONPATH=src
    ../QuantOS/.venv/bin/python scripts/testnet_roundtrip.py BTCUSDC`, then report.
 2. Sun 00:00 UTC (only after coordinator says go): `launchctl bootout gui/$(id -u)/com.quantos.v3.paper` then
    `scripts/deploy_live50.sh install` (re-run `prepare` first if HEAD changed: new commit dir).
