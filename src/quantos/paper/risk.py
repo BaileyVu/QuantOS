@@ -72,6 +72,10 @@ EVENT_STRATEGIES = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_shor
 
 
 def strategy_slot(strategy_id: str) -> str:
+    # crash_flush gets its own slot: in the 10-29 replay, alt_dip trades held every
+    # shared event slot through the whole flush (REPLAY_V2.md).
+    if strategy_id == "crash_flush_e2":
+        return "crash"
     return "event" if strategy_id in EVENT_STRATEGIES else "trend"
 
 
@@ -92,7 +96,7 @@ class LivePolicy(Policy):
     notional_headroom: Decimal = D(".02")
 
     max_positions = 3
-    slots = (("event", 2), ("trend", 1))
+    slots = (("crash", 1), ("event", 1), ("trend", 1))
     enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17",
                                     "tsmom_4h", "turtle_55", "vol_squeeze_breakout"})
 

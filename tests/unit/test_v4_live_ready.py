@@ -82,8 +82,12 @@ class LivePolicyTests(unittest.TestCase):
         self.assertEqual(self.decide(tsmom, trend).reason, "SLOT_FULL_TREND")
         events = account(active_orders=2, gross_notional=D(10), margin_used=D(5), long_risk=D(1),
                          open_symbols=("ETHUSDC", "SOLUSDC"), open_strategies=("crash_flush_e2", "alt_dip_reversal"))
-        self.assertEqual(self.decide(event(), events).reason, "SLOT_FULL_EVENT")
+        self.assertEqual(self.decide(event(), events).reason, "SLOT_FULL_CRASH")
+        self.assertEqual(self.decide(event("alt_dip_reversal"), events).reason, "SLOT_FULL_EVENT")
         self.assertTrue(self.decide(tsmom, events).approved)
+        alt = account(active_orders=1, gross_notional=D(10), margin_used=D(5), long_risk=D(".5"),
+                      open_symbols=("FILUSDC",), open_strategies=("alt_dip_reversal",))
+        self.assertTrue(self.decide(event(), alt).approved)  # an alt_dip trade cannot starve crash_flush
 
     def test_disabled_reference_strategies_and_breakers(self):
         self.assertEqual(self.decide(signal(strategy_id="ema_atr_ref", strategy_version="1.0.0")).reason,
