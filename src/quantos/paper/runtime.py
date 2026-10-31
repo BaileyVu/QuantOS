@@ -402,7 +402,10 @@ class Runtime:
                     previous_handlers[sig] = signal.signal(sig, lambda *_, f=flag: setattr(self, f, True))
             alerter, heartbeat = Alerter(self.state, notify=self.notify), Heartbeat(self.state)
             monitor = FeedMonitor(stale_seconds=60, startup_grace_seconds=120)
-            for name in ("feed", "scan"): monitor.expect(name, now)
+            # A 4h-close scan refreshes 1h+4h candles for every symbol and takes ~65s; prices keep the 60s
+            # rule, scans get 150s (five missed 30s cycles), which still catches a real stall quickly.
+            scan_monitor = FeedMonitor(stale_seconds=150, startup_grace_seconds=180)
+            monitor.expect("feed", now); scan_monitor.expect("scan", now)
             next_check, killed, last_mirror, mirror = 0, False, 0, None
             if self.execution != "paper":
                 from ..live.bridge import ExchangeMirror
@@ -453,7 +456,7 @@ class Runtime:
                     self.record(kind, payload, now)
                     dispatch(engines, kind, payload, now, strategies=self.strategies, sentiment=self.sentiment)
                     if kind == "scan":
-                        monitor.note("scan", now)
+                        scan_monitor.note("scan", now)
                         if now >= next_check and payload:
                             checks = self_check(self.strategies, payload)
                             for e in engines:
@@ -493,7 +496,7 @@ class Runtime:
                     for e in engines: e.kill(now)
                     alerter.alert("critical", "kill_switch", "KILL file present: entries paused, positions closing", now)
                 if now-last_status >= 10000:
-                    stale = dict(monitor.stale(now))
+                    stale = {**dict(monitor.stale(now)), **dict(scan_monitor.stale(now))}
                     for name in ("feed", "scan"):
                         if name in stale:
                             alerter.alert("critical", f"stale:{name}", f"{name} stale for {stale[name]:.0f}s", now)
@@ -504,7 +507,7 @@ class Runtime:
                     try:
                         with ExitStack() as stack:
                             for e in engines: stack.enter_context(e.journal.transaction())
-                            status = build_status("paper", run, engines, {"ages_s": monitor.ages(now), "stale": stale},
+                            status = build_status("paper", run, engines, {"ages_s": {**monitor.ages(now), **scan_monitor.ages(now)}, "stale": stale},
                                                   killed, now, recent_events(engines[0].journal),
                                                   recent_events(engines[0].journal, ("FILLED", "PARTIAL", "CLOSED")))
                         write_status(self.state, status)
