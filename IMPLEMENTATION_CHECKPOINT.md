@@ -51,13 +51,22 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   `QuantOS-Secrets/binance-futures-testnet.env`): 0.002 BTCUSDC market entry FILLED, algo STOP_MARKET
   (closePosition) placed, reconcile OK, reduce-only close, stop auto-cancelled by Binance, reconcile flat OK.
 
-### Remaining / exact next step
-1. (done) testnet round trip: `QUANTOS_KEY_FILE=<file> [QUANTOS_TESTNET_HOST=demo] PYTHONPATH=src
-   ../QuantOS/.venv/bin/python scripts/testnet_roundtrip.py BTCUSDC`, then report.
-2. Sun 00:00 UTC (only after coordinator says go): `launchctl bootout gui/$(id -u)/com.quantos.v3.paper` then
-   `scripts/deploy_live50.sh install` (re-run `prepare` first if HEAD changed: new commit dir).
-3. Optional T8 crash-episode dataset (not started).
-Usage at 02:20 UTC: see report; 5h window resets 06:50 UTC.
+### RUNNING (started 2026-10-31 02:49 UTC by bb374e0 `scripts/deploy_three.py install`; ends 2026-11-03 02:49 UTC)
+- com.quantos.v4.paper  (+ .watchdog) state `~/Library/Application Support/QuantOS/v4-live50`, paper, $50 pL.
+- com.quantos.v4.demo   (+ .watchdog) state `.../QuantOS/v4-live50-demo`, `--execution testnet` on Binance Demo
+  futures (QUANTOS_TESTNET_HOST=demo, key copy `.../QuantOS/keys/binance-futures-testnet.env`, mode 600).
+- com.sentibot.spot / com.sentibot.perp from `~/Library/Application Support/sentibot/app` (moved off Desktop; Desktop
+  copy is stale). Sentibot fix: per-source STATUS logged + stderr WARNING each cycle (Reddit unauthenticated API is
+  unreachable from this network: www.reddit.com no connect, old.reddit HTML -> stays EMPTY, now loud). Backups of
+  original sentiment.py/paper.py in scratchpad `sentibot_backup/`.
+- QuantOS code copy `~/Library/Application Support/QuantOS/app-v4/bb374e0/src`. Old com.quantos.v3.paper booted out.
+- Health at 02:52: both self-checks 6/6 ok, heartbeat <10s, equity 50/50. Startup 429 rate limit (both runs cold
+  start at once) for 60s, recovered.
+- Stop all: `../QuantOS/.venv/bin/python scripts/deploy_three.py uninstall` (graceful SIGTERM). Kill switch for one
+  run: `touch "<state>/KILL"`. Mainnet never configured.
+
+### Next step
+Periodic health check (heartbeat, alerts.jsonl, ERROR events, mirror.json on demo); report fills. Optional T8.
 
 # QuantOS V3 implementation checkpoint
 
