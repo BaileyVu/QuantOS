@@ -99,6 +99,7 @@ class LivePolicy(Policy):
     max_positions = 3
     slots = (("crash", 1), ("event", 1), ("trend", 1))
     limit_entries = False  # live50 polls no trade prints, so a LIMIT entry could never be filled honestly
+    risk_headroom = D("0.9")
     enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17",
                                     "tsmom_4h", "turtle_55", "vol_squeeze_breakout"})
 
@@ -294,7 +295,9 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     max_entry = entry * (1 + policy.slippage)
     margin_capacity = max(D(0), min(account.equity * policy.margin_fraction,
                                    account.equity - account.margin_used))
-    bounds = {"risk": budget / unit_loss,
+    # Live profiles size below the budget so a small adverse move between signal and fill stays inside
+    # it; the engine's fill-time check caps at the full budget (requested_risk).
+    bounds = {"risk": budget * getattr(policy, "risk_headroom", D(1)) / unit_loss,
               "gross_notional": max(D(0), account.equity * policy.gross_fraction - account.gross_notional) / (max_entry * (1 + entry_fee)),
               "margin": margin_capacity / (max_entry / safe + costs),
               "exchange_max": min(instrument.max_qty, instrument.market_max_qty)}
@@ -315,7 +318,8 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
         if (bump_cap is None or need > others
                 or need_risk > min(account.equity * bump_cap, risk_room)):
             return Decision(False, "BELOW_EXCHANGE_MINIMUM", detail=detail)
-        quantity, binding, budget = need, "EXCHANGE_MINIMUM_BUMP", need_risk
+        quantity, binding = need, "EXCHANGE_MINIMUM_BUMP"
+        budget = min(account.equity * bump_cap, risk_room)  # the cap, so the fill check has the same room
     notional = quantity * entry
     # Leverage decision, step 2: the lowest leverage that fits the margin budget, so unused leverage
     # never shortens the distance to liquidation and free margin stays available.

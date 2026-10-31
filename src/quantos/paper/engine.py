@@ -490,7 +490,8 @@ class PaperEngine:
                                 self._cancel(o, now_ms, "INVALID_BRACKET")
                             elif s["take_profit"] is None and costs > D(".25")*distance:
                                 self._cancel(o, now_ms, "COSTS_TOO_HIGH_FOR_STOP")
-                            elif fill_risk > D(o["decision"]["achievable_risk"]):
+                            elif fill_risk > (max(D(o["decision"]["achievable_risk"]), D(o["decision"]["requested_risk"]))
+                                              if hasattr(self.policy, "risk_headroom") else D(o["decision"]["achievable_risk"])):
                                 self._cancel(o, now_ms, "FILL_EXCEEDS_APPROVED_RISK")
                             else:
                                 self._entry_fill(o, quantity, price, now_ms, f"quote-{q.time_ms}", False)

@@ -159,7 +159,8 @@ class R5Tests(unittest.TestCase):
         self.assertTrue(d.approved)
         self.assertEqual(d.binding_constraint, "risk")          # no bump needed at 5%
         self.assertLessEqual(d.achievable_risk, D("2.50"))
-        self.assertGreater(d.notional, D(9))
+        self.assertGreater(d.notional, D(8))                    # sized at 90% of budget (headroom)
+        self.assertEqual(d.requested_risk, D("2.50"))           # fill check may use the full budget
 
     def test_breakers_scaled(self):
         from quantos.paper.risk import LiveR5Policy
