@@ -95,13 +95,40 @@ def restart_quantos():
         if label.endswith("paper"): time.sleep(90)
 
 
+def install_dashboard():
+    """Local read-only dashboard on http://127.0.0.1:8787 (launchd com.quantos.dashboard)."""
+    commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
+                            capture_output=True, text=True, check=True).stdout.strip()
+    app = QOS / "app-v4" / commit / "src"
+    app.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["rsync", "-a", "--delete", "--exclude", "__pycache__", f"{REPO / 'src'}/", f"{app}/"], check=True)
+    label = "com.quantos.dashboard"
+    if loaded(label):
+        subprocess.run(["launchctl", "bootout", f"{DOMAIN}/{label}"], check=False)
+        while loaded(label): __import__("time").sleep(1)
+    (QOS / "dashboard-logs").mkdir(exist_ok=True)
+    plist = {"Label": label, "RunAtLoad": True, "KeepAlive": True, "ThrottleInterval": 10,
+             "ProgramArguments": [str(python()), "-m", "quantos.paper.webdash",
+                                  "--run", f"paper={QOS / 'v4-live50'}", "--run", f"demo={QOS / 'v4-live50-demo'}",
+                                  "--sentibot", str(SB / "app"), "--port", "8787"],
+             "EnvironmentVariables": {"PYTHONPATH": str(app)}, "WorkingDirectory": str(QOS),
+             "StandardOutPath": str(QOS / "dashboard-logs" / "out.log"),
+             "StandardErrorPath": str(QOS / "dashboard-logs" / "err.log")}
+    path = AGENTS / f"{label}.plist"
+    with path.open("wb") as f:
+        plistlib.dump(plist, f, sort_keys=True)
+    subprocess.run(["launchctl", "bootstrap", DOMAIN, str(path)], check=True)
+    print("started", label, "http://localhost:8787")
+
+
 def uninstall():
     for label in ("com.quantos.v4.paper", "com.quantos.v4.demo", "com.quantos.v4.paper.watchdog",
-                  "com.quantos.v4.demo.watchdog", "com.sentibot.spot", "com.sentibot.perp"):
+                  "com.quantos.v4.demo.watchdog", "com.sentibot.spot", "com.sentibot.perp", "com.quantos.dashboard"):
         if loaded(label):
             subprocess.run(["launchctl", "bootout", f"{DOMAIN}/{label}"], check=False)
             print("stopped", label)
 
 
 if __name__ == "__main__":
-    {"install": install, "uninstall": uninstall, "restart-quantos": restart_quantos}[sys.argv[1]]()
+    {"install": install, "uninstall": uninstall, "restart-quantos": restart_quantos,
+     "install-dashboard": install_dashboard}[sys.argv[1]]()
