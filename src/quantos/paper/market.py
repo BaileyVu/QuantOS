@@ -17,6 +17,7 @@ ENDPOINTS = {
     "/fapi/v1/ticker/24hr",
     "/fapi/v1/ticker/bookTicker", "/fapi/v1/premiumIndex",
     "/fapi/v1/aggTrades", "/fapi/v1/fundingRate",
+    "/futures/data/openInterestHist",
 }
 
 
@@ -152,12 +153,16 @@ class PublicMarket:
         data = self._get("/fapi/v1/time")
         return _int(data["serverTime"], "serverTime")
 
-    def candles(self, symbol: str, interval: str, now_ms: int, limit: int = 100) -> tuple[Candle, ...]:
+    def candles(self, symbol: str, interval: str, now_ms: int, limit: int = 100,
+                *, historical: bool = False) -> tuple[Candle, ...]:
+        """`historical=True` requests bars closed before `now_ms` (an exact bar boundary)."""
         widths = {"1m": 60_000, "5m": 300_000, "1h": 3_600_000,
                   "4h": 14_400_000, "1d": 86_400_000}
         if interval not in widths or not 1 <= limit <= 1000:
             raise ValueError("unsupported candle request")
-        rows = self._get("/fapi/v1/klines", {"symbol": symbol, "interval": interval, "limit": limit})
+        params = {"symbol": symbol, "interval": interval, "limit": limit}
+        if historical: params["endTime"] = now_ms - 1
+        rows = self._get("/fapi/v1/klines", params)
         if not isinstance(rows, list): raise ValueError("malformed klines")
         width = widths[interval]
         out = []
@@ -177,6 +182,19 @@ class PublicMarket:
         if out[-1].close_ms != now_open - 1:
             raise ValueError("latest completed candle missing or stale")
         return tuple(out)
+
+    def open_interest_value(self, symbol: str, end_ms: int | None = None, limit: int = 500):
+        """Hourly (label_ms, sumOpenInterestValue); Binance serves only the latest ~30 days."""
+        params = {"symbol": symbol, "period": "1h", "limit": limit}
+        if end_ms is not None: params["endTime"] = end_ms
+        rows = self._get("/futures/data/openInterestHist", params)
+        if not isinstance(rows, list): raise ValueError("malformed open interest")
+        out = []
+        for r in rows:
+            if not isinstance(r, dict) or r.get("symbol") != symbol: raise ValueError("malformed open interest row")
+            # Bad values (e.g. zero) are passed through; the strategy's repair rule judges them.
+            out.append((_int(r.get("timestamp"), "timestamp"), _decimal(r.get("sumOpenInterestValue"), "oi value")))
+        return sorted(out)
 
     def quote(self, symbol: str) -> Quote:
         b = self._get("/fapi/v1/ticker/bookTicker", {"symbol": symbol})

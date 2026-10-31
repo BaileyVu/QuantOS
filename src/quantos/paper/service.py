@@ -24,7 +24,8 @@ WATCHDOG_LABEL = "com.quantos.v3.watchdog"
 
 
 def build_plist(python: Path, state: Path, logdir: Path,
-                duration_hours: int = 72, *, min_quote_volume=Decimal("20000000")) -> dict:
+                duration_hours: int = 72, *, min_quote_volume=Decimal("20000000"),
+                extra_args=(), pythonpath=None) -> dict:
     # Keep the venv executable's lexical path; resolving its symlink can select
     # the base interpreter and lose the venv's installed package environment.
     python = Path(os.path.abspath(os.path.expanduser(os.fspath(python))))
@@ -40,7 +41,8 @@ def build_plist(python: Path, state: Path, logdir: Path,
         "Label": LABEL,
         "ProgramArguments": [str(python), "-m", "quantos.paper.cli", "start", "--mode", "paper",
                              "--state", str(state), "--min-quote-volume", str(min_quote_volume),
-                             "--hours", str(duration_hours)],
+                             "--hours", str(duration_hours), *map(str, extra_args)],
+        **_env(pythonpath),
         "RunAtLoad": True,
         "KeepAlive": {"SuccessfulExit": False, "Crashed": True},
         # The runtime uses up to 25 seconds for graceful checkpoint/close.
@@ -50,6 +52,11 @@ def build_plist(python: Path, state: Path, logdir: Path,
         "StandardOutPath": str(logs),
         "StandardErrorPath": str(errors),
     }
+
+
+def _env(pythonpath) -> dict:
+    """Run code copied outside ~/Desktop: launchd jobs hit macOS privacy (TCC) blocks there."""
+    return {"EnvironmentVariables": {"PYTHONPATH": str(pythonpath)}} if pythonpath else {}
 
 
 def _launchctl() -> str:
@@ -67,7 +74,8 @@ def _domain() -> str:
     return f"gui/{os.getuid()}"
 
 
-def install_service(python: Path, state: Path, duration_hours: int = 72, *, min_quote_volume=Decimal("20000000")) -> Path:
+def install_service(python: Path, state: Path, duration_hours: int = 72, *, min_quote_volume=Decimal("20000000"),
+                    extra_args=(), pythonpath=None) -> Path:
     launchctl = _launchctl()
     python = Path(os.path.abspath(os.path.expanduser(os.fspath(python))))
     if not python.is_file() or not os.access(python, os.X_OK):
@@ -80,7 +88,8 @@ def install_service(python: Path, state: Path, duration_hours: int = 72, *, min_
         raise RuntimeError("could not confirm paper service is stopped")
     path = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
     logdir = Path(state).expanduser().resolve() / "logs"
-    plist = build_plist(python, state, logdir, duration_hours, min_quote_volume=min_quote_volume)
+    plist = build_plist(python, state, logdir, duration_hours, min_quote_volume=min_quote_volume,
+                        extra_args=extra_args, pythonpath=pythonpath)
     path.parent.mkdir(parents=True, exist_ok=True)
     logdir.mkdir(parents=True, exist_ok=True)
     logdir.chmod(0o700)
@@ -120,13 +129,14 @@ def stop_service() -> bool:
                                         output=result.stdout, stderr=result.stderr)
 
 
-def build_watchdog_plist(python: Path, state: Path, logdir: Path) -> dict:
+def build_watchdog_plist(python: Path, state: Path, logdir: Path, pythonpath=None) -> dict:
     python = Path(os.path.abspath(os.path.expanduser(os.fspath(python))))
     state, logdir = (Path(p).expanduser().resolve() for p in (state, logdir))
     return {
         "Label": WATCHDOG_LABEL,
         "ProgramArguments": [str(python), "-m", "quantos.paper.health", "watchdog",
                              "--state", str(state)],
+        **_env(pythonpath),
         "StartInterval": 60,
         "RunAtLoad": True,
         "WorkingDirectory": str(state.parent),
@@ -135,7 +145,7 @@ def build_watchdog_plist(python: Path, state: Path, logdir: Path) -> dict:
     }
 
 
-def install_watchdog(python: Path, state: Path) -> Path:
+def install_watchdog(python: Path, state: Path, pythonpath=None) -> Path:
     launchctl = _launchctl()
     python = Path(os.path.abspath(os.path.expanduser(os.fspath(python))))
     if not python.is_file() or not os.access(python, os.X_OK):
@@ -148,7 +158,7 @@ def install_watchdog(python: Path, state: Path) -> Path:
         raise RuntimeError("could not confirm watchdog service is stopped")
     path = Path.home() / "Library" / "LaunchAgents" / f"{WATCHDOG_LABEL}.plist"
     logdir = Path(state).expanduser().resolve() / "logs"
-    plist = build_watchdog_plist(python, state, logdir)
+    plist = build_watchdog_plist(python, state, logdir, pythonpath)
     path.parent.mkdir(parents=True, exist_ok=True)
     logdir.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=f".{WATCHDOG_LABEL}.", suffix=".tmp", dir=path.parent)

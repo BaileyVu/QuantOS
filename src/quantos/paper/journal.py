@@ -9,10 +9,10 @@ from .types import D, dumps
 
 
 class Journal:
-    def __init__(self, path: Path, profile: str, evidence: str = "natural", initial_balance: str = "200"):
+    def __init__(self, path: Path, profile: str, evidence: str = "natural", initial_balance=None):
         if profile not in {"p1", "p5", "pA", "pR", "pL"} or evidence not in {"natural", "synthetic", "replay"}:
             raise ValueError("invalid journal identity")
-        if not D(str(initial_balance)).is_finite() or D(str(initial_balance)) <= 0:
+        if initial_balance is not None and (not D(str(initial_balance)).is_finite() or D(str(initial_balance)) <= 0):
             raise ValueError("invalid initial balance")
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path, self.profile = path, profile
@@ -34,6 +34,9 @@ class Journal:
                 time_ms INTEGER NOT NULL, amount TEXT NOT NULL);
         ''')
         with self.transaction():
+            previous = self.get("identity")
+            if initial_balance is None:  # reopen with the stored balance; new journals default to 200
+                initial_balance = previous["initial_balance"] if isinstance(previous, dict) else "200"
             identity = {"profile": profile, "evidence": evidence, "schema": 1,
                         "initial_balance": str(initial_balance), "margin_asset": "USDT" if profile == "pR" else "USDC"}
             previous = self.get("identity")

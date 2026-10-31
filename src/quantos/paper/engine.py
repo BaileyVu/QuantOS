@@ -84,6 +84,19 @@ class PaperEngine:
             self.journal.save(o)
         if first: self.journal.event(now_ms, "LOSS_BREAKER", {"equity": str(account.equity)})
 
+    def kill(self, now_ms, reason="KILL_SWITCH"):
+        """Pause entries, cancel pending intents and close every filled position."""
+        with self.journal.transaction():
+            first = self.journal.get("paused") != reason
+            self.journal.set("paused", reason)
+            for o in self.active():
+                if D(o["filled"]) > 0 and o["state"] != "CLOSING":
+                    self._closing(o, now_ms, reason)
+                elif o["state"] != "CLOSING":
+                    self._cancel(o, now_ms, reason)
+                self.journal.save(o)
+            if first: self.journal.event(now_ms, reason, {})
+
     def account(self, now_ms):
         equity = self.journal.cash()
         gross = margin = long_risk = short_risk = D(0)
