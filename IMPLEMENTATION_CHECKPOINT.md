@@ -80,8 +80,11 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   code (both app-v4/16d2b25 after a flat demo restart at 04:14).
 - Usage 81% at 04:13 UTC, 5h window resets 06:50 UTC.
 
+- 07:05 both runs restarted flat onto 331a42f (scan stale threshold 150s; feed 60s). SUSPENDED->RESTART verified.
+  05:00-07:00: no trades, no critical alerts, 0 rate-limit errors. Monitor re-armed (fills/closes/critical only).
+
 ### Next step
-Periodic health check (heartbeat, alerts.jsonl, ERROR events, mirror.json on demo); report fills. Optional T8.
+T8 crash-episode research in `~/Desktop/PythonProject/edge_data/crash_episodes_2020/` (research only; services untouched).
 
 # QuantOS V3 implementation checkpoint
 
