@@ -25,7 +25,11 @@ def running(label):
 def age(path, key="updated_ms"):
     try:
         h = json.loads(path.read_text())
-        ts = h.get(key) / 1000 if h.get(key) else h.get("ts")
+        if key == "utc":  # hl_copy heartbeat stores an ISO-8601 UTC time
+            from datetime import datetime
+            ts = datetime.fromisoformat(h["utc"]).timestamp()
+        else:
+            ts = h[key] / 1000
         return round(time.time() - ts)
     except Exception:
         return None
@@ -59,7 +63,7 @@ def main():
         crit = [a["key"] for a in alerts[seen:] if a.get("level") == "critical"]
         cur[f"{run}:alerts"] = len(alerts)
         lines.append(f"{run[3:]}: hb {age(Q / run / 'heartbeat.json')}s new_critical {crit or '-'}")
-    lines.append(f"hlcopy: hb {age(HOME / 'Library/Application Support/hl_copy/state/heartbeat.json', 'ts')}s")
+    lines.append(f"hlcopy: hb {age(HOME / 'Library/Application Support/hl_copy/state/heartbeat.json', 'utc')}s")
     CURSOR.write_text(json.dumps(cur))
     print("\n".join(lines[:10]))
 
