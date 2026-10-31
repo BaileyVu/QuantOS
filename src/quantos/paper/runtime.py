@@ -158,6 +158,7 @@ class Runtime:
         self.instrument_lock = threading.Lock()
         self.instruments = {}
         self.stop_requested = False
+        self.suspend_requested = False  # live50: SIGTERM/SIGINT leaves protected positions for the restart
         self.last_final_attempt = 0
 
     def _client(self):
@@ -395,7 +396,10 @@ class Runtime:
             previous_handlers = {}
             if threading.current_thread() is threading.main_thread():
                 for sig in (signal.SIGTERM, signal.SIGINT):
-                    previous_handlers[sig] = signal.signal(sig, lambda *_: setattr(self, "stop_requested", True))
+                    # A redeploy or launchd stop must not realise trades in a supervised live50 run;
+                    # an explicit `quantos stop` (stop.request), the deadline or KILL still close them.
+                    flag = "suspend_requested" if self.portfolio == "live50" else "stop_requested"
+                    previous_handlers[sig] = signal.signal(sig, lambda *_, f=flag: setattr(self, f, True))
             alerter, heartbeat = Alerter(self.state, notify=self.notify), Heartbeat(self.state)
             monitor = FeedMonitor(stale_seconds=60, startup_grace_seconds=120)
             for name in ("feed", "scan"): monitor.expect(name, now)
@@ -423,6 +427,13 @@ class Runtime:
                         with e.journal.transaction():
                             e.journal.event(now, "OBSERVATION_GAP", {"seconds": gap, "missed_scan_estimate": int(gap//30)})
                 last_wall, last_mono = now, mono
+                if self.suspend_requested:
+                    run.update(status="suspended", suspended_ms=now)
+                    atomic_json(run_file, run)
+                    for e in engines:
+                        with e.journal.transaction():
+                            e.journal.event(now, "SUSPENDED", {"active": len(e.active())})
+                    return 0
                 self.stop_requested = self.stop_requested or (self.state / "stop.request").exists()
                 finishing = self.stop_requested or now >= run["deadline_ms"]
                 if finishing:
