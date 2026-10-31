@@ -1,0 +1,20 @@
+{
+  "candidate_id": "s199-1656ba6e3f44",
+  "credible_edge": false,
+  "parameters": {
+    "calibration": {
+      "kind": "raw"
+    },
+    "max_ask": 0.75,
+    "max_pair_ask_cost": 1.01,
+    "min_ask": 0.1,
+    "min_net_edge": 0.02,
+    "min_probability": 0.65,
+    "momentum": "none",
+    "snapshot_seconds": 60,
+    "trade_size": 2.0
+  },
+  "selected_on": "train_and_validation_only",
+  "source_model": "frozen_s199",
+  "test_evaluated_once": true
+}

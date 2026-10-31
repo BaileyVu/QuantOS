@@ -1,0 +1,52 @@
+{
+ "rule_id": "weather_rule_v1",
+ "frozen_at_utc": "2026-10-21T06:05:33Z",
+ "universe": "Polymarket 'highest temperature in <city> on <date>' events, closed, end date within the 46 days before 2026-10-21; all 51 city series",
+ "truth": "official winning bucket (outcomePrices). Station = the one named in the event description (ICAO from weather.gov site= or Wunderground URL; Hong Kong Observatory for HK)",
+ "split": "events sorted by local date; dates <= median date = CALIBRATION (first half), later dates = EVALUATION (second half). No PnL is computed on calibration events.",
+ "decision_times_hours_before_local_day_end": [
+  36,
+  24,
+  12,
+  6
+ ],
+ "forecast": {
+  "source": "Open-Meteo previous-runs API (best_match), hourly temperature_2m_previous_dayN at the station lat/lon, daily max over the local calendar day",
+  "no_lookahead_rule": "use N = ceil((L + 6) / 24) for decision lead L hours (N=1 for L=6,12; N=2 for L=24,36): every hourly value used was issued >= 6h before the decision time, assuming the previous_dayN value for hour h comes from a run initialised about 24*N hours before h",
+  "units": "converted to the market unit (F or C)"
+ },
+ "error_model": {
+  "fit_on": "calibration half only",
+  "truth_proxy": "midpoint of the winning bucket (open-ended buckets: edge -/+ 1 unit)",
+  "bias": "per city and per N: mean(forecast - truth)",
+  "sigma": "per N pooled over cities: stdev of (forecast - bias - truth), floor 0.8 unit",
+  "distribution": "Normal(forecast - bias, sigma); bucket probability integrates over [lo - 0.5, hi + 0.5) to reflect whole-degree rounding; open-ended buckets integrate to +/- infinity; probabilities renormalised to sum to 1"
+ },
+ "strategy": {
+  "price_proxy": "last CLOB /prices-history point (fidelity 60) at or before the decision time for the bucket YES token",
+  "entry_price": "price_proxy + 0.01 slippage",
+  "fee": "shares * rate * p * (1 - p) from the market feeSchedule (rate defaults to 0.05 if missing)",
+  "entry_condition": "model_prob - entry_price >= 0.10 and entry_price <= 0.60 and entry_price >= 0.02",
+  "stake_usd": 10,
+  "max_trades_per_bucket": 1,
+  "first_qualifying_decision_time_wins": true,
+  "payout": "$1 per share if bucket won, else 0"
+ },
+ "report": [
+  "trades",
+  "win rate",
+  "total PnL",
+  "PnL/trade",
+  "ROI",
+  "by lead time",
+  "by city",
+  "bootstrap 95% CI resampling events",
+  "calibration table (model prob deciles vs realized)",
+  "share of traded buckets with total volume >= $1,000 (proxy for $10-$50 fill capacity)"
+ ],
+ "look_ahead_checks": [
+  "forecast issue time vs decision time (rule above)",
+  "price proxy strictly <= decision time",
+  "archive (ERA5) daily max at station vs official bucket for label mismatch rate"
+ ]
+}

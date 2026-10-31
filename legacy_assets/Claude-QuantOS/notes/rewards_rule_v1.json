@@ -1,0 +1,20 @@
+{
+  "rule_id": "rewards_rule_v1",
+  "frozen_at_utc": "2026-10-20T03:44:42Z",
+  "evaluation_window": {"from_utc": "2026-10-20T03:44:42Z", "to": "end of pm_rewards_shadow run (PID 5916, ~2026-10-20T17:44Z)"},
+  "universe": "markets present in data/pm_rewards_shadow.jsonl during the evaluation window",
+  "include_if_all": {
+    "daily_reward_pool_usd_max": 200,
+    "vol_5m_cents_max": 0.6,
+    "vol_definition": "stdev of 5-minute changes in YES mid, in cents, computed ONLY from shadow rows before frozen_at_utc (markets added later: first 60 minutes of their own rows, which are then excluded from evaluation)",
+    "min_days_to_resolution": 1,
+    "days_to_resolution_definition": "market end date (end_date_iso) minus frozen_at_utc; markets with no end date are excluded",
+    "exclude_keywords_in_slug_or_question": ["iran", "israel", "hormuz", "ceasefire", "war", "strike", "missile", "attack", "military", "invade", "invasion", "troops", "nuclear", "russia", "ukraine", "putin", "zelensky", "zelenskyy", "gaza", "hamas", "hezbollah", "houthi", "china-taiwan", "taiwan", "north-korea", "kim-jong-un", "regime", "coup", "curfew", "emergency", "protest", "riot", "sanction", "tariff", "election", "senate", "president", "trump", "breaking", "announce"]
+  },
+  "fill_models": {
+    "A_book_cross": "fill when next snapshot best ask <= our prior bid (or best bid >= our prior ask), as recorded by the shadow",
+    "B_trade_print": "fill whenever a public trade prints at or through our resting level in the minute after we quote (YES-equivalent price; full quote size filled), in addition to A; inventory marked to mid"
+  },
+  "metrics": ["est_rewards_usd", "inventory_pnl_usd", "net_usd", "fills", "avg_markout_5m_30m", "usd_quoted"],
+  "notes": "Frozen before looking at further data. Keyword list is deliberately broad (excludes tariff/election/senate/president/announce markets too). Rewards estimate assumes quotes at best bid/ask with full queue credit."
+}

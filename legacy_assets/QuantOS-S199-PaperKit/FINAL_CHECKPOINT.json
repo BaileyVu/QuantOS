@@ -1,0 +1,111 @@
+{
+  "system": "S199 standalone paper engine",
+  "generated_utc": "2026-10-19T04:32:00Z",
+  "decision": "ENGINEERING_GO_RESCUE_CHANGE_EMPIRICALLY_REJECTED",
+  "paper_only": true,
+  "engineering": {
+    "standalone_integrated_engine": {"status": "PASS", "note": "Gamma/CLOB/Binance public data to virtual fill and official settlement"},
+    "book_health_and_recovery": {"status": "PASS", "note": "Current BTC five-minute markets only; valid two-token snapshots required; stale/empty/crossed books fail closed; per-token failures never reconnect the entire WebSocket; unavailable tokens are pruned; each market receives one persistent final evaluation or explicit rejection"},
+    "fees_and_sizing": {"status": "PASS", "note": "Actual frozen policy is unchanged: token-specific fee endpoint, Decimal five-place fees, two-share base target, venue minimum, depth, partial fill and slippage checks"},
+    "restart_safe_account": {"status": "PASS", "note": "SQLite WAL, fixed experiment identity, deterministic fill and settlement IDs, deduplication; market/shadow evaluations and shadow settlements are exactly once"},
+    "risk_controls": {"status": "PASS", "initial_cash": 200, "max_open_risk": 6, "daily_loss_stop": 1.2, "note": "Actual daily risk includes unresolved cost at worst case; rejected five-share rescue policy cannot place virtual fills"},
+    "official_settlement": {"status": "PASS", "note": "Closed UP/DOWN price plus Chainlink/Data Streams/TWAP methodology required for both actual and shadow settlement"},
+    "shutdown_and_diagnostics": {"status": "PASS", "note": "SIGINT/SIGTERM, atomic status, fsynced JSONL diagnostics; retry spam replaced by one persistent per-market completion/rejection"},
+    "public_live_smoke": {
+      "status": "PASS",
+      "duration_seconds": 75,
+      "runtime": "runtime/rescue-smoke-final-20261019",
+      "rollovers": 1,
+      "old_tokens_unsubscribed": 2,
+      "new_tokens_subscribed": 2,
+      "healthy_current_markets_at_end": 1,
+      "gamma": true,
+      "clob_snapshot": true,
+      "polymarket_websocket": true,
+      "binance_websocket": true,
+      "websocket_reconnects": 0,
+      "clob_404": 0,
+      "virtual_fills": 0,
+      "cash": 200,
+      "shutdown": "clean",
+      "note": "The smoke began in the closing seconds of an old market, persisted its unavailable windows as missed, pruned it at expiry, updated the existing WebSocket subscription in place, immediately obtained valid REST snapshots for both new tokens, and ended with fresh UP/DOWN books and all feeds healthy. No label or evaluation was fabricated."
+    },
+    "tests": {"status": "PASS", "passed": 32, "failed": 0, "doctor_exit_code": 0, "coverage": ["expired-token 404", "valid live tokens", "empty/crossed books", "WebSocket reconnect", "market rollover", "dynamic venue minimum shadow sizing", "shadow restart/exactly-once settlement", "single per-market rejection"]},
+    "wallet_signing_live_orders": {"status": "PASS", "enabled": false},
+    "entrypoint": {"status": "PASS", "path": "./run_s199.sh", "commands": ["doctor", "paper", "status", "stop", "report"]}
+  },
+  "strategy": {
+    "conclusion": "NO_EDGE",
+    "observations": 122,
+    "partition": {"train": 73, "validation": 24, "untouched_test": 25, "chronological": true},
+    "candidate_grid": {
+      "total": 144,
+      "eligible": 12,
+      "calibration": ["raw", "75% shrinkage", "train-only Platt"],
+      "net_edge_thresholds": [0.02, 0.04, 0.06, 0.08],
+      "max_ask": [0.65, 0.75],
+      "pair_cost": [1.01, 1.02],
+      "momentum": ["none", "aligned", "reject_both_opposed"],
+      "selection_control": "validation score subtracts a max-selection penalty over the predeclared grid"
+    },
+    "frozen_candidate": {
+      "candidate_id": "s199-1656ba6e3f44",
+      "source_model": "frozen_s199",
+      "calibration": {"kind": "raw"},
+      "trade_size": 2.0,
+      "snapshot_seconds": 60,
+      "min_net_edge": 0.02,
+      "min_ask": 0.1,
+      "max_ask": 0.75,
+      "min_probability": 0.65,
+      "max_pair_ask_cost": 1.01,
+      "momentum": "none"
+    },
+    "train": {"net_pnl": 3.27842, "trades": 5, "max_drawdown": 0.0, "brier": 0.06707884013698631},
+    "validation": {"net_pnl": 0.06268, "trades": 3, "max_drawdown": 1.46118, "brier": 0.14828222291666668},
+    "untouched_test": {"net_pnl": 0.0, "trades": 0, "max_drawdown": 0.0, "brier": 0.1006728876, "mean_trade_pnl_ci95": null},
+    "frozen_original_test": {"net_pnl": 0.0, "trades": 0, "max_drawdown": 0.0, "brier": 0.1006728876},
+    "market_probability_test_brier": 0.10566058419347764,
+    "test_evaluated_once": true
+  },
+  "rescue_20261019": {
+    "decision": "EMPIRICAL_REJECTION_RETAIN_FROZEN_POLICY",
+    "official_checker": {"path": "runtime/rescue-official-check-20261019/S199_17_outcome_summary.json", "verified": 0, "unknown": 17, "reason": "The included checker queried the collection endpoint, which returned no matching slug rows; its UNKNOWN labels were preserved and not converted."},
+    "official_v2_crosscheck": {
+      "path": "runtime/rescue-v2-crosscheck-20261019/S199_RESCUE_OUTCOME_RECONCILIATION.json",
+      "label_rule": "Existing V2 event endpoint/parser: exactly one closed market, exact 1/0 Up/Down prices, and Chainlink/Data Streams/TWAP methodology",
+      "candidates": 17,
+      "verified": 17,
+      "unknown": 0,
+      "wins": 14,
+      "losses": 3,
+      "win_rate": 0.8235294117647058,
+      "win_rate_wilson_ci95": [0.5897054143116588, 0.9380887336237901],
+      "hypothetical_net_pnl_usd": 0.4885,
+      "bootstrap_total_pnl_ci95_usd": [-15.70525, 15.0093],
+      "model_brier_selected_side": 0.155847916254277,
+      "market_brier_selected_side": 0.15359123529411767,
+      "cost_assumption": "Five shares at the logged ask using inferred_cost_per_share from the overnight evidence, including its logged fee/slippage adjustment",
+      "evidence_status": "POST_HOC_NOT_HOLDOUT"
+    },
+    "rejection_rationale": "The post-hoc screen produced only $0.4885 across 17 hypothetical five-share trades, the bootstrap interval spans substantial loss and gain, and market-implied probabilities had slightly lower Brier error. This does not justify raising the actual maximum ask, pair-cost ceiling, or order size.",
+    "actual_policy_changed": false,
+    "read_only_forward_shadows": {
+      "horizons_seconds": [120, 60],
+      "policies": {
+        "current": "Archived frozen policy, read-only mirror",
+        "rescue": "Ask 0.10-0.85; pair cost <=1.02; selected probability >=0.65; token-fee-adjusted edge >=0.02; visible best-ask size >=5; target=max(5, venue minimum); <=$6 hypothetical debit"
+      },
+      "execution": "No fills and no effect on cash, exposure, daily loss budget, or actual strategy decisions",
+      "settlement": "Official TWAP-consistent V2 label parser; UNKNOWN remains unresolved"
+    }
+  },
+  "limitations": [
+    "The 122 archived observations and 17 post-hoc rescue candidates are exploratory and too small to establish profitability.",
+    "The rescue candidates were selected after observing overnight logs and are not an untouched holdout.",
+    "The included official checker could not resolve historical slugs through its collection endpoint; the reported labels come from the existing stricter V2 event endpoint/parser, with raw responses retained.",
+    "A live venue minimum above two shares causes the actual frozen policy to fail closed; the two-share risk cap is not relaxed.",
+    "Forward 120-second and 60-second shadows require a valid initial snapshot and causal BTC history; missed windows are persisted explicitly rather than imputed."
+  ],
+  "next_action": "Run the unchanged frozen candidate paper-only for 24 hours while collecting the current-versus-rescue 120-second and 60-second shadows; do not interpret this as permission for live-money trading."
+}
