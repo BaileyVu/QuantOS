@@ -74,6 +74,22 @@ MANIFESTS = (
               ('near_atr','1'),('target_r','1.5'),('maximum_hold_hours','72'),
               ('major_swing_fib_filter','false'),('margin_asset','USDT')),
              'CANDIDATE_UNVERIFIED', status='candidate'),
+    Manifest('crash_flush_e2', 'paper-usdc-1.1.0', 'crash_reversal',
+             'crash_flush_e2 research rule mapped to USDC perps; tolerant OI repair rule',
+             '1h', 'MARKET', 'time', 86400,
+             (('oi_change_hours','4'),('oi_z_window_hours','720'),('oi_z_threshold','-2'),
+              ('oi_mode','tolerant'),('oi_min_coverage','0.9'),
+              ('drawdown_24h','0.08'),('stop_fraction','0.25'),('holding_hours','24'),
+              ('cooldown_hours','24'),('signal_source','USDC candles + USDT twin OI'),
+              ('margin_asset','USDC')),
+             'PROMOTED_PAPER_UNVERIFIED', status='promoted'),
+    Manifest('alt_dip_reversal', 'paper-usdc-1.1.0', 'cross_sectional_reversal',
+             'alt_dip_reversal research rule mapped to USDC perps; USDT-calibrated quarterly cutoff',
+             '1h', 'MARKET', 'time', 86400,
+             (('calibration_days','90'),('embargo_days','3'),('cutoff_quantile','0.01'),
+              ('holding_hours','24'),('stop_fraction','0.25'),
+              ('signal_source','USDC candles + USDT-universe cutoff'),('margin_asset','USDC')),
+             'PROMOTED_PAPER_UNVERIFIED', status='promoted'),
 )
 
 

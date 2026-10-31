@@ -87,7 +87,7 @@ class PaperEngine:
     def account(self, now_ms):
         equity = self.journal.cash()
         gross = margin = long_risk = short_risk = D(0)
-        symbols = []
+        symbols, strategies = [], []
         for o in self.active():
             q = self.quotes.get(o["signal"]["symbol"])
             mark = q.mark if q else D(o["last_mark"])
@@ -103,8 +103,9 @@ class PaperEngine:
             if o["signal"]["side"] == "LONG": long_risk += reserved_risk
             else: short_risk += reserved_risk
             symbols.append(o["signal"]["symbol"])
+            strategies.append(o["signal"]["strategy_id"])
         day = datetime.fromtimestamp(now_ms / 1000, timezone.utc).date().isoformat()
-        high = max(D(self.journal.get("high_water", "200")), equity)
+        high = max(D(self.journal.get("high_water", self.journal.get("identity")["initial_balance"])), equity)
         self.journal.set("high_water", str(high))
         if self.journal.get("day") != day:
             self.journal.set("day", day)
@@ -112,7 +113,7 @@ class PaperEngine:
         return Account(equity, D(self.journal.get("day_equity")), high,
                        len(self.active()), self.connected and self.journal.get("reconciled", False),
                        bool(self.journal.get("paused", False)),
-                       gross, margin, long_risk, short_risk, tuple(symbols))
+                       gross, margin, long_risk, short_risk, tuple(symbols), tuple(strategies))
 
     def recover(self, now_ms):
         """Verify durable fill totals and restore known protection before new entries."""
@@ -301,7 +302,7 @@ class PaperEngine:
         if self.journal.db.execute("SELECT 1 FROM fills WHERE id=?", (fill_id,)).fetchone():
             return
         fee = price * quantity * (self.policy.maker_fee if maker else self.policy.taker_fee)
-        if self.policy.candidates_enabled:
+        if self.policy.candidates_enabled or self.policy.max_positions > 1:
             # Recheck the *whole* reserved portfolio at execution, including
             # pending intents and immediate entry fee/mark-to-market loss.
             account = self.account(now_ms)

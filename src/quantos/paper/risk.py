@@ -68,6 +68,42 @@ class ResearchPolicy(Policy):
     candidates_enabled = True
 
 
+EVENT_STRATEGIES = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17"})
+
+
+def strategy_slot(strategy_id: str) -> str:
+    return "event" if strategy_id in EVENT_STRATEGIES else "trend"
+
+
+@dataclass(frozen=True)
+class LivePolicy(Policy):
+    """$50 USDC run: reserved event slots, minimum-notional bump, tighter breakers.
+
+    A trade whose risk budget is below the exchange minimum is lifted to the
+    smallest compliant quantity only if that quantity risks at most
+    `bump_max_risk` of equity (and fits every other cap); otherwise it is
+    skipped with the required notional and risk recorded.
+    """
+    risk_fraction: Decimal = D(".02")
+    daily_loss: Decimal = D(".06")
+    drawdown: Decimal = D(".20")
+    bump_max_risk: Decimal = D(".03")
+    portfolio_risk_fraction: Decimal = D(".03")
+    notional_headroom: Decimal = D(".02")
+
+    max_positions = 3
+    slots = (("event", 2), ("trend", 1))
+    enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17",
+                                    "tsmom_4h", "turtle_55", "vol_squeeze_breakout"})
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not 0 < self.bump_max_risk <= D(".05") or not self.risk_fraction <= self.portfolio_risk_fraction <= D(".05"):
+            raise ValueError("hard ceiling: bump or portfolio risk")
+        if sum(n for _, n in self.slots) != self.max_positions:
+            raise ValueError("slots must add up to max_positions")
+
+
 def portfolio_risk_caps(policy: Policy) -> tuple[Decimal, Decimal]:
     """Frozen same-direction and total fractions; independent of signal order."""
     base = getattr(policy, "portfolio_risk_fraction", D(0)) or policy.risk_fraction
@@ -87,6 +123,7 @@ class Account:
     long_risk: Decimal = D(0)
     short_risk: Decimal = D(0)
     open_symbols: tuple[str, ...] = ()
+    open_strategies: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -101,6 +138,7 @@ class Decision:
     leverage: Decimal = D(0)
     effective_leverage: Decimal = D(0)
     binding_constraint: str = ""
+    detail: str = ""
 
 
 def quantity_step(instrument: Instrument) -> Decimal:
@@ -127,6 +165,14 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
         return reject("UNRECONCILED_OR_PAUSED")
     if account.active_orders >= policy.max_positions:
         return reject("EXISTING_EXPOSURE")
+    enabled = getattr(policy, "enabled_strategies", None)
+    if enabled is not None and signal.strategy_id not in enabled:
+        return reject("STRATEGY_DISABLED")
+    slots = dict(getattr(policy, "slots", ()))
+    if slots:
+        slot = strategy_slot(signal.strategy_id)
+        if sum(strategy_slot(s) == slot for s in account.open_strategies) >= slots.get(slot, 0):
+            return reject(f"SLOT_FULL_{slot.upper()}")
     if account.active_orders < 0:
         return reject("INVALID_EXPOSURE")
     exposure = (account.gross_notional, account.margin_used, account.long_risk, account.short_risk)
@@ -168,7 +214,7 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     if manifest and manifest.status == "candidate" and not policy.candidates_enabled:
         return reject("CANDIDATE_RESEARCH_ONLY")
     hold_ceiling = 259200 if manifest and manifest.timeframe == "4h" else 14400
-    if manifest and manifest.status == "candidate" and policy.candidates_enabled:
+    if manifest and (manifest.status == "promoted" or manifest.status == "candidate" and policy.candidates_enabled):
         hold_ceiling = min(259200, manifest.maximum_hold_seconds)
     no_target = bool(manifest and manifest.exit_model in {"trailing", "channel", "time"})
     if not 1 <= signal.maximum_hold_seconds <= hold_ceiling:
@@ -208,7 +254,9 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     if not no_target and (abs(target - entry) - costs) / unit_loss < policy.min_net_rr:
         return reject("NET_REWARD_RISK")
     budget = account.equity * policy.risk_fraction
-    if policy.candidates_enabled:
+    shared = policy.candidates_enabled or policy.max_positions > 1
+    risk_room = budget
+    if shared:
         # All same-direction positions share a risk bucket, even if a noisy
         # historical correlation estimate would call them independent.
         used = account.long_risk if signal.side == "LONG" else account.short_risk
@@ -216,6 +264,7 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
         direction_budget = account.equity * direction_cap - used
         total_budget = account.equity * total_cap - account.long_risk - account.short_risk
         budget = min(budget, direction_budget, total_budget)
+        risk_room = min(direction_budget, total_budget)
         if budget <= 0:
             return reject("PORTFOLIO_RISK_CAP")
     # Reserve both adverse price movement and entry costs inside the gross cap.
@@ -227,14 +276,27 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
               "margin": margin_capacity / (max_entry / safe + costs),
               "exchange_max": min(instrument.max_qty, instrument.market_max_qty)}
     binding = min(bounds, key=bounds.get)
-    quantity = floor_step(bounds[binding], quantity_step(instrument))
-    if (quantity <= 0 or quantity < max(instrument.min_qty, instrument.market_min_qty)
-            or quantity * entry < instrument.min_notional):
-        return reject("BELOW_EXCHANGE_MINIMUM")
+    step = quantity_step(instrument)
+    quantity = floor_step(bounds[binding], step)
+    minimum_qty = max(instrument.min_qty, instrument.market_min_qty)
+    headroom = 1 + getattr(policy, "notional_headroom", D(0))
+    if (quantity <= 0 or quantity < minimum_qty
+            or quantity * entry < instrument.min_notional * headroom):
+        bump_cap = getattr(policy, "bump_max_risk", None)
+        need = max(minimum_qty, instrument.min_notional * headroom / entry)
+        need = -floor_step(-need, step)  # round up to a whole step
+        need_risk = need * unit_loss
+        detail = (f"required_qty={need} required_notional={need * entry:.2f} "
+                  f"required_risk={need_risk / account.equity:.4f}")
+        others = min(v for k, v in bounds.items() if k != "risk")
+        if (bump_cap is None or need > others
+                or need_risk > min(account.equity * bump_cap, risk_room)):
+            return Decision(False, "BELOW_EXCHANGE_MINIMUM", detail=detail)
+        quantity, binding, budget = need, "EXCHANGE_MINIMUM_BUMP", need_risk
     notional = quantity * entry
     # Leverage decision, step 2: the lowest leverage that fits the margin budget, so unused leverage
     # never shortens the distance to liquidation and free margin stays available.
-    leverage_capacity = (margin_capacity - quantity * costs if policy.candidates_enabled
+    leverage_capacity = (margin_capacity - quantity * costs if shared
                          else account.equity * policy.margin_fraction)
     if leverage_capacity <= 0:
         return reject("INSUFFICIENT_MARGIN")

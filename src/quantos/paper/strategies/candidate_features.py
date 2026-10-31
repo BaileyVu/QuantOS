@@ -255,3 +255,43 @@ def confirmed_swing_pivots(bars: tuple[Candle, ...], left: int = 2,
         if all(pivot.low < x.low for x in (*left_bars, *right_bars)):
             out.append(SwingPivot(pivot.close_ms, right_bars[-1].close_ms, "low", pivot.low))
     return tuple(out)
+
+
+OI_MIN_COVERAGE = D("0.9")
+
+
+def oi_value_4h_change_zscore_tolerant(observations: tuple[TimedValue, ...],
+                                       window_hours: int = 720,
+                                       min_coverage: Decimal = OI_MIN_COVERAGE
+                                       ) -> TimedValue | None:
+    """Latest 4h OI-value change z-score that tolerates isolated bad rows.
+
+    Repair rule (paper-usdc-1.1.0, causal): a non-positive, non-finite or
+    off-hour observation is treated as missing instead of invalidating the
+    whole window. A 4h change exists only where both endpoints are valid. The
+    latest observation and its t-4h endpoint must be valid. The z-score uses
+    the valid changes among the `window_hours` hours strictly before t and
+    needs at least `min_coverage` of them. Only values at or before t are
+    used, so no future data enters. On a gap-free series it equals
+    `oi_value_4h_change_zscore(...)[-1]`.
+    """
+    if window_hours <= 0 or not observations:
+        return None
+    valid = {o.time_ms: o.value for o in observations
+             if o.time_ms % HOUR_MS == 0 and o.value.is_finite() and o.value > 0}
+    t = observations[-1].time_ms
+    if t not in valid or t - 4 * HOUR_MS not in valid:
+        return None
+
+    def change(at):
+        prior = valid.get(at - 4 * HOUR_MS)
+        return None if at not in valid or prior is None else valid[at] / prior - 1
+
+    prior = [c for c in (change(t - k * HOUR_MS) for k in range(1, window_hours + 1)) if c is not None]
+    if D(len(prior)) < min_coverage * D(window_hours):
+        return None
+    mean = sum(prior, D(0)) / D(len(prior))
+    variance = sum(((x - mean) ** 2 for x in prior), D(0)) / D(len(prior))
+    if variance == 0:
+        return None
+    return TimedValue(t, (change(t) - mean) / variance.sqrt())
