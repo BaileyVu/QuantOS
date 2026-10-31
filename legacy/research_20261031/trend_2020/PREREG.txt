@@ -1,0 +1,18 @@
+PRE-REGISTRATION trend_2020 / tsmom_4h_v2  (2026-10-31, written before any run)
+Reference: QuantOS-mainnet-ready/src/quantos/paper/strategies/tsmom_4h.py + manifest: signal on 4h close: LONG if close/close[-181]-1 > 0 AND EMA50 slope (EMA_t - EMA_{t-1}) > 0; SHORT if both < 0.
+ ATR(14) Wilder, stop = signal close -/+ 2 ATR, MARKET entry, trailing (activate when favourable excursion >= 1R, new stop = best - 2R, tighten only; R = |entry-stop|), max hold 72h = 18 four-hour bars.
+Data: hourly OHLC of 29 USDT-M perps (edge_data/crash_episodes_2020) resampled CAUSALLY to 4h (UTC-aligned blocks of 4 hours; bar NaN if any hour missing; decision at bar close).
+BUILD 2020-01-01..2023-06-30 is the only period used for selection. HELD-OUT 2023-07-01..2024-12-31 is touched only for <=2 finalists + the current config, each ONCE. No 2025+ data.
+Fees: maker 0%, taker 0.04% (+ taker slippage 0.05% BTC/ETH, 0.10% others; maker slippage 0); STRESS maker 0.02%, taker 0.05%. Stops/time exits taker (stop level or worse open on gap), checked on 4h high/low, stop first.
+Sweep (288 = 3x2x2x2x3x2x2), full factorial:
+ return lookback L bars {90,180,360} (signal ret = C[i]/C[i-L]-1); trend filter EMA {50,100} slope; stop {2,3} ATR; trailing {none, current (1R / 2R)};
+ side {long-only; "lf" = longs always + shorts only when BTC close < EMA200(4h); both}; vol targeting {off (weight 1), on (weight = min(3, 0.01/ATR%) with ATR% = ATR14/close at signal)};
+ entry {market at next open; maker limit at signal close -/+ 0.25 ATR valid 2 bars (fills if later bar trades through by 1 tick = 1e-5; fill at limit; unfilled = missed, slot held until expiry)}.
+ Limit-entry stop and ATR from signal bar; R from fill price; limit fill bar: stop checked, trail best not updated on that bar. Time exit 18 bars after fill at next-bar open.
+ Portfolio: max 5 concurrent positions, one per symbol; at each bar candidates ranked by |return| desc fill free slots. Trade pnl unit = weight x net return (per 1x notional).
+ Reference row = (L=180, EMA50, stop 2, trail current, both, vol off, market) = the current production config, inside the grid (not an extra trial).
+Metrics per variant: trades, mean pnl bp/trade, 90% week-block bootstrap CI (week of fill), stress mean, max DD ($10 notional per unit slot, 5 slots on $50), stop share, placebo pct, DSR.
+DSR: per-trade SR of pnl units; SR variance = variance across the 288 variants; N = search_ledger.jsonl line count after my lines + 81 CCI. SR0 formula as before; DSR>0 means SR>SR0.
+Placebo: per exit-config pool of random (symbol, bar, side) trades in the BUILD window with the same entry/exit mechanics (no concurrency cap); sample as many trades as the variant 200 seeds; side restricted like the variant; percentile = share of seeds below real mean.
+FINALIST RULE: DSR>0 at N AND BUILD CI lower bound > 0 AND stress mean >= 0 AND >= 200 trades AND placebo pct > 90 AND every one-step neighbour (axes ordered: L, EMA, stop, trail, side [long, lf, both], vol, entry) has mean > 0. Rank by DSR, at most 2.
+Each finalist then runs ONCE on HELD-OUT with the current config alongside. If a finalist beats current on HELD-OUT with CI lower bound > 0, a Forward-test spec (rule + 5% risk sizing) is written. Otherwise tsmom_4h_v2 stays `dead` (or `idea` if nothing ran).

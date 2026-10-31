@@ -1,0 +1,14 @@
+[strategy]
+id = "alt_dip_reversal"
+version = "research-1.0.0"
+
+[parameters]
+calibration_days = "90"
+embargo_days = "3"
+cutoff_quantile = "0.01"
+quantile_grid = "0.005,0.01"
+holding_hours = "24"
+holding_grid_hours = "12,24,72"
+stop_fraction = "0.25"
+stop_sensitivity_only = "0.15"
+margin_asset = "USDT"

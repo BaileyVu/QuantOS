@@ -9,9 +9,11 @@ from .types import D, dumps
 
 
 class Journal:
-    def __init__(self, path: Path, profile: str, evidence: str = "natural"):
-        if profile not in {"p1", "p5", "pA"} or evidence not in {"natural", "synthetic", "replay"}:
+    def __init__(self, path: Path, profile: str, evidence: str = "natural", initial_balance=None):
+        if profile not in {"p1", "p5", "pA", "pR", "pL", "pL5"} or evidence not in {"natural", "synthetic", "replay"}:
             raise ValueError("invalid journal identity")
+        if initial_balance is not None and (not D(str(initial_balance)).is_finite() or D(str(initial_balance)) <= 0):
+            raise ValueError("invalid initial balance")
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path, self.profile = path, profile
         self.db = sqlite3.connect(path, timeout=10)
@@ -32,8 +34,11 @@ class Journal:
                 time_ms INTEGER NOT NULL, amount TEXT NOT NULL);
         ''')
         with self.transaction():
+            previous = self.get("identity")
+            if initial_balance is None:  # reopen with the stored balance; new journals default to 200
+                initial_balance = previous["initial_balance"] if isinstance(previous, dict) else "200"
             identity = {"profile": profile, "evidence": evidence, "schema": 1,
-                        "initial_balance": "200", "margin_asset": "USDC"}
+                        "initial_balance": str(initial_balance), "margin_asset": "USDT" if profile == "pR" else "USDC"}
             previous = self.get("identity")
             if previous is not None and previous != identity:
                 raise ValueError("journal identity mismatch")
@@ -72,7 +77,7 @@ class Journal:
                         (order["id"], dumps(order)))
 
     def cash(self) -> Decimal:
-        cash = D("200")
+        cash = D(self.get("identity")["initial_balance"])
         for row in self.db.execute("SELECT fee,pnl FROM fills"):
             cash += D(row["pnl"]) - D(row["fee"])
         for row in self.db.execute("SELECT amount FROM funding"):

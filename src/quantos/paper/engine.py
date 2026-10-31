@@ -6,7 +6,7 @@ import json
 from decimal import InvalidOperation
 
 from .journal import Journal
-from .risk import Account, Policy, evaluate, valid_quote, quantity_step
+from .risk import portfolio_risk_caps, Account, Policy, evaluate, valid_quote, quantity_step
 from .types import D, Funding, Instrument, Quote, Signal, Trade, floor_step
 from .strategies.manifest import manifest_for
 
@@ -46,6 +46,15 @@ class PaperEngine:
         self.faults = faults or Faults()
         self.quotes: dict[str, Quote] = {}
         self.connected = False
+        if (journal.profile == "pR") != policy.candidates_enabled:
+            raise ValueError("research policy requires a separate pR journal")
+        if policy.candidates_enabled:
+            frozen = json.loads(json.dumps(asdict(policy), default=str, sort_keys=True))
+            with journal.transaction():
+                previous = journal.get("research_policy")
+                if previous is not None and previous != frozen:
+                    raise ValueError("research policy changed; use a new state directory")
+                journal.set("research_policy", frozen)
 
     def active(self):
         return [o for o in self.journal.orders() if o["state"] not in TERMINAL]
@@ -75,22 +84,49 @@ class PaperEngine:
             self.journal.save(o)
         if first: self.journal.event(now_ms, "LOSS_BREAKER", {"equity": str(account.equity)})
 
+    def kill(self, now_ms, reason="KILL_SWITCH"):
+        """Pause entries, cancel pending intents and close every filled position."""
+        with self.journal.transaction():
+            first = self.journal.get("paused") != reason
+            self.journal.set("paused", reason)
+            for o in self.active():
+                if D(o["filled"]) > 0 and o["state"] != "CLOSING":
+                    self._closing(o, now_ms, reason)
+                elif o["state"] != "CLOSING":
+                    self._cancel(o, now_ms, reason)
+                self.journal.save(o)
+            if first: self.journal.event(now_ms, reason, {})
+
     def account(self, now_ms):
         equity = self.journal.cash()
+        gross = margin = long_risk = short_risk = D(0)
+        symbols, strategies = [], []
         for o in self.active():
             q = self.quotes.get(o["signal"]["symbol"])
+            mark = q.mark if q else D(o["last_mark"])
             if D(o["filled"]) > 0:
-                mark = q.mark if q else D(o["last_mark"])
                 equity += D(o["filled"]) * (mark - D(o["average"])) * D(o["direction"])
+            # Pending entries reserve capital too. Initial risk is retained
+            # until quantity leaves the account, even after a stop tightens.
+            reserved_qty = D(o["filled"]) + D(o["remaining"])
+            notional = reserved_qty * max(mark, D(o["signal"]["entry_price"]))
+            gross += notional
+            margin += notional / D(o["decision"]["leverage"])
+            reserved_risk = D(o["decision"]["achievable_risk"]) * reserved_qty / D(o["quantity"])
+            if o["signal"]["side"] == "LONG": long_risk += reserved_risk
+            else: short_risk += reserved_risk
+            symbols.append(o["signal"]["symbol"])
+            strategies.append(o["signal"]["strategy_id"])
         day = datetime.fromtimestamp(now_ms / 1000, timezone.utc).date().isoformat()
-        high = max(D(self.journal.get("high_water", "200")), equity)
+        high = max(D(self.journal.get("high_water", self.journal.get("identity")["initial_balance"])), equity)
         self.journal.set("high_water", str(high))
         if self.journal.get("day") != day:
             self.journal.set("day", day)
             self.journal.set("day_equity", str(equity))
         return Account(equity, D(self.journal.get("day_equity")), high,
                        len(self.active()), self.connected and self.journal.get("reconciled", False),
-                       bool(self.journal.get("paused", False)))
+                       bool(self.journal.get("paused", False)),
+                       gross, margin, long_risk, short_risk, tuple(symbols), tuple(strategies))
 
     def recover(self, now_ms):
         """Verify durable fill totals and restore known protection before new entries."""
@@ -160,6 +196,11 @@ class PaperEngine:
                 return None
             self.journal.db.execute("INSERT INTO signals VALUES(?,?)", (signal.signal_id, now_ms))
             self.journal.event(now_ms, "SIGNAL", asdict(signal))
+            cooldowns = self.journal.get("entry_cooldowns", {})
+            if now_ms < cooldowns.get(f"{signal.strategy_id}:{signal.symbol}", 0):
+                self.journal.event(now_ms, "REJECTED_RISK", {
+                    "signal_id": signal.signal_id, "approved": False, "reason": "ENTRY_COOLDOWN"})
+                return None
             self.quotes[quote.symbol] = quote
             policy = self.policy
             if self.adaptive is not None:
@@ -273,12 +314,39 @@ class PaperEngine:
         fill_id = f"{o['id']}:ENTRY:{source}"
         if self.journal.db.execute("SELECT 1 FROM fills WHERE id=?", (fill_id,)).fetchone():
             return
+        fee = price * quantity * (self.policy.maker_fee if maker else self.policy.taker_fee)
+        if self.policy.candidates_enabled or self.policy.max_positions > 1:
+            # Recheck the *whole* reserved portfolio at execution, including
+            # pending intents and immediate entry fee/mark-to-market loss.
+            account = self.account(now_ms)
+            q = self.quotes.get(o["signal"]["symbol"])
+            mark = q.mark if q else D(o["last_mark"])
+            reserve_price = max(mark, D(o["signal"]["entry_price"]))
+            extra = quantity * max(D(0), price-reserve_price)
+            equity_after = account.equity-fee + quantity*(mark-price)*D(o["direction"])
+            gross_after = account.gross_notional + extra
+            margin_after = account.margin_used + extra/D(o["decision"]["leverage"])
+            if (equity_after <= 0 or gross_after > equity_after*self.policy.gross_fraction
+                    or margin_after > equity_after):
+                self._cancel(o, now_ms, "FILL_EXCEEDS_PORTFOLIO_CAP")
+                return
+            direction_cap, total_cap = portfolio_risk_caps(self.policy)
+            used_direction = account.long_risk if D(o["direction"]) > 0 else account.short_risk
+            if (used_direction > equity_after * direction_cap
+                    or account.long_risk + account.short_risk > equity_after * total_cap):
+                self._cancel(o, now_ms, "FILL_EXCEEDS_PORTFOLIO_RISK_CAP")
+                return
         old = D(o["filled"])
         o["average"] = str((D(o["average"]) * old + price * quantity) / (old + quantity))
         o["filled"] = str(old + quantity)
         o["remaining"] = str(D(o["remaining"]) - quantity)
         o["first_fill_ms"] = o["first_fill_ms"] or now_ms
-        fee = price * quantity * (self.policy.maker_fee if maker else self.policy.taker_fee)
+        if old == 0 and o["signal"]["strategy_id"] in {"crash_flush_e2", "alt_dip_reversal"}:
+            cooldowns = self.journal.get("entry_cooldowns", {})
+            seconds = (86400 if o["signal"]["strategy_id"] == "crash_flush_e2"
+                       else o["signal"]["maximum_hold_seconds"])
+            cooldowns[f'{o["signal"]["strategy_id"]}:{o["signal"]["symbol"]}'] = now_ms + seconds*1000
+            self.journal.set("entry_cooldowns", cooldowns)
         self.journal.db.execute("INSERT INTO fills VALUES(?,?,?,?,?,?,?,?)",
                                (fill_id, o["id"], now_ms, "ENTRY", str(quantity), str(price), str(fee), "0"))
         o["state"] = "FILLED" if D(o["remaining"]) == 0 else "PARTIAL"
@@ -422,7 +490,8 @@ class PaperEngine:
                                 self._cancel(o, now_ms, "INVALID_BRACKET")
                             elif s["take_profit"] is None and costs > D(".25")*distance:
                                 self._cancel(o, now_ms, "COSTS_TOO_HIGH_FOR_STOP")
-                            elif fill_risk > D(o["decision"]["achievable_risk"]):
+                            elif fill_risk > (max(D(o["decision"]["achievable_risk"]), D(o["decision"]["requested_risk"]))
+                                              if hasattr(self.policy, "risk_headroom") else D(o["decision"]["achievable_risk"])):
                                 self._cancel(o, now_ms, "FILL_EXCEEDS_APPROVED_RISK")
                             else:
                                 self._entry_fill(o, quantity, price, now_ms, f"quote-{q.time_ms}", False)

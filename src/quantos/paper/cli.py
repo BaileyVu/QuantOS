@@ -31,16 +31,27 @@ def parser():
         if name in {"start", "install-service"}:
             cmd.add_argument("--min-quote-volume", type=_quote_volume, default=D("20000000"))
         if name == "start": cmd.add_argument("--mode", choices=["paper"], default="paper")
+        if name in {"start", "install-service"}:
+            cmd.add_argument("--execution", choices=["paper", "dry-run", "testnet"], default="paper",
+                             help="mirror paper positions to Binance; testnet reads QUANTOS_KEY_FILE")
+        if name in {"start", "install-service"}:
+            cmd.add_argument("--portfolio", choices=["legacy", "live50"], default="legacy")
+            cmd.add_argument("--sentiment-file", type=Path, help="sentibot paper_perp_signals.jsonl (shadow only)")
+        if name == "install-service":
+            cmd.add_argument("--pythonpath", type=Path, help="copied source dir outside ~/Desktop")
+            cmd.add_argument("--watchdog", action="store_true")
         if name == "report": cmd.add_argument("--day", type=int, choices=[1, 2, 3])
-        if name == "exits": cmd.add_argument("--profile", choices=["p1", "p5", "pA"], default="p1")
+        if name == "exits": cmd.add_argument("--profile", choices=["p1", "p5", "pA", "pL"], default="p1")
         if name == "journal":
-            cmd.add_argument("--profile", choices=["p1", "p5", "pA"], default="p1")
+            cmd.add_argument("--profile", choices=["p1", "p5", "pA", "pL"], default="p1")
             cmd.add_argument("--limit", type=int, default=50)
     sub.add_parser("doctor")
     cmd = sub.add_parser("strategies"); cmd.add_argument("action", choices=["list"])
     cmd.add_argument("--state", type=Path, default=default)
+    cmd.add_argument("--include-candidates", action="store_true")
     cmd = sub.add_parser("demo"); cmd.add_argument("--state", required=True, type=Path)
     cmd = sub.add_parser("backtest")
+    cmd.add_argument("--research", action="store_true", help="Use isolated USDT pR candidate replay")
     cmd.add_argument("--input", nargs="+", required=True, type=Path)
     cmd.add_argument("--state", required=True, type=Path)
     selection = cmd.add_mutually_exclusive_group()
@@ -120,16 +131,17 @@ def _read_pa_profile(state: Path, strategy_id: str) -> dict:
             db.close()
 
 
-def _strategy_listing(state: Path) -> list[dict]:
+def _strategy_listing(state: Path, include_candidates=False) -> list[dict]:
     rows = []
-    for strategy in library():
+    for strategy in library(include_candidates):
         manifest = manifest_for(strategy.strategy_id, strategy.version)
         if manifest is None:
             raise ValueError(f"strategy has no preregistered manifest: {strategy.strategy_id}")
         rows.append({
             "manifest": asdict(manifest),
             "evidence_status": manifest.evidence_status,
-            "pA": _read_pa_profile(state, strategy.strategy_id),
+            "pA": ({"state": "RESEARCH_ONLY", "risk_fraction": D(0), "risk_percent": D(0)}
+                   if manifest.status == "candidate" else _read_pa_profile(state, strategy.strategy_id)),
         })
     return rows
 
@@ -179,7 +191,7 @@ def main(argv=None):
             if abs(offset) > 2000 or not eligible: raise RuntimeError("clock or margin compatibility check failed")
             result = {"mode": "paper", "keys_required": False, "clock_offset_ms": offset,
                       "eligible_symbols": eligible, "python": sys.version.split()[0]}
-        elif args.command == "strategies": result = _strategy_listing(args.state)
+        elif args.command == "strategies": result = _strategy_listing(args.state, args.include_candidates)
         elif args.command == "demo":
             report = run_demo(args.state)
             result = {"evidence": "synthetic", "report": str(args.state / "reports" / "final.json"),
@@ -187,14 +199,20 @@ def main(argv=None):
         elif args.command == "backtest":
             from .replay import replay
             selected_strategy = _strategy_from_config(args.config) if args.config else args.strategy
-            result = replay(args.input, args.state, selected_strategy)
+            result = replay(args.input, args.state, selected_strategy,
+                            **({"research": True} if args.research else {}))
         elif args.command == "start": return Runtime(
-            args.state, args.hours, min_quote_volume=args.min_quote_volume).run()
+            args.state, args.hours, min_quote_volume=args.min_quote_volume,
+            portfolio=args.portfolio, sentiment_path=args.sentiment_file, execution=args.execution).run()
         elif args.command == "install-service":
-            from .service import install_service
+            from .service import install_service, install_watchdog
+            extra = ["--portfolio", args.portfolio, "--execution", args.execution] + (
+                ["--sentiment-file", str(args.sentiment_file)] if args.sentiment_file else [])
             result = {"plist": str(install_service(
                 Path(sys.executable), args.state, args.hours,
-                min_quote_volume=args.min_quote_volume))}
+                min_quote_volume=args.min_quote_volume, extra_args=extra, pythonpath=args.pythonpath))}
+            if args.watchdog:
+                result["watchdog"] = str(install_watchdog(Path(sys.executable), args.state, args.pythonpath))
         elif args.command == "stop":
             if not (args.state / "run.json").exists(): raise ValueError("no paper run in this state directory")
             (args.state / "stop.request").touch()

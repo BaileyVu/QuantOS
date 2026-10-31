@@ -1,0 +1,473 @@
+{
+ "frozen_utc": "2026-10-31T16:13:13+00:00",
+ "criteria_note": "Leaderboard exposes day/week/month/allTime only (no 90d): required month>0 and allTime>0, AV>=50k; 90d net PnL (closedPnl-fee) computed from fills and ranks the final list. Top 60 by 30d PnL screened. 'closed trades' = closing fills; position notional is gross, time-weighted.",
+ "n_candidates_screened": 60,
+ "n_rejected": 48,
+ "reject_reasons": {
+  "0x5b5d51203a0f9079f8aeb098a6523a13f298c060": [
+   "median_hold<=15m"
+  ],
+  "0xb83de012dba672c76a7dbbbf3e459cb59d7d6e36": [
+   "median_hold<=15m"
+  ],
+  "0x659ddde484fd9dc313917d5de92a52b6a74a9d63": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ],
+  "0x87f9cd15f5050a9283b8896300f7c8cf69ece2cf": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ],
+  "0x45d26f28196d226497130c4bac709d808fed4029": [
+   "top2>=50%",
+   "median_hold<=15m"
+  ],
+  "0xfe7ce058edc7cfcde9ef8262ba51f8d4796ab7ae": [
+   "median_hold<=15m"
+  ],
+  "0xecb63caa47c7c4e77f60f1ce858cf28dc2b82b00": [
+   "top2>=50%",
+   "pnl90<=0"
+  ],
+  "0xfc667adba8d4837586078f4fdcdc29804337ca06": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ],
+  "0xdf954bbe619273a56e0cfa90dad8382195dc7d72": [
+   "top2>=50%",
+   "median_hold<=15m"
+  ],
+  "0xf5d81a135f756ca16544e53c20fc20643ec3ad53": [
+   "median_hold<=15m",
+   "pos<=20%acct"
+  ],
+  "0x024294c53a69c1e6b39810b3fac87385752fffa1": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ],
+  "0x3dc908374e11623d8eb9f07dfc7a2e5e803a54b0": [
+   "too_many_fills"
+  ],
+  "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f": [
+   "median_hold<=15m"
+  ],
+  "0xf818fa41af44a1b42ba7433f4ec472be40a2c268": [
+   "closed_trades<30",
+   "top2>=50%",
+   "pos<=20%acct",
+   "pnl90<=0"
+  ],
+  "0x484bc1608211d0604bf70bae72792a56884562f8": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "pnl90<=0"
+  ],
+  "0x218a65e21eddeece7a9df38c6bbdd89f692b7da2": [
+   "top2>=50%",
+   "pnl90<=0"
+  ],
+  "0xd47587702a91731dc1089b5db0932cf820151a91": [
+   "top2>=50%",
+   "median_hold<=15m",
+   "pnl90<=0"
+  ],
+  "0x49e96e255ba418d08e66c35b588e2f2f3766e1d0": [
+   "too_many_fills"
+  ],
+  "0x023a3d058020fb76cca98f01b3c48c8938a22355": [
+   "top2>=50%",
+   "pnl90<=0"
+  ],
+  "0xba5d9cc840745aeeeeedac5712e32f13ab8ea352": [
+   "top2>=50%",
+   "pnl90<=0"
+  ],
+  "0x856c35038594767646266bc7fd68dc26480e910d": [
+   "median_hold<=15m",
+   "pos<=20%acct"
+  ],
+  "0x9aa589355bf745db9784c8ef3c646360f11b58af": [
+   "median_hold<=15m"
+  ],
+  "0xdcda2478f8f4f16fe13335f7b2795e2ce3520176": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ],
+  "0x64a4fbb71858f681f3fa10a42b34180a9a48088d": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ],
+  "0xe0ffc829349c88c159462942ad885f12130e7610": [
+   "top2>=50%",
+   "pnl90<=0"
+  ],
+  "0x99967871e6c4f9a5185abc57edede9e9540191f6": [
+   "top2>=50%",
+   "pnl90<=0"
+  ],
+  "0x60a8c761f39696b3b419f31dcda20b405cb685f6": [
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "pnl90<=0"
+  ],
+  "0xd8c5228c515db3043dfa0c8cd6f22450ee9a99b0": [
+   "too_many_fills"
+  ],
+  "0x8cc94dc843e1ea7a19805e0cca43001123512b6a": [
+   "median_hold<=15m"
+  ],
+  "0xbfc79c444c41a74516bf31237ebf586a231480b4": [
+   "median_hold<=15m"
+  ],
+  "0x10f32d13169dace9fa37ad7dcdc9071c290f3c11": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ],
+  "0x5647249079e257329ecb6f46ed41821d3c69e7de": [
+   "too_many_fills"
+  ],
+  "0xda3768e9299e1fd81708ec030dac5ea37125f7b5": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ],
+  "0x58b27998b4ff896949d5f57466b259e50ee211f3": [
+   "too_many_fills"
+  ],
+  "0xcf5343ba750a6e30afbb1dadda08bc78f8c8ee11": [
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "pnl90<=0"
+  ],
+  "0x4c78a97cef589b01bb91dbf893fffa14243d2444": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ],
+  "0x880ac484a1743862989a441d6d867238c7aa311c": [
+   "top2>=50%"
+  ],
+  "0x77ee3604adbdefa66a817b3cf776412a6613a018": [
+   "too_many_fills"
+  ],
+  "0xcac19662ec88d23fa1c81ac0e8570b0cf2ff26b3": [
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "pnl90<=0"
+  ],
+  "0xd1dd6d99c5fb5d31ff52eacce5046c7158859e85": [
+   "median_hold<=15m"
+  ],
+  "0x6859da14835424957a1e6b397d8026b1d9ff7e1e": [
+   "top2>=50%",
+   "pnl90<=0"
+  ],
+  "0x47f5a6397b79deaaca5c456503e7c1a49357b942": [
+   "top2>=50%",
+   "pnl90<=0"
+  ],
+  "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3": [
+   "pos<=20%acct"
+  ],
+  "0xaf0fdd39e5d92499b0ed9f68693da99c0ec1e92e": [
+   "top2>=50%",
+   "pnl90<=0"
+  ],
+  "0x6910c590d8503a1f3ef5ea9b64a5d7c7f3b5feda": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ],
+  "0x10e14ba2d77263543be1bdb2851b0933ddf4f4bd": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "pnl90<=0"
+  ],
+  "0x3440f23a87f1950e7a88cd248fd270e92d1132c5": [
+   "top2>=50%",
+   "pnl90<=0"
+  ],
+  "0xff4cd3826ecee12acd4329aada4a2d3419fc463c": [
+   "closed_trades<30",
+   "top2>=50%",
+   "median_hold<=15m",
+   "pos<=20%acct",
+   "binance_frac<70%",
+   "pnl90<=0"
+  ]
+ },
+ "wallets": [
+  {
+   "address": "0xe81309ec9b79309e4d108ae3a92d1aa618cd6d74",
+   "metrics": {
+    "n_fills": 26327,
+    "pnl_90d_net": 6457706.682123005,
+    "closed_trades": 13598,
+    "top2_share": 0.345759071035718,
+    "median_hold_min": 435.1937584187826,
+    "n_holds": 13598,
+    "fills_per_day": 292.52222222222224,
+    "mean_gross_pos_notional": 12187441.72119932,
+    "mean_pos_frac_of_acct": 0.537943425554865,
+    "binance_notional_frac": 1.0,
+    "address": "0xe81309ec9b79309e4d108ae3a92d1aa618cd6d74",
+    "account_value": 22655619.796131,
+    "pnl_30d": 6201120.185206,
+    "pnl_alltime": 6321330.316131
+   }
+  },
+  {
+   "address": "0x418aa6bf98a2b2bc93779f810330d88cde488888",
+   "metrics": {
+    "n_fills": 15278,
+    "pnl_90d_net": 1000558.647154,
+    "closed_trades": 7189,
+    "top2_share": 0.26830011490439076,
+    "median_hold_min": 1132.9394404459636,
+    "n_holds": 7189,
+    "fills_per_day": 169.75555555555556,
+    "mean_gross_pos_notional": 9710886.14654916,
+    "mean_pos_frac_of_acct": 2.117063045605433,
+    "binance_notional_frac": 1.0,
+    "address": "0x418aa6bf98a2b2bc93779f810330d88cde488888",
+    "account_value": 4586961.246481,
+    "pnl_30d": 3924235.900071,
+    "pnl_alltime": 36670630.526481
+   }
+  },
+  {
+   "address": "0xb695651daa495f59dd2725c6fe98322d8b51a92d",
+   "metrics": {
+    "n_fills": 17788,
+    "pnl_90d_net": 998824.255735,
+    "closed_trades": 9720,
+    "top2_share": 0.04510643123984488,
+    "median_hold_min": 709.04342224528,
+    "n_holds": 9720,
+    "fills_per_day": 197.64444444444445,
+    "mean_gross_pos_notional": 96531309.11129811,
+    "mean_pos_frac_of_acct": 2.58391265987455,
+    "binance_notional_frac": 1.0,
+    "address": "0xb695651daa495f59dd2725c6fe98322d8b51a92d",
+    "account_value": 37358580.500931,
+    "pnl_30d": 21228653.584795,
+    "pnl_alltime": 12583928.070931
+   }
+  },
+  {
+   "address": "0x4ba3979955f52158c0e4e3378b18985475182ce2",
+   "metrics": {
+    "n_fills": 5546,
+    "pnl_90d_net": 940015.083462,
+    "closed_trades": 371,
+    "top2_share": 0.4249242344802728,
+    "median_hold_min": 41401.336611576335,
+    "n_holds": 371,
+    "fills_per_day": 61.62222222222222,
+    "mean_gross_pos_notional": 4781049.586658081,
+    "mean_pos_frac_of_acct": 0.20481401535368915,
+    "binance_notional_frac": 1.0,
+    "address": "0x4ba3979955f52158c0e4e3378b18985475182ce2",
+    "account_value": 23343371.196555,
+    "pnl_30d": 6673832.351593,
+    "pnl_alltime": 6858213.584229
+   }
+  },
+  {
+   "address": "0x92bbd8110393350dda7e9c32089e95af071a9b6f",
+   "metrics": {
+    "n_fills": 17851,
+    "pnl_90d_net": 610392.554494,
+    "closed_trades": 6682,
+    "top2_share": 0.017303963784020604,
+    "median_hold_min": 401.3415458943685,
+    "n_holds": 6682,
+    "fills_per_day": 198.34444444444443,
+    "mean_gross_pos_notional": 3893164.354765582,
+    "mean_pos_frac_of_acct": 2.1277750081201527,
+    "binance_notional_frac": 1.0,
+    "address": "0x92bbd8110393350dda7e9c32089e95af071a9b6f",
+    "account_value": 1829687.979184,
+    "pnl_30d": 3335739.792531,
+    "pnl_alltime": 6316780.189184
+   }
+  },
+  {
+   "address": "0xe86b057f5eb764c9738d6b0d38170befd0723664",
+   "metrics": {
+    "n_fills": 11989,
+    "pnl_90d_net": 490056.213941,
+    "closed_trades": 5374,
+    "top2_share": 0.05357123388738563,
+    "median_hold_min": 1850.1389739501953,
+    "n_holds": 5374,
+    "fills_per_day": 133.2111111111111,
+    "mean_gross_pos_notional": 8757856.270125872,
+    "mean_pos_frac_of_acct": 1.3914614530619125,
+    "binance_notional_frac": 1.0,
+    "address": "0xe86b057f5eb764c9738d6b0d38170befd0723664",
+    "account_value": 6293998.479694999,
+    "pnl_30d": 3094132.27281,
+    "pnl_alltime": 24020332.699113
+   }
+  },
+  {
+   "address": "0xbe19541903f64af97bcf8436f4d15bf3a56b8bd1",
+   "metrics": {
+    "n_fills": 16134,
+    "pnl_90d_net": 248875.838026,
+    "closed_trades": 1706,
+    "top2_share": 0.04096786582767763,
+    "median_hold_min": 33792.38565370687,
+    "n_holds": 1706,
+    "fills_per_day": 179.26666666666668,
+    "mean_gross_pos_notional": 5338780.134630277,
+    "mean_pos_frac_of_acct": 0.22927611612729729,
+    "binance_notional_frac": 1.0,
+    "address": "0xbe19541903f64af97bcf8436f4d15bf3a56b8bd1",
+    "account_value": 23285374.09307,
+    "pnl_30d": 3710526.907919,
+    "pnl_alltime": 10528313.89307
+   }
+  },
+  {
+   "address": "0x7a6d5fc57f6906f337c48fe2763c3a501304f79c",
+   "metrics": {
+    "n_fills": 16034,
+    "pnl_90d_net": 226439.297454,
+    "closed_trades": 8713,
+    "top2_share": 0.08112609195730171,
+    "median_hold_min": 3935.3078126993814,
+    "n_holds": 8713,
+    "fills_per_day": 178.15555555555557,
+    "mean_gross_pos_notional": 5759143.063603906,
+    "mean_pos_frac_of_acct": 1.7442517324467555,
+    "binance_notional_frac": 1.0,
+    "address": "0x7a6d5fc57f6906f337c48fe2763c3a501304f79c",
+    "account_value": 3301784.3448119997,
+    "pnl_30d": 3238295.40217,
+    "pnl_alltime": 17004807.754812
+   }
+  },
+  {
+   "address": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
+   "metrics": {
+    "n_fills": 9673,
+    "pnl_90d_net": 127894.968551,
+    "closed_trades": 4925,
+    "top2_share": 0.061993271891992704,
+    "median_hold_min": 105.99455114746094,
+    "n_holds": 4925,
+    "fills_per_day": 107.47777777777777,
+    "mean_gross_pos_notional": 105784490.7718949,
+    "mean_pos_frac_of_acct": 2.212402016060828,
+    "binance_notional_frac": 1.0,
+    "address": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
+    "account_value": 47814316.748926,
+    "pnl_30d": 26957616.643324003,
+    "pnl_alltime": 153551578.328926
+   }
+  },
+  {
+   "address": "0xca4903c207a0df58bf37d4bc8bbc5210726f53c8",
+   "metrics": {
+    "n_fills": 11592,
+    "pnl_90d_net": 85262.111488,
+    "closed_trades": 1463,
+    "top2_share": 0.03352847078391135,
+    "median_hold_min": 6819.72945,
+    "n_holds": 1463,
+    "fills_per_day": 128.8,
+    "mean_gross_pos_notional": 53593410.737289414,
+    "mean_pos_frac_of_acct": 3.03990837304087,
+    "binance_notional_frac": 1.0,
+    "address": "0xca4903c207a0df58bf37d4bc8bbc5210726f53c8",
+    "account_value": 17629942.801098,
+    "pnl_30d": 8784817.992703,
+    "pnl_alltime": 8265034.831098
+   }
+  },
+  {
+   "address": "0xfc27136e42af1732ddc9ce2605ea9bff1b959d9d",
+   "metrics": {
+    "n_fills": 4062,
+    "pnl_90d_net": 84351.691922,
+    "closed_trades": 1391,
+    "top2_share": 0.31438717462267624,
+    "median_hold_min": 421.3660052571615,
+    "n_holds": 1391,
+    "fills_per_day": 45.13333333333333,
+    "mean_gross_pos_notional": 145270043.65704033,
+    "mean_pos_frac_of_acct": 4.086777773317279,
+    "binance_notional_frac": 1.0,
+    "address": "0xfc27136e42af1732ddc9ce2605ea9bff1b959d9d",
+    "account_value": 35546352.582593,
+    "pnl_30d": 19288681.996446,
+    "pnl_alltime": 16489647.572593
+   }
+  },
+  {
+   "address": "0xd4c1f7e8d876c4749228d515473d36f919583d1d",
+   "metrics": {
+    "n_fills": 18576,
+    "pnl_90d_net": 55891.181945,
+    "closed_trades": 9182,
+    "top2_share": 0.055867855166718994,
+    "median_hold_min": 336.2097881632487,
+    "n_holds": 9182,
+    "fills_per_day": 206.4,
+    "mean_gross_pos_notional": 25788404.294490814,
+    "mean_pos_frac_of_acct": 3.2314801448633492,
+    "binance_notional_frac": 1.0,
+    "address": "0xd4c1f7e8d876c4749228d515473d36f919583d1d",
+    "account_value": 7980369.099740001,
+    "pnl_30d": 5829480.51255,
+    "pnl_alltime": 24216391.36974
+   }
+  }
+ ]
+}

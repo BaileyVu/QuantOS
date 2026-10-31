@@ -95,7 +95,18 @@ def write_reports(state: Path, run: dict, day: int | None = None, final=False):
                   "pA sizes from p1's measured edge in R (quarter Kelly, capped 5%, probe 0.25% for the first 30 trades).",
                   "R divides net trade PnL by cost-inclusive approved risk of the actually filled size."],
               "profiles": {}}
-    for profile in ("p1", "p5", "pA"):
+    profiles = run.get("profiles", ["p1", "p5", "pA"])
+    if profiles not in (["p1", "p5", "pA"], ["pR"], ["pL"], ["pL", "pL5"]):
+        raise ValueError("invalid report profile set")
+    if profiles[0] == "pL":
+        result["assumptions"] = [x for x in result["assumptions"] if not x.startswith(("p5 ", "pA "))]
+        result["assumptions"].append("pL: $50 USDC LivePolicy, reserved event slots, min-notional bump <=3% risk.")
+        if "pL5" in profiles:
+            result["assumptions"].append("pL5: same, 5% risk/trade, 15% daily stop, 35% drawdown pause.")
+    if profiles == ["pR"]:
+        result["assumptions"] = [x for x in result["assumptions"] if not x.startswith(("p5 ", "pA "))]
+        result["assumptions"].append("pR is isolated USDT research; no candidate is promoted by replay success.")
+    for profile in profiles:
         if profile == "pA" and not (state / "journal_pA.db").is_file():
             continue  # runs started before the adaptive profile existed
         if not (state / f"journal_{profile}.db").is_file():

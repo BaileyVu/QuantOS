@@ -19,7 +19,7 @@ class ServiceTests(unittest.TestCase):
             "--mode", "paper", "--state", str((root/"state/run.db").resolve()),
             "--min-quote-volume", "20000000", "--hours", "72"])
         self.assertTrue(plist["RunAtLoad"])
-        self.assertEqual(plist["KeepAlive"], {"SuccessfulExit": False})
+        self.assertEqual(plist["KeepAlive"], {"SuccessfulExit": False, "Crashed": True})
         self.assertEqual(plist["ExitTimeOut"], 45)
         self.assertEqual(plist["ThrottleInterval"], 30)
         self.assertEqual(Path(plist["WorkingDirectory"]).name, "state")

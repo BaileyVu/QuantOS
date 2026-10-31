@@ -1,0 +1,382 @@
+{
+ "crash_flush|TRAIN|episodes": {
+  "episodes_total": 110,
+  "episodes_with_trades": 32,
+  "trades": 148,
+  "mean_trade": 0.005052451460386787,
+  "median_trade": 0.00894950978054354,
+  "win_rate": 0.5743243243243243,
+  "mean_per_episode": 0.011563380740172716,
+  "worst_trade": -0.2529940097350226,
+  "ci90_mean_per_episode": [
+   -0.0030009029889202735,
+   0.026161290993610288
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.016239255114267027,
+   0.026410561389105074
+  ],
+  "episodes_with_OI_coverage": 48
+ },
+ "crash_flush|TRAIN|random_nonepisode": {
+  "episodes_total": 110,
+  "episodes_with_trades": 13,
+  "trades": 27,
+  "mean_trade": 0.004752562657122485,
+  "median_trade": 0.0022200950471213954,
+  "win_rate": 0.5185185185185185,
+  "mean_per_episode": 2.1024449683488858e-05,
+  "worst_trade": -0.08134458250432608,
+  "ci90_mean_per_episode": [
+   -0.01770007745757899,
+   0.01609111447398671
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.008054804131196755,
+   0.01689557905857133
+  ],
+  "mean_per_episode_over_30_draws": 0.013366806081902983
+ },
+ "alt_dip|TRAIN|episodes": {
+  "episodes_total": 110,
+  "episodes_with_trades": 70,
+  "trades": 691,
+  "mean_trade": 0.02544807166425137,
+  "median_trade": 0.03471223924132194,
+  "win_rate": 0.6599131693198264,
+  "mean_per_episode": 0.02699635263360697,
+  "worst_trade": -0.25299400973502273,
+  "ci90_mean_per_episode": [
+   0.012846328399653249,
+   0.04109465709054818
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.0007284593535477219,
+   0.051497245483760536
+  ]
+ },
+ "alt_dip|TRAIN|random_nonepisode": {
+  "episodes_total": 110,
+  "episodes_with_trades": 20,
+  "trades": 101,
+  "mean_trade": 0.022921487082470143,
+  "median_trade": 0.024273391629515473,
+  "win_rate": 0.6237623762376238,
+  "mean_per_episode": -0.01579646694096562,
+  "worst_trade": -0.25299400973502273,
+  "ci90_mean_per_episode": [
+   -0.04603821224664665,
+   0.01106317966500196
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.015491087619292732,
+   0.05442424857350848
+  ],
+  "mean_per_episode_over_30_draws": 0.017304725162960565
+ },
+ "bounce_momentum|TRAIN|episodes": {
+  "episodes_total": 110,
+  "episodes_with_trades": 110,
+  "trades": 550,
+  "mean_trade": 0.014302839376718928,
+  "median_trade": 0.007388549766250141,
+  "win_rate": 0.5654545454545454,
+  "mean_per_episode": 0.014302839376718932,
+  "worst_trade": -0.25299400973502273,
+  "ci90_mean_per_episode": [
+   0.0014537757901984722,
+   0.02833172191557206
+  ],
+  "ci90_mean_trade_cluster": [
+   0.001453775790198471,
+   0.028331721915572053
+  ]
+ },
+ "bounce_momentum|TRAIN|random_nonepisode": {
+  "episodes_total": 110,
+  "episodes_with_trades": 110,
+  "trades": 550,
+  "mean_trade": 0.003377542785447639,
+  "median_trade": 0.00387417880495744,
+  "win_rate": 0.5327272727272727,
+  "mean_per_episode": 0.00337754278544764,
+  "worst_trade": -0.2529940097350225,
+  "ci90_mean_per_episode": [
+   -0.0029450937286361416,
+   0.01022721758635883
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.002945093728636142,
+   0.010227217586358828
+  ],
+  "mean_per_episode_over_30_draws": 0.0011524842338888292
+ },
+ "baseline_basket_at_entry|TRAIN|episodes": {
+  "episodes_total": 110,
+  "episodes_with_trades": 110,
+  "trades": 2848,
+  "mean_trade": 0.0025368419122624324,
+  "median_trade": 0.008851691042509158,
+  "win_rate": 0.5705758426966292,
+  "mean_per_episode": 0.0023066455516845947,
+  "worst_trade": -0.25299400973502273,
+  "ci90_mean_per_episode": [
+   -0.008489240254712892,
+   0.013032383013156098
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.0076180383807588035,
+   0.012972350990155616
+  ]
+ },
+ "baseline_basket_at_entry|TRAIN|random_nonepisode": {
+  "episodes_total": 110,
+  "episodes_with_trades": 110,
+  "trades": 2799,
+  "mean_trade": 0.006209626552925469,
+  "median_trade": 0.001389874557902182,
+  "win_rate": 0.518399428367274,
+  "mean_per_episode": 0.007063867947190497,
+  "worst_trade": -0.2529940097350225,
+  "ci90_mean_per_episode": [
+   0.0023578900693355157,
+   0.012557726771085733
+  ],
+  "ci90_mean_trade_cluster": [
+   0.001260234749331688,
+   0.012207486426753364
+  ],
+  "mean_per_episode_over_30_draws": 0.004841456746897591
+ },
+ "crash_flush|HELD|episodes": {
+  "episodes_total": 22,
+  "episodes_with_trades": 21,
+  "trades": 100,
+  "mean_trade": 0.023431913258419784,
+  "median_trade": 0.02742543136856901,
+  "win_rate": 0.68,
+  "mean_per_episode": 0.02778911661930022,
+  "worst_trade": -0.13820089963488924,
+  "ci90_mean_per_episode": [
+   0.010220046777921548,
+   0.04456098900264284
+  ],
+  "ci90_mean_trade_cluster": [
+   0.0034988656123738225,
+   0.04418834763046707
+  ],
+  "episodes_with_OI_coverage": 22
+ },
+ "crash_flush|HELD|random_nonepisode": {
+  "episodes_total": 22,
+  "episodes_with_trades": 6,
+  "trades": 27,
+  "mean_trade": -0.005415770300091261,
+  "median_trade": -0.01579130795435213,
+  "win_rate": 0.4444444444444444,
+  "mean_per_episode": 0.010671240221090285,
+  "worst_trade": -0.13820089963488924,
+  "ci90_mean_per_episode": [
+   -0.022024372523247793,
+   0.04336685296542836
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.029531897714587325,
+   0.02319863285654724
+  ],
+  "mean_per_episode_over_30_draws": 0.020285875882589104
+ },
+ "alt_dip|HELD|episodes": {
+  "episodes_total": 22,
+  "episodes_with_trades": 21,
+  "trades": 372,
+  "mean_trade": 0.023241807533227417,
+  "median_trade": 0.021755323446284613,
+  "win_rate": 0.6317204301075269,
+  "mean_per_episode": 0.024026533175187447,
+  "worst_trade": -0.22730804401301463,
+  "ci90_mean_per_episode": [
+   0.007222973863437368,
+   0.04097339051455178
+  ],
+  "ci90_mean_trade_cluster": [
+   0.0018190126931550692,
+   0.044388267174475624
+  ]
+ },
+ "alt_dip|HELD|random_nonepisode": {
+  "episodes_total": 22,
+  "episodes_with_trades": 10,
+  "trades": 74,
+  "mean_trade": -0.001801261172717837,
+  "median_trade": -0.00565528202073684,
+  "win_rate": 0.47297297297297297,
+  "mean_per_episode": -0.0051290325425746765,
+  "worst_trade": -0.10451893914248533,
+  "ci90_mean_per_episode": [
+   -0.019000308434044974,
+   0.008251269771337603
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.01909466833021764,
+   0.020362883083234577
+  ],
+  "mean_per_episode_over_30_draws": 0.013415500063692042
+ },
+ "bounce_momentum|HELD|episodes": {
+  "episodes_total": 22,
+  "episodes_with_trades": 22,
+  "trades": 110,
+  "mean_trade": -0.005554393928967148,
+  "median_trade": 0.01736842363518598,
+  "win_rate": 0.5727272727272728,
+  "mean_per_episode": -0.005554393928967149,
+  "worst_trade": -0.2529940097350226,
+  "ci90_mean_per_episode": [
+   -0.03472303540001212,
+   0.020603156684130975
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.03472303540001212,
+   0.020603156684130982
+  ]
+ },
+ "bounce_momentum|HELD|random_nonepisode": {
+  "episodes_total": 22,
+  "episodes_with_trades": 22,
+  "trades": 110,
+  "mean_trade": 0.00664859598112669,
+  "median_trade": -0.005534162041994306,
+  "win_rate": 0.41818181818181815,
+  "mean_per_episode": 0.00664859598112669,
+  "worst_trade": -0.08539812583892548,
+  "ci90_mean_per_episode": [
+   -0.008517882561416853,
+   0.0253448728143092
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.008517882561416851,
+   0.025344872814309197
+  ],
+  "mean_per_episode_over_30_draws": -0.00466313435695026
+ },
+ "baseline_basket_at_entry|HELD|episodes": {
+  "episodes_total": 22,
+  "episodes_with_trades": 22,
+  "trades": 638,
+  "mean_trade": 0.0014797788063242937,
+  "median_trade": 0.005317200152811119,
+  "win_rate": 0.5470219435736677,
+  "mean_per_episode": 0.0014797788063242963,
+  "worst_trade": -0.2529940097350226,
+  "ci90_mean_per_episode": [
+   -0.021716496952096348,
+   0.02329769152252084
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.02171649695209635,
+   0.02329769152252084
+  ]
+ },
+ "baseline_basket_at_entry|HELD|random_nonepisode": {
+  "episodes_total": 22,
+  "episodes_with_trades": 22,
+  "trades": 638,
+  "mean_trade": 0.005605187661593887,
+  "median_trade": -0.0010282685095934774,
+  "win_rate": 0.4780564263322884,
+  "mean_per_episode": 0.005605187661593889,
+  "worst_trade": -0.12426629074221829,
+  "ci90_mean_per_episode": [
+   -0.005889936036705474,
+   0.019566482926910565
+  ],
+  "ci90_mean_trade_cluster": [
+   -0.005889936036705472,
+   0.019566482926910562
+  ],
+  "mean_per_episode_over_30_draws": -0.0007521291403066979
+ },
+ "alt_dip_quarter_cutoffs": {
+  "2020-01": [
+   null,
+   0
+  ],
+  "2020-04": [
+   null,
+   0
+  ],
+  "2020-07": [
+   -0.10239030848146957,
+   13
+  ],
+  "2020-10": [
+   -0.12983926519098501,
+   15
+  ],
+  "2021-01": [
+   -0.1572785299095146,
+   22
+  ],
+  "2021-04": [
+   -0.1750562548503878,
+   26
+  ],
+  "2021-07": [
+   -0.25338893431009624,
+   28
+  ],
+  "2021-10": [
+   -0.16001113682234122,
+   28
+  ],
+  "2022-01": [
+   -0.1382148743025525,
+   29
+  ],
+  "2022-04": [
+   -0.16148181832665687,
+   19
+  ],
+  "2022-07": [
+   -0.19470424373534487,
+   19
+  ],
+  "2022-10": [
+   -0.11106047732929779,
+   29
+  ],
+  "2023-01": [
+   -0.13736326021602446,
+   29
+  ],
+  "2023-04": [
+   -0.09621400818984975,
+   29
+  ],
+  "2023-07": [
+   -0.10420692961425061,
+   29
+  ],
+  "2023-10": [
+   -0.07280540249540819,
+   29
+  ],
+  "2024-01": [
+   -0.08439273154313741,
+   29
+  ],
+  "2024-04": [
+   -0.11250216928122445,
+   29
+  ],
+  "2024-07": [
+   -0.13695197796613834,
+   29
+  ],
+  "2024-10": [
+   -0.1220054856710489,
+   29
+  ]
+ }
+}

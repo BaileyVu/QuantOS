@@ -17,6 +17,7 @@ ENDPOINTS = {
     "/fapi/v1/ticker/24hr",
     "/fapi/v1/ticker/bookTicker", "/fapi/v1/premiumIndex",
     "/fapi/v1/aggTrades", "/fapi/v1/fundingRate",
+    "/futures/data/openInterestHist",
 }
 
 
@@ -118,46 +119,7 @@ class PublicMarket:
         raise RuntimeError("public API request failed")
 
     def exchange_info(self) -> dict[str, Instrument]:
-        data = self._get("/fapi/v1/exchangeInfo")
-        if not isinstance(data, dict) or not isinstance(data.get("symbols"), list):
-            raise ValueError("malformed exchangeInfo")
-        found = {}
-        for item in data["symbols"]:
-            if not isinstance(item, dict):
-                raise ValueError("malformed instrument")
-            if (item.get("quoteAsset") != "USDC" or item.get("marginAsset") != "USDC"
-                    or item.get("contractType") != "PERPETUAL"):
-                continue
-            sym = item.get("symbol")
-            if not isinstance(sym, str) or not sym.endswith("USDC"):
-                continue
-            filters = item.get("filters")
-            if not isinstance(filters, list):
-                continue
-            by = {f.get("filterType"): f for f in filters if isinstance(f, dict)}
-            try:
-                base_asset = item.get("baseAsset", sym[:-4])
-                if not isinstance(base_asset, str) or not base_asset:
-                    continue
-                p, l, ml, mn, pp = (by[x] for x in ("PRICE_FILTER", "LOT_SIZE", "MARKET_LOT_SIZE", "MIN_NOTIONAL", "PERCENT_PRICE"))
-                instrument = Instrument(sym, item["marginAsset"], item["status"],
-                    _decimal(p["tickSize"], "tick"), _decimal(l["stepSize"], "step"),
-                    _decimal(l["minQty"], "minQty"), _decimal(l["maxQty"], "maxQty"),
-                    _decimal(mn.get("notional", mn.get("minNotional")), "minNotional"),
-                    _decimal(p["minPrice"], "minPrice"), _decimal(p["maxPrice"], "maxPrice"),
-                    _decimal(ml["stepSize"], "marketStep"), _decimal(ml["minQty"], "marketMinQty"),
-                    _decimal(ml["maxQty"], "marketMaxQty"), _decimal(pp["multiplierUp"], "multiplierUp"),
-                    _decimal(pp["multiplierDown"], "multiplierDown"),
-                    base_asset)
-                if any(v <= 0 for v in (instrument.tick, instrument.step, instrument.min_qty,
-                    instrument.max_qty, instrument.min_notional, instrument.market_step,
-                    instrument.market_min_qty, instrument.market_max_qty, instrument.multiplier_up,
-                    instrument.multiplier_down)) or instrument.min_price < 0 or instrument.max_price <= instrument.min_price:
-                    continue
-                found[sym] = instrument
-            except (KeyError, ValueError, TypeError):
-                continue
-        return {s: found[s] for s in sorted(found, key=lambda x: (x not in {"BTCUSDC", "ETHUSDC"}, x))}
+        return parse_exchange_info(self._get("/fapi/v1/exchangeInfo"))
 
     def eligible_instruments(self, min_quote_volume: Decimal = D("20000000")) -> dict[str, Instrument]:
         """Return TRADING USDC perpetuals meeting the 24h quote-turnover floor."""
@@ -191,12 +153,16 @@ class PublicMarket:
         data = self._get("/fapi/v1/time")
         return _int(data["serverTime"], "serverTime")
 
-    def candles(self, symbol: str, interval: str, now_ms: int, limit: int = 100) -> tuple[Candle, ...]:
+    def candles(self, symbol: str, interval: str, now_ms: int, limit: int = 100,
+                *, historical: bool = False) -> tuple[Candle, ...]:
+        """`historical=True` requests bars closed before `now_ms` (an exact bar boundary)."""
         widths = {"1m": 60_000, "5m": 300_000, "1h": 3_600_000,
                   "4h": 14_400_000, "1d": 86_400_000}
         if interval not in widths or not 1 <= limit <= 1000:
             raise ValueError("unsupported candle request")
-        rows = self._get("/fapi/v1/klines", {"symbol": symbol, "interval": interval, "limit": limit})
+        params = {"symbol": symbol, "interval": interval, "limit": limit}
+        if historical: params["endTime"] = now_ms - 1
+        rows = self._get("/fapi/v1/klines", params)
         if not isinstance(rows, list): raise ValueError("malformed klines")
         width = widths[interval]
         out = []
@@ -216,6 +182,19 @@ class PublicMarket:
         if out[-1].close_ms != now_open - 1:
             raise ValueError("latest completed candle missing or stale")
         return tuple(out)
+
+    def open_interest_value(self, symbol: str, end_ms: int | None = None, limit: int = 500):
+        """Hourly (label_ms, sumOpenInterestValue); Binance serves only the latest ~30 days."""
+        params = {"symbol": symbol, "period": "1h", "limit": limit}
+        if end_ms is not None: params["endTime"] = end_ms
+        rows = self._get("/futures/data/openInterestHist", params)
+        if not isinstance(rows, list): raise ValueError("malformed open interest")
+        out = []
+        for r in rows:
+            if not isinstance(r, dict) or r.get("symbol") != symbol: raise ValueError("malformed open interest row")
+            # Bad values (e.g. zero) are passed through; the strategy's repair rule judges them.
+            out.append((_int(r.get("timestamp"), "timestamp"), _decimal(r.get("sumOpenInterestValue"), "oi value")))
+        return sorted(out)
 
     def quote(self, symbol: str) -> Quote:
         b = self._get("/fapi/v1/ticker/bookTicker", {"symbol": symbol})
@@ -322,3 +301,48 @@ class PublicMarket:
             if nxt <= cursor: raise ValueError("funding pagination stalled")
             cursor = nxt
         return tuple(sorted(out, key=lambda x:x.time_ms))
+
+
+def parse_exchange_info(data: dict, margin_asset: str = "USDC") -> dict[str, Instrument]:
+    """Parse public filters without I/O; historical callers must declare provenance."""
+    if margin_asset not in {"USDC", "USDT"}:
+        raise ValueError("unsupported margin asset")
+    if not isinstance(data, dict) or not isinstance(data.get("symbols"), list):
+        raise ValueError("malformed exchangeInfo")
+    found = {}
+    for item in data["symbols"]:
+        if not isinstance(item, dict):
+            raise ValueError("malformed instrument")
+        if (item.get("quoteAsset") != margin_asset or item.get("marginAsset") != margin_asset
+                or item.get("contractType") != "PERPETUAL"):
+            continue
+        sym = item.get("symbol")
+        if not isinstance(sym, str) or not sym.endswith(margin_asset):
+            continue
+        filters = item.get("filters")
+        if not isinstance(filters, list):
+            continue
+        by = {f.get("filterType"): f for f in filters if isinstance(f, dict)}
+        try:
+            base_asset = item.get("baseAsset", sym[:-4])
+            if not isinstance(base_asset, str) or not base_asset:
+                continue
+            p, l, ml, mn, pp = (by[x] for x in ("PRICE_FILTER", "LOT_SIZE", "MARKET_LOT_SIZE", "MIN_NOTIONAL", "PERCENT_PRICE"))
+            instrument = Instrument(sym, item["marginAsset"], item["status"],
+                _decimal(p["tickSize"], "tick"), _decimal(l["stepSize"], "step"),
+                _decimal(l["minQty"], "minQty"), _decimal(l["maxQty"], "maxQty"),
+                _decimal(mn.get("notional", mn.get("minNotional")), "minNotional"),
+                _decimal(p["minPrice"], "minPrice"), _decimal(p["maxPrice"], "maxPrice"),
+                _decimal(ml["stepSize"], "marketStep"), _decimal(ml["minQty"], "marketMinQty"),
+                _decimal(ml["maxQty"], "marketMaxQty"), _decimal(pp["multiplierUp"], "multiplierUp"),
+                _decimal(pp["multiplierDown"], "multiplierDown"),
+                base_asset)
+            if any(v <= 0 for v in (instrument.tick, instrument.step, instrument.min_qty,
+                instrument.max_qty, instrument.min_notional, instrument.market_step,
+                instrument.market_min_qty, instrument.market_max_qty, instrument.multiplier_up,
+                instrument.multiplier_down)) or instrument.min_price < 0 or instrument.max_price <= instrument.min_price:
+                continue
+            found[sym] = instrument
+        except (KeyError, ValueError, TypeError):
+            continue
+    return {s: found[s] for s in sorted(found, key=lambda x: (x not in {"BTC" + margin_asset, "ETH" + margin_asset}, x))}

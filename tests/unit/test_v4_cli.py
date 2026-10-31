@@ -64,7 +64,7 @@ class V4CliTests(unittest.TestCase):
 
     def test_each_preregistered_backtest_config_resolves_manifest(self):
         configs = sorted(Path("configs/strategies").glob("*.toml"))
-        self.assertEqual(len(configs), 6)
+        self.assertEqual(len(configs), 9)
         for config in configs:
             with self.subTest(config=config.name):
                 strategy_id = _strategy_from_config(config)
