@@ -32,6 +32,7 @@ class _IPv4Handler(HTTPSHandler):
 _OPENER = build_opener(_IPv4Handler())
 
 BASES = {"testnet": "https://testnet.binancefuture.com", "mainnet": "https://fapi.binance.com"}
+TESTNET_HOSTS = {"testnet": "https://testnet.binancefuture.com", "demo": "https://demo-fapi.binance.com"}
 CONFIRM_LINE = "I CONFIRM MAINNET QUANTOS"
 ALLOWED = {
     ("POST", "/fapi/v1/order"), ("GET", "/fapi/v1/order"), ("DELETE", "/fapi/v1/order"),
@@ -97,6 +98,9 @@ class SignedClient:
         if mode == "mainnet": check_mainnet(allow_mainnet, confirm_file)
         if mode != "dry-run" and keys is None: raise ModeError("keys required")
         self.mode, self._keys, self.recv_window = mode, keys, int(recv_window)
+        # Futures testnet keys come from either host; QUANTOS_TESTNET_HOST=demo selects Demo Trading.
+        self.base = (TESTNET_HOSTS[os.environ.get("QUANTOS_TESTNET_HOST", "testnet")]
+                     if mode == "testnet" else BASES.get(mode))
         self._transport = transport or self._urlopen
         self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
         self._offset: int | None = 0 if mode == "dry-run" else None
@@ -132,7 +136,7 @@ class SignedClient:
             q += "&signature=" + sign(self._keys.api_secret, q)
         else:
             q = urlencode(p)
-        req = Request(BASES[self.mode] + path + ("?" + q if q else ""), method=method,
+        req = Request(self.base + path + ("?" + q if q else ""), method=method,
                       headers={"Accept": "application/json", "User-Agent": "QuantOS-live/1"})
         if signed: req.add_header("X-MBX-APIKEY", self._keys.api_key)
         try:
