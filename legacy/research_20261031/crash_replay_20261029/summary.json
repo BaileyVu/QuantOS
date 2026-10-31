@@ -1,0 +1,531 @@
+{
+ "out:L:p1": {
+  "cash_realized": "195.8714",
+  "unrealized": "0.1376",
+  "equity_marked": "196.0090",
+  "pnl_marked": "-3.9910",
+  "per_strategy": {
+   "ema_atr_limit_pullback": {
+    "signals": 2591,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "EXISTING_EXPOSURE": 1373,
+     "NET_REWARD_RISK": 1216,
+     "PERCENT_PRICE_FILTER": 2
+    },
+    "no_fill": {}
+   },
+   "donchian_atr_stop_breakout": {
+    "signals": 524,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "EXISTING_EXPOSURE": 265,
+     "NET_REWARD_RISK": 249,
+     "STOP_ALREADY_TRIGGERED": 10
+    },
+    "no_fill": {}
+   },
+   "tsmom_4h": {
+    "signals": 41,
+    "approved": 4,
+    "filled": 3,
+    "closed": 2,
+    "open": 1,
+    "net_pnl_incl_unrealized": "-3.9909",
+    "R_sum": "-2.006",
+    "rejects": {
+     "EXISTING_EXPOSURE": 37
+    },
+    "no_fill": {
+     "NO_FILL:FILL_EXCEEDS_APPROVED_RISK": 1
+    }
+   },
+   "turtle_55": {
+    "signals": 10,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "EXISTING_EXPOSURE": 10
+    },
+    "no_fill": {}
+   },
+   "vol_squeeze_breakout": {
+    "signals": 2,
+    "approved": 1,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "EXISTING_EXPOSURE": 1
+    },
+    "no_fill": {
+     "NO_FILL:FILL_EXCEEDS_APPROVED_RISK": 1
+    }
+   }
+  },
+  "events": {
+   "CONFLICT": 18,
+   "FUNDING": 1
+  },
+  "disconnect_reasons": {},
+  "paused": false
+ },
+ "out:L:p5": {
+  "cash_realized": "194.1686",
+  "unrealized": "0.0000",
+  "equity_marked": "194.1686",
+  "pnl_marked": "-5.8314",
+  "per_strategy": {
+   "ema_atr_limit_pullback": {
+    "signals": 2591,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "NET_REWARD_RISK": 1699,
+     "EXISTING_EXPOSURE": 890,
+     "PERCENT_PRICE_FILTER": 2
+    },
+    "no_fill": {}
+   },
+   "donchian_atr_stop_breakout": {
+    "signals": 524,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "NET_REWARD_RISK": 342,
+     "EXISTING_EXPOSURE": 163,
+     "STOP_ALREADY_TRIGGERED": 19
+    },
+    "no_fill": {}
+   },
+   "tsmom_4h": {
+    "signals": 41,
+    "approved": 5,
+    "filled": 1,
+    "closed": 1,
+    "open": 0,
+    "net_pnl_incl_unrealized": "-5.8314",
+    "R_sum": "-0.973",
+    "rejects": {
+     "EXISTING_EXPOSURE": 36
+    },
+    "no_fill": {
+     "NO_FILL:INSUFFICIENT_EXECUTABLE_DEPTH": 4
+    }
+   },
+   "turtle_55": {
+    "signals": 10,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "EXISTING_EXPOSURE": 10
+    },
+    "no_fill": {}
+   },
+   "vol_squeeze_breakout": {
+    "signals": 2,
+    "approved": 1,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "EXISTING_EXPOSURE": 1
+    },
+    "no_fill": {
+     "NO_FILL:INSUFFICIENT_EXECUTABLE_DEPTH": 1
+    }
+   }
+  },
+  "events": {
+   "CONFLICT": 18,
+   "FUNDING": 1
+  },
+  "disconnect_reasons": {},
+  "paused": false
+ },
+ "out:L:pA": {
+  "cash_realized": "198.9500",
+  "unrealized": "-0.1939",
+  "equity_marked": "198.7561",
+  "pnl_marked": "-1.2439",
+  "per_strategy": {
+   "ema_atr_limit_pullback": {
+    "signals": 2591,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "EXISTING_EXPOSURE": 1613,
+     "NET_REWARD_RISK": 976,
+     "PERCENT_PRICE_FILTER": 2
+    },
+    "no_fill": {}
+   },
+   "donchian_atr_stop_breakout": {
+    "signals": 524,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "EXISTING_EXPOSURE": 362,
+     "NET_REWARD_RISK": 158,
+     "STOP_ALREADY_TRIGGERED": 4
+    },
+    "no_fill": {}
+   },
+   "tsmom_4h": {
+    "signals": 41,
+    "approved": 3,
+    "filled": 3,
+    "closed": 2,
+    "open": 1,
+    "net_pnl_incl_unrealized": "-1.2440",
+    "R_sum": "-2.721",
+    "rejects": {
+     "EXISTING_EXPOSURE": 37,
+     "BELOW_EXCHANGE_MINIMUM": 1
+    },
+    "no_fill": {}
+   },
+   "turtle_55": {
+    "signals": 10,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "STOP_ALREADY_TRIGGERED": 10
+    },
+    "no_fill": {}
+   },
+   "vol_squeeze_breakout": {
+    "signals": 2,
+    "approved": 1,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "BELOW_EXCHANGE_MINIMUM": 1
+    },
+    "no_fill": {
+     "NO_FILL:FILL_EXCEEDS_APPROVED_RISK": 1
+    }
+   }
+  },
+  "events": {
+   "CONFLICT": 18,
+   "FUNDING": 1
+  },
+  "disconnect_reasons": {},
+  "paused": false
+ },
+ "out:R:pR": {
+  "cash_realized": "199.9916",
+  "unrealized": "0.3221",
+  "equity_marked": "200.3137",
+  "pnl_marked": "0.3137",
+  "per_strategy": {
+   "alt_dip_reversal": {
+    "signals": 97,
+    "approved": 8,
+    "filled": 2,
+    "closed": 0,
+    "open": 2,
+    "net_pnl_incl_unrealized": "0.3137",
+    "R_sum": "0.164",
+    "rejects": {
+     "BELOW_EXCHANGE_MINIMUM": 87,
+     "ENTRY_COOLDOWN": 2
+    },
+    "no_fill": {
+     "NO_FILL:INSUFFICIENT_EXECUTABLE_DEPTH": 6
+    }
+   }
+  },
+  "events": {
+   "FUNDING": 2
+  },
+  "disconnect_reasons": {},
+  "paused": false
+ },
+ "out:CF:p1": {
+  "cash_realized": "199.9949",
+  "unrealized": "0.1160",
+  "equity_marked": "200.1109",
+  "pnl_marked": "0.1109",
+  "per_strategy": {
+   "alt_dip_reversal": {
+    "signals": 97,
+    "approved": 1,
+    "filled": 1,
+    "closed": 0,
+    "open": 1,
+    "net_pnl_incl_unrealized": "0.1109",
+    "R_sum": "0.056",
+    "rejects": {
+     "EXISTING_EXPOSURE": 92,
+     "BELOW_EXCHANGE_MINIMUM": 3,
+     "ENTRY_COOLDOWN": 1
+    },
+    "no_fill": {}
+   }
+  },
+  "events": {
+   "FUNDING": 1
+  },
+  "disconnect_reasons": {},
+  "paused": false
+ },
+ "out:CF:p5": {
+  "cash_realized": "199.9714",
+  "unrealized": "-0.8515",
+  "equity_marked": "199.1199",
+  "pnl_marked": "-0.8801",
+  "per_strategy": {
+   "alt_dip_reversal": {
+    "signals": 97,
+    "approved": 1,
+    "filled": 1,
+    "closed": 0,
+    "open": 1,
+    "net_pnl_incl_unrealized": "-0.8801",
+    "R_sum": "-0.089",
+    "rejects": {
+     "EXISTING_EXPOSURE": 88,
+     "ENTRY_COOLDOWN": 8
+    },
+    "no_fill": {}
+   }
+  },
+  "events": {
+   "FUNDING": 2
+  },
+  "disconnect_reasons": {},
+  "paused": false
+ },
+ "out:CF:pA": {
+  "cash_realized": "200.0000",
+  "unrealized": "0.0000",
+  "equity_marked": "200.0000",
+  "pnl_marked": "0.0000",
+  "per_strategy": {
+   "alt_dip_reversal": {
+    "signals": 97,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "BELOW_EXCHANGE_MINIMUM": 97
+    },
+    "no_fill": {}
+   }
+  },
+  "events": {},
+  "disconnect_reasons": {},
+  "paused": false
+ },
+ "out_oirepair:R:pR": {
+  "cash_realized": "199.9916",
+  "unrealized": "0.3221",
+  "equity_marked": "200.3137",
+  "pnl_marked": "0.3137",
+  "per_strategy": {
+   "crash_flush_e2": {
+    "signals": 13,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "BELOW_EXCHANGE_MINIMUM": 9,
+     "EXISTING_SYMBOL_EXPOSURE": 4
+    },
+    "no_fill": {}
+   },
+   "alt_dip_reversal": {
+    "signals": 97,
+    "approved": 8,
+    "filled": 2,
+    "closed": 0,
+    "open": 2,
+    "net_pnl_incl_unrealized": "0.3137",
+    "R_sum": "0.164",
+    "rejects": {
+     "BELOW_EXCHANGE_MINIMUM": 87,
+     "ENTRY_COOLDOWN": 2
+    },
+    "no_fill": {
+     "NO_FILL:INSUFFICIENT_EXECUTABLE_DEPTH": 6
+    }
+   }
+  },
+  "events": {
+   "FUNDING": 2
+  },
+  "disconnect_reasons": {},
+  "paused": false
+ },
+ "out_oirepair:CF:p1": {
+  "cash_realized": "199.9949",
+  "unrealized": "0.1160",
+  "equity_marked": "200.1109",
+  "pnl_marked": "0.1109",
+  "per_strategy": {
+   "crash_flush_e2": {
+    "signals": 13,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "EXISTING_EXPOSURE": 13
+    },
+    "no_fill": {}
+   },
+   "alt_dip_reversal": {
+    "signals": 97,
+    "approved": 1,
+    "filled": 1,
+    "closed": 0,
+    "open": 1,
+    "net_pnl_incl_unrealized": "0.1109",
+    "R_sum": "0.056",
+    "rejects": {
+     "EXISTING_EXPOSURE": 92,
+     "BELOW_EXCHANGE_MINIMUM": 3,
+     "ENTRY_COOLDOWN": 1
+    },
+    "no_fill": {}
+   }
+  },
+  "events": {
+   "FUNDING": 1
+  },
+  "disconnect_reasons": {},
+  "paused": false
+ },
+ "out_oirepair:CF:p5": {
+  "cash_realized": "199.9714",
+  "unrealized": "-0.8515",
+  "equity_marked": "199.1199",
+  "pnl_marked": "-0.8801",
+  "per_strategy": {
+   "crash_flush_e2": {
+    "signals": 13,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "EXISTING_EXPOSURE": 13
+    },
+    "no_fill": {}
+   },
+   "alt_dip_reversal": {
+    "signals": 97,
+    "approved": 1,
+    "filled": 1,
+    "closed": 0,
+    "open": 1,
+    "net_pnl_incl_unrealized": "-0.8801",
+    "R_sum": "-0.089",
+    "rejects": {
+     "EXISTING_EXPOSURE": 88,
+     "ENTRY_COOLDOWN": 8
+    },
+    "no_fill": {}
+   }
+  },
+  "events": {
+   "FUNDING": 2
+  },
+  "disconnect_reasons": {},
+  "paused": false
+ },
+ "out_oirepair:CF:pA": {
+  "cash_realized": "200.0000",
+  "unrealized": "0.0000",
+  "equity_marked": "200.0000",
+  "pnl_marked": "0.0000",
+  "per_strategy": {
+   "crash_flush_e2": {
+    "signals": 13,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "BELOW_EXCHANGE_MINIMUM": 13
+    },
+    "no_fill": {}
+   },
+   "alt_dip_reversal": {
+    "signals": 97,
+    "approved": 0,
+    "filled": 0,
+    "closed": 0,
+    "open": 0,
+    "net_pnl_incl_unrealized": "0.0000",
+    "R_sum": "0.000",
+    "rejects": {
+     "BELOW_EXCHANGE_MINIMUM": 97
+    },
+    "no_fill": {}
+   }
+  },
+  "events": {},
+  "disconnect_reasons": {},
+  "paused": false
+ }
+}

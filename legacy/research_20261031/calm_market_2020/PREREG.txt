@@ -1,0 +1,42 @@
+PRE-REGISTRATION  (written before any HELD-OUT number was computed; 2026-10-31)
+Candidates (2 trials): range_mr_maker_v1, grid_calm_maker_v1. funding_carry_v1 DROPPED by coordinator (not tested).
+Data: edge_data/crash_episodes_2020 hourly USDT-M OHLC. DEVELOP 2020-01-01..2023-06-30, HELD-OUT 2023-07-01..2024-12-31. No 2025+ data.
+Fees (PLACEHOLDER pending owner's real numbers): maker 0.00%/side, taker 0.04%/side, taker slippage 0.05% (BTC/ETH) or 0.10% (others), maker slippage 0.
+STRESS: maker 0.02%, taker 0.05%, same slippage.
+Fill rule: limit fills only if a LATER bar trades THROUGH by >=1 tick (tick = 1e-5 of price; buy: low < p*(1-1e-5); sell: high > p*(1+1e-5)); fill at limit price.
+Entries post-only limits; targets maker limits; stops/time/regime-off = taker (stop at stop level, or worse open on gap).
+Choices not specified, fixed here: ATR = 14-bar simple mean of true range; BB std population (ddof 0); RSI = Wilder 14; 30-day median = 720 bars;
+ range_mr post-only limit price = min(lower band, signal close) for buys / max(upper band, signal close) for sells; since signal needs close beyond the band this is the signal close;
+ unit trade notional: $50 (range_mr), $50/3 (grid unit); stop checked on the fill bar too; target not allowed on the fill bar; grid re-arm after stop-out only after regime has been off once.
+PASS RULE (per candidate, HELD-OUT): (a) net mean/trade (placeholder fees) > 0 with 90% week-block bootstrap CI lower bound > 0;
+ (b) mean net >= 0 under STRESS fees; (c) >= 100 trades; (d) real mean above 90th percentile of 200-seed placebo;
+ (e) deflated Sharpe (per-trade SR, null SR variance 1/n, n_trials=2) has SR - SR0 > 0 (prob>0.5); stricter line: same with n_trials=2+81=83 (reported separately).
+Otherwise status = dead.
+
+=== APPENDIX 2026-10-31 (owner follow-up; written BEFORE running; DEVELOP 2020-01-01..2023-06-30 ONLY, HELD-OUT bars are not loaded) ===
+Fees now CONFIRMED by owner: maker 0.00%, taker 0.04%/side (+ taker slippage 0.05% BTC/ETH, 0.10% others); STRESS maker 0.02%, taker 0.05%.
+Exactly 4 variants (everything else as in range_mr_maker_v1 / grid_calm_maker_v1):
+ range_mr_tp_band : target = opposite Bollinger(20,2) band of the previous close (maker limit); time exit 48 bars.
+ range_mr_tp_1p5atr : target = entry +/- 1.5*ATR(14 at signal bar) (maker limit); time exit 48 bars.
+ grid_tp2 : each grid fill closes 2 levels toward/through the mean (maker); stop at +-4 levels unchanged.
+ grid_tp3 : closes 3 levels away.
+Report: trades, win rate, mean/median net bp, 90% week-block CI, stop-out share, placebo percentile (200 seeds, same placebo construction, target adjusted).
+DECISION RULE: a variant is eligible for a FORWARD paper test only if DEVELOP mean net > 0 with CI lower bound > 0 under base fees AND mean >= 0 under stress fees.
+Otherwise all are dead. No HELD-OUT validation is claimed even for an eligible variant. Code: variants.py.
+
+=== APPENDIX 2 2026-10-31 (owner: "twist everything possible"; written BEFORE running; DEVELOP only, code sweep.py) ===
+Full-factorial sweep, 144 variants, fees base maker 0%/taker 0.04% (+slip) and stress 0.02/0.05, same fill model, 8 coins (range) / BTC,ETH (grid).
+range_mr family (108): entry band k in {2.0,2.5,3.0} x RSI {25/75, 30/70} x target {SMA20, opposite band (same k), entry+-1.5 ATR} x stop {2 ATR, 3 ATR, none} x regime filter {on, off}.
+ Time exit: 24 bars if (target=SMA20 and a stop exists), else 48 bars (stop=none always 48). Limit at signal close, 3-bar life, ATR at signal bar.
+grid family (36): spacing {0.5,1.0} ATR x levels L {3,5} x close-at m {1,2,3} levels x stop {+-4 levels, +-6 levels, none (regime-off flatten only)}; regime filter always on.
+ Literal reading: with L=5 and stop +-4, levels 4,5 are unreachable (kept as specified). Grid starts only if |close-SMA100| < (stop levels, or L+1 if none) x spacing.
+Metrics per variant: trades, mean net bp, 90% week-block CI, max DD ($ at $50 notional / $16.67 unit), stop share, stress mean, DSR.
+DSR: per-trade SR, N = 144 + 4 (TP variants) + 2 (original) + 81 (CCI) = 231 trials; SR variance = variance of per-trade SR across the 144 sweep variants; DSR>0 means SR > SR0.
+FORWARD-TEST CANDIDATE only if: DSR>0 at N=231 AND DEVELOP CI lower bound > 0 (base fees) AND stress mean >= 0 AND >= 200 trades AND every one-step neighbour
+ (one parameter changed by one step; ordered axes: k, RSI, stop, spacing, L, m, stop-levels; target order SMA20->band->1.5ATR; regime on/off adjacent) has mean net > 0 (no isolated spike).
+Rank by DSR, pick at most 3. Nothing is claimed as held-out validated. HELD-OUT is not computed for any sweep variant.
+
+=== APPENDIX 3 2026-10-31 (written before the sweep ran) ===
+Ledger rule from coordinator: every variant tested (original 2 candidates in DEVELOP and HELD-OUT rows, 4 TP variants, 144 sweep variants) is appended to edge_vault/search_ledger.jsonl.
+Deflated-Sharpe N for the sweep = (ledger line count after my lines are added) + 81 prior CCI trials; this REPLACES the fixed 231 above and is reported in SWEEP.md.
+(It double-counts the two original candidates' HELD-OUT rows, a deliberate conservative choice.)

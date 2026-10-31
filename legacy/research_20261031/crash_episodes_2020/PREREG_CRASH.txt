@@ -1,0 +1,25 @@
+PREREG_CRASH.txt  -- written 2026-10-31 BEFORE any sweep code was run.  Research only.
+Data: existing data/prices.npz (2020-01..2024-12, 29 USDT-M perps, hourly) + data/oi_hourly.json. No 2025+ data. Episodes = episodes.csv (unchanged).
+BUILD = TRAIN split (episodes start <= 2023-06-30). HELD-OUT = 2023-07..2024-12 (22 episodes); touched only for the finalists + current rule, once each.
+
+FAMILIES
+ crash_flush: universe 9 MAJORS; signal at hourly close t within [episode k, k+48]: C[t]/C[t-4]<1, C[t] <= max(HI[t-23..t])*(1-DD), tolerant OI 4h-change z(720h) < Z. First fire per symbol per episode.
+ alt_dip:     universe all 29 symbols; signal: C[t]/C[t-24]-1 <= quarterly pooled-quantile cutoff Q (calibration window [S-90d,S-3d) as in evaluate.py; own numpy replica, checked vs results.json for Q=1%). First fire per symbol per episode.
+FACTORS (full factorial, no sampling; every cell is a ledger line)
+ hold H in {12,24,48,72}h; trail in {none, arm +3% trail 2%, arm +5% trail 3%}; catastrophe stop in {15%,25%};
+ entry in {market at open t+1, 3-rung maker ladder at -1/-2/-3% below close[t], valid 6h (bars t+1..t+6), each rung 1/3 of notional, unfilled rung = 0 return on that third};
+ BTC gate in {none, BTC 24h return at t > -10%};  max positions per episode MP in {1,3,5} (causal: chronological order of signals, same-bar ties -> deepest drawdown first);
+ crash_flush: Z in {-1.5,-2,-2.5} x DD in {6%,8%,10%} (9 cells => 24*2*2*3*9 = 2592 variants);  alt_dip: Q in {0.5%,1%,2%} (=> 864 variants).
+ Total BUILD variants 3456 (no Latin-hypercube needed). Hold clock starts at open t+1 for every entry type; all exits are taker.
+COSTS (owner-confirmed): maker 0.00%, taker 0.04%/side; slippage on taker fills 0.05% BTC/ETH, 0.10% others; maker fills no slippage, fill only on trade-through (bar LOW < limit; fill at limit).
+ Stress: maker 0.02%, taker 0.05%, same slippage.
+FILL CONVENTIONS: catastrophe stop = entry*(1-cat), triggered on bar low, fill min(bar open, stop). Trail: running high includes the current bar (conservative); level=high*(1-trail), armed when high >= entry*(1+arm); fill min(open, level). Catastrophe checked before trail. Ladder rung: stop checked from fill bar, trail high tracked from the bar after fill. Trades touching NaN bars (archive holes) skipped.
+UNIT: per-episode mean net return over its trades (episodes with >=1 trade); CI90 = bootstrap over episodes (2000 resamples, seed 1). Ledger mean_net_bp = mean of per-episode means in bp.
+SELECTION (BUILD only), per family, N = (ledger lines at selection time) + 81 prior + 8 reserved (baselines + finalist held-out runs).
+ DSR (Bailey-Lopez de Prado) on per-episode Sharpe (mean/std over episodes), SR0 from variance of SR across the family's 'trials' and N, skew/kurtosis adjusted, T = episodes with trades. Finalist requires DSR z-stat > 0 (prob > 0.5).
+ Rank by DSR; walk down the list; candidate becomes finalist if ALL: DSR>0; BUILD CI90 lower bound > 0; stress mean >= 0; >= 30 episodes with trades; beats random-entry placebo at 90th pct;
+  all one-step neighbours (one ordinal step in one factor, incl. entry type and gate) have mean net > 0 on BUILD.
+ Placebo: 200 draws; each draw = same number of episodes and same trades per episode as the candidate, start hours random from non-episode hours (excluded -24h..+96h of any episode start, inside TRAIN, and in the era where the rule can fire: crash_flush >= 2021-12 OI era, alt_dip >= 2020-07), symbols random from the rule universe with data, same entry/exit/stop mechanics. Pass if candidate mean > 90th pct of the 200 draw means. (Placebo is a check, not a ledger variant.)
+ At most 2 finalists per family; the 2nd must not be a one-step neighbour of the 1st.
+HELD-OUT: each finalist once, as-is; current production rule (market, H24, no trail, cat 25%, gate none, MP unlimited, Z-2/DD8% | Q1%) on BUILD and HELD under the same new cost model for comparison.
+ "Better than current" = HELD mean per-episode higher than current rule's HELD and CI90 lower bound > 0 -> Forward-test spec written. Otherwise reported as-is; edge status dead or backtest-pass per EDGE_SPEC.
