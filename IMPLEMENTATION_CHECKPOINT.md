@@ -91,6 +91,16 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   correlated episodes, small N, survivor universe, both rules designed with 2021-24 in view. Tibo's sealed 2025+
   evaluation data NOT used. No change to running services.
 
+- 15:34 pL5 (5% risk, 15% daily / 35% DD) added in the paper process (566f7f4), batched live50 quote feed.
+  0880512: live sizing at 90% of risk budget, fill check capped at full budget (5% replay fills 5/8 vs 1/14).
+  d5ad038: pL5 restricted to crash_flush/alt_dip/delist (owner decision; trend failed held-out). Paper on d5ad038,
+  PEPE position preserved through every pause-restart. Demo still on 331a42f (2%, unaffected).
+- Hunt blocks (all in edge_vault/, ledger edge_vault/search_ledger.jsonl ~3,900 variants): calm MR/grid dead
+  (148 variants), crash rule improvements none (3,456; current rules hold: HELD crash_flush +292bp,
+  alt_dip +253bp per episode), tsmom_4h_v2 dead (production config HELD +18bp CI [-43,+90]).
+- Block 4 in progress: Hyperliquid wallet-copy forward paper (edge_data/hl_copy), owner approved installing
+  com.quantos.hlcopy after code/unicode review.
+
 ### Next step
 Keep runs stable; report at user check-ins. Paper run ends 2026-11-03 02:49 UTC -> final reports, then decide on live.
 
