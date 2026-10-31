@@ -47,7 +47,32 @@ def load_keys(path: str | os.PathLike | None = None) -> Keys:
     if not p.is_file() or st.st_mode & 0o077:
         raise KeyError_("key file must be a regular file with mode 600 (no group/world access)")
     try:
-        data = json.loads(p.read_text())
-        return Keys(data["api_key"], data["api_secret"])
-    except (OSError, ValueError, KeyError, TypeError):
-        raise KeyError_("key file malformed; expected JSON {api_key, api_secret}") from None
+        text = p.read_text()
+    except OSError:
+        raise KeyError_("key file not readable") from None
+    if text.lstrip().startswith("{"):
+        try:
+            data = json.loads(text)
+            return Keys(data["api_key"], data["api_secret"])
+        except (ValueError, KeyError, TypeError):
+            raise KeyError_("key file malformed; expected JSON {api_key, api_secret}") from None
+    return _from_env(text)
+
+
+def _from_env(text: str) -> Keys:
+    """KEY=VALUE lines; picks the one *SECRET* name and the one other *KEY* name. Errors name variables only."""
+    pairs = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = line.removeprefix("export ").split("=", 1)
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        pairs[name.strip()] = value
+    secrets = [n for n in pairs if "SECRET" in n.upper()]
+    keys = [n for n in pairs if "KEY" in n.upper() and n not in secrets]
+    if len(secrets) != 1 or len(keys) != 1:
+        raise KeyError_(f"env key file needs exactly one *SECRET* and one *KEY* variable; found names {sorted(pairs)}")
+    return Keys(pairs[keys[0]], pairs[secrets[0]])

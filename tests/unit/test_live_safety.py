@@ -83,3 +83,26 @@ class GuardTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EnvKeyFileTests(unittest.TestCase):
+    def load(self, text):
+        import os, tempfile
+        from quantos.live.keys import load_keys
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "k.env")
+            with open(path, "w") as f: f.write(text)
+            os.chmod(path, 0o600)
+            return load_keys(path)
+
+    def test_env_format_by_name_pattern(self):
+        k = self.load("# testnet\nexport BINANCE_TESTNET_API_KEY='abc'\nBINANCE_TESTNET_API_SECRET=\"xyz\"\n")
+        self.assertEqual((k.api_key, k.api_secret), ("abc", "xyz"))
+        self.assertEqual(repr(k), "Keys(****)")
+
+    def test_ambiguous_env_error_names_only(self):
+        from quantos.live.keys import KeyError_
+        with self.assertRaises(KeyError_) as cm:
+            self.load("A_KEY=v1\nB_KEY=v2\nS_SECRET=v3\n")
+        self.assertIn("A_KEY", str(cm.exception))
+        self.assertNotIn("v1", str(cm.exception))
