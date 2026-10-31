@@ -94,7 +94,7 @@ function lastFeed(r,kinds){var f=r.feed||[];for(var i=0;i<f.length;i++)if(kinds.
 function evText(e){return e?(e.kind+" "+(e.strategy||"")+" "+(e.symbol||"")+" "+(e.reason||"")).trim()+" ("+ago((Date.now()-e.time_ms)/1000)+" ago)":"no events yet"}
 function stages(r){
  var st=r.status||{},run=r.run||{},fh=st.feed_health||{},stale=Object.keys(fh.stale||{}),hb=r.heartbeat_age_s,S=[],e=eng(r);
- var c=(hb!=null&&hb<30&&!stale.length)?"ok":"bad";if(c==="ok"&&(r.errors_last_hour||0)>0)c="warn";
+ var c=(hb!=null&&hb<30&&!stale.length)?"ok":"bad";if(c==="ok"&&(r.errors_last_15m||0)>0)c="warn";
  S.push({n:"Feeds",c:c,e:"hb "+ago(hb)+", scan "+ago((fh.ages_s||{}).scan)+", err/h "+(r.errors_last_hour==null?"?":r.errors_last_hour)+(stale.length?", stale: "+stale.join(","):"")});
  var sc=(r.self_check||{}).checks||{},lv="ok",bad=[];Object.keys(sc).forEach(function(k){var l=sc[k].level;if(l==="critical"){lv="bad";bad.push(k)}else if(l==="warn"){lv=worst(lv,"warn");bad.push(k)}});
  if(!r.self_check)lv="warn";
