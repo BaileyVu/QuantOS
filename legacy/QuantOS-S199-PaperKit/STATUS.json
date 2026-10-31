@@ -1,0 +1,27 @@
+{
+  "generated_at_date": "2026-10-16",
+  "research_strategy": "S199 BTC five-minute probability dislocation",
+  "state": "MAC_READY_RESEARCH_SCAFFOLD_NOT_LIVE_VALIDATED",
+  "pinned_upstream_sha": "c76e77af00ef53472a9da8f66dae7fdd2d3e5928",
+  "capital": {
+    "mode": "virtual",
+    "starting_usd": 200,
+    "restarts_do_not_restore_balance": true
+  },
+  "checks": {
+    "shell_syntax": "PASS",
+    "local_unit_tests": "5/5 PASS",
+    "source_profile_examined": true,
+    "macOS_install_tested": false,
+    "polymarket_feed_connected_here": false,
+    "real_paper_fills": 0,
+    "real_paper_trades_observed": 0,
+    "historical_2026_09_plus_holdout_accessed_for_backtest": false
+  },
+  "validation": {
+    "live_trading_approval": false,
+    "verified_profitable_edge": false,
+    "source_2026_model_current_2026_twap_compatibility": "NOT_VALIDATED"
+  },
+  "next": "Install local on Mac, run build-only then sandbox; Tibo must implement persistent ledger and current-rule TWAP test."
+}

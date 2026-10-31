@@ -1,0 +1,26 @@
+{
+  "bootstrap_total_pnl_ci95_usd": [
+    -15.70525,
+    15.0093
+  ],
+  "candidate_count": 17,
+  "cost_assumption": "five shares at logged ask; inferred_cost_per_share from overnight log includes logged fee/slippage adjustment",
+  "evidence_status": "POST_HOC_NOT_HOLDOUT",
+  "full_17_net_pnl_usd": 0.4885,
+  "label_rule": "existing V2 event parser: closed market, exact 1/0 Up/Down prices, Chainlink/Data Streams/TWAP methodology",
+  "losses": 3,
+  "market_brier_selected_side": 0.15359123529411767,
+  "model_brier_selected_side": 0.155847916254277,
+  "partial_verified_net_pnl_usd": 0.4885,
+  "raw_events": "/Users/bailey12/Desktop/QuantOS-S199-PaperKit/runtime/rescue-v2-crosscheck-20261019/event_raw.jsonl",
+  "retrieved_utc": "2026-10-19T04:22:26.320263+00:00",
+  "source_candidates": "/Users/bailey12/Desktop/S199_Rescue_Research/S199_recovery_candidates_17.csv",
+  "unknown": 0,
+  "verified": 17,
+  "win_rate": 0.8235294117647058,
+  "win_rate_wilson_ci95": [
+    0.5897054143116588,
+    0.9380887336237901
+  ],
+  "wins": 14
+}

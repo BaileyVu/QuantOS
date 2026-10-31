@@ -1,0 +1,4237 @@
+{
+  "method": "Independent Decimal aggregation of existing SQLite journals opened mode=ro&immutable=1, after asserting WAL absent or zero bytes. Verify hash chain. Sum fill costs by outcome, virtual_merge payouts and virtual_redemption payouts; never invoke engine. Frequencies from one deterministic episode per entered fixture market, not estimated real-world probabilities. Partial-fill order counts are distinct from partial-fill events.",
+  "calibration": {
+    "counts": {
+      "one": 4,
+      "neither": 100,
+      "both_full": 1996
+    },
+    "n": 2100,
+    "frequencies": {
+      "one": "0.001904761904761904761904761904761904761905",
+      "neither": "0.04761904761904761904761904761904761904762",
+      "both_full": "0.9504761904761904761904761904761904761905"
+    },
+    "training_naive_expected_per_share": "0.01707619047619047619047619047619047619048"
+  },
+  "compensation": {
+    "gross_pair_profit_per_share": ".02",
+    "full_loss_unmatched_share": ".49",
+    "pair_shares_required_per_losing_unmatched_share": "24.5",
+    "integer_pair_shares_required": "25",
+    "pair_profit_after_configured_ops_allowance_per_share": ".019",
+    "pair_shares_required_with_0_001_allowance_in_loss_and_pairs": "25.84210526315789473684210526315789473684"
+  },
+  "runs": [
+    {
+      "run_id": "3bacb22a289ec3ad1688",
+      "capital": "200",
+      "model": "optimistic",
+      "independent_net_pnl": "-3.51960799",
+      "independent_pair_gross_pnl": "0.48365722",
+      "independent_redemption_pnl": "-4.00326521",
+      "reported_pnl": "-3.51960799",
+      "reported_unrealized_pnl": "0E-8",
+      "reported_cash": "196.48039201",
+      "reported_reserved_collateral": "0",
+      "fee_sum": "0",
+      "entered_outcome_counts": {
+        "both": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_full_completion_counts": {
+        "both_full": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_outcome_frequencies": {
+        "both": "0.6",
+        "only_up": "0.2",
+        "only_down": "0",
+        "neither": "0.2"
+      },
+      "expected_net_per_entered_market_empirical": "-0.703921598",
+      "expected_net_per_candidate_market_empirical": "-0.5866013316666666666666666666666666666667",
+      "orders_submitted": 10,
+      "orders_partially_filled_at_least_once": 0,
+      "partial_fill_events": 0,
+      "orders_canceled": 3,
+      "orders_rejected": 0,
+      "orders_fully_filled": 7,
+      "orders_with_final_partial_fill": 0,
+      "largest_losses": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "outcome": "UP",
+          "order_ids": [
+            "virtual-00000003"
+          ],
+          "shares": "8.169929",
+          "loss": "-4.00326521",
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "8.169929",
+              "time": 1782950403010,
+              "unmatched_cost": "4.00326521",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ]
+        }
+      ],
+      "markets": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "day": "2026-07-01",
+          "winner": "UP",
+          "fills": {
+            "UP": "8.163265",
+            "DOWN": "8.163265"
+          },
+          "fill_cost": {
+            "UP": "3.99999985",
+            "DOWN": "3.99999985"
+          },
+          "submits": {
+            "UP": "8.163265",
+            "DOWN": "8.163265"
+          },
+          "merged_pairs": "8.163265",
+          "merge_pnl": "0.16326530",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "8.163265",
+              "time": 1782864003010,
+              "unmatched_cost": "3.99999985",
+              "utc": "2026-07-01T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "8.163265",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "8.163265",
+              "time": 1782864004010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-01T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-01T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.16326530",
+          "direct_cash_pnl": "0.16326530",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "day": "2026-07-02",
+          "winner": "DOWN",
+          "fills": {
+            "UP": "8.169929",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "4.00326521",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "8.169929",
+            "DOWN": "8.169929"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "-4.00326521",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "4.00326521",
+          "loss_order_ids": [
+            "virtual-00000003"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "8.169929",
+              "time": 1782950403010,
+              "unmatched_cost": "4.00326521",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "8.169929",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "4.00326521",
+            "DOWN": "0"
+          },
+          "net_pnl": "-4.00326521",
+          "direct_cash_pnl": "-4.00326521",
+          "outcome": "only_up",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 1,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+          "day": "2026-07-03",
+          "winner": "UP",
+          "fills": {
+            "UP": "8.006530",
+            "DOWN": "8.006530"
+          },
+          "fill_cost": {
+            "UP": "3.92319970",
+            "DOWN": "3.92319970"
+          },
+          "submits": {
+            "UP": "8.006530",
+            "DOWN": "8.006530"
+          },
+          "merged_pairs": "8.006530",
+          "merge_pnl": "0.16013060",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "8.006530",
+              "time": 1783036803010,
+              "unmatched_cost": "3.92319970",
+              "utc": "2026-07-03T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "8.006530",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "8.006530",
+              "time": 1783036804010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-03T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-03T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.16013060",
+          "direct_cash_pnl": "0.16013060",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "day": "2026-07-04",
+          "winner": "UP",
+          "fills": {
+            "UP": "8.013066",
+            "DOWN": "8.013066"
+          },
+          "fill_cost": {
+            "UP": "3.92640234",
+            "DOWN": "3.92640234"
+          },
+          "submits": {
+            "UP": "8.013066",
+            "DOWN": "8.013066"
+          },
+          "merged_pairs": "8.013066",
+          "merge_pnl": "0.16026132",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "8.013066",
+              "time": 1783123203010,
+              "unmatched_cost": "3.92640234",
+              "utc": "2026-07-04T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "8.013066",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "8.013066",
+              "time": 1783123204010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-04T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.16026132",
+          "direct_cash_pnl": "0.16026132",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000005",
+          "day": "2026-07-05",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "8.019607",
+            "DOWN": "8.019607"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000006",
+          "day": "2026-07-06",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {},
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        }
+      ],
+      "journal_hash_valid": true
+    },
+    {
+      "run_id": "9ee3184e4cb460897141",
+      "capital": "200",
+      "model": "baseline",
+      "independent_net_pnl": "-3.51960799",
+      "independent_pair_gross_pnl": "0.48365722",
+      "independent_redemption_pnl": "-4.00326521",
+      "reported_pnl": "-3.51960799",
+      "reported_unrealized_pnl": "0E-8",
+      "reported_cash": "196.48039201",
+      "reported_reserved_collateral": "0",
+      "fee_sum": "0",
+      "entered_outcome_counts": {
+        "both": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_full_completion_counts": {
+        "both_full": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_outcome_frequencies": {
+        "both": "0.6",
+        "only_up": "0.2",
+        "only_down": "0",
+        "neither": "0.2"
+      },
+      "expected_net_per_entered_market_empirical": "-0.703921598",
+      "expected_net_per_candidate_market_empirical": "-0.5866013316666666666666666666666666666667",
+      "orders_submitted": 10,
+      "orders_partially_filled_at_least_once": 0,
+      "partial_fill_events": 0,
+      "orders_canceled": 3,
+      "orders_rejected": 0,
+      "orders_fully_filled": 7,
+      "orders_with_final_partial_fill": 0,
+      "largest_losses": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "outcome": "UP",
+          "order_ids": [
+            "virtual-00000003"
+          ],
+          "shares": "8.169929",
+          "loss": "-4.00326521",
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "8.169929",
+              "time": 1782950403010,
+              "unmatched_cost": "4.00326521",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ]
+        }
+      ],
+      "markets": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "day": "2026-07-01",
+          "winner": "UP",
+          "fills": {
+            "UP": "8.163265",
+            "DOWN": "8.163265"
+          },
+          "fill_cost": {
+            "UP": "3.99999985",
+            "DOWN": "3.99999985"
+          },
+          "submits": {
+            "UP": "8.163265",
+            "DOWN": "8.163265"
+          },
+          "merged_pairs": "8.163265",
+          "merge_pnl": "0.16326530",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "8.163265",
+              "time": 1782864003010,
+              "unmatched_cost": "3.99999985",
+              "utc": "2026-07-01T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "8.163265",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "8.163265",
+              "time": 1782864004010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-01T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-01T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.16326530",
+          "direct_cash_pnl": "0.16326530",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "day": "2026-07-02",
+          "winner": "DOWN",
+          "fills": {
+            "UP": "8.169929",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "4.00326521",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "8.169929",
+            "DOWN": "8.169929"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "-4.00326521",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "4.00326521",
+          "loss_order_ids": [
+            "virtual-00000003"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "8.169929",
+              "time": 1782950403010,
+              "unmatched_cost": "4.00326521",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "8.169929",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "4.00326521",
+            "DOWN": "0"
+          },
+          "net_pnl": "-4.00326521",
+          "direct_cash_pnl": "-4.00326521",
+          "outcome": "only_up",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 1,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+          "day": "2026-07-03",
+          "winner": "UP",
+          "fills": {
+            "UP": "8.006530",
+            "DOWN": "8.006530"
+          },
+          "fill_cost": {
+            "UP": "3.92319970",
+            "DOWN": "3.92319970"
+          },
+          "submits": {
+            "UP": "8.006530",
+            "DOWN": "8.006530"
+          },
+          "merged_pairs": "8.006530",
+          "merge_pnl": "0.16013060",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "8.006530",
+              "time": 1783036803010,
+              "unmatched_cost": "3.92319970",
+              "utc": "2026-07-03T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "8.006530",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "8.006530",
+              "time": 1783036804010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-03T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-03T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.16013060",
+          "direct_cash_pnl": "0.16013060",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "day": "2026-07-04",
+          "winner": "UP",
+          "fills": {
+            "UP": "8.013066",
+            "DOWN": "8.013066"
+          },
+          "fill_cost": {
+            "UP": "3.92640234",
+            "DOWN": "3.92640234"
+          },
+          "submits": {
+            "UP": "8.013066",
+            "DOWN": "8.013066"
+          },
+          "merged_pairs": "8.013066",
+          "merge_pnl": "0.16026132",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "8.013066",
+              "time": 1783123203010,
+              "unmatched_cost": "3.92640234",
+              "utc": "2026-07-04T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "8.013066",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "8.013066",
+              "time": 1783123204010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-04T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.16026132",
+          "direct_cash_pnl": "0.16026132",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000005",
+          "day": "2026-07-05",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "8.019607",
+            "DOWN": "8.019607"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000006",
+          "day": "2026-07-06",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {},
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        }
+      ],
+      "journal_hash_valid": true
+    },
+    {
+      "run_id": "5fef92fa92320fa15374",
+      "capital": "200",
+      "model": "pessimistic",
+      "independent_net_pnl": "-3.51960799",
+      "independent_pair_gross_pnl": "0.48365722",
+      "independent_redemption_pnl": "-4.00326521",
+      "reported_pnl": "-3.51960799",
+      "reported_unrealized_pnl": "0E-8",
+      "reported_cash": "196.48039201",
+      "reported_reserved_collateral": "0",
+      "fee_sum": "0",
+      "entered_outcome_counts": {
+        "both": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_full_completion_counts": {
+        "both_full": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_outcome_frequencies": {
+        "both": "0.6",
+        "only_up": "0.2",
+        "only_down": "0",
+        "neither": "0.2"
+      },
+      "expected_net_per_entered_market_empirical": "-0.703921598",
+      "expected_net_per_candidate_market_empirical": "-0.5866013316666666666666666666666666666667",
+      "orders_submitted": 10,
+      "orders_partially_filled_at_least_once": 7,
+      "partial_fill_events": 7,
+      "orders_canceled": 3,
+      "orders_rejected": 0,
+      "orders_fully_filled": 7,
+      "orders_with_final_partial_fill": 0,
+      "largest_losses": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "outcome": "UP",
+          "order_ids": [
+            "virtual-00000003"
+          ],
+          "shares": "8.169929",
+          "loss": "-4.00326521",
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1782950403010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-02T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "6.169929",
+              "time": 1782950405010,
+              "unmatched_cost": "4.00326521",
+              "utc": "2026-07-02T00:00:05.010Z"
+            }
+          ]
+        }
+      ],
+      "markets": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "day": "2026-07-01",
+          "winner": "UP",
+          "fills": {
+            "UP": "8.163265",
+            "DOWN": "8.163265"
+          },
+          "fill_cost": {
+            "UP": "3.99999985",
+            "DOWN": "3.99999985"
+          },
+          "submits": {
+            "UP": "8.163265",
+            "DOWN": "8.163265"
+          },
+          "merged_pairs": "8.163265",
+          "merge_pnl": "0.16326530",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1782864003010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-01T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "2.0",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1782864004010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-01T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "1.0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "6.163265",
+              "time": 1782864005010,
+              "unmatched_cost": "2.52999985",
+              "utc": "2026-07-01T00:00:05.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "5.163265",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "5.163265",
+              "time": 1782864006010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-01T00:00:06.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-01T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.16326530",
+          "direct_cash_pnl": "0.16326530",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "day": "2026-07-02",
+          "winner": "DOWN",
+          "fills": {
+            "UP": "8.169929",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "4.00326521",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "8.169929",
+            "DOWN": "8.169929"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "-4.00326521",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "4.00326521",
+          "loss_order_ids": [
+            "virtual-00000003"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1782950403010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-02T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "6.169929",
+              "time": 1782950405010,
+              "unmatched_cost": "4.00326521",
+              "utc": "2026-07-02T00:00:05.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "8.169929",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "4.00326521",
+            "DOWN": "0"
+          },
+          "net_pnl": "-4.00326521",
+          "direct_cash_pnl": "-4.00326521",
+          "outcome": "only_up",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 1,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+          "day": "2026-07-03",
+          "winner": "UP",
+          "fills": {
+            "UP": "8.006530",
+            "DOWN": "8.006530"
+          },
+          "fill_cost": {
+            "UP": "3.92319970",
+            "DOWN": "3.92319970"
+          },
+          "submits": {
+            "UP": "8.006530",
+            "DOWN": "8.006530"
+          },
+          "merged_pairs": "8.006530",
+          "merge_pnl": "0.16013060",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1783036803010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-03T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "2.0",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1783036804010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-03T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "1.0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "6.006530",
+              "time": 1783036805010,
+              "unmatched_cost": "2.45319970",
+              "utc": "2026-07-03T00:00:05.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "5.006530",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "5.006530",
+              "time": 1783036806010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-03T00:00:06.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-03T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.16013060",
+          "direct_cash_pnl": "0.16013060",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "day": "2026-07-04",
+          "winner": "UP",
+          "fills": {
+            "UP": "8.013066",
+            "DOWN": "8.013066"
+          },
+          "fill_cost": {
+            "UP": "3.92640234",
+            "DOWN": "3.92640234"
+          },
+          "submits": {
+            "UP": "8.013066",
+            "DOWN": "8.013066"
+          },
+          "merged_pairs": "8.013066",
+          "merge_pnl": "0.16026132",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1783123203010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-04T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "2.0",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1783123204010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-04T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "1.0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "6.013066",
+              "time": 1783123205010,
+              "unmatched_cost": "2.45640234",
+              "utc": "2026-07-04T00:00:05.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "5.013066",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "5.013066",
+              "time": 1783123206010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-04T00:00:06.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.16026132",
+          "direct_cash_pnl": "0.16026132",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000005",
+          "day": "2026-07-05",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "8.019607",
+            "DOWN": "8.019607"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000006",
+          "day": "2026-07-06",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {},
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        }
+      ],
+      "journal_hash_valid": true
+    },
+    {
+      "run_id": "758580030698af26cca4",
+      "capital": "350",
+      "model": "optimistic",
+      "independent_net_pnl": "-6.15931408",
+      "independent_pair_gross_pnl": "0.84640016",
+      "independent_redemption_pnl": "-7.00571424",
+      "reported_pnl": "-6.15931408",
+      "reported_unrealized_pnl": "0E-8",
+      "reported_cash": "343.84068592",
+      "reported_reserved_collateral": "0",
+      "fee_sum": "0",
+      "entered_outcome_counts": {
+        "both": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_full_completion_counts": {
+        "both_full": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_outcome_frequencies": {
+        "both": "0.6",
+        "only_up": "0.2",
+        "only_down": "0",
+        "neither": "0.2"
+      },
+      "expected_net_per_entered_market_empirical": "-1.231862816",
+      "expected_net_per_candidate_market_empirical": "-1.026552346666666666666666666666666666667",
+      "orders_submitted": 10,
+      "orders_partially_filled_at_least_once": 0,
+      "partial_fill_events": 0,
+      "orders_canceled": 3,
+      "orders_rejected": 0,
+      "orders_fully_filled": 7,
+      "orders_with_final_partial_fill": 0,
+      "largest_losses": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "outcome": "UP",
+          "order_ids": [
+            "virtual-00000003"
+          ],
+          "shares": "14.297376",
+          "loss": "-7.00571424",
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "14.297376",
+              "time": 1782950403010,
+              "unmatched_cost": "7.00571424",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ]
+        }
+      ],
+      "markets": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "day": "2026-07-01",
+          "winner": "UP",
+          "fills": {
+            "UP": "14.285714",
+            "DOWN": "14.285714"
+          },
+          "fill_cost": {
+            "UP": "6.99999986",
+            "DOWN": "6.99999986"
+          },
+          "submits": {
+            "UP": "14.285714",
+            "DOWN": "14.285714"
+          },
+          "merged_pairs": "14.285714",
+          "merge_pnl": "0.28571428",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "14.285714",
+              "time": 1782864003010,
+              "unmatched_cost": "6.99999986",
+              "utc": "2026-07-01T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "14.285714",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "14.285714",
+              "time": 1782864004010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-01T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-01T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.28571428",
+          "direct_cash_pnl": "0.28571428",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "day": "2026-07-02",
+          "winner": "DOWN",
+          "fills": {
+            "UP": "14.297376",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "7.00571424",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "14.297376",
+            "DOWN": "14.297376"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "-7.00571424",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "7.00571424",
+          "loss_order_ids": [
+            "virtual-00000003"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "14.297376",
+              "time": 1782950403010,
+              "unmatched_cost": "7.00571424",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "14.297376",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "7.00571424",
+            "DOWN": "0"
+          },
+          "net_pnl": "-7.00571424",
+          "direct_cash_pnl": "-7.00571424",
+          "outcome": "only_up",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 1,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+          "day": "2026-07-03",
+          "winner": "UP",
+          "fills": {
+            "UP": "14.011428",
+            "DOWN": "14.011428"
+          },
+          "fill_cost": {
+            "UP": "6.86559972",
+            "DOWN": "6.86559972"
+          },
+          "submits": {
+            "UP": "14.011428",
+            "DOWN": "14.011428"
+          },
+          "merged_pairs": "14.011428",
+          "merge_pnl": "0.28022856",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "14.011428",
+              "time": 1783036803010,
+              "unmatched_cost": "6.86559972",
+              "utc": "2026-07-03T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "14.011428",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "14.011428",
+              "time": 1783036804010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-03T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-03T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.28022856",
+          "direct_cash_pnl": "0.28022856",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "day": "2026-07-04",
+          "winner": "UP",
+          "fills": {
+            "UP": "14.022866",
+            "DOWN": "14.022866"
+          },
+          "fill_cost": {
+            "UP": "6.87120434",
+            "DOWN": "6.87120434"
+          },
+          "submits": {
+            "UP": "14.022866",
+            "DOWN": "14.022866"
+          },
+          "merged_pairs": "14.022866",
+          "merge_pnl": "0.28045732",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "14.022866",
+              "time": 1783123203010,
+              "unmatched_cost": "6.87120434",
+              "utc": "2026-07-04T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "14.022866",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "14.022866",
+              "time": 1783123204010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-04T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.28045732",
+          "direct_cash_pnl": "0.28045732",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000005",
+          "day": "2026-07-05",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "14.034313",
+            "DOWN": "14.034313"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000006",
+          "day": "2026-07-06",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {},
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        }
+      ],
+      "journal_hash_valid": true
+    },
+    {
+      "run_id": "0d3a04f93abdd27658ed",
+      "capital": "350",
+      "model": "baseline",
+      "independent_net_pnl": "-6.15931408",
+      "independent_pair_gross_pnl": "0.84640016",
+      "independent_redemption_pnl": "-7.00571424",
+      "reported_pnl": "-6.15931408",
+      "reported_unrealized_pnl": "0E-8",
+      "reported_cash": "343.84068592",
+      "reported_reserved_collateral": "0",
+      "fee_sum": "0",
+      "entered_outcome_counts": {
+        "both": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_full_completion_counts": {
+        "both_full": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_outcome_frequencies": {
+        "both": "0.6",
+        "only_up": "0.2",
+        "only_down": "0",
+        "neither": "0.2"
+      },
+      "expected_net_per_entered_market_empirical": "-1.231862816",
+      "expected_net_per_candidate_market_empirical": "-1.026552346666666666666666666666666666667",
+      "orders_submitted": 10,
+      "orders_partially_filled_at_least_once": 0,
+      "partial_fill_events": 0,
+      "orders_canceled": 3,
+      "orders_rejected": 0,
+      "orders_fully_filled": 7,
+      "orders_with_final_partial_fill": 0,
+      "largest_losses": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "outcome": "UP",
+          "order_ids": [
+            "virtual-00000003"
+          ],
+          "shares": "14.297376",
+          "loss": "-7.00571424",
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "14.297376",
+              "time": 1782950403010,
+              "unmatched_cost": "7.00571424",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ]
+        }
+      ],
+      "markets": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "day": "2026-07-01",
+          "winner": "UP",
+          "fills": {
+            "UP": "14.285714",
+            "DOWN": "14.285714"
+          },
+          "fill_cost": {
+            "UP": "6.99999986",
+            "DOWN": "6.99999986"
+          },
+          "submits": {
+            "UP": "14.285714",
+            "DOWN": "14.285714"
+          },
+          "merged_pairs": "14.285714",
+          "merge_pnl": "0.28571428",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "14.285714",
+              "time": 1782864003010,
+              "unmatched_cost": "6.99999986",
+              "utc": "2026-07-01T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "14.285714",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "14.285714",
+              "time": 1782864004010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-01T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-01T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.28571428",
+          "direct_cash_pnl": "0.28571428",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "day": "2026-07-02",
+          "winner": "DOWN",
+          "fills": {
+            "UP": "14.297376",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "7.00571424",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "14.297376",
+            "DOWN": "14.297376"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "-7.00571424",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "7.00571424",
+          "loss_order_ids": [
+            "virtual-00000003"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "14.297376",
+              "time": 1782950403010,
+              "unmatched_cost": "7.00571424",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "14.297376",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "7.00571424",
+            "DOWN": "0"
+          },
+          "net_pnl": "-7.00571424",
+          "direct_cash_pnl": "-7.00571424",
+          "outcome": "only_up",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 1,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+          "day": "2026-07-03",
+          "winner": "UP",
+          "fills": {
+            "UP": "14.011428",
+            "DOWN": "14.011428"
+          },
+          "fill_cost": {
+            "UP": "6.86559972",
+            "DOWN": "6.86559972"
+          },
+          "submits": {
+            "UP": "14.011428",
+            "DOWN": "14.011428"
+          },
+          "merged_pairs": "14.011428",
+          "merge_pnl": "0.28022856",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "14.011428",
+              "time": 1783036803010,
+              "unmatched_cost": "6.86559972",
+              "utc": "2026-07-03T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "14.011428",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "14.011428",
+              "time": 1783036804010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-03T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-03T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.28022856",
+          "direct_cash_pnl": "0.28022856",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "day": "2026-07-04",
+          "winner": "UP",
+          "fills": {
+            "UP": "14.022866",
+            "DOWN": "14.022866"
+          },
+          "fill_cost": {
+            "UP": "6.87120434",
+            "DOWN": "6.87120434"
+          },
+          "submits": {
+            "UP": "14.022866",
+            "DOWN": "14.022866"
+          },
+          "merged_pairs": "14.022866",
+          "merge_pnl": "0.28045732",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "14.022866",
+              "time": 1783123203010,
+              "unmatched_cost": "6.87120434",
+              "utc": "2026-07-04T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "14.022866",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "14.022866",
+              "time": 1783123204010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-04T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.28045732",
+          "direct_cash_pnl": "0.28045732",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000005",
+          "day": "2026-07-05",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "14.034313",
+            "DOWN": "14.034313"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000006",
+          "day": "2026-07-06",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {},
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        }
+      ],
+      "journal_hash_valid": true
+    },
+    {
+      "run_id": "150d189c891df6eee790",
+      "capital": "350",
+      "model": "pessimistic",
+      "independent_net_pnl": "-6.68977140",
+      "independent_pair_gross_pnl": "0.80594284",
+      "independent_redemption_pnl": "-7.49571424",
+      "reported_pnl": "-6.68977140",
+      "reported_unrealized_pnl": "0E-8",
+      "reported_cash": "343.31022860",
+      "reported_reserved_collateral": "0",
+      "fee_sum": "0",
+      "entered_outcome_counts": {
+        "both": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_full_completion_counts": {
+        "both_full": 2,
+        "only_up": 1,
+        "both_partial": 1,
+        "neither": 1
+      },
+      "entered_outcome_frequencies": {
+        "both": "0.6",
+        "only_up": "0.2",
+        "only_down": "0",
+        "neither": "0.2"
+      },
+      "expected_net_per_entered_market_empirical": "-1.33795428",
+      "expected_net_per_candidate_market_empirical": "-1.11496190",
+      "orders_submitted": 10,
+      "orders_partially_filled_at_least_once": 7,
+      "partial_fill_events": 9,
+      "orders_canceled": 5,
+      "orders_rejected": 0,
+      "orders_fully_filled": 5,
+      "orders_with_final_partial_fill": 2,
+      "largest_losses": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "outcome": "UP",
+          "order_ids": [
+            "virtual-00000003"
+          ],
+          "shares": "14.297376",
+          "loss": "-7.00571424",
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1782950403010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-02T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "12.297376",
+              "time": 1782950405010,
+              "unmatched_cost": "7.00571424",
+              "utc": "2026-07-02T00:00:05.010Z"
+            }
+          ]
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "outcome": "DOWN",
+          "order_ids": [
+            "virtual-00000008"
+          ],
+          "shares": "1.0",
+          "loss": "-0.490",
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "2.0",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1783123204010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-04T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "9.0",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "10.0",
+              "time": 1783123206010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-04T00:00:06.010Z"
+            }
+          ]
+        }
+      ],
+      "markets": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "day": "2026-07-01",
+          "winner": "UP",
+          "fills": {
+            "UP": "14.285714",
+            "DOWN": "14.285714"
+          },
+          "fill_cost": {
+            "UP": "6.99999986",
+            "DOWN": "6.99999986"
+          },
+          "submits": {
+            "UP": "14.285714",
+            "DOWN": "14.285714"
+          },
+          "merged_pairs": "14.285714",
+          "merge_pnl": "0.28571428",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1782864003010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-01T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "2.0",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1782864004010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-01T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "1.0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "12.285714",
+              "time": 1782864005010,
+              "unmatched_cost": "5.52999986",
+              "utc": "2026-07-01T00:00:05.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "11.285714",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "11.285714",
+              "time": 1782864006010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-01T00:00:06.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-01T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.28571428",
+          "direct_cash_pnl": "0.28571428",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "day": "2026-07-02",
+          "winner": "DOWN",
+          "fills": {
+            "UP": "14.297376",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "7.00571424",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "14.297376",
+            "DOWN": "14.297376"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "-7.00571424",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "7.00571424",
+          "loss_order_ids": [
+            "virtual-00000003"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1782950403010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-02T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "12.297376",
+              "time": 1782950405010,
+              "unmatched_cost": "7.00571424",
+              "utc": "2026-07-02T00:00:05.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "14.297376",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "7.00571424",
+            "DOWN": "0"
+          },
+          "net_pnl": "-7.00571424",
+          "direct_cash_pnl": "-7.00571424",
+          "outcome": "only_up",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 1,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+          "day": "2026-07-03",
+          "winner": "UP",
+          "fills": {
+            "UP": "14.011428",
+            "DOWN": "14.011428"
+          },
+          "fill_cost": {
+            "UP": "6.86559972",
+            "DOWN": "6.86559972"
+          },
+          "submits": {
+            "UP": "14.011428",
+            "DOWN": "14.011428"
+          },
+          "merged_pairs": "14.011428",
+          "merge_pnl": "0.28022856",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1783036803010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-03T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "2.0",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1783036804010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-03T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "1.0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "12.011428",
+              "time": 1783036805010,
+              "unmatched_cost": "5.39559972",
+              "utc": "2026-07-03T00:00:05.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "11.011428",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "11.011428",
+              "time": 1783036806010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-03T00:00:06.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-03T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.28022856",
+          "direct_cash_pnl": "0.28022856",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "day": "2026-07-04",
+          "winner": "UP",
+          "fills": {
+            "UP": "12.0",
+            "DOWN": "13.0"
+          },
+          "fill_cost": {
+            "UP": "5.880",
+            "DOWN": "6.370"
+          },
+          "submits": {
+            "UP": "14.022866",
+            "DOWN": "14.022866"
+          },
+          "merged_pairs": "12.0",
+          "merge_pnl": "0.240",
+          "redemption_pnl": "-0.490",
+          "fee": "0",
+          "redemption_payout": "0.0",
+          "redemption_cost": "0.490",
+          "loss_order_ids": [
+            "virtual-00000008"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1783123203010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-04T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "2.0",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1783123204010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-04T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "1.0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "10.0",
+              "time": 1783123205010,
+              "unmatched_cost": "4.410",
+              "utc": "2026-07-04T00:00:05.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "9.0",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "10.0",
+              "time": 1783123206010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-04T00:00:06.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.0",
+            "DOWN": "1.0"
+          },
+          "unmatched_cost": {
+            "UP": "0.000",
+            "DOWN": "0.490"
+          },
+          "net_pnl": "-0.250",
+          "direct_cash_pnl": "-0.250",
+          "outcome": "both",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000005",
+          "day": "2026-07-05",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "14.012662",
+            "DOWN": "14.012662"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000006",
+          "day": "2026-07-06",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {},
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        }
+      ],
+      "journal_hash_valid": true
+    },
+    {
+      "run_id": "742d23fd95720be5c58c",
+      "capital": "500",
+      "model": "optimistic",
+      "independent_net_pnl": "-8.60000000",
+      "independent_pair_gross_pnl": "1.20000000",
+      "independent_redemption_pnl": "-9.80000000",
+      "reported_pnl": "-8.60000000",
+      "reported_unrealized_pnl": "0E-8",
+      "reported_cash": "491.40000000",
+      "reported_reserved_collateral": "0",
+      "fee_sum": "0",
+      "entered_outcome_counts": {
+        "both": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_full_completion_counts": {
+        "both_full": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_outcome_frequencies": {
+        "both": "0.6",
+        "only_up": "0.2",
+        "only_down": "0",
+        "neither": "0.2"
+      },
+      "expected_net_per_entered_market_empirical": "-1.72000000",
+      "expected_net_per_candidate_market_empirical": "-1.433333333333333333333333333333333333333",
+      "orders_submitted": 10,
+      "orders_partially_filled_at_least_once": 0,
+      "partial_fill_events": 0,
+      "orders_canceled": 3,
+      "orders_rejected": 0,
+      "orders_fully_filled": 7,
+      "orders_with_final_partial_fill": 0,
+      "largest_losses": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "outcome": "UP",
+          "order_ids": [
+            "virtual-00000003"
+          ],
+          "shares": "20.000000",
+          "loss": "-9.80000000",
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1782950403010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ]
+        }
+      ],
+      "markets": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "day": "2026-07-01",
+          "winner": "UP",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "9.80000000"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "20.000000",
+          "merge_pnl": "0.40000000",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1782864003010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-01T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "20.000000",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1782864004010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-01T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-01T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.40000000",
+          "direct_cash_pnl": "0.40000000",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "day": "2026-07-02",
+          "winner": "DOWN",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "-9.80000000",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "9.80000000",
+          "loss_order_ids": [
+            "virtual-00000003"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1782950403010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "20.000000",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "9.80000000",
+            "DOWN": "0"
+          },
+          "net_pnl": "-9.80000000",
+          "direct_cash_pnl": "-9.80000000",
+          "outcome": "only_up",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 1,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+          "day": "2026-07-03",
+          "winner": "UP",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "9.80000000"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "20.000000",
+          "merge_pnl": "0.40000000",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1783036803010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-03T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "20.000000",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1783036804010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-03T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-03T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.40000000",
+          "direct_cash_pnl": "0.40000000",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "day": "2026-07-04",
+          "winner": "UP",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "9.80000000"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "20.000000",
+          "merge_pnl": "0.40000000",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1783123203010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-04T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "20.000000",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1783123204010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-04T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.40000000",
+          "direct_cash_pnl": "0.40000000",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000005",
+          "day": "2026-07-05",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000006",
+          "day": "2026-07-06",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {},
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        }
+      ],
+      "journal_hash_valid": true
+    },
+    {
+      "run_id": "dde567e3777d733dc8c6",
+      "capital": "500",
+      "model": "baseline",
+      "independent_net_pnl": "-8.60000000",
+      "independent_pair_gross_pnl": "1.20000000",
+      "independent_redemption_pnl": "-9.80000000",
+      "reported_pnl": "-8.60000000",
+      "reported_unrealized_pnl": "0E-8",
+      "reported_cash": "491.40000000",
+      "reported_reserved_collateral": "0",
+      "fee_sum": "0",
+      "entered_outcome_counts": {
+        "both": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_full_completion_counts": {
+        "both_full": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_outcome_frequencies": {
+        "both": "0.6",
+        "only_up": "0.2",
+        "only_down": "0",
+        "neither": "0.2"
+      },
+      "expected_net_per_entered_market_empirical": "-1.72000000",
+      "expected_net_per_candidate_market_empirical": "-1.433333333333333333333333333333333333333",
+      "orders_submitted": 10,
+      "orders_partially_filled_at_least_once": 0,
+      "partial_fill_events": 0,
+      "orders_canceled": 3,
+      "orders_rejected": 0,
+      "orders_fully_filled": 7,
+      "orders_with_final_partial_fill": 0,
+      "largest_losses": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "outcome": "UP",
+          "order_ids": [
+            "virtual-00000003"
+          ],
+          "shares": "20.000000",
+          "loss": "-9.80000000",
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1782950403010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ]
+        }
+      ],
+      "markets": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "day": "2026-07-01",
+          "winner": "UP",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "9.80000000"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "20.000000",
+          "merge_pnl": "0.40000000",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1782864003010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-01T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "20.000000",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1782864004010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-01T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-01T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.40000000",
+          "direct_cash_pnl": "0.40000000",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "day": "2026-07-02",
+          "winner": "DOWN",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "-9.80000000",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "9.80000000",
+          "loss_order_ids": [
+            "virtual-00000003"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1782950403010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-02T00:00:03.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "20.000000",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "9.80000000",
+            "DOWN": "0"
+          },
+          "net_pnl": "-9.80000000",
+          "direct_cash_pnl": "-9.80000000",
+          "outcome": "only_up",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 1,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+          "day": "2026-07-03",
+          "winner": "UP",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "9.80000000"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "20.000000",
+          "merge_pnl": "0.40000000",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1783036803010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-03T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "20.000000",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1783036804010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-03T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-03T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.40000000",
+          "direct_cash_pnl": "0.40000000",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "day": "2026-07-04",
+          "winner": "UP",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "9.80000000"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "20.000000",
+          "merge_pnl": "0.40000000",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1783123203010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-04T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "20.000000",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "20.000000",
+              "time": 1783123204010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-04T00:00:04.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.40000000",
+          "direct_cash_pnl": "0.40000000",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000005",
+          "day": "2026-07-05",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000006",
+          "day": "2026-07-06",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {},
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        }
+      ],
+      "journal_hash_valid": true
+    },
+    {
+      "run_id": "43684903b25ad4ac9e49",
+      "capital": "500",
+      "model": "pessimistic",
+      "independent_net_pnl": "-9.25000000",
+      "independent_pair_gross_pnl": "1.04000000",
+      "independent_redemption_pnl": "-10.29000000",
+      "reported_pnl": "-9.25000000",
+      "reported_unrealized_pnl": "0E-8",
+      "reported_cash": "490.75000000",
+      "reported_reserved_collateral": "0",
+      "fee_sum": "0",
+      "entered_outcome_counts": {
+        "both": 3,
+        "only_up": 1,
+        "neither": 1
+      },
+      "entered_full_completion_counts": {
+        "both_full": 2,
+        "only_up": 1,
+        "both_partial": 1,
+        "neither": 1
+      },
+      "entered_outcome_frequencies": {
+        "both": "0.6",
+        "only_up": "0.2",
+        "only_down": "0",
+        "neither": "0.2"
+      },
+      "expected_net_per_entered_market_empirical": "-1.85000000",
+      "expected_net_per_candidate_market_empirical": "-1.541666666666666666666666666666666666667",
+      "orders_submitted": 10,
+      "orders_partially_filled_at_least_once": 7,
+      "partial_fill_events": 9,
+      "orders_canceled": 5,
+      "orders_rejected": 0,
+      "orders_fully_filled": 5,
+      "orders_with_final_partial_fill": 2,
+      "largest_losses": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "outcome": "UP",
+          "order_ids": [
+            "virtual-00000003"
+          ],
+          "shares": "20.000000",
+          "loss": "-9.80000000",
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1782950403010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-02T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "18.000000",
+              "time": 1782950405010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-02T00:00:05.010Z"
+            }
+          ]
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "outcome": "DOWN",
+          "order_ids": [
+            "virtual-00000008"
+          ],
+          "shares": "1.0",
+          "loss": "-0.490",
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "2.0",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1783123204010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-04T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "9.0",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "10.0",
+              "time": 1783123206010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-04T00:00:06.010Z"
+            }
+          ]
+        }
+      ],
+      "markets": [
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "day": "2026-07-01",
+          "winner": "UP",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "9.80000000"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "20.000000",
+          "merge_pnl": "0.40000000",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1782864003010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-01T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "2.0",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1782864004010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-01T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "1.0",
+              "order": "virtual-00000001",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "18.000000",
+              "time": 1782864005010,
+              "unmatched_cost": "8.33000000",
+              "utc": "2026-07-01T00:00:05.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "matched": "17.000000",
+              "order": "virtual-00000002",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "17.000000",
+              "time": 1782864006010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-01T00:00:06.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-01T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.40000000",
+          "direct_cash_pnl": "0.40000000",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+          "day": "2026-07-02",
+          "winner": "DOWN",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "-9.80000000",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "9.80000000",
+          "loss_order_ids": [
+            "virtual-00000003"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1782950403010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-02T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "matched": "0",
+              "order": "virtual-00000003",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "18.000000",
+              "time": 1782950405010,
+              "unmatched_cost": "9.80000000",
+              "utc": "2026-07-02T00:00:05.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-02T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "20.000000",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "9.80000000",
+            "DOWN": "0"
+          },
+          "net_pnl": "-9.80000000",
+          "direct_cash_pnl": "-9.80000000",
+          "outcome": "only_up",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 1,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+          "day": "2026-07-03",
+          "winner": "UP",
+          "fills": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "fill_cost": {
+            "UP": "9.80000000",
+            "DOWN": "9.80000000"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "20.000000",
+          "merge_pnl": "0.40000000",
+          "redemption_pnl": "0E-8",
+          "fee": "0",
+          "redemption_payout": "0.000000",
+          "redemption_cost": "0E-8",
+          "loss_order_ids": [],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1783036803010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-03T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "2.0",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1783036804010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-03T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "1.0",
+              "order": "virtual-00000005",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "18.000000",
+              "time": 1783036805010,
+              "unmatched_cost": "8.33000000",
+              "utc": "2026-07-03T00:00:05.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "matched": "17.000000",
+              "order": "virtual-00000006",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "17.000000",
+              "time": 1783036806010,
+              "unmatched_cost": "0E-8",
+              "utc": "2026-07-03T00:00:06.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-03T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.000000",
+            "DOWN": "0.000000"
+          },
+          "unmatched_cost": {
+            "UP": "0E-8",
+            "DOWN": "0E-8"
+          },
+          "net_pnl": "0.40000000",
+          "direct_cash_pnl": "0.40000000",
+          "outcome": "both",
+          "both_full": true,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+          "day": "2026-07-04",
+          "winner": "UP",
+          "fills": {
+            "UP": "12.0",
+            "DOWN": "13.0"
+          },
+          "fill_cost": {
+            "UP": "5.880",
+            "DOWN": "6.370"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "12.0",
+          "merge_pnl": "0.240",
+          "redemption_pnl": "-0.490",
+          "fee": "0",
+          "redemption_payout": "0.0",
+          "redemption_cost": "0.490",
+          "loss_order_ids": [
+            "virtual-00000008"
+          ],
+          "fill_details": [
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "2.0",
+              "time": 1783123203010,
+              "unmatched_cost": "0.980",
+              "utc": "2026-07-04T00:00:03.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "2.0",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "3.0",
+              "time": 1783123204010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-04T00:00:04.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "1.0",
+              "order": "virtual-00000007",
+              "outcome": "UP",
+              "price": "0.49",
+              "size": "10.0",
+              "time": 1783123205010,
+              "unmatched_cost": "4.410",
+              "utc": "2026-07-04T00:00:05.010Z"
+            },
+            {
+              "fee": "0",
+              "kind": "virtual_fill",
+              "market": "0x0000000000000000000000000000000000000000000000000000000000000004",
+              "matched": "9.0",
+              "order": "virtual-00000008",
+              "outcome": "DOWN",
+              "price": "0.49",
+              "size": "10.0",
+              "time": 1783123206010,
+              "unmatched_cost": "0.490",
+              "utc": "2026-07-04T00:00:06.010Z"
+            }
+          ],
+          "settlement_utc": "2026-07-04T00:05:01.010Z",
+          "unmatched_shares": {
+            "UP": "0.0",
+            "DOWN": "1.0"
+          },
+          "unmatched_cost": {
+            "UP": "0.000",
+            "DOWN": "0.490"
+          },
+          "net_pnl": "-0.250",
+          "direct_cash_pnl": "-0.250",
+          "outcome": "both",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 1,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 0
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000005",
+          "day": "2026-07-05",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {
+            "UP": "20.000000",
+            "DOWN": "20.000000"
+          },
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        },
+        {
+          "market": "0x0000000000000000000000000000000000000000000000000000000000000006",
+          "day": "2026-07-06",
+          "winner": null,
+          "fills": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "fill_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "submits": {},
+          "merged_pairs": "0",
+          "merge_pnl": "0",
+          "redemption_pnl": "0",
+          "fee": "0",
+          "redemption_payout": "0",
+          "redemption_cost": "0",
+          "loss_order_ids": [],
+          "fill_details": [],
+          "unmatched_shares": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "unmatched_cost": {
+            "UP": "0",
+            "DOWN": "0"
+          },
+          "net_pnl": "0",
+          "direct_cash_pnl": "0",
+          "outcome": "neither",
+          "both_full": false,
+          "observed_indicator": {
+            "both": 0,
+            "only_up": 0,
+            "only_down": 0,
+            "neither": 1
+          }
+        }
+      ],
+      "journal_hash_valid": true
+    }
+  ]
+}

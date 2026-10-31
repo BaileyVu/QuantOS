@@ -1,0 +1,57 @@
+rule frozen 2026-10-20T03:44:42Z; markets in data 37; selected 9
+
+Fill model A: fill when next snapshot best ask <= our prior bid (or best bid >= our prior ask), as recorded by the shadow
+market                                           pool   vol  days  min    q$     rew fills      inv      net    mo5   mo30
+dow-quarterly-earnings-nongaap-eps-10-22-2026-0p   50  0.00   1.8  177   100    1.55     0     0.00     1.55    nan    nan
+tfx-quarterly-earnings-nongaap-eps-10-22-2026-1p   50  0.05   1.8  837   100    3.85     0     0.00     3.85    nan    nan
+us-canada-diplomatic-agreement-to-lower-tariffs-   30  0.00  72.8  837   192   14.84     0     0.00    14.84    nan    nan
+will-cashmere-launch-a-token-by-december-31-2026   80  0.38  72.8  837   100   14.71     0     0.00    14.71    nan    nan
+will-juninho-unam-pumas-be-the-top-goalscorer-of   28  0.11 250.8  837   100    3.49     0     0.00     3.49    nan    nan
+will-pltr-dip-to-192-in-october-2026-from-octobe   50  0.43  11.8  585   100    4.04     1   -26.92   -22.89 -0.025 -0.025
+will-shadowrocket-be-1-paid-app-in-the-us-apple-   50  0.24   2.8  837   100    1.19     2     0.45     1.63 -0.003  0.003
+will-the-total-domestic-gross-for-resident-evil-  100  0.13  10.8  837   100    0.96     0     0.00     0.96    nan    nan
+will-there-be-no-next-meta-muse-spark-model-rele  200  0.07  10.8  837   100    1.13     0     0.00     1.13    nan    nan
+TOTAL quoted $992  rewards $45.75  inventory $-26.48  net $+19.27  fills 3  window 13.9h  net/day $+33.15
+
+Fill model B: fill whenever a public trade prints at or through our resting level in the minute after we quote (YES-equivalent price; full quote size filled), in addition to A; inventory marked to mid
+market                                           pool   vol  days  min    q$     rew fills      inv      net    mo5   mo30
+dow-quarterly-earnings-nongaap-eps-10-22-2026-0p   50  0.00   1.8  177   100    1.55     0     0.00     1.55    nan    nan
+tfx-quarterly-earnings-nongaap-eps-10-22-2026-1p   50  0.05   1.8  837   100    3.85     0     0.00     3.85    nan    nan
+us-canada-diplomatic-agreement-to-lower-tariffs-   30  0.00  72.8  837   192   14.84     1     0.00    14.84 -0.005 -0.005
+will-cashmere-launch-a-token-by-december-31-2026   80  0.38  72.8  837   100   14.71     0     0.00    14.71    nan    nan
+will-juninho-unam-pumas-be-the-top-goalscorer-of   28  0.11 250.8  837   100    3.49     0     0.00     3.49    nan    nan
+will-pltr-dip-to-192-in-october-2026-from-octobe   50  0.43  11.8  585   100    4.04     6   -32.59   -28.55  0.002 -0.003
+will-shadowrocket-be-1-paid-app-in-the-us-apple-   50  0.24   2.8  837   100    1.19     3     1.84     3.02  0.002  0.003
+will-the-total-domestic-gross-for-resident-evil-  100  0.13  10.8  837   100    0.96     2     3.60     4.57  0.005  0.005
+will-there-be-no-next-meta-muse-spark-model-rele  200  0.07  10.8  837   100    1.13     1     0.54     1.67  0.010  0.010
+TOTAL quoted $992  rewards $45.75  inventory $-26.61  net $+19.14  fills 13  window 13.9h  net/day $+32.93
+
+excluded 28:
+  curfew-in-major-french-city-by-december-31-2026    kw=['curfew']
+  curfew-in-major-french-city-by-november-15-2026    vol=None, kw=['curfew']
+  curfew-in-major-french-city-by-october-31-2026     vol=None, kw=['curfew']
+  france-declares-state-of-emergency-by-december-31- vol=1.6081019942554107, kw=['emergency']
+  france-declares-state-of-emergency-by-october-31-2 kw=['emergency']
+  hormuz-agreement-by-nov-2-and-the-democrats-win-th pool, kw=['hormuz', 'senate']
+  hormuz-agreement-by-nov-2-and-the-republicans-win- pool, kw=['hormuz', 'senate']
+  kim-jong-un-out-as-supreme-leader-of-north-korea-b pool, vol=0.9934076250892828, kw=['north-korea', 'kim-jong-un']
+  no-hormuz-agreement-by-nov-2                       pool, kw=['hormuz']
+  paris-curfew-by-october-21                         pool, kw=['curfew']
+  republican-senate-odds-dip-to-30-by-october-31     vol=0.7000213641519759, kw=['senate']
+  t-quarterly-earnings-nongaap-eps-10-21-2026-0pt61  days=0.8439583333333334
+  us-iran-ceasefire-continues-through-the-midterms   pool, vol=0.7936374605219759, kw=['iran', 'ceasefire']
+  us-x-iran-ceasefire-continues-through-october-22   pool, vol=1.6548400480634227, kw=['iran', 'ceasefire']
+  us-x-iran-ceasefire-continues-through-october-31-2 pool, vol=1.0786444567705902, kw=['iran', 'ceasefire']
+  will-amzn-dip-to-256-in-october-2026-from-october- vol=2.8535192803186984
+  will-antonio-conte-be-the-next-head-coach-of-the-e vol=20.22885764985709
+  will-ewy-reach-159-by-october-19-2026              vol=2.0334582085696145
+  will-grand-theft-auto-vi-launch-trailer-get-betwee pool, vol=1.7656739024711046
+  will-hood-reach-100-in-october-2026-from-october-1 vol=2.58004597462209
+  will-nvda-dip-to-216-in-october-2026-from-october- vol=0.7557405055453725
+  will-open-dip-to-1-75-by-october-19-2026           vol=2.8622800001932474
+  will-the-bank-of-korea-hike-by-25-bps-at-the-novem vol=1.7647156931623638
+  will-the-next-fable-model-5pt2-be-released-on-octo vol=0.6410588244965442, days=0.8439583333333334
+  will-there-be-a-hormuz-agreement-and-the-democrats pool, kw=['hormuz', 'senate']
+  will-there-be-at-least-6500-measles-cases-in-the-u vol=0.6875516509523292
+  will-there-be-no-next-fable-model-5pt2-release-by- vol=0.8162436761063743
+  zelenskyy-of-tweets-october-16-october-23-2026-80- kw=['zelenskyy']

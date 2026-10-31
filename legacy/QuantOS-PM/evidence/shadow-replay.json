@@ -1,0 +1,48 @@
+{
+  "run_id": "4749f04db23c5a094dab",
+  "starting_equity": "200",
+  "ending_equity": "200",
+  "orders": {
+    "quoted": 0,
+    "canceled": 0,
+    "rejected": 0,
+    "fills": 0,
+    "partial_fills": 0,
+    "missed_fills": 0,
+    "unobservable_fills": 0
+  },
+  "max_drawdown": "0",
+  "execution_uncertain": true,
+  "manifest": {
+    "schema": 1,
+    "version": "0.1.0",
+    "config": {
+      "capital": "200",
+      "mode": "shadow",
+      "model": "pessimistic",
+      "quote_size": "20",
+      "stale_ms": 10000,
+      "submit_ms": 100,
+      "cancel_ms": 250,
+      "quote_ttl_ms": 30000,
+      "calibration": "",
+      "enable_taker_complete_set_arb": false,
+      "enable_early_loser_exit": false,
+      "enable_directional_inventory_alpha": false,
+      "enable_live_orders": false
+    },
+    "model": "pessimistic",
+    "feed_sha256": "82c647b59fef75b25efb8890b45b546f87b75183c37ce38b703ec91fa5d2ebbe",
+    "calibration_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "code_sha256": "d758a250840b075ad83b7e6cfb9d63ad2c391a6fe6ce4972a6dcf2a86eac1dbf",
+    "virtual_only": true,
+    "data_provenance": "public_capture",
+    "timestamps": "UTC; event_time=source, receipt_time=local arrival; decisions use receipt order"
+  },
+  "skip_reasons": {
+    "inactive_or_expiring": 170,
+    "unverified_rules_or_fees": 4180,
+    "network_or_execution_uncertain": 40968
+  },
+  "source_capture": "/Users/bailey12/Desktop/PythonProject/QuantOS-PM/artifacts/captures/shadow-1792343095793928000"
+}
