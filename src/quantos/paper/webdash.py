@@ -35,6 +35,16 @@ def _tail(path: Path, n: int) -> list:
     return out
 
 
+def _price(p: dict) -> str:
+    """Short human text for fill/close events: price to 6 significant digits, plus gross PnL."""
+    try:
+        text = f"price {float(p['price']):.6g}" if p.get("price") else ""
+        if p.get("pnl_gross"): text += f", pnl {float(p['pnl_gross']):+.4f}"
+        return text
+    except (TypeError, ValueError):
+        return ""
+
+
 def run_view(name: str, state: Path, now_ms: int) -> dict:
     view = {"name": name, "state": str(state), "run": _json(state / "run.json", {}),
             "status": _json(state / "dashboard" / "status.json", {}),
@@ -69,15 +79,19 @@ def run_view(name: str, state: Path, now_ms: int) -> dict:
         signals = {}
         for (payload,) in db.execute("SELECT payload FROM events WHERE kind='SIGNAL' ORDER BY id DESC LIMIT 300"):
             p = json.loads(payload); signals[p.get("signal_id")] = p
+        # Fill/close events carry the order id; map it back to the order's signal.
+        by_order = {}
+        for (payload,) in db.execute("SELECT payload FROM orders"):
+            o = json.loads(payload); by_order[o["id"]] = o["signal"]
         feed = []
         marks = ",".join("?" * len(DECISIONS))
         for t, kind, payload in db.execute(
                 f"SELECT time_ms,kind,payload FROM events WHERE kind IN ({marks}) ORDER BY id DESC LIMIT 40", DECISIONS):
             p = json.loads(payload)
-            s = signals.get(p.get("signal_id"), p if kind == "SIGNAL" else {})
+            s = signals.get(p.get("signal_id")) or by_order.get(p.get("id")) or (p if kind == "SIGNAL" else {})
             feed.append({"time_ms": t, "kind": kind, "strategy": s.get("strategy_id"), "symbol": s.get("symbol"),
                          "side": s.get("side"), "reason": p.get("reason") or p.get("verdict") or "",
-                         "detail": p.get("detail") or p.get("binding_constraint") or p.get("price") or ""})
+                         "detail": p.get("detail") or p.get("binding_constraint") or _price(p) or ""})
         view["feed"] = feed
         closed = db.execute("SELECT COALESCE(SUM(CAST(pnl AS REAL)),0), COALESCE(SUM(CAST(fee AS REAL)),0) FROM fills").fetchone()
         view["realized"] = {"pnl": closed[0], "fees": closed[1]}
