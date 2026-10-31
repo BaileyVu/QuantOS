@@ -95,7 +95,7 @@ function evText(e){return e?(e.kind+" "+(e.strategy||"")+" "+(e.symbol||"")+" "+
 function stages(r){
  var st=r.status||{},run=r.run||{},fh=st.feed_health||{},stale=Object.keys(fh.stale||{}),hb=r.heartbeat_age_s,S=[],e=eng(r);
  var c=(hb!=null&&hb<30&&!stale.length)?"ok":"bad";if(c==="ok"&&(r.errors_last_15m||0)>0)c="warn";
- S.push({n:"Feeds",c:c,e:"hb "+ago(hb)+", scan "+ago((fh.ages_s||{}).scan)+", err/h "+(r.errors_last_hour==null?"?":r.errors_last_hour)+(stale.length?", stale: "+stale.join(","):"")});
+ S.push({n:"Feeds",c:c,e:"hb "+ago(hb)+", scan "+ago((fh.ages_s||{}).scan)+", err/15m "+(r.errors_last_15m==null?"?":r.errors_last_15m)+", stale quotes/15m "+(r.stale_quotes_last_15m==null?"?":r.stale_quotes_last_15m)+(stale.length?", stale: "+stale.join(","):"")});
  var sc=(r.self_check||{}).checks||{},lv="ok",bad=[];Object.keys(sc).forEach(function(k){var l=sc[k].level;if(l==="critical"){lv="bad";bad.push(k)}else if(l==="warn"){lv=worst(lv,"warn");bad.push(k)}});
  if(!r.self_check)lv="warn";
  S.push({n:"Strategies (6)",c:lv,e:!r.self_check?"no self-check yet":bad.length?"attention: "+bad.join(", "):"all 6 self-checks ok"});

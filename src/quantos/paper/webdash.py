@@ -52,8 +52,11 @@ def run_view(name: str, state: Path, now_ms: int) -> dict:
             "SELECT COUNT(DISTINCT time_ms) FROM events WHERE kind='SCAN' AND time_ms>=?", (since,)).fetchone()[0]
         view["errors_last_hour"] = db.execute(
             "SELECT COUNT(*) FROM events WHERE kind='ERROR' AND time_ms>=?", (since,)).fetchone()[0]
-        view["errors_last_15m"] = db.execute(
-            "SELECT COUNT(*) FROM events WHERE kind='ERROR' AND time_ms>=?", (now_ms - 900_000,)).fetchone()[0]
+        # Fail-closed stale-quote rejections (quiet USDC books) are expected and reported apart from real errors.
+        view["errors_last_15m"], view["stale_quotes_last_15m"] = db.execute(
+            "SELECT COALESCE(SUM(payload NOT LIKE '%invalid or stale quote%'),0), "
+            "COALESCE(SUM(payload LIKE '%invalid or stale quote%'),0) FROM events WHERE kind='ERROR' AND time_ms>=?",
+            (now_ms - 900_000,)).fetchone()
         row = db.execute("SELECT time_ms,payload FROM events WHERE kind='SELF_CHECK' ORDER BY id DESC LIMIT 1").fetchone()
         view["self_check"] = None if row is None else {"time_ms": row[0], "checks": json.loads(row[1])}
         view["counts"] = dict(db.execute(
