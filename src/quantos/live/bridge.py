@@ -43,6 +43,9 @@ class ExchangeMirror:
         self.alert = alert or (lambda level, key, message: None)
         self.kill = KillSwitch(self.state)
         self.margin_type, self.failures = margin_type, 0
+        # Reconciliation costs ~3 signed calls; every 2s it stalled the runtime's main loop until
+        # quotes went stale. Check every 30s, and right after any exchange action.
+        self.check_every_ms, self.last_check_ms = 30_000, 0
         self.path = self.state / "mirror.json"
         self.book = json.loads(self.path.read_text()) if self.path.exists() else {}
 
@@ -64,6 +67,7 @@ class ExchangeMirror:
     def sync(self, engine, now_ms: int) -> dict:
         if self.kill.active:
             return {"skipped": "KILL"}
+        before = json.dumps(self.book, sort_keys=True)
         live = {o["id"]: o for o in engine.active() if D(o["filled"]) > 0 and o["state"] != "CLOSING"}
         for oid, o in live.items():
             if oid in self.book:
@@ -110,6 +114,9 @@ class ExchangeMirror:
                 else:
                     self.alert("warn", f"stop:{oid}", f"stop update failed on {m['symbol']}; old stop kept: {error}")
             self._save()
+        if json.dumps(self.book, sort_keys=True) == before and now_ms - self.last_check_ms < self.check_every_ms:
+            return {"ok": True, "skipped": "INTERVAL"}
+        self.last_check_ms = now_ms
         return self.check()
 
     def _cancel_stop(self, m):

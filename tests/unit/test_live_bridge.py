@@ -106,3 +106,13 @@ class MirrorTests(unittest.TestCase):
         e.orders = [order()]
         self.mirror(ex).sync(e, 1)
         self.assertIn(("critical", "auth"), self.alerts)
+
+
+class IntervalTests(MirrorTests):
+    def test_reconcile_throttled_when_nothing_changes(self):
+        ex, e = FakeExchange(), Engine()
+        e.orders = [order()]
+        m = self.mirror(ex)
+        self.assertNotIn("skipped", m.sync(e, 1_000))      # entry placed -> immediate check
+        self.assertEqual(m.sync(e, 3_000)["skipped"], "INTERVAL")
+        self.assertNotIn("skipped", m.sync(e, 40_000))     # 30s elapsed -> check

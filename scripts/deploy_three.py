@@ -83,7 +83,8 @@ def restart_quantos():
     """Deploy the current commit to both QuantOS runs; each resumes its run.json (same deadline)."""
     import time
     plan = {k: v for k, v in jobs(resume=True).items() if k.startswith("com.quantos.v4.")}
-    for label in ("com.quantos.v4.paper", "com.quantos.v4.demo"):  # staggered: no simultaneous cold start
+    only = sys.argv[2:] or ["paper", "demo"]
+    for label in [f"com.quantos.v4.{n}" for n in only]:  # staggered: no simultaneous cold start
         for name in (label, label + ".watchdog"):
             subprocess.run(["launchctl", "bootout", f"{DOMAIN}/{name}"], check=False)
             while loaded(name): time.sleep(1)
@@ -92,7 +93,7 @@ def restart_quantos():
                 plistlib.dump(plan[name], f, sort_keys=True)
             subprocess.run(["launchctl", "bootstrap", DOMAIN, str(path)], check=True)
             print("restarted", name)
-        if label.endswith("paper"): time.sleep(90)
+        if label.endswith("paper") and len(only) > 1: time.sleep(90)
 
 
 def install_dashboard():
