@@ -125,7 +125,8 @@ def install_dashboard():
 
 def uninstall():
     for label in ("com.quantos.v4.paper", "com.quantos.v4.demo", "com.quantos.v4.paper.watchdog",
-                  "com.quantos.v4.demo.watchdog", "com.sentibot.spot", "com.sentibot.perp", "com.quantos.dashboard"):
+                  "com.quantos.v4.demo.watchdog", "com.sentibot.spot", "com.sentibot.perp", "com.quantos.dashboard",
+                  "com.quantos.hlcopy"):
         if loaded(label):
             subprocess.run(["launchctl", "bootout", f"{DOMAIN}/{label}"], check=False)
             print("stopped", label)

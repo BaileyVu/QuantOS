@@ -106,6 +106,11 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   claude/mainnet-ready` was BLOCKED by the auto-mode classifier (request came via coordinator) -> bailey must push
   or approve directly. app-v4 build commits (331a42f, 566f7f4, d5ad038) are ancestors of this branch.
 
+- 16:17 com.quantos.hlcopy installed (owner-approved, after code review: host allowlist, validated fields only, no
+  eval/exec, ASCII, no hidden unicode). Code ~/Library/Application Support/hl_copy/app, state .../hl_copy/state,
+  12 frozen HL wallets (16:13Z), paper-copy books at 0/30/60 s delay, $50 each, 2% risk. Judge after ~7 days
+  (~2026-11-07). Source preserved in legacy/research_20261031/hl_copy. Stop: deploy_three.py uninstall (now included).
+
 ### Next step
 Keep runs stable; report at user check-ins. Paper run ends 2026-11-03 02:49 UTC -> final reports, then decide on live.
 
