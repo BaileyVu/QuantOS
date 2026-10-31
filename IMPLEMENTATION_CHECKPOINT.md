@@ -26,7 +26,7 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
 - Live smoke (public data, 5 min, scratch state): self-check OK 6/6, OI z on 9/9 majors, cutoff -7.77% (29/29),
   402 scans, reports OK.
 
-- 8060e83 `scripts/deploy_live50.sh prepare|install` (copies src to ~/Library/Application Support/QuantOS/app-v4/<commit>,
+- 8060e83 `legacy/deploy_live50.sh prepare|install` (superseded by scripts/deploy_three.py) (copies src to ~/Library/Application Support/QuantOS/app-v4/<commit>,
   fresh state v4-live50, base python from ../QuantOS/.venv realpath). Old label com.quantos.v3.paper is still loaded
   (not running): `launchctl bootout gui/$UID/com.quantos.v3.paper` before install.
 - 7488210 `live/bridge.py` ExchangeMirror behind `start --execution paper|dry-run|testnet` (live50 only; mainnet not
@@ -100,6 +100,11 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   alt_dip +253bp per episode), tsmom_4h_v2 dead (production config HELD +18bp CI [-43,+90]).
 - Block 4 in progress: Hyperliquid wallet-copy forward paper (edge_data/hl_copy), owner approved installing
   com.quantos.hlcopy after code/unicode review.
+
+- 2b6f086 legacy/: research scripts/reports + edge docs preserved in-repo. Secret scan of all 92 unpushed commits:
+  clean (64-char hits are SHA-256 hashes / public Binance docs test vector; no .env, no >50MB). `git push -u origin
+  claude/mainnet-ready` was BLOCKED by the auto-mode classifier (request came via coordinator) -> bailey must push
+  or approve directly. app-v4 build commits (331a42f, 566f7f4, d5ad038) are ancestors of this branch.
 
 ### Next step
 Keep runs stable; report at user check-ins. Paper run ends 2026-11-03 02:49 UTC -> final reports, then decide on live.
