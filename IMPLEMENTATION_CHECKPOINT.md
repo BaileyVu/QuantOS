@@ -72,6 +72,15 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   http://localhost:8787 (/api/state), read-only, no Binance calls. Install/redeploy:
   `scripts/deploy_three.py install-dashboard`. Stop: `launchctl bootout gui/$(id -u)/com.quantos.dashboard`.
 
+- 04:00 first trade (tsmom_4h LONG 1000PEPEUSDC) in both runs; demo mirrored on Binance Demo with algo stop.
+- 04:06 demo feed went stale: mirror reconciled every 2s inside the main loop. Fix 8e340ce (reconcile every 30s
+  + after actions). Restarting demo (04:08) and then paper (04:11) closed the PEPE position in both (RUN_END on
+  SIGTERM; demo -0.089 gross, paper -0.030 gross; exchange flattened, no orphan stops). Fix 16d2b25: live50
+  SIGTERM/SIGINT now SUSPENDS (status "suspended", positions kept, restored on restart). Both runs now on 16d2b25
+  code (paper app-v4/16d2b25, demo app-v4/8e340ce -> demo still has OLD signal handling until its next restart;
+  do NOT restart demo with an open position without first restarting it flat).
+- Usage 81% at 04:13 UTC, 5h window resets 06:50 UTC.
+
 ### Next step
 Periodic health check (heartbeat, alerts.jsonl, ERROR events, mirror.json on demo); report fills. Optional T8.
 
