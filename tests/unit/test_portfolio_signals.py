@@ -24,6 +24,9 @@ from quantos.paper.market import parse_exchange_info
 from quantos.paper.strategies.indicators import make_signal
 from quantos.paper.types import Instrument, Quote, Snapshot
 
+# Committed minimal exchangeInfo (BTCUSDT only); data/ is gitignored and absent in CI.
+FILTER_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "usdt_proxy_filter_min.json"
+
 
 def _index(bars, *, window=("2021-10-01", "2024-12-31")):
     return DatasetIndex(
@@ -56,7 +59,8 @@ class PortfolioSignalCacheTests(unittest.TestCase):
                          D(100), D(101), D(99), D(100), D(1))
                      for t in (TRAINING_START_MS, TRAINING_END_MS))
         cache = build_signal_cache(_index({"BTCUSDT": rows}), include_alt=False,
-                                   include_crash=False, include_ema=False)
+                                   include_crash=False, include_ema=False,
+                                   filter_snapshot_path=FILTER_FIXTURE)
         self.assertEqual(cache.training_window, (TRAINING_START_MS, TRAINING_END_MS))
         self.assertEqual(cache.data_hash, "fixture")
         self.assertEqual(len(cache.source_hash), 64)
@@ -115,7 +119,7 @@ class PortfolioSignalCacheTests(unittest.TestCase):
         expected_at = start + len(prices) * HOUR_MS
         from quantos.paper.research.signals import _snapshot
         import json
-        filter_data = json.loads(Path("data/portfolio/filters/current_usdt_proxy_20261029.json").read_text())
+        filter_data = json.loads(FILTER_FIXTURE.read_text())
         instrument = parse_exchange_info(filter_data, "USDT")[symbol]
         eligible = [row for row in metrics if row.conservative_available_ms <= expected_at]
         direct_oi = tuple(OpenInterestValue(row.label_ms, row.conservative_available_ms,
@@ -126,10 +130,11 @@ class PortfolioSignalCacheTests(unittest.TestCase):
         direct_signal = CrashFlushE2Strategy().evaluate(direct_snapshot)
         self.assertIsNotNone(direct_signal)
         cache = build_signal_cache(index, include_alt=False, include_ema=False,
-                                   include_stop_sensitivity=False, symbols=(symbol,))
+                                   include_stop_sensitivity=False, symbols=(symbol,),
+                                   filter_snapshot_path=FILTER_FIXTURE)
         expected_params = expected_signal_parameter_hash(
             index, include_alt=False, include_ema=False,
-            include_stop_sensitivity=False, symbols=(symbol,))
+            include_stop_sensitivity=False, symbols=(symbol,), filter_snapshot_path=FILTER_FIXTURE)
         validate_cache_provenance(cache, data_hash=index.content_hash,
                                   filter_hash=cache.filter_hash,
                                   parameter_hash=expected_params)
@@ -155,6 +160,7 @@ class PortfolioSignalCacheTests(unittest.TestCase):
                 cache_path, expected_data_hash=cache.data_hash,
                 expected_filter_hash=cache.filter_hash,
                 expected_parameter_hash=cache.parameter_hash,
+                filter_snapshot_path=FILTER_FIXTURE,
             )
             self.assertEqual(loaded, cache)
             with self.assertRaises(FileExistsError):
@@ -164,6 +170,7 @@ class PortfolioSignalCacheTests(unittest.TestCase):
                     cache_path, expected_data_hash="stale",
                     expected_filter_hash=cache.filter_hash,
                     expected_parameter_hash=cache.parameter_hash,
+                    filter_snapshot_path=FILTER_FIXTURE,
                 )
             envelope = json.loads(gzip.decompress(cache_path.read_bytes()))
             envelope["payload"]["records"][0]["signal"]["entry_price"] = "1"
@@ -178,6 +185,7 @@ class PortfolioSignalCacheTests(unittest.TestCase):
                     tampered, expected_data_hash=cache.data_hash,
                     expected_filter_hash=cache.filter_hash,
                     expected_parameter_hash=cache.parameter_hash,
+                    filter_snapshot_path=FILTER_FIXTURE,
                 )
 
     def test_timestamp_resampling_rejects_gap_without_rephasing_pairs(self):
