@@ -83,8 +83,16 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
 - 07:05 both runs restarted flat onto 331a42f (scan stale threshold 150s; feed 60s). SUSPENDED->RESTART verified.
   05:00-07:00: no trades, no critical alerts, 0 rate-limit errors. Monitor re-armed (fills/closes/critical only).
 
+- T8 DONE (research only): `edge_data/crash_episodes_2020/` (REPORT.md, results.json, re-runnable scripts).
+  132 crash episodes 2020-01..2024-12 (breadth>=50% of 29 coins down >=8%/24h AND index 24h <= -7%, 72h cooldown);
+  TRAIN 110 (2020..2023-06) / HELD-OUT 22 (2023-07..2024-12). Net of 0.40% round trip, mean per-episode, 90% CI:
+  crash_flush HELD +2.78% [+1.02,+4.46] (21 eps, OI only from 2021-12); alt_dip HELD +2.40% [+0.72,+4.10] (21 eps);
+  bounce_momentum HELD -0.56% [-3.47,+2.06] -> rejected; buy-all-at-episode baseline ~0. Not an edge claim:
+  correlated episodes, small N, survivor universe, both rules designed with 2021-24 in view. Tibo's sealed 2025+
+  evaluation data NOT used. No change to running services.
+
 ### Next step
-T8 crash-episode research in `~/Desktop/PythonProject/edge_data/crash_episodes_2020/` (research only; services untouched).
+Keep runs stable; report at user check-ins. Paper run ends 2026-11-03 02:49 UTC -> final reports, then decide on live.
 
 # QuantOS V3 implementation checkpoint
 
