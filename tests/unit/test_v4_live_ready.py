@@ -170,3 +170,13 @@ class R5Tests(unittest.TestCase):
                                  LiveR5Policy(), T).approved)
         with self.assertRaises(ValueError):
             LiveR5Policy(daily_loss=D(".20"))
+
+
+class R5ScopeTests(unittest.TestCase):
+    def test_five_percent_profile_is_crash_and_dip_only(self):
+        from quantos.paper.risk import LiveR5Policy
+        tsmom = signal(strategy_id="tsmom_4h", strategy_version="1.0.0", entry_type="MARKET",
+                       take_profit=None, maximum_hold_seconds=259200, stop_loss=D("98.32"))
+        self.assertEqual(evaluate(tsmom, INS, quote(), account(), LiveR5Policy(), T).reason, "STRATEGY_DISABLED")
+        self.assertTrue(evaluate(tsmom, INS, quote(), account(), LivePolicy(), T).approved)
+        self.assertTrue(evaluate(event(), INS, quote(), account(), LiveR5Policy(), T).approved)

@@ -124,6 +124,10 @@ class LiveR5Policy(LivePolicy):
 
     daily_loss_ceiling = ".15"
     drawdown_ceiling = ".35"
+    # Owner decision 2026-10-31: the 5% profile takes only rules with held-out support (crash/dip) plus
+    # delist; trend rules failed their held-out test (edge_vault/tsmom_4h_v2). Exits of any open trend
+    # position are unaffected; only new entries are blocked.
+    enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17"})
 
 
 def portfolio_risk_caps(policy: Policy) -> tuple[Decimal, Decimal]:
