@@ -1,3 +1,38 @@
+## claude/mainnet-ready
+
+Updated 2026-10-31 ~02:10 UTC. Worktree `~/Desktop/PythonProject/QuantOS-mainnet-ready`, branch
+`claude/mainnet-ready` (base ecd5ddb, local only, no remote). Python: `../QuantOS/.venv/bin/python`.
+Tests: `PYTHONPATH=src:. ../QuantOS/.venv/bin/python -m unittest discover -s tests -q` -> 296 run,
+4 pre-existing errors (missing `data/portfolio/filters/current_usdt_proxy_20261029.json`, not in this
+worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
+
+### Completed (commits)
+- c86c3fc T1: `paper/health.py` (Heartbeat, FeedMonitor 60s, Alerter jsonl+macOS notification, watchdog CLI),
+  `service.py` KeepAlive {SuccessfulExit false, Crashed true}, watchdog plist (60s), `paper/dashboard.py`,
+  `docs/ARCHITECTURE_V4.md`.
+- 5027066 T4: `src/quantos/live/` signed client (dry-run/testnet/mainnet = flag + confirm file
+  "I CONFIRM MAINNET QUANTOS"), keys only via QUANTOS_KEY_FILE (chmod 600, outside repo), idempotent client ids,
+  STOP_MARKET/TP reduce-only via Algo Order API (`/fapi/v1/algoOrder`, default; legacy optional),
+  ambiguous-submit -> query, protection failure -> reduce-only close, reconcile, kill switch + flatten CLI,
+  DailyLossGuard. 28 mocked tests. NOT yet wired into the engine (paper remains the executor).
+- ffa573e T2/T3: tolerant OI z-score (bad rows = missing; latest + t-4h must be valid; >=90% of 720h prior
+  changes; equals strict rule on gap-free data), `UsdcMapped` (USDC candles + USDT-twin OI / USDT cutoff;
+  entry re-anchored to USDC ask), manifests `paper-usdc-1.1.0`, `LivePolicy` ($50: 2% risk, bump to exchange
+  minimum if <=3% risk, slots event 2 / trend 1, lev <=3, daily loss 6%, DD 20%, ema/donchian disabled).
+- 6dfe4e7 runtime `--portfolio live50` (single pL journal, $50), OI cache (API, 30d) + quarterly cutoff cache,
+  self-check at start + daily (hourly while failing) with alerts, KILL file, sentiment shadow
+  (`--sentiment-file`, logs SENTIMENT_SHADOW, never blocks), heartbeat + `dashboard/status.json` every 10s,
+  hourly report failures non-fatal, plist PYTHONPATH/extra args, CLI `install-service --portfolio --pythonpath --watchdog`.
+- Live smoke (public data, 5 min, scratch state): self-check OK 6/6, OI z on 9/9 majors, cutoff -7.77% (29/29),
+  402 scans, reports OK.
+
+### In progress / remaining
+- T6 replay: `edge_data/crash_replay_20261029/scripts/replay_v2.py` -> `out_v2/summary_v2.json`; write REPLAY_V2.md.
+- T5: sentibot FDA instructions to bailey (no launchd job; manual run under /usr/bin/python3 -> grant FDA to the
+  launching terminal app, or move data to ~/Library/Application Support/sentibot).
+- Fresh paper state + service install command (code copy outside ~/Desktop to avoid TCC). Do not start without telling coordinator.
+- Order layer -> engine integration for testnet (after bailey gives key file path). T8 optional.
+
 # QuantOS V3 implementation checkpoint
 
 Updated 2026-10-26, Vietnam time. Source commit `b21093d`; implementation exists; final review and 72-hour
