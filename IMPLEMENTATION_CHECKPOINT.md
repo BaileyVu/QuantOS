@@ -37,12 +37,23 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   auto-mode classifier (credential exploration); also denied re-reading `live/keys.py`. Not worked around.
   .env-format support in keys.py NOT done. Needs bailey's permission or bailey runs the round-trip.
 
-### In progress / remaining
-- T6 replay: `edge_data/crash_replay_20261029/scripts/replay_v2.py` -> `out_v2/summary_v2.json`; write REPLAY_V2.md.
-- T5: sentibot FDA instructions to bailey (no launchd job; manual run under /usr/bin/python3 -> grant FDA to the
-  launching terminal app, or move data to ~/Library/Application Support/sentibot).
-- Fresh paper state + service install command (code copy outside ~/Desktop to avoid TCC). Do not start without telling coordinator.
-- Order layer -> engine integration for testnet (after bailey gives key file path). T8 optional.
+- Key loader reads .env by name pattern; IPv4 forced (aa25d6b); QUANTOS_TESTNET_HOST=demo (4b723e9).
+  bailey's binance-testnet.env is a SPOT testnet key (works on testnet.binance.vision, -2015 on both futures
+  hosts). Waiting for a futures key file `QuantOS-Secrets/binance-futures-testnet.env`. Mainnet key untouched.
+- e19922f dedicated crash_flush slot (crash 1 / event 1 / trend 1). 302 tests, 4 pre-existing errors.
+- T6 done: `edge_data/crash_replay_20261029/REPLAY_V2.md` (crash_flush 0->13 signals; LINK taken at 22:00 with
+  dedicated slot; v2 49.18 / strict 49.95 / 1slot 49.12 marked; no edge evidence; slot change is in-sample).
+- Paper prep done: `scripts/deploy_live50.sh prepare` -> code `~/Library/Application Support/QuantOS/app-v4/e19922f/src`,
+  fresh state `.../QuantOS/v4-live50` (empty, nothing started). Status JSON: `<state>/dashboard/status.json`,
+  heartbeat `<state>/heartbeat.json`, alerts `<state>/alerts.jsonl`, arch doc `docs/ARCHITECTURE_V4.md`.
+
+### Remaining / exact next step
+1. When the futures key file exists: `QUANTOS_KEY_FILE=<file> [QUANTOS_TESTNET_HOST=demo] PYTHONPATH=src
+   ../QuantOS/.venv/bin/python scripts/testnet_roundtrip.py BTCUSDC`, then report.
+2. Sun 00:00 UTC (only after coordinator says go): `launchctl bootout gui/$(id -u)/com.quantos.v3.paper` then
+   `scripts/deploy_live50.sh install` (re-run `prepare` first if HEAD changed: new commit dir).
+3. Optional T8 crash-episode dataset (not started).
+Usage at 02:20 UTC: see report; 5h window resets 06:50 UTC.
 
 # QuantOS V3 implementation checkpoint
 
