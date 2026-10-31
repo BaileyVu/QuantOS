@@ -97,6 +97,7 @@ class LivePolicy(Policy):
 
     max_positions = 3
     slots = (("crash", 1), ("event", 1), ("trend", 1))
+    limit_entries = False  # live50 polls no trade prints, so a LIMIT entry could never be filled honestly
     enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17",
                                     "tsmom_4h", "turtle_55", "vol_squeeze_breakout"})
 
@@ -225,6 +226,8 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
         return reject("INVALID_HOLD")
     if signal.side not in {"LONG", "SHORT"} or signal.entry_type not in {"LIMIT", "MARKET", "STOP"}:
         return reject("INVALID_SIGNAL")
+    if signal.entry_type == "LIMIT" and not getattr(policy, "limit_entries", True):
+        return reject("LIMIT_ENTRY_UNSUPPORTED")
     entry, stop, target = signal.entry_price, signal.stop_loss, signal.take_profit
     if (target is None) != no_target:
         return reject("INVALID_BRACKET")

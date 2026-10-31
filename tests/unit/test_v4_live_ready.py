@@ -98,6 +98,11 @@ class LivePolicyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             LivePolicy(leverage=D(4))
 
+    def test_limit_entries_refused(self):
+        lp_cls = type("AllLimit", (LivePolicy,), {"enabled_strategies": None})
+        d = evaluate(signal(), INS, quote(), account(), lp_cls(), T)
+        self.assertEqual(d.reason, "LIMIT_ENTRY_UNSUPPORTED")
+
     def test_default_policy_unchanged_below_minimum(self):
         self.assertEqual(evaluate(event(), INS, quote(), account(), Policy(), T).reason, "BELOW_EXCHANGE_MINIMUM")
 

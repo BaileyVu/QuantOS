@@ -303,7 +303,10 @@ class Runtime:
                 records = []
                 now = milliseconds()
                 for symbol in symbols:
-                    trades = market.trades(symbol, from_id=cursors[symbol]) if symbol in cursors else market.trades(symbol, start_ms=now-2000)
+                    # Trade prints only fill LIMIT entries; live50 has none, and aggTrades (weight 20 per
+                    # call every 2s) pushed two runs on one IP past Binance's request-weight limit.
+                    if self.portfolio == "live50": trades = ()
+                    else: trades = market.trades(symbol, from_id=cursors[symbol]) if symbol in cursors else market.trades(symbol, start_ms=now-2000)
                     if len(trades) == 1000:
                         # Backlog is uncertain, not a reason to award stale fills.
                         cursors.pop(symbol, None)

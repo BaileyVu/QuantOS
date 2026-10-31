@@ -28,7 +28,7 @@ def python():
     return Path(out.stdout.strip())
 
 
-def jobs():
+def jobs(resume=False):
     commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
                             capture_output=True, text=True, check=True).stdout.strip()
     app = QOS / "app-v4" / commit / "src"
@@ -38,8 +38,8 @@ def jobs():
     for name, execution, env in (("paper", "paper", {}),
                                  ("demo", "testnet", {"QUANTOS_KEY_FILE": str(KEY), "QUANTOS_TESTNET_HOST": "demo"})):
         state = QOS / ("v4-live50" if name == "paper" else "v4-live50-demo")
-        if (state / "run.json").exists():
-            raise SystemExit(f"{state} already has a run; use a fresh folder")
+        if (state / "run.json").exists() != resume:
+            raise SystemExit(f"{state}: {'no run to resume' if resume else 'already has a run; use a fresh folder'}")
         (state / "logs").mkdir(parents=True, exist_ok=True)
         state.chmod(0o700)
         p = build_plist(py, state, state / "logs", 72, min_quote_volume="5000000", pythonpath=app,
@@ -79,6 +79,22 @@ def install():
         print("started", label)
 
 
+def restart_quantos():
+    """Deploy the current commit to both QuantOS runs; each resumes its run.json (same deadline)."""
+    import time
+    plan = {k: v for k, v in jobs(resume=True).items() if k.startswith("com.quantos.v4.")}
+    for label in ("com.quantos.v4.paper", "com.quantos.v4.demo"):  # staggered: no simultaneous cold start
+        for name in (label, label + ".watchdog"):
+            subprocess.run(["launchctl", "bootout", f"{DOMAIN}/{name}"], check=False)
+            while loaded(name): time.sleep(1)
+            path = AGENTS / f"{name}.plist"
+            with path.open("wb") as f:
+                plistlib.dump(plan[name], f, sort_keys=True)
+            subprocess.run(["launchctl", "bootstrap", DOMAIN, str(path)], check=True)
+            print("restarted", name)
+        if label.endswith("paper"): time.sleep(90)
+
+
 def uninstall():
     for label in ("com.quantos.v4.paper", "com.quantos.v4.demo", "com.quantos.v4.paper.watchdog",
                   "com.quantos.v4.demo.watchdog", "com.sentibot.spot", "com.sentibot.perp"):
@@ -88,4 +104,4 @@ def uninstall():
 
 
 if __name__ == "__main__":
-    {"install": install, "uninstall": uninstall}[sys.argv[1]]()
+    {"install": install, "uninstall": uninstall, "restart-quantos": restart_quantos}[sys.argv[1]]()
