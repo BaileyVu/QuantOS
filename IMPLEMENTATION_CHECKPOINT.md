@@ -35,7 +35,7 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
 - 6b31985 `scripts/testnet_roundtrip.py` (not run).
 - BLOCKED: reading bailey's key file (`QuantOS V1 Data and Secrets/binance-testnet.env`) was denied by the
   auto-mode classifier (credential exploration); also denied re-reading `live/keys.py`. Not worked around.
-  .env-format support in keys.py NOT done. Needs bailey's permission or bailey runs the round-trip himself.
+  .env-format support in keys.py NOT done. Needs bailey's permission or bailey runs the round-trip.
 
 ### In progress / remaining
 - T6 replay: `edge_data/crash_replay_20261029/scripts/replay_v2.py` -> `out_v2/summary_v2.json`; write REPLAY_V2.md.
