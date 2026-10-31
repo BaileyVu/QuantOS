@@ -135,7 +135,7 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
 class Runtime:
     def __init__(self, state: Path, hours=72, market_factory=PublicMarket,
                  min_quote_volume=D("20000000"), announcement_factory=BinanceAnnouncements,
-                 portfolio="legacy", sentiment_path=None, notify=True):
+                 portfolio="legacy", sentiment_path=None, notify=True, execution="paper", client_factory=None):
         if not 0 < hours <= 72: raise ValueError("duration must be >0 and <=72 hours")
         self.state, self.hours, self.market_factory = state, hours, market_factory
         self.shutdown = threading.Event()
@@ -145,6 +145,11 @@ class Runtime:
         self.strategies = live_library() if portfolio == "live50" else library()
         self.sentiment = SentimentShadow(sentiment_path) if sentiment_path else None
         self.notify = notify
+        if execution not in ("paper", "dry-run", "testnet"):
+            raise ValueError("execution must be paper, dry-run or testnet (mainnet is not enabled here)")
+        if execution != "paper" and portfolio != "live50":
+            raise ValueError("exchange execution requires --portfolio live50")
+        self.execution, self.client_factory = execution, client_factory
         self.min_quote_volume = D(min_quote_volume)
         if not self.min_quote_volume.is_finite() or self.min_quote_volume < 0:
             raise ValueError("invalid quote volume floor")
@@ -154,6 +159,17 @@ class Runtime:
         self.instruments = {}
         self.stop_requested = False
         self.last_final_attempt = 0
+
+    def _client(self):
+        if self.client_factory is not None:
+            return self.client_factory(self.execution)
+        from ..live.client import SignedClient
+        if self.execution == "dry-run":
+            return SignedClient("dry-run", None, log_path=self.state / "dry_run_orders.jsonl")
+        from ..live.keys import load_keys
+        path = os.environ.get("QUANTOS_KEY_FILE")
+        if not path: raise ValueError("QUANTOS_KEY_FILE must name the testnet key file")
+        return SignedClient(self.execution, load_keys(path))
 
     def emit(self, kind, payload):
         try: self.messages.put((kind, payload), timeout=1)
@@ -380,7 +396,13 @@ class Runtime:
             alerter, heartbeat = Alerter(self.state, notify=self.notify), Heartbeat(self.state)
             monitor = FeedMonitor(stale_seconds=60, startup_grace_seconds=120)
             for name in ("feed", "scan"): monitor.expect(name, now)
-            next_check, killed = 0, False
+            next_check, killed, last_mirror, mirror = 0, False, 0, None
+            if self.execution != "paper":
+                from ..live.bridge import ExchangeMirror
+                def mirror_alert(level, key, message):
+                    if level == "recovered": alerter.clear(key, milliseconds())
+                    else: alerter.alert(level, key, message, milliseconds())
+                mirror = ExchangeMirror(self._client(), f"q{run['started_ms'] // 1000}", self.state, mirror_alert)
             last_wall, last_mono = milliseconds(), time.monotonic()
             last_feed, last_status, last_report = 0, 0, 0
             finishing_since = None
@@ -443,6 +465,15 @@ class Runtime:
                     detail = {"finish": finishing}
                     self.record("tick", detail, now)
                     dispatch(engines, "tick", detail, now)
+                if mirror is not None and now - last_mirror >= 2000:
+                    last_mirror = now
+                    try:
+                        with engines[0].journal.transaction():
+                            result = mirror.sync(engines[0], now)
+                            if not result.get("ok", True):
+                                engines[0].journal.event(now, "EXCHANGE_RECONCILE_FAILED", result)
+                    except Exception as error:
+                        alerter.alert("critical", "mirror", f"exchange mirror error: {error}", now)
                 if (self.state / "KILL").exists() and not killed:
                     killed = True
                     for e in engines: e.kill(now)

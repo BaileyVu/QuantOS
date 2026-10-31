@@ -32,6 +32,9 @@ def parser():
             cmd.add_argument("--min-quote-volume", type=_quote_volume, default=D("20000000"))
         if name == "start": cmd.add_argument("--mode", choices=["paper"], default="paper")
         if name in {"start", "install-service"}:
+            cmd.add_argument("--execution", choices=["paper", "dry-run", "testnet"], default="paper",
+                             help="mirror paper positions to Binance; testnet reads QUANTOS_KEY_FILE")
+        if name in {"start", "install-service"}:
             cmd.add_argument("--portfolio", choices=["legacy", "live50"], default="legacy")
             cmd.add_argument("--sentiment-file", type=Path, help="sentibot paper_perp_signals.jsonl (shadow only)")
         if name == "install-service":
@@ -200,10 +203,10 @@ def main(argv=None):
                             **({"research": True} if args.research else {}))
         elif args.command == "start": return Runtime(
             args.state, args.hours, min_quote_volume=args.min_quote_volume,
-            portfolio=args.portfolio, sentiment_path=args.sentiment_file).run()
+            portfolio=args.portfolio, sentiment_path=args.sentiment_file, execution=args.execution).run()
         elif args.command == "install-service":
             from .service import install_service, install_watchdog
-            extra = ["--portfolio", args.portfolio] + (
+            extra = ["--portfolio", args.portfolio, "--execution", args.execution] + (
                 ["--sentiment-file", str(args.sentiment_file)] if args.sentiment_file else [])
             result = {"plist": str(install_service(
                 Path(sys.executable), args.state, args.hours,
