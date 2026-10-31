@@ -26,6 +26,17 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
 - Live smoke (public data, 5 min, scratch state): self-check OK 6/6, OI z on 9/9 majors, cutoff -7.77% (29/29),
   402 scans, reports OK.
 
+- 8060e83 `scripts/deploy_live50.sh prepare|install` (copies src to ~/Library/Application Support/QuantOS/app-v4/<commit>,
+  fresh state v4-live50, base python from ../QuantOS/.venv realpath). Old label com.quantos.v3.paper is still loaded
+  (not running): `launchctl bootout gui/$UID/com.quantos.v3.paper` before install.
+- 7488210 `live/bridge.py` ExchangeMirror behind `start --execution paper|dry-run|testnet` (live50 only; mainnet not
+  exposed in CLI). Protection failure / 2x reconcile failure -> KILL + flatten; auth errors (-2015/-2014/-1022/401)
+  -> critical alert. 4 tests.
+- 6b31985 `scripts/testnet_roundtrip.py` (not run).
+- BLOCKED: reading bailey's key file (`QuantOS V1 Data and Secrets/binance-testnet.env`) was denied by the
+  auto-mode classifier (credential exploration); also denied re-reading `live/keys.py`. Not worked around.
+  .env-format support in keys.py NOT done. Needs bailey's permission or bailey runs the round-trip himself.
+
 ### In progress / remaining
 - T6 replay: `edge_data/crash_replay_20261029/scripts/replay_v2.py` -> `out_v2/summary_v2.json`; write REPLAY_V2.md.
 - T5: sentibot FDA instructions to bailey (no launchd job; manual run under /usr/bin/python3 -> grant FDA to the
