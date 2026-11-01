@@ -1,0 +1,109 @@
+{
+  "coverage": {
+    "activity": {
+      "complete": true,
+      "rows": 175821
+    },
+    "closed_positions": {
+      "complete": true,
+      "rows": 19607
+    },
+    "open_positions": {
+      "complete": true,
+      "rows": 11
+    },
+    "taker_trades": {
+      "complete": true,
+      "rows": 10700
+    },
+    "tips": {
+      "complete": true,
+      "rows": 0
+    },
+    "trades": {
+      "complete": true,
+      "rows": 151835
+    }
+  },
+  "errors": [],
+  "evidence_directory": "/Users/bailey12/Desktop/PythonProject/QuantOS-PM/artifacts/research/0x56f609c609975454bf851f0d91079fbc4a5fe251-1792342872278223000",
+  "execution_classification": {
+    "CONFIRMED_MAKER": 140911,
+    "CONFIRMED_TAKER": 10700,
+    "UNKNOWN": 224
+  },
+  "full_public_api_walk": true,
+  "months": {
+    "2026-04": {
+      "activity_rows": 0,
+      "complete": true,
+      "conclusion": "no wallet activity returned for this month"
+    },
+    "2026-05": {
+      "activity_rows": 0,
+      "complete": true,
+      "conclusion": "no wallet activity returned for this month"
+    },
+    "2026-06": {
+      "activity_rows": 4823,
+      "complete": true,
+      "conclusion": "activity observed"
+    }
+  },
+  "status": "INCOMPLETE_ATTRIBUTION",
+  "wallet": "0x56f609c609975454bf851f0d91079fbc4a5fe251",
+  "join_date_utc": "2026-05-13T10:11:44+00:00",
+  "activity_types": {
+    "DEPOSIT": 6,
+    "SPLIT": 9830,
+    "TRADE": 151835,
+    "REDEEM": 14067,
+    "MERGE": 15,
+    "MAKER_REBATE": 47,
+    "TAKER_REBATE": 16,
+    "WITHDRAWAL": 5
+  },
+  "trade_sides": {
+    "SELL": 151835
+  },
+  "june_activity_types": {
+    "DEPOSIT": 1,
+    "SPLIT": 322,
+    "TRADE": 4178,
+    "REDEEM": 316,
+    "MERGE": 2,
+    "MAKER_REBATE": 4
+  },
+  "june_trade_sides": {
+    "SELL": 4178
+  },
+  "credited_api_atoms": {
+    "deposits": null,
+    "economic_pnl": "21464.06242",
+    "fees": "-5935.75382",
+    "fees_paid": "-5935.75382",
+    "maker_rebate": "364.9126",
+    "position_pnl": "21099.14982",
+    "reward_income": "0.0",
+    "taker_rebate": "0.0",
+    "timestamp": 1792342061,
+    "withdrawals": null
+  },
+  "partial_attribution": {
+    "directional_inventory": null,
+    "early_exits": "-329222.2611790",
+    "fees": null,
+    "matched_sets": "0.0",
+    "rebates": "4821.2866",
+    "rewards": null,
+    "spread_capture": null
+  },
+  "unexplained_position_pnl_difference": "351088.2669790",
+  "incentive_discrepancies": {
+    "maker_rebate": "4039.9589",
+    "taker_rebate": "416.4151"
+  },
+  "gap_counts": {
+    "redemption token burn/cost requires transaction receipt": 14067
+  }
+}

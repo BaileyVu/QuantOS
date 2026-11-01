@@ -1,0 +1,14 @@
+{
+  "accounting_residuals": "all exactly zero",
+  "audit_source_sha256": "22b3a92e320490af1ac7b30d49367cbb1f49d52fbc9cfaf0f9ce12a57065f485",
+  "candidate_runs": 72,
+  "experiment_source_sha256": "f3c6d4411ab9fa8a7b4ee6d74509c4e43fa525dc11e3ba481eca7147059f22c6",
+  "held_out_validation": "unavailable; user authorized fixture diagnostics only",
+  "original_checkpoints": 576,
+  "original_preservation": {
+    "changed": [],
+    "files_verified": 79,
+    "status": "unchanged"
+  },
+  "original_runs": 9
+}

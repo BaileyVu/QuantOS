@@ -1,0 +1,32 @@
+{
+ "rule_id": "sports_rule_v1",
+ "frozen_at_utc": "2026-10-21T07:03:13Z",
+ "universe": "resolved Polymarket soccer moneyline events (home/draw/away YES markets) with gameStartTime in the 60 days before 2026-10-21, in leagues covered by football-data.co.uk 2026/27 CSVs",
+ "matching": "same kickoff date (UTC date of gameStartTime vs CSV Date, +/-1 day allowed for time-zone) AND both team names fuzzy-matched (normalised tokens, alias table, similarity >= 0.6 each); games with more than one candidate match are DROPPED (no guessing); the Polymarket market for each outcome identified by groupItemTitle/question (home team, away team, draw)",
+ "sharp_reference": {
+  "primary": "football-data 'BFEH/BFED/BFEA' = Betfair Exchange pre-match odds (football-data collects pre-match odds on Fridays/Tuesdays, i.e. BEFORE kickoff -> no look-ahead). The 2026/27 CSVs contain no Pinnacle columns.",
+  "fallback": "if BFE missing: AvgH/AvgD/AvgA (market average) - reported separately",
+  "devig": "proportional: p_i = (1/odds_i) / sum(1/odds)",
+  "diagnostic_only": "closing odds BFECH/BFECD/BFECA are LOOK-AHEAD relative to a T-1h entry and are reported only as a diagnostic, never as the strategy result"
+ },
+ "strategy": {
+  "decision_time": "gameStartTime - 60 minutes",
+  "price_proxy": "last CLOB /prices-history point (fidelity 10) at or before decision time for that outcome's YES token",
+  "entry_price": "price_proxy + 0.01",
+  "fee": "shares * rate * p * (1-p) from the market feeSchedule (default 0.05)",
+  "entry_condition": "sharp_prob - entry_price >= 0.03 and 0.03 <= entry_price <= 0.90",
+  "stake_usd": 10,
+  "max_one_trade_per_outcome": true,
+  "payout": "$1/share if outcome won"
+ },
+ "report": [
+  "trades",
+  "win rate",
+  "PnL",
+  "ROI",
+  "bootstrap 95% CI by game",
+  "by league",
+  "match rate",
+  "closing-odds diagnostic (look-ahead)"
+ ]
+}

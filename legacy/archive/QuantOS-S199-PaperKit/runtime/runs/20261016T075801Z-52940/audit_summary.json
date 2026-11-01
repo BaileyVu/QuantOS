@@ -1,0 +1,18 @@
+{
+  "data_warning": "Exchange-authenticated fills NOT obtained. Equity is upstream session-only and is NOT restart-safe.",
+  "initial_cash": 200,
+  "latest_upstream_synthetic_equity": "199.685534",
+  "position_slugs": [
+    "btc-updown-5m-1792175700",
+    "btc-updown-5m-1792187700",
+    "btc-updown-5m-1792191000"
+  ],
+  "restart_safe": false,
+  "session_id": "20261016T075801Z-52940",
+  "settled_count": 3,
+  "settlement_ledger_present": true,
+  "status": "settled_or_empty",
+  "total_simulated_fills": 3,
+  "trading_mode": "SANDBOX_ONLY",
+  "unsettled_count": 0
+}

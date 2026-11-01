@@ -1,0 +1,13 @@
+capital = "350"
+mode = "shadow"
+model = "pessimistic"
+quote_size = "20"
+stale_ms = 10000
+submit_ms = 100
+cancel_ms = 250
+quote_ttl_ms = 30000
+calibration = ""
+enable_taker_complete_set_arb = false
+enable_early_loser_exit = false
+enable_directional_inventory_alpha = false
+enable_live_orders = false

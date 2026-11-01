@@ -26,7 +26,7 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
 - Live smoke (public data, 5 min, scratch state): self-check OK 6/6, OI z on 9/9 majors, cutoff -7.77% (29/29),
   402 scans, reports OK.
 
-- 8060e83 `legacy/deploy_live50.sh prepare|install` (superseded by scripts/deploy_three.py) (copies src to ~/Library/Application Support/QuantOS/app-v4/<commit>,
+- 8060e83 `legacy/scripts/deploy_live50.sh prepare|install` (superseded by scripts/deploy_three.py) (copies src to ~/Library/Application Support/QuantOS/app-v4/<commit>,
   fresh state v4-live50, base python from ../QuantOS/.venv realpath). Old label com.quantos.v3.paper is still loaded
   (not running): `launchctl bootout gui/$UID/com.quantos.v3.paper` before install.
 - 7488210 `live/bridge.py` ExchangeMirror behind `start --execution paper|dry-run|testnet` (live50 only; mainnet not
@@ -109,7 +109,7 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
 - 16:17 com.quantos.hlcopy installed (owner-approved, after code review: host allowlist, validated fields only, no
   eval/exec, ASCII, no hidden unicode). Code ~/Library/Application Support/hl_copy/app, state .../hl_copy/state,
   12 frozen HL wallets (16:13Z), paper-copy books at 0/30/60 s delay, $50 each, 2% risk. Judge after ~7 days
-  (~2026-11-07). Source preserved in legacy/research_20261031/hl_copy. Stop: deploy_three.py uninstall (now included).
+  (~2026-11-07). Source preserved in legacy/research/2026-10-31/hl_copy. Stop: deploy_three.py uninstall (now included).
 
 - Block 4 (2026-11-01 ~17:20 UTC): 3 new cross-sectional families DEAD on BUILD (DSR at N=4056):
   xs_rank_ret_v1 (weekly L/S momentum, best +103bp/wk CI [31,179], DSR z -3.73), xs_funding_v1 (funding rank,
@@ -119,6 +119,8 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
 - Block 4b: funding_settle_drift dead (-24.7bp, 1603 trades); premium extremes + OI surge skipped (duplicates);
   new_listing_fade v1 near-miss (35 trades, survivors) -> v2 on 396 listings incl. delisted, 5m-wick stops,
   short funding, 2x cap: DEAD (+18.7bp CI [-30,+70], DSR z -1.79 at N=4170; only 34/396 listings had USDC).
+
+- 2026-11-01 repo cleanup (branch claude/repo-cleanup): legacy_assets → legacy/v1_v3, merged main (PR #25) archives → legacy/archive/, V1/V3 docs → legacy/docs/, README rewritten. Main 313 + legacy 1001 tests pass.
 
 ### Next step
 Keep runs stable; report at user check-ins. Paper run ends 2026-11-03 02:49 UTC -> final reports, then decide on live.

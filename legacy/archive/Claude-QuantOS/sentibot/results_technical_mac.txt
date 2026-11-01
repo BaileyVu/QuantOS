@@ -1,0 +1,23 @@
+Fear & Greed history: loaded, 3181 days
+Costs 0.15% per side. Portfolio = 1/3 each of BTCUSDT, ETHUSDT, SOLUSDT. $/day at $200 from CAGR.
+
+
+## in-sample 2021-2023
+| Variant | Total | CAGR | Sharpe | MaxDD | $/day at $200 |
+|---|---|---|---|---|---|
+| momentum only | +62.9% | +18.8% | 0.79 | -37.0% | $0.10 |
+| pattern only | +2.1% | +0.7% | 0.15 | -47.2% | $0.00 |
+| momentum+pattern | +12.4% | +4.2% | 0.29 | -47.5% | $0.02 |
+| full technical (+fear&greed) | +14.7% | +4.9% | 0.32 | -46.0% | $0.03 |
+| hold | +210.0% | +49.0% | 0.90 | -86.1% | $0.27 |
+
+## out-of-sample 2024-now
+| Variant | Total | CAGR | Sharpe | MaxDD | $/day at $200 |
+|---|---|---|---|---|---|
+| momentum only | +15.1% | +5.1% | 0.32 | -40.2% | $0.03 |
+| pattern only | +33.9% | +11.0% | 0.54 | -28.1% | $0.06 |
+| momentum+pattern | +8.4% | +2.9% | 0.24 | -37.0% | $0.02 |
+| full technical (+fear&greed) | +6.5% | +2.3% | 0.21 | -38.0% | $0.01 |
+| hold | +45.1% | +14.2% | 0.52 | -65.4% | $0.08 |
+
+Position changes over the whole history (all 3 coins): momentum only: 2013, pattern only: 1521, momentum+pattern: 1819, full technical (+fear&greed): 1833

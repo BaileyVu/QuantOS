@@ -1,0 +1,13 @@
+{
+  "disclaimer": "POST-HOC SCREEN. Counterfactual fills assume available best ask with inferred cost. NOT LIVE TRADE RESULTS or untouched holdout evidence.",
+  "all_candidates": 17,
+  "official_winners_verified": 0,
+  "unverified": 17,
+  "verified_candidate_wins": 0,
+  "full_17_hypothetical_pnl_usd": null,
+  "partial_verified_only_hypothetical_pnl_usd": 0.0,
+  "model_brier_on_verified_subset": null,
+  "market_brier_on_verified_subset": null,
+  "files": "/Users/bailey12/Desktop/QuantOS-S199-PaperKit/runtime/rescue-official-check-20261019/S199_17_outcomes_and_counterfactuals.csv",
+  "label_source": "Gamma closed=true AND umaResolutionStatus=resolved AND exact 1/0 outcomes"
+}
