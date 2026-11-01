@@ -16,7 +16,6 @@ jobs:
       - run: python -m unittest discover -s tests -t .
       - name: Validate preserved legacy research and V1 tests
         env:
-          PYTHONSAFEPATH: '1'
           PYTHONPATH: legacy/v1_v3:legacy/v1_v3/src
           PYTHONSAFEPATH: '1'  # keep the root tests/ package off sys.path (also in subprocesses)
         run: python -m unittest discover -s legacy/v1_v3/tests -t legacy/v1_v3
