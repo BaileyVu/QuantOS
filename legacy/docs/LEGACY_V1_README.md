@@ -1,7 +1,7 @@
 # QuantOS
 
 <p align="center">
-  <img src="assets/quantos-overview.svg" alt="QuantOS architecture overview">
+  <img src="../v1_v3/assets/quantos-overview.svg" alt="QuantOS architecture overview">
 </p>
 
 <p align="center">

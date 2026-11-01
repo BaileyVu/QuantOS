@@ -393,12 +393,12 @@ class AF4BPreregistrationTests(unittest.TestCase):
     def test_33_production_code_and_feature_engine_unchanged(self):
         root = Path(af.__file__).resolve().parents[2]
         result = subprocess.run(
-            ["git", "diff", "--quiet", "HEAD", "--", "legacy_assets/src/quantos"],
+            ["git", "diff", "--quiet", "HEAD", "--", "legacy/v1_v3/src/quantos"],
             cwd=root,
             check=False,
         )
         self.assertEqual(result.returncode, 0)
-        for path in (root / "legacy_assets/src/quantos").rglob("*.py"):
+        for path in (root / "v1_v3/src/quantos").rglob("*.py"):
             self.assertNotIn(
                 "alpha_funnel_af4b_preregistration",
                 path.read_text(encoding="utf-8"),
@@ -438,7 +438,7 @@ class AF4BPreregistrationTests(unittest.TestCase):
     def test_37_parent_research_hashes_match_authoritative_artifacts(self):
         root = Path(af.__file__).resolve().parents[2]
         for parent in af.PARENT_RESEARCH:
-            value = json.loads((root / "legacy_assets" / parent["path"]).read_bytes())
+            value = json.loads((root / "v1_v3" / parent["path"]).read_bytes())
             self.assertEqual(
                 af.digest(af.canonical_json_bytes(value)), parent["sha256"]
             )

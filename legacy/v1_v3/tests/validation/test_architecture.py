@@ -8,7 +8,7 @@ import tomllib
 import unittest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-PRODUCTION_ROOT = PROJECT_ROOT / "legacy_assets" / "src" / "quantos"
+PRODUCTION_ROOT = PROJECT_ROOT / "v1_v3" / "src" / "quantos"
 DOMAIN_ROOT = PRODUCTION_ROOT / "domain"
 APPLICATION_ROOT = PRODUCTION_ROOT / "application"
 STORAGE_ROOT = PRODUCTION_ROOT / "infrastructure" / "storage"
@@ -66,7 +66,7 @@ class ArchitectureTests(unittest.TestCase):
                         self.assertNotIn(node.attr, forbidden_attributes)
 
     def test_phase_4b_pins_only_approved_model_dependencies(self) -> None:
-        project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        project = tomllib.loads((PROJECT_ROOT.parent / "pyproject.toml").read_text(encoding="utf-8"))
         # V3 paper is stdlib-only; retain pinned research as an optional extra.
         self.assertEqual(project["project"]["dependencies"], [])
         self.assertEqual(set(project["project"]["optional-dependencies"]["research"]), {
@@ -133,7 +133,7 @@ class ArchitectureTests(unittest.TestCase):
                         self.assertNotIn(node.attr, forbidden_attributes)
 
     def test_project_has_no_third_party_technical_analysis_dependency(self) -> None:
-        project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        project = tomllib.loads((PROJECT_ROOT.parent / "pyproject.toml").read_text(encoding="utf-8"))
         for requirement in project["project"]["dependencies"]:
             name = requirement.split("==")[0].lower().replace("_", "-")
             self.assertNotIn(name, {"ta", "ta-lib", "pandas", "pandas-ta", "finta"})

@@ -2,7 +2,7 @@
 
 ## Current V3 implementation contract
 
-For the October 26 paper-engine task, `docs/V3_PAPER_CONTRACT.md` supersedes the
+For the October 26 paper-engine task, `legacy/docs/V3_PAPER_CONTRACT.md` supersedes the
 historical frozen V1 scope and specification precedence below. Preserve old
 research and tests as historical evidence. V3 is public-data-only paper/fake:
 no authenticated account access, real-order code, or live enablement. Resume
@@ -16,9 +16,9 @@ QuantOS V1 is specification-driven.
 
 Before making changes, treat the repository specifications as authoritative:
 
-* `docs/000_READ_FIRST.md` — highest-priority V1 Source of Truth.
-* `docs/001_PRODUCT_REQUIREMENTS.md` through `docs/007_VALIDATION_BACKTESTING.md` — coequal frozen V1 specifications.
-* `docs/008_IMPLEMENTATION_GUIDE.md` — implementation guidance subordinate to `000–007`.
+* `legacy/docs/000_READ_FIRST.md` — highest-priority V1 Source of Truth.
+* `legacy/docs/001_PRODUCT_REQUIREMENTS.md` through `legacy/docs/007_VALIDATION_BACKTESTING.md` — coequal frozen V1 specifications.
+* `legacy/docs/008_IMPLEMENTATION_GUIDE.md` — implementation guidance subordinate to `000–007`.
 
 Do not infer a priority order among documents `001–007` from their filenames or numbering.
 
@@ -28,7 +28,7 @@ If two frozen specifications appear inconsistent:
 2. otherwise surface the conflict explicitly;
 3. do not silently choose one frozen specification over another.
 
-Do not modify `docs/000_READ_FIRST.md` through `docs/008_IMPLEMENTATION_GUIDE.md` unless explicitly instructed to update the frozen specification.
+Do not modify `legacy/docs/000_READ_FIRST.md` through `legacy/docs/008_IMPLEMENTATION_GUIDE.md` unless explicitly instructed to update the frozen specification.
 
 ---
 
@@ -55,9 +55,9 @@ Do not reread every specification unnecessarily.
 
 For each task:
 
-1. read `docs/000_READ_FIRST.md`;
+1. read `legacy/docs/000_READ_FIRST.md`;
 2. read the frozen specification files directly relevant to the task;
-3. read `docs/008_IMPLEMENTATION_GUIDE.md` when implementation structure or sequencing matters.
+3. read `legacy/docs/008_IMPLEMENTATION_GUIDE.md` when implementation structure or sequencing matters.
 
 For cross-cutting architectural changes, read all affected frozen specifications before modifying code.
 
