@@ -140,11 +140,20 @@ HLCOPY = Path.home() / "Library/Application Support/hl_copy/state"
 
 def services_view() -> list:
     """launchd state per service (read-only `launchctl print`)."""
-    uid = subprocess.run(["id", "-u"], capture_output=True, text=True).stdout.strip()
     out = []
+    try:
+        uid = subprocess.run(["id", "-u"], capture_output=True, text=True).stdout.strip()
+    except OSError:  # no `id` (non-POSIX): report every service as unknown
+        uid = None
     for name, label in SERVICES:
-        r = subprocess.run(["launchctl", "print", f"gui/{uid}/{label}"], capture_output=True, text=True)
-        out.append({"name": name, "label": label, "running": "state = running" in r.stdout})
+        running = None
+        if uid is not None:
+            try:
+                r = subprocess.run(["launchctl", "print", f"gui/{uid}/{label}"], capture_output=True, text=True)
+                running = "state = running" in r.stdout
+            except OSError:  # launchctl only exists on macOS
+                running = None
+        out.append({"name": name, "label": label, "running": running})
     return out
 
 
