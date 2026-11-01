@@ -112,6 +112,16 @@ class LivePolicy(Policy):
 
 
 @dataclass(frozen=True)
+class Cap200M10Policy(LivePolicy):
+    """Owner's compounding rule: each new trade's MARGIN = current balance / 10 ($200 -> $20; after a -$15 loss
+    -> $18.50). Position = margin x the strategy's safe leverage (<= 3x, lower for wide stops); the loss is
+    whatever the stop gives. Below the exchange minimum -> skip (no bump). Same strategies/slots/breakers as 2%."""
+    margin_per_trade: Decimal = D(".10")
+    bump_max_risk: Decimal = D(".000001")  # effectively no minimum-notional bump: skip instead
+    portfolio_risk_fraction: Decimal = D(".05")
+
+
+@dataclass(frozen=True)
 class LiveR5Policy(LivePolicy):
     """Owner's aggressive profile: 5% of current equity at risk per trade (1/10 of a 50% drawdown
     budget). Breakers scale with it: 15% daily loss stop, 35% drawdown pause. Same strategies, slots,
@@ -150,6 +160,7 @@ class Account:
     short_risk: Decimal = D(0)
     open_symbols: tuple[str, ...] = ()
     open_strategies: tuple[str, ...] = ()
+    cash: Decimal = D(0)  # realized balance (closed trades, fees, funding); 0 = unknown -> use equity
 
 
 @dataclass(frozen=True)
@@ -301,7 +312,10 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
                                    account.equity - account.margin_used))
     # Live profiles size below the budget so a small adverse move between signal and fill stays inside
     # it; the engine's fill-time check caps at the full budget (requested_risk).
-    bounds = {"risk": budget * getattr(policy, "risk_headroom", D(1)) / unit_loss,
+    margin_rule = getattr(policy, "margin_per_trade", None)
+    balance = account.cash if account.cash > 0 else account.equity
+    bounds = {"risk": min(balance * margin_rule * safe / max_entry, max(D(0), risk_room) / unit_loss) if margin_rule else
+              budget * getattr(policy, "risk_headroom", D(1)) / unit_loss,
               "gross_notional": max(D(0), account.equity * policy.gross_fraction - account.gross_notional) / (max_entry * (1 + entry_fee)),
               "margin": margin_capacity / (max_entry / safe + costs),
               "exchange_max": min(instrument.max_qty, instrument.market_max_qty)}
@@ -331,7 +345,9 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
                          else account.equity * policy.margin_fraction)
     if leverage_capacity <= 0:
         return reject("INSUFFICIENT_MARGIN")
-    leverage = min(safe, max(D(1), D(ceil(notional / leverage_capacity))))
+    leverage = safe if margin_rule else min(safe, max(D(1), D(ceil(notional / leverage_capacity))))
+    if margin_rule:  # the stop sets the loss; give the fill-time check the usual 10% room over it
+        budget = quantity * unit_loss / D("0.9")
     return Decision(True, "NET_RR_NOT_APPLICABLE" if no_target else "APPROVED",
                     quantity, budget, quantity * unit_loss, notional,
                     notional / leverage, leverage,
