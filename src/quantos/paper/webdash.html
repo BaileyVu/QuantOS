@@ -1,205 +1,243 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QuantOS Live Dashboard</title>
+<title>QuantOS</title>
 <style>
-:root{--bg:#f4f5f7;--card:#fff;--fg:#1b1f24;--mut:#6a7280;--bd:#dde0e5;--ok:#1a9e55;--warn:#d98a00;--bad:#d63a3a;--off:#9aa1ab;--acc:#2f6fdb;--okbg:#e3f5ea;--warnbg:#fdf1d8;--badbg:#fbe3e3;--offbg:#eceef1}
-@media(prefers-color-scheme:dark){:root{--bg:#0f1216;--card:#181c22;--fg:#e4e7eb;--mut:#8b94a1;--bd:#2a3039;--ok:#3dc27a;--warn:#e8a82e;--bad:#ef5b5b;--off:#6b7380;--acc:#6aa0ff;--okbg:#14301f;--warnbg:#38290a;--badbg:#3c1717;--offbg:#242a32}}
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1b2230;--mut:#667085;--line:#e4e7ec;--good:#15803d;--bad:#c2261f;--warn:#b45309;--acc:#2f6fed;--goodbg:#e7f6ec;--badbg:#fdeceb;--warnbg:#fff4e0;--chip:#eef1f6}
+@media (prefers-color-scheme:dark){:root{--bg:#10141b;--card:#181e28;--ink:#e6e9ef;--mut:#8b95a7;--line:#2a3140;--good:#4ade80;--bad:#f87171;--warn:#fbbf24;--acc:#7aa2ff;--goodbg:#14301f;--badbg:#3a1b1b;--warnbg:#3a2b10;--chip:#222a38}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums;overflow-x:hidden}
-main{max-width:1200px;margin:0 auto;padding:10px}
-h1{font-size:16px;margin:4px 0}h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
-.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
-#banner{display:none;background:var(--bad);color:#fff;padding:8px 10px;border-radius:6px;margin:6px 0;font-weight:600}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:10px;margin:10px 0;min-width:0}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid>.card{margin:0}
-@media(max-width:700px){.grid{grid-template-columns:1fr}}
-.tw{overflow-x:auto;max-width:100%}
-table{border-collapse:collapse;width:100%;white-space:nowrap}
-th,td{text-align:left;padding:3px 8px;border-bottom:1px solid var(--bd)}th{color:var(--mut);font-weight:600;font-size:11px}
-td.n,th.n{text-align:right}td.wrap{white-space:normal;min-width:180px}
-.pos{color:var(--ok)}.neg{color:var(--bad)}.mut{color:var(--mut)}.small{font-size:11px}
-.chip{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;margin:1px 3px 1px 0;background:var(--offbg);color:var(--fg);white-space:nowrap}
-.chip.ok{background:var(--okbg);color:var(--ok)}.chip.warn{background:var(--warnbg);color:var(--warn)}.chip.bad{background:var(--badbg);color:var(--bad)}.chip.off{background:var(--offbg);color:var(--off)}
-.flow{display:flex;flex-wrap:wrap;gap:4px 0;align-items:stretch}
-.stage{flex:1 1 120px;min-width:110px;border:1px solid var(--bd);border-left-width:5px;border-radius:6px;padding:5px 7px;background:var(--card);margin-right:18px;position:relative}
-.stage:not(:last-child)::after{content:"\2192";position:absolute;right:-16px;top:8px;color:var(--mut);font-size:14px}
-.stage.ok{border-left-color:var(--ok)}.stage.warn{border-left-color:var(--warn)}.stage.bad{border-left-color:var(--bad)}.stage.off{border-left-color:var(--off)}
-.stage b{font-size:12px}.stage .ev{font-size:10.5px;color:var(--mut);overflow-wrap:anywhere;margin-top:2px}
-.flowrow{margin:6px 0}.flowrow>.lbl{font-weight:600;margin-bottom:3px}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:var(--off)}.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
-.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin:8px 0}
-.kv div{background:var(--bg);border-radius:6px;padding:4px 7px}.kv span{display:block;font-size:10.5px;color:var(--mut)}.kv b{font-size:14px}
-.bar{height:8px;background:var(--offbg);border-radius:4px;overflow:hidden;display:inline-block;width:70px;vertical-align:middle}.bar i{display:block;height:100%;background:var(--acc)}
-.cbar{position:relative;height:10px;background:var(--offbg);border-radius:4px;min-width:120px}.cbar:before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--mut)}.cbar i{position:absolute;top:0;bottom:0;border-radius:3px}
-.a-critical{border-left:4px solid var(--bad)}.a-warn{border-left:4px solid var(--warn)}.a-recovered{border-left:4px solid var(--ok)}
-.alert{padding:3px 8px;margin:3px 0;background:var(--bg);border-radius:4px}
-body{background:linear-gradient(180deg,var(--bg),var(--bg2)) fixed}
-:root{--bg2:#e9edf5;--sh:0 1px 2px rgba(20,30,50,.06),0 6px 18px rgba(20,30,50,.07)}
-@media(prefers-color-scheme:dark){:root{--bg2:#0b0e13;--sh:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35)}}
-.card{border-radius:14px;box-shadow:var(--sh);padding:14px}
-h2{font-size:12px;display:flex;align-items:center;gap:6px}
-.hero{border-radius:18px;padding:16px 18px;margin:8px 0;color:#fff;background:linear-gradient(135deg,#2f6fdb,#6a4fe0 60%,#8a3fd0);box-shadow:var(--sh)}
-.hero.warn{background:linear-gradient(135deg,#d98a00,#e0662a)}.hero.bad{background:linear-gradient(135deg,#d63a3a,#a8245a)}
-.hero .hs{font-size:15px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.hero .hg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
-.hero .hg div span{display:block;font-size:11px;opacity:.8;text-transform:uppercase;letter-spacing:.05em}.hero .hg b{font-size:22px;font-weight:700}
-.hero .sub{font-size:11px;opacity:.85}
-.stage{border-radius:10px;transition:box-shadow .2s}.stage:hover{box-shadow:var(--sh)}
-.dot.live{animation:pulse 2s infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(61,194,122,.6)}70%{box-shadow:0 0 0 7px rgba(61,194,122,0)}100%{box-shadow:0 0 0 0 rgba(61,194,122,0)}}
-.stage.ok .sd{background:var(--ok);animation:pulse 2s infinite}.sd{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:var(--off)}.stage.warn .sd{background:var(--warn)}.stage.bad .sd{background:var(--bad)}
-.empty{padding:14px;text-align:center;color:var(--mut);background:var(--bg);border-radius:10px;font-size:12px}
-.kv div{border-radius:10px}[title]{cursor:help}.hint{border-bottom:1px dotted var(--mut)}
-.chip{transition:background .3s}
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums;overflow-x:hidden}
+main{max-width:1180px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0}h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:24px 0 10px}
+header{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;justify-content:space-between}
+.sub{color:var(--mut)}.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}.mut{color:var(--mut)}
+#banner{display:none;background:var(--bad);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pill{display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border-radius:99px;background:var(--chip);font-size:13px}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--good)}
+.pill.down{background:var(--badbg)}.pill.down i{background:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.card h3{margin:0;font-size:15px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.card .note{color:var(--mut);font-size:12px;margin:2px 0 8px}
+.big{font-size:30px;font-weight:700;margin-top:6px}
+.row{display:flex;flex-wrap:wrap;gap:4px 18px;margin:6px 0;color:var(--mut)}.row b{color:var(--ink);font-weight:600}
+.tag{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--chip);color:var(--mut);font-weight:500}
+.tag.bad{background:var(--badbg);color:var(--bad)}.tag.good{background:var(--goodbg);color:var(--good)}.tag.warn{background:var(--warnbg);color:var(--warn)}
+.scroll{overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{color:var(--mut);font-weight:500;text-align:left}th,td{padding:4px 8px 4px 0;white-space:nowrap;border-bottom:1px solid var(--line)}
+td.n,th.n{text-align:right}
+svg.spark{width:100%;height:56px;display:block;margin-top:6px}
+.chips{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.chips button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:5px 14px;font:inherit;cursor:pointer}
+.chips button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.feed{background:var(--card);border:1px solid var(--line);border-radius:14px;max-height:520px;overflow:auto}
+.ev{display:grid;grid-template-columns:58px 74px 1fr;gap:8px;padding:7px 14px;border-bottom:1px solid var(--line);align-items:baseline}
+.ev:last-child{border:0}.ev .t{color:var(--mut);font-size:12px}
+.al{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);align-items:baseline;flex-wrap:wrap}
+.sent{display:grid;grid-template-columns:48px 1fr 46px;gap:8px;align-items:center;margin:4px 0;font-size:12.5px}
+.bar{position:relative;height:8px;background:var(--chip);border-radius:4px}
+.bar::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--mut)}
+.bar span{position:absolute;top:0;bottom:0;border-radius:4px}
+.mini{border-top:1px solid var(--line);padding:8px 0}
+code{display:block;background:var(--chip);padding:8px 10px;border-radius:8px;margin:4px 0 10px;user-select:all;overflow-x:auto;white-space:pre;font:12px ui-monospace,Menlo,monospace}
+footer{margin-top:10px}
+@media (max-width:720px){.grid{grid-template-columns:1fr}.big{font-size:26px}.ev{grid-template-columns:50px 1fr}.ev .r{display:none}main{padding:12px}}
 </style></head><body><main>
-<div class="top"><h1>QuantOS live dashboard <span class="small mut" title="Both runs trade a $50 test account. Paper run is simulated; the demo run mirrors orders to Binance Demo.">(what is this?)</span></h1><div id="upd" class="mut">connecting...</div></div>
 <div id="banner"></div>
-<div id="hero" class="hero"><div class="hs">Connecting...</div></div>
-<div class="card"><h2>Process flow</h2><div id="flow"></div></div>
-<div id="runs"></div>
-<div class="card"><h2>Live signal feed</h2><div class="tw" id="feed"></div></div>
-<div class="card"><h2>Fills / orders</h2><div id="fills"></div></div>
-<div class="card"><h2>Alerts</h2><div id="alerts"></div></div>
-<div class="card"><h2>Sentibot</h2><div class="grid" id="senti"></div></div>
+<header><div><h1>QuantOS</h1><div id="status" class="sub">Loading…</div></div>
+<div class="sub" style="text-align:right"><div id="deadline"></div><div id="updated"></div></div></header>
+<div class="pills" id="pills"></div>
+<h2>Runs</h2><div class="grid" id="cards"></div>
+<h2>Live activity</h2>
+<div class="chips" id="chips"></div><div class="feed" id="feed"></div>
+<h2>Alerts</h2><div class="card" id="alerts"></div>
+<footer><h2>Controls (read-only)</h2><div class="card">
+<div class="sub">Copy and run in a terminal. Nothing on this page acts.</div>
+<div class="sub" style="margin-top:8px">Stop everything (run in ~/Desktop/PythonProject/QuantOS-mainnet-ready):</div>
+<code>../QuantOS/.venv/bin/python scripts/deploy_three.py uninstall</code>
+<div class="sub">Emergency stop one run:</div><div id="kills"></div></div></footer>
 </main>
 <script>
 "use strict";
-var D=null,lastOk=0,fetchErr=null;
-var $=function(id){return document.getElementById(id)};
-function el(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=String(txt);return e}
-function add(p){for(var i=1;i<arguments.length;i++){var c=arguments[i];if(c!=null)p.appendChild(c&&c.nodeType?c:document.createTextNode(String(c)))}return p}
-function num(x){var v=parseFloat(x);return isFinite(v)?v:null}
-function f(x,d){var v=num(x);return v==null?"-":v.toFixed(d==null?2:d)}
-function tip(t,h){var s=el("span","hint",t);s.title=h;return s}
-function chipT(t,h,c){var s=chip(t,c);s.title=h;return s}
-function money(x){var v=num(x);return v==null?"-":(v<0?"-$":"$")+Math.abs(v).toFixed(2)}
-function sgn(v){return v==null?"mut":v>0?"pos":v<0?"neg":"mut"}
-function cn(v,txt){return el("span",sgn(v),txt)}
-function chip(txt,cls){return el("span","chip "+(cls||""),txt)}
-function ts(ms){if(!ms)return el("span","mut","-");var d=new Date(ms),s=el("span",null,d.toLocaleTimeString([], {hour12:false})+" "+d.toLocaleDateString([], {month:"short",day:"numeric"}));s.title=d.toISOString().replace("T"," ").slice(0,19)+" UTC";return s}
-function ago(s){if(s==null)return "?";s=Math.round(s);if(s<90)return s+"s";if(s<5400)return Math.round(s/60)+"m";return (s/3600).toFixed(1)+"h"}
-function table(heads,rows,emptyMsg){var w=el("div","tw"),t=el("table"),h=el("tr");heads.forEach(function(x){h.appendChild(el("th",x[1]?"n":"",x[0]))});t.appendChild(h);
- rows.forEach(function(r){var tr=el("tr");r.forEach(function(c,i){var td=el("td",(heads[i]&&heads[i][1]?"n":"")+(heads[i]&&heads[i][2]?" wrap":""));add(td,c==null?"-":c);tr.appendChild(td)});t.appendChild(tr)});
- w.appendChild(t);if(!rows.length){w.appendChild(el("div","empty",emptyMsg||"Nothing here yet"))}return w}
-function isDemo(r){return String(r.name).indexOf("demo")===0||r.mirror!=null}
-function eng(r){return ((r.status||{}).engines||[{}])[0]||{}}
-function worst(a,b){var o={ok:0,off:0,warn:1,bad:2};return (o[b]||0)>(o[a]||0)?b:a}
+const $=id=>document.getElementById(id);
+const num=v=>{const x=parseFloat(v);return isFinite(x)?x:null};
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function add(p,...kids){for(const k of kids)if(k!=null)p.appendChild(k);return p}
+const money=(v,sign)=>{const x=num(v);if(x==null)return"–";const s=Math.abs(x).toFixed(2);return(x<0?"−":sign?"+":"")+"$"+s};
+const px=v=>{const x=num(v);return x==null?"–":Number(x.toPrecision(5)).toString()};
+const cls=x=>x==null||x===0?"":x>0?"good":"bad";
+const SLOT_NAMES={SLOT_FULL_TREND:"trend slot already used",SLOT_FULL_EVENT:"event slot already used",SLOT_FULL_CRASH:"crash slot already used",
+BELOW_EXCHANGE_MINIMUM:"below Binance minimum order",STRATEGY_DISABLED:"strategy switched off",EXISTING_EXPOSURE:"already holding it",
+ENTRY_COOLDOWN:"cooling down after last entry",COSTS_TOO_HIGH_FOR_STOP:"costs too high for the stop distance",
+FILL_EXCEEDS_APPROVED_RISK:"fill would exceed approved risk",INSUFFICIENT_EXECUTABLE_DEPTH:"not enough order-book depth"};
+const CLOSE_NAMES={RUN_END:"run ended",SL:"stop-loss hit",TIME_EXIT:"time exit",KILL_SWITCH:"kill switch"};
+function strat(s){s=String(s||"");if(/tsmom|trend/i.test(s))return"trend";if(/crash/i.test(s))return"crash";if(/event|dip|news/i.test(s))return"event";return s||"?"}
+function base(sym){return String(sym||"?").replace(/(USDC|USDT)$/,"")}
+function hhmm(ms){const d=new Date(ms);return d.toTimeString().slice(0,5)}
+function ago(s){if(s==null)return"–";s=Math.max(0,Math.round(s));return s<90?s+"s":s<5400?Math.round(s/60)+"m":Math.round(s/3600)+"h"}
 
-/* ---------- health ---------- */
-function senti(){var p=D.sentibot&&D.sentibot.perp;if(!p||!p.available)return {c:"warn",t:"perp unavailable"};
- var age=(Date.now()-Date.parse(p.time))/1000;if(!isFinite(age)||age>10800)return {c:"warn",t:"stale reading ("+ago(age)+")"};return {c:"ok",t:"fresh "+ago(age)+" ago"}}
-function lastFeed(r,kinds){var f=r.feed||[];for(var i=0;i<f.length;i++)if(kinds.indexOf(f[i].kind)>=0)return f[i];return null}
-function evText(e){return e?(e.kind+" "+(e.strategy||"")+" "+(e.symbol||"")+" "+(e.reason||"")).trim()+" ("+ago((Date.now()-e.time_ms)/1000)+" ago)":"no events yet"}
-function stages(r){
- var st=r.status||{},run=r.run||{},fh=st.feed_health||{},stale=Object.keys(fh.stale||{}),hb=r.heartbeat_age_s,S=[],e=eng(r);
- var c=(hb!=null&&hb<30&&!stale.length)?"ok":"bad";if(c==="ok"&&(r.errors_last_15m||0)>0)c="warn";
- S.push({n:"Feeds",c:c,e:"hb "+ago(hb)+", scan "+ago((fh.ages_s||{}).scan)+", err/15m "+(r.errors_last_15m==null?"?":r.errors_last_15m)+", stale quotes/15m "+(r.stale_quotes_last_15m==null?"?":r.stale_quotes_last_15m)+(stale.length?", stale: "+stale.join(","):"")});
- var sc=(r.self_check||{}).checks||{},lv="ok",bad=[];Object.keys(sc).forEach(function(k){var l=sc[k].level;if(l==="critical"){lv="bad";bad.push(k)}else if(l==="warn"){lv=worst(lv,"warn");bad.push(k)}});
- if(!r.self_check)lv="warn";
- S.push({n:"Strategies (6)",c:lv,e:!r.self_check?"no self-check yet":bad.length?"attention: "+bad.join(", "):"all 6 self-checks ok"});
- var s=senti(),sh=lastFeed(r,["SENTIMENT_SHADOW"]);S.push({t:"Shadow sentiment: news/social mood is scored and logged as would-block / would-allow but never actually blocks trades.",n:"Sentiment shadow",c:s.c,e:s.t+(sh?" | "+evText(sh):"")});
- var rk=(st.kill_switch_active||e.paused)?"bad":"ok",rj=lastFeed(r,["REJECTED_RISK","APPROVED","KILL_SWITCH","LOSS_BREAKER"]);
- S.push({t:"Checks kill switch, open-position slots and position size before any order.",n:"Risk / slots / sizing",c:rk,e:(st.kill_switch_active?"KILL SWITCH ":"")+(e.paused?"PAUSED ":"")+evText(rj)});
- var run_ok=run.status==="running";
- S.push({n:isDemo(r)?"Paper engine + mirror":"Paper engine",c:run_ok?"ok":"bad",e:"run "+(run.status||"?")+", "+evText(lastFeed(r,["FILLED","PARTIAL","CLOSED"]))});
- if(isDemo(r)){var m=r.mirror,ms=m?Object.keys(m).map(function(k){return m[k].state}):[],rf=lastFeed(r,["EXCHANGE_RECONCILE_FAILED"]);
-  var mc=(ms.indexOf("FAILED")>=0||ms.indexOf("CLOSE_FAILED")>=0||rf)?"bad":(m==null?"warn":"ok");
-  S.push({n:"Exchange mirror / recon",c:mc,e:m==null?"idle (nothing traded yet)":ms.length+" orders: "+ms.join(",")+(rf?" | "+evText(rf):"")})}
- else S.push({n:"Reconciliation",c:e.reconciled===false?"bad":"ok",e:e.reconciled===false?"not reconciled":"reconciled"});
- return S}
-function renderFlow(){var root=$("flow");root.textContent="";D.runs.forEach(function(r){var row=el("div","flowrow"),fl=el("div","flow");
- add(row,el("div","lbl",r.name+(isDemo(r)?" (demo mirror)":" (paper)")));
- stages(r).forEach(function(s){var d=el("div","stage "+s.c);if(s.t)d.title=s.t;add(d,el("span","sd"),el("b",null,s.n),el("div","ev",s.e));fl.appendChild(d)});row.appendChild(fl);root.appendChild(row)})}
+/* Turn one journal event into {cat, text, tone} or null to hide. */
+function describe(f){
+  const sym=base(f.symbol),side=f.side||"",st=strat(f.strategy),why=String(f.reason||"");
+  const nice=SLOT_NAMES[why]||why;
+  switch(f.kind){
+    case"FILLED":case"PARTIAL":return{cat:"trade",tone:"good",text:`${f.kind==="PARTIAL"?"Partly filled":"Opened"} ${side} ${sym} (${st})${f.detail?" – "+f.detail:""}`};
+    case"CLOSED":{const m=/pnl\s*([+-][\d.]+)/.exec(f.detail||"");const p=m?parseFloat(m[1]):null;
+      return{cat:"trade",tone:cls(p)||"",text:`Closed ${sym}: ${CLOSE_NAMES[why]||why||"closed"}${p!=null?", "+money(p,true):""}`}}
+    case"REJECTED_RISK":{let extra=f.detail?` (${f.detail})`:"";return{cat:"skip",tone:"",text:`Skipped ${sym}: ${nice||"rejected"}${extra}`}}
+    case"CANCELED":return{cat:"trade",tone:"warn",text:`Cancelled order ${sym}${why?": "+(CLOSE_NAMES[why]||why):""}`};
+    case"KILL_SWITCH":return{cat:"alert",tone:"bad",text:"Kill switch triggered"+(why?": "+why:"")};
+    case"LOSS_BREAKER":return{cat:"alert",tone:"bad",text:"Loss breaker tripped"+(why?": "+why:"")};
+    case"EXCHANGE_RECONCILE_FAILED":return{cat:"alert",tone:"bad",text:"Could not reconcile with the exchange"};
+    default:return null}
+}
 
-/* ---------- run cards ---------- */
-function countdown(ms){var s=(ms-Date.now())/1000;if(!isFinite(s))return "-";if(s<=0)return "deadline passed";var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=Math.floor(s%60);return (d?d+"d ":"")+h+"h "+m+"m "+x+"s"}
-function kv(p,k,v){var d=el("div"),sp=el("span");add(sp,k);d.appendChild(sp);var b=el("b");add.apply(null,[b].concat(Array.isArray(v)?v:[v]));d.appendChild(b);p.appendChild(d)}
-function renderRuns(){var root=$("runs");root.textContent="";D.runs.forEach(function(r){
- var e=eng(r),st=r.status||{},run=r.run||{},card=el("div","card"),eq=num(e.equity),pnl=eq==null?null:eq-50;
- var h=el("h2",null,r.name+" - "+(isDemo(r)?"demo mirror":"paper"));
- var dot=el("span","dot "+(run.status==="running"?"ok live":"bad"));h.insertBefore(dot,h.firstChild);card.appendChild(h);
- var g=el("div","kv");
- kv(g,"Equity (start $50)",money(eq));kv(g,"PnL vs $50",[cn(pnl,pnl==null?"-":money(pnl)+" ("+(pnl/50*100).toFixed(2)+"%)")]);
- kv(g,tip("Realized / fees","Realized = profit/loss from closed trades. Fees = exchange costs paid."),[cn((r.realized||{}).pnl,money((r.realized||{}).pnl))," / "+money((r.realized||{}).fees)]);
- kv(g,"Day PnL",cn(num(e.day_pnl),money(e.day_pnl)));kv(g,tip("Drawdown","How far equity is below its highest point so far."),f(num(e.drawdown)*100,2)+"%");
- kv(g,tip("Kill switch","Emergency stop: when active, no new trades are opened."),chip(st.kill_switch_active?"ACTIVE":"off",st.kill_switch_active?"bad":"ok"));
- kv(g,tip("Paused","Trading paused automatically, e.g. after hitting a loss limit."),chip(e.paused?"PAUSED":"no",e.paused?"bad":"ok"));
- kv(g,tip("Heartbeat age","Seconds since the bot last reported it is alive. Under 30s is healthy."),chip(ago(r.heartbeat_age_s),r.heartbeat_age_s!=null&&r.heartbeat_age_s<30?"ok":"bad"));
- kv(g,"Restarts",run.restarts==null?"-":run.restarts);kv(g,"Run status",run.status||"?");
- var dl=el("span",null,countdown(run.deadline_ms));dl.setAttribute("data-dl",run.deadline_ms);dl.title=run.deadline_ms?new Date(run.deadline_ms).toISOString():"";kv(g,"Deadline in",dl);
- card.appendChild(g);
- var sl=el("div","small"),slots=r.slots||{};add(sl,tip("Slots","Each strategy family (crash / event / trend) may hold only this many open positions at once, to limit risk."),el("span","mut"," "));
- Object.keys(slots).forEach(function(k){var s=slots[k],pct=s.max?Math.min(100,s.used/s.max*100):0,b=el("span","bar"),i=el("i");i.style.width=pct+"%";b.appendChild(i);add(sl,k+" ",b," "+s.used+"/"+s.max+"  ")});card.appendChild(sl);
- var chips=el("div");chips.style.margin="6px 0";add(chips,chipT("scans/h "+(r.scans_last_hour==null?"?":r.scans_last_hour),"Market scans completed in the last hour",""),chip("errors/h "+(r.errors_last_hour==null?"?":r.errors_last_hour),(r.errors_last_hour>0)?"warn":"ok"));
- var rr=r.reject_reasons||{},ks=Object.keys(rr).slice(0,3);ks.forEach(function(k){add(chips,chipT(k+" x"+rr[k],k==="BELOW_EXCHANGE_MINIMUM"?"Min-notional skip: the trade was too small for the exchange minimum order size, so it was skipped.":"Risk check rejected the signal","warn"))});if(!ks.length)add(chips,chip("no rejects","off"));
- var cnts=r.counts||{};Object.keys(cnts).forEach(function(k){add(chips,chip(k+" "+cnts[k]))});card.appendChild(chips);
- var ops=e.open_positions||[];
- card.appendChild(table([["Symbol"],["Side"],["Strategy"],["Entry",1],["Stop",1],["Mark",1],["Unreal.",1]],ops.map(function(p){
-  var av=num(p.average),mk=num(p.last_mark),u=(num(p.filled)!=null&&av!=null&&mk!=null)?num(p.filled)*(mk-av)*(p.side==="LONG"?1:-1):null;
-  return [p.symbol,p.side,p.strategy_id,f(av,4),f(p.stop_price||p.stop_loss,4),f(mk,4),cn(u,u==null?"-":money(u))]}),"No positions yet \u2014 waiting for a signal"));
- root.appendChild(card)})}
-function tick(){document.querySelectorAll("[data-dl]").forEach(function(s){s.textContent=countdown(+s.getAttribute("data-dl"))});
- var a=lastOk?(Date.now()-lastOk)/1000:null;$("upd").textContent=a==null?"waiting for data...":"last update "+Math.round(a)+"s ago";
- var b=$("banner"),msg=null;if(fetchErr)msg="Fetch failed: "+fetchErr;else if(a!=null&&a>30)msg="Data is stale: last update "+Math.round(a)+"s ago";else if(D&&D.time_ms&&(Date.now()-D.time_ms)/1000>30)msg="Server snapshot is older than 30s";
- b.style.display=msg?"block":"none";b.textContent=msg||""}
+let FILTER="all",LAST=null,LAST_OK=0,FAILED=false,EVENTS=[];
+const FILTERS=[["all","All"],["trade","Trades"],["skip","Skips"],["alert","Alerts"]];
+function drawChips(){const c=$("chips");c.replaceChildren();
+  for(const[k,l]of FILTERS){const b=el("button",k===FILTER?"on":"",l);b.onclick=()=>{FILTER=k;drawChips();drawFeed()};c.appendChild(b)}}
 
-/* ---------- feed ---------- */
-var OUT={SIGNAL:["signal",""],APPROVED:["approved","ok"],REJECTED_RISK:["skipped","warn"],FILLED:["filled","ok"],PARTIAL:["partial","ok"],CLOSED:["closed","off"],CANCELED:["canceled","off"],KILL_SWITCH:["kill switch","bad"],LOSS_BREAKER:["loss breaker","bad"],EXCHANGE_RECONCILE_FAILED:["recon failed","bad"],SENTIMENT_SHADOW:["sentiment","off"]};
-function renderFeed(){var rows=[],all=[];D.runs.forEach(function(r){(r.feed||[]).forEach(function(x){all.push({r:r.name,x:x})})});
- var sh=all.filter(function(a){return a.x.kind==="SENTIMENT_SHADOW"}),used={};
- all.forEach(function(a){var x=a.x;if(x.kind==="SENTIMENT_SHADOW")return;
-  var flag=null;sh.forEach(function(s,i){if(s.r===a.r&&s.x.symbol===x.symbol&&(!x.strategy||!s.x.strategy||s.x.strategy===x.strategy)&&Math.abs(s.x.time_ms-x.time_ms)<120000){flag=s.x.reason;used[i]=1}});
-  rows.push({t:x.time_ms,r:a.r,x:x,flag:flag})});
- sh.forEach(function(s,i){if(!used[i])rows.push({t:s.x.time_ms,r:s.r,x:s.x,flag:null})});
- rows.sort(function(a,b){return b.t-a.t});rows=rows.slice(0,60);
- $("feed").textContent="";$("feed").appendChild(table([["Time"],["Run"],["Strategy"],["Symbol"],["Side"],["Outcome"],["Reason / detail",0,1]],rows.map(function(o){var x=o.x,m=OUT[x.kind]||[x.kind,""],c=el("span");c.appendChild(chip(m[0],m[1]));
-  if(o.flag)c.appendChild(chip("sentiment: "+o.flag.replace("_"," ").toLowerCase(),o.flag==="WOULD_BLOCK"?"warn":"off"));
-  var d=[x.reason,x.detail].filter(function(v){return v!==""&&v!=null}).join(" | ");
-  return [ts(x.time_ms),o.r,x.strategy,x.symbol,x.side,c,d]}),"No signals yet \u2014 the six strategies are scanning the market"))}
+function spark(hist,base0){
+  const pts=(hist||[]).map(p=>[+p[0],num(p[1])]).filter(p=>p[1]!=null);
+  const NS="http://www.w3.org/2000/svg",svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("viewBox","0 0 300 56");svg.setAttribute("preserveAspectRatio","none");svg.setAttribute("class","spark");
+  if(pts.length<2)return svg;
+  const ys=pts.map(p=>p[1]).concat(base0);let lo=Math.min(...ys),hi=Math.max(...ys);if(hi-lo<0.05){lo-=.05;hi+=.05}
+  const t0=pts[0][0],t1=pts[pts.length-1][0]||t0+1,X=t=>4+292*(t-t0)/Math.max(1,t1-t0),Y=v=>52-48*(v-lo)/(hi-lo);
+  const mk=(n,a)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e};
+  mk("line",{x1:0,x2:300,y1:Y(base0),y2:Y(base0),stroke:"var(--mut)","stroke-dasharray":"3 3","stroke-width":1,"vector-effect":"non-scaling-stroke"});
+  const up=pts[pts.length-1][1]>=base0;
+  mk("polyline",{points:pts.map(p=>X(p[0]).toFixed(1)+","+Y(p[1]).toFixed(1)).join(" "),fill:"none",stroke:up?"var(--good)":"var(--bad)","stroke-width":2,"vector-effect":"non-scaling-stroke","stroke-linejoin":"round"});
+  return svg}
 
-/* ---------- fills, alerts ---------- */
-function renderFills(){var root=$("fills");root.textContent="";D.runs.forEach(function(r){var box=el("div");box.style.marginBottom="10px";add(box,el("div","small mut",r.name+" fills"));
- box.appendChild(table([["Time"],["Kind"],["Order"],["Qty",1],["Price",1],["Fee",1],["PnL",1]],(r.fills||[]).map(function(x){return [ts(x.time_ms),x.kind,String(x.order_id||"").slice(-12),f(x.quantity,4),f(x.price,4),f(x.fee,4),cn(num(x.pnl),f(x.pnl,4))]}),"No fills yet \u2014 no trade has been executed"));
- if(isDemo(r)){add(box,el("div","small mut","exchange orders (Binance Demo mirror)"));var m=r.mirror||{};
-  box.appendChild(table([["Paper order"],["Symbol"],["Side"],["Qty",1],["Stop",1],["Stop client id"],["State"]],Object.keys(m).map(function(k){var o=m[k]||{},bad=o.state==="FAILED"||o.state==="CLOSE_FAILED";return [k.slice(-12),o.symbol,o.side,f(o.qty,4),f(o.stop,4),o.stop_cid,chip(o.state||"?",bad?"bad":o.state==="OPEN"?"ok":"off")]}),"No exchange orders yet \u2014 the mirror is idle"))}
- root.appendChild(box)})}
-function renderAlerts(){var a=[];D.runs.forEach(function(r){(r.alerts||[]).forEach(function(x){a.push({r:r.name,x:x})})});
- a.sort(function(p,q){return (q.x.time_ms||Date.parse(q.x.iso)||0)-(p.x.time_ms||Date.parse(p.x.iso)||0)});
- var root=$("alerts");root.textContent="";a.slice(0,50).forEach(function(o){var d=el("div","alert a-"+o.x.level);add(d,ts(o.x.time_ms||Date.parse(o.x.iso)),"  ",chip(o.r),chip(o.x.level,o.x.level==="critical"?"bad":o.x.level==="warn"?"warn":"ok"),o.x.message||"");root.appendChild(d)});
- if(!a.length)root.appendChild(el("div","empty","All quiet \u2014 no alerts"))}
+function table(heads,rows){const w=el("div","scroll"),t=el("table"),h=el("tr");
+  heads.forEach((x,i)=>h.appendChild(el("th",i>=3?"n":"",x)));t.appendChild(h);
+  for(const r of rows){const tr=el("tr");r.forEach((c,i)=>{const td=el("td",(i>=3?"n ":"")+(c&&c.cls||""),c&&c.t!=null?c.t:c);tr.appendChild(td)});t.appendChild(tr)}
+  return add(w,t)}
 
-/* ---------- sentibot ---------- */
-function cbar(v){var b=el("div","cbar"),i=el("i"),x=Math.max(-1,Math.min(1,v||0));i.style.background=x<0?"var(--bad)":"var(--ok)";i.style.left=(x<0?50+x*50:50)+"%";i.style.width=Math.abs(x)*50+"%";b.appendChild(i);return b}
-function renderSenti(){var root=$("senti");root.textContent="";var sb=D.sentibot;
- if(!sb){root.appendChild(el("div","mut","sentibot not configured"));return}
- ["perp","spot"].forEach(function(k){var p=sb[k],box=el("div");add(box,el("b",null,k));
-  if(!p||!p.available){add(box,el("div","mut","unavailable"));root.appendChild(box);return}
-  var age=(Date.now()-Date.parse(p.time))/1000;add(box,el("div","small mut","equity "+money(p.equity)+" | reading "+ago(age)+" ago"));
-  var src=el("div");src.style.margin="4px 0";var s=p.sources||{};Object.keys(s).forEach(function(n){var v=String(s[n]),c=v==="ok"?"ok":/^disabled/i.test(v)?"off":"warn",ch=chip(n+": "+(v==="ok"?"ok":c==="off"?"disabled":"unavailable"),c);ch.title=v;src.appendChild(ch)});
-  var cn_=p.counts||{};Object.keys(cn_).forEach(function(n){src.appendChild(chip(n+" n="+cn_[n]))});box.appendChild(src);
-  var coins=Object.keys(p.composite||{});box.appendChild(table([["Coin"],["Composite"],["",1],["News",1]],coins.map(function(c){var v=num(p.composite[c]),nw=(p.news||{})[c];return [c.replace("USDT",""),cbar(v),cn(v,f(v,2)),cn(num(nw),f(nw,2))]}).concat([["MARKET","","",cn(num((p.news||{})._market),f((p.news||{})._market,2))]])));
-  root.appendChild(box)})}
+function quantCard(r){
+  const card=el("div","card"),eng=((r.status||{}).engines||[])[0]||{};
+  const five=/5%/.test(r.name),demo=/demo/i.test(r.name);
+  const h=el("h3",null,r.name),run=r.run||{};
+  const st=run.status||"unknown",tg=el("span","tag "+(st==="running"?"good":"warn"),st);h.appendChild(tg);card.appendChild(h);
+  card.appendChild(el("div","note",five?"crash & dip rules only":demo?"Binance Demo money, real exchange orders":"standard rules, paper money"));
+  const eq=num(eng.equity),start=50,chg=eq==null?null:eq-start;
+  card.appendChild(el("div","big "+cls(chg),eq==null?"–":money(eq)));
+  const pc=chg==null?"":` (${chg>=0?"+":"−"}${Math.abs(chg/start*100).toFixed(2)}%)`;
+  card.appendChild(el("div",cls(chg),eq==null?"No data yet":`${money(chg,true)}${pc} vs $50 start`));
+  const dp=num(eng.day_pnl),dd=num(eng.drawdown);
+  const row=el("div","row");
+  const kv=(k,v,c)=>{const s=el("span",null,k+" ");s.appendChild(el("b",c||"",v));return s};
+  add(row,kv("Today",money(dp,true),cls(dp)),kv("Drawdown",dd==null?"–":money(dd),dd>0.5?"warn":""),
+    kv("Heartbeat",ago(r.heartbeat_age_s),r.heartbeat_age_s>120?"bad":r.heartbeat_age_s>30?"warn":""),kv("Restarts",String(run.restarts??0)));
+  card.appendChild(row);
+  card.appendChild(spark(r.equity_history,start));
+  const tags=el("div","row");
+  if(eng.paused)tags.appendChild(el("span","tag warn","paused"));
+  if((r.status||{}).kill_switch_active)tags.appendChild(el("span","tag bad","KILL SWITCH ACTIVE"));
+  const sl=r.slots||{};for(const k of["crash","event","trend"])if(sl[k])tags.appendChild(el("span","tag "+(sl[k].used?"warn":""),`${k} ${sl[k].used}/${sl[k].max}`));
+  if(r.errors_last_15m)tags.appendChild(el("span","tag bad",r.errors_last_15m+" errors/15m"));
+  if(r.stale_quotes_last_15m)tags.appendChild(el("span","tag",r.stale_quotes_last_15m+" stale quotes/15m"));
+  card.appendChild(tags);
+  const ops=eng.open_positions||[];
+  if(!ops.length)card.appendChild(el("div","note","No open positions"));
+  else card.appendChild(table(["Symbol","Side","Rule","Entry","Stop","Target","Mark","Unreal."],ops.map(p=>{
+    const a=num(p.average),m=num(p.last_mark),q=num(p.filled),u=a==null||m==null||q==null?null:(m-a)*q*(p.side==="SHORT"?-1:1);
+    return[base(p.symbol),{t:p.side,cls:p.side==="LONG"?"good":"bad"},strat(p.strategy_id),px(p.average),px(p.stop_price),p.take_profit?px(p.take_profit):"time exit",px(p.last_mark),{t:money(u,true),cls:cls(u)}]})));
+  if(demo&&r.mirror){const n=Object.values(r.mirror).filter(x=>x&&x.state&&x.state!=="CLOSED").length;
+    card.appendChild(el("div","note",`Exchange mirror: ${n} live order${n===1?"":"s"} on Binance Demo`))}
+  return card}
 
-var shown={};
-function anim(node,key,to,fmt){var from=shown[key]!=null?shown[key]:to,t0=performance.now();shown[key]=to;
- (function step(t){var k=Math.min(1,(t-t0)/600),v=from+(to-from)*k;node.textContent=fmt(v);if(k<1)requestAnimationFrame(step)})(t0)}
-function renderHero(){var h=$("hero");h.textContent="";var minor=[],crit=[],eqT=0,dlMin=null;
- D.runs.forEach(function(r){stages(r).forEach(function(s){if(s.c==="bad")crit.push(r.name+": "+s.n);else if(s.c==="warn"&&s.n.indexOf("Sentiment")<0&&s.n.indexOf("mirror")<0)minor.push(r.name+": "+s.n)});
-  var q=num(eng(r).equity);if(q!=null)eqT+=q;var d=(r.run||{}).deadline_ms;if(d&&(dlMin==null||d<dlMin))dlMin=d});
- h.className="hero"+(crit.length?" bad":minor.length?" warn":"");
- var st=el("div","hs"),dt=el("span","dot live");dt.style.background="#fff";
- add(st,dt,crit.length?"Attention needed: "+crit.join("; "):minor.length?"Running, minor issues: "+minor.join("; "):"All systems healthy");h.appendChild(st);
- var g=el("div","hg"),base=50*D.runs.length;
- function cell(l,tp,node,sub){var d=el("div"),sp=el("span",null,l);sp.title=tp;d.appendChild(sp);var b=el("b");b.appendChild(node);d.appendChild(b);if(sub)d.appendChild(el("div","sub",sub));g.appendChild(d)}
- var e1=el("span"),e2=el("span"),dc=el("span");dc.setAttribute("data-dl",dlMin);dc.textContent=countdown(dlMin);
- cell("Total equity","Combined account value of all runs",e1,"started with $"+base);
- cell("Total PnL","Profit / loss versus the $50 starting balance per run",e2,D.runs.map(function(r){var q=num(eng(r).equity);return r.name+" "+(q==null?"-":money(q-50))}).join("  |  "));
- cell("Time left","Countdown to the end of the test run (deadline)",dc,dlMin?new Date(dlMin).toISOString().slice(0,16).replace("T"," ")+" UTC":"");
- cell("Runs live","Runs reporting a running status",el("span",null,D.runs.filter(function(r){return (r.run||{}).status==="running"}).length+"/"+D.runs.length));
- h.appendChild(g);anim(e1,"eq",eqT,money);anim(e2,"pn",eqT-base,function(v){return (v>=0?"+":"")+money(v)+" ("+(v/base*100).toFixed(2)+"%)"})}
-function render(){renderHero();renderFlow();renderRuns();renderFeed();renderFills();renderAlerts();renderSenti()}
-function poll(){fetch("/api/state",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).then(function(j){D=j;lastOk=Date.now();fetchErr=null;try{render()}catch(e){fetchErr="render error: "+e.message}tick()}).catch(function(e){fetchErr=String(e.message||e);tick()})}
-poll();setInterval(poll,5000);setInterval(tick,1000);
+function hlCard(h){
+  const card=el("div","card");card.appendChild(el("h3",null,"HL copy"));
+  card.appendChild(el("div","note","Paper copy of a wallet's trades, at 0 / 30 / 60 s delay"));
+  if(!h){card.appendChild(el("div","note","No data"));return card}
+  for(const d of["0","30","60"]){const b=(h.books||{})[d];if(!b)continue;
+    const m=el("div","mini"),eq=num(b.equity),start=num(b.start)||50,chg=eq==null?null:eq-start;
+    const top=el("div","row");top.style.margin="0";
+    add(top,kv2("Delay "+d+" s",""),kv2(eq==null?"–":money(eq),cls(chg)),kv2(chg==null?"":money(chg,true),cls(chg)),kv2(`${(b.open||[]).length} open · ${b.closed??0} closed`,"mut"));
+    m.appendChild(top);
+    if((b.open||[]).length)m.appendChild(table(["Symbol","Side","Qty","Entry","Stop"],b.open.map(o=>[base(o.symbol),{t:o.side,cls:o.side==="LONG"?"good":"bad"},"" + px(o.qty),px(o.entry),px(o.stop)])));
+    card.appendChild(m)}
+  card.appendChild(el("div","note",`Heartbeat ${h.heartbeat_utc||"–"} · errors ${h.errors??0}`));
+  return card}
+function kv2(t,c){return el("b",c,t)}
+
+function sentCard(s){
+  const card=el("div","card");card.appendChild(el("h3",null,"Sentibot"));
+  card.appendChild(el("div","note","Market mood per coin: left = bearish, right = bullish"));
+  if(!s){card.appendChild(el("div","note","No data"));return card}
+  const row=el("div","row");
+  for(const k of["perp","spot"]){const v=s[k]||{};row.appendChild(kv2(k+" "+(v.available?money(v.equity):"–"),""))}
+  card.appendChild(row);
+  const v=(s.perp&&s.perp.available?s.perp:s.spot)||{};
+  const comp=v.composite||{};
+  for(const k of Object.keys(comp)){const x=num(comp[k]);if(x==null)continue;
+    const r=el("div","sent"),bar=el("div","bar"),sp=el("span");
+    const w=Math.min(50,Math.abs(x)*50);sp.style.width=w+"%";sp.style.left=(x<0?50-w:50)+"%";sp.style.background=x<0?"var(--bad)":"var(--good)";
+    bar.appendChild(sp);add(r,el("span",null,base(k)),bar,el("span","n "+cls(x),(x>0?"+":x<0?"−":"")+Math.abs(x).toFixed(2)));card.appendChild(r)}
+  const src=v.sources||{},bad=Object.keys(src).filter(k=>!/^ok/.test(String(src[k])));
+  if(bad.length)card.appendChild(el("div","note",bad.map(k=>k+": "+String(src[k]).split(" (")[0]).join(" · ")));
+  if(v.time)card.appendChild(el("div","note","Last reading "+v.time.replace("T"," ").slice(0,16)+" UTC"));
+  return card}
+
+function allEvents(d){const out=[];
+  for(const r of d.runs||[])for(const f of r.feed||[]){const x=describe(f);if(x)out.push({ms:f.time_ms,run:r.name,...x})}
+  for(const r of d.runs||[])for(const a of r.alerts||[])out.push({ms:a.time_ms||Date.parse(a.iso),run:r.name,cat:"alert",tone:a.level==="critical"?"bad":a.level==="warn"?"warn":"good",text:a.message});
+  out.sort((a,b)=>b.ms-a.ms);return out.slice(0,50)}
+function drawFeed(){const f=$("feed");f.replaceChildren();
+  const rows=EVENTS.filter(e=>FILTER==="all"||e.cat===FILTER);
+  if(!rows.length)f.appendChild(el("div","ev")).appendChild(el("span","mut","Nothing here yet"));
+  for(const e of rows){const r=el("div","ev"),t=el("span","t",hhmm(e.ms)),run=el("span","tag r",e.run);
+    r.appendChild(t);r.appendChild(run);r.appendChild(el("span",(e.tone||"")+(e.faint?" mut":""),e.text));f.appendChild(r)}}
+
+function drawAlerts(d){const c=$("alerts");c.replaceChildren();const all=[];
+  for(const r of d.runs||[])for(const a of r.alerts||[])all.push({...a,run:r.name,ms:a.time_ms||Date.parse(a.iso)});
+  all.sort((a,b)=>b.ms-a.ms);
+  if(!all.length)c.appendChild(el("div","mut","No alerts"));
+  for(const a of all.slice(0,20)){const row=el("div","al"),t=a.level==="critical"?"bad":a.level==="warn"?"warn":"good";
+    add(row,el("span","tag "+t,a.level||"?"),el("span","t mut",new Date(a.ms).toISOString().slice(5,16).replace("T"," ")),el("span","tag",a.run),el("span",null,a.message||a.key));c.appendChild(row)}}
+
+function countdown(ms){const left=ms-Date.now();
+  if(!ms)return"";const d=new Date(ms).toISOString().slice(0,16).replace("T"," ")+" UTC";
+  if(left<=0)return"Run ended "+d;
+  const h=Math.floor(left/3.6e6),m=Math.floor(left%3.6e6/6e4);return`Run ends in ${h>=24?Math.floor(h/24)+"d "+h%24+"h":h+"h "+m+"m"} (${d})`}
+
+function render(d){
+  LAST=d;const runs=d.runs||[],svc=d.services||[];
+  const down=svc.filter(s=>!s.running).map(s=>s.name+" is down");
+  for(const r of runs){const a=r.heartbeat_age_s;if(a==null||a>120)down.push(r.name+" heartbeat "+(a==null?"missing":"stale ("+ago(a)+")"));
+    if((r.status||{}).kill_switch_active)down.push(r.name+" kill switch on")}
+  const st=$("status");st.textContent=down.length?`${down.length} issue${down.length>1?"s":""}: ${down.join(", ")}`:`All ${svc.length} services healthy`;
+  st.className=down.length?"bad":"good";
+  const dl=Math.max(0,...runs.map(r=>(r.run||{}).deadline_ms||0));$("deadline").textContent=countdown(dl);
+  const p=$("pills");p.replaceChildren();
+  for(const s of svc){const r=runs.find(x=>x.name.split(" ")[0]===s.name),pill=el("span","pill"+(s.running?"":" down"));
+    pill.appendChild(el("i"));pill.appendChild(document.createTextNode(s.name));
+    if(r&&r.heartbeat_age_s!=null&&(s.name==="paper"||s.name==="demo")){const a=r.heartbeat_age_s,e=el("span",a>120?"bad":a>30?"warn":"mut",ago(a));pill.appendChild(e)}
+    p.appendChild(pill)}
+  const cards=$("cards");cards.replaceChildren();
+  for(const r of runs)cards.appendChild(quantCard(r));
+  cards.appendChild(hlCard(d.hlcopy));cards.appendChild(sentCard(d.sentibot));
+  EVENTS=allEvents(d);drawFeed();drawAlerts(d);
+  const k=$("kills");k.replaceChildren();
+  const seen=new Set();for(const r of runs){if(!r.state||seen.has(r.state))continue;seen.add(r.state);
+    k.appendChild(el("div","sub",r.name+(runs.filter(x=>x.state===r.state).length>1?" (and siblings sharing this folder)":"")));
+    k.appendChild(el("code",null,`touch "${r.state}/KILL"`))}
+}
+function tick(){
+  const age=LAST?(Date.now()-LAST.time_ms)/1000:null,b=$("banner");
+  const stale=LAST_OK&&(Date.now()-LAST_OK)/1000>30;
+  if(FAILED||stale||(age!=null&&age>30)){b.style.display="block";b.textContent=FAILED?"Can't reach the dashboard server – showing old data.":"Data is more than 30 seconds old."}
+  else b.style.display="none";
+  $("updated").textContent=LAST_OK?`updated ${Math.round((Date.now()-LAST_OK)/1000)}s ago`:"";
+  if(LAST){const dl=Math.max(0,...(LAST.runs||[]).map(r=>(r.run||{}).deadline_ms||0));$("deadline").textContent=countdown(dl)}}
+async function load(){
+  try{const r=await fetch("/api/state",{cache:"no-store"});if(!r.ok)throw new Error(r.status);
+    const d=await r.json();FAILED=false;LAST_OK=Date.now();render(d)}
+  catch(e){FAILED=true;if(!LAST)$("status").textContent="Waiting for data…"}
+  tick()}
+drawChips();load();setInterval(load,5000);setInterval(tick,1000);
 </script></body></html>

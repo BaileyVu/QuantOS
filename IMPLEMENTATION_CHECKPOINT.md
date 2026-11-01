@@ -111,6 +111,15 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   12 frozen HL wallets (16:13Z), paper-copy books at 0/30/60 s delay, $50 each, 2% risk. Judge after ~7 days
   (~2026-11-07). Source preserved in legacy/research_20261031/hl_copy. Stop: deploy_three.py uninstall (now included).
 
+- Block 4 (2026-11-01 ~17:20 UTC): 3 new cross-sectional families DEAD on BUILD (DSR at N=4056):
+  xs_rank_ret_v1 (weekly L/S momentum, best +103bp/wk CI [31,179], DSR z -3.73), xs_funding_v1 (funding rank,
+  CI includes 0), xs_risk_rank_v1 (low-beta L/S, +93bp/wk CI [18,166], DSR z -2.18). Held-out not spent.
+  edge_data/block4_2020, edge_vault/xs_*. Ledger 3,975 lines. Health script fixed (559ad57).
+
+- Block 4b: funding_settle_drift dead (-24.7bp, 1603 trades); premium extremes + OI surge skipped (duplicates);
+  new_listing_fade v1 near-miss (35 trades, survivors) -> v2 on 396 listings incl. delisted, 5m-wick stops,
+  short funding, 2x cap: DEAD (+18.7bp CI [-30,+70], DSR z -1.79 at N=4170; only 34/396 listings had USDC).
+
 ### Next step
 Keep runs stable; report at user check-ins. Paper run ends 2026-11-03 02:49 UTC -> final reports, then decide on live.
 

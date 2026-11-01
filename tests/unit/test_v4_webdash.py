@@ -28,3 +28,12 @@ class WebdashTests(unittest.TestCase):
             self.assertEqual(len(run["alerts"]), 1)
             self.assertIsNone(out["runs"][1]["heartbeat_age_s"])
             json.dumps(out, default=str)
+
+
+class WebdashPortabilityTests(unittest.TestCase):
+    def test_snapshot_survives_missing_launchctl(self):
+        from unittest import mock
+        from quantos.paper import webdash
+        with mock.patch.object(webdash.subprocess, "run", side_effect=FileNotFoundError("launchctl")):
+            out = webdash.snapshot([], None)
+        self.assertEqual({svc["running"] for svc in out["services"]}, {None})
