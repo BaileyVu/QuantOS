@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import sqlite3
+import subprocess
 import time
 
 DECISIONS = ("SIGNAL", "APPROVED", "REJECTED_RISK", "FILLED", "PARTIAL", "CLOSED", "CANCELED",
@@ -69,6 +70,10 @@ def run_view(name: str, state: Path, now_ms: int, profile: str = "pL") -> dict:
         view["errors_last_hour"] = db.execute(
             "SELECT COUNT(*) FROM events WHERE kind='ERROR' AND time_ms>=?", (since,)).fetchone()[0]
         # Fail-closed stale-quote rejections (quiet USDC books) are expected and reported apart from real errors.
+        # Equity curve: last observation per 15 minutes over the run (cheap, bounded to ~300 points).
+        view["equity_history"] = [[t, float(e)] for t, e in db.execute(
+            "SELECT MAX(time_ms) AS t, json_extract(payload,'$.equity') FROM events WHERE kind='OBSERVATION' "
+            "GROUP BY time_ms/900000 ORDER BY t DESC LIMIT 300")][::-1]
         view["errors_last_15m"], view["stale_quotes_last_15m"] = db.execute(
             "SELECT COALESCE(SUM(payload NOT LIKE '%invalid or stale quote%'),0), "
             "COALESCE(SUM(payload LIKE '%invalid or stale quote%'),0) FROM events WHERE kind='ERROR' AND time_ms>=?",
@@ -127,13 +132,48 @@ def sentibot_view(path: Path | None, now_ms: int) -> dict | None:
             "sources": (r.get("sentiment") or {}).get("status"), "counts": (r.get("sentiment") or {}).get("counts")}
 
 
+SERVICES = (("paper", "com.quantos.v4.paper"), ("demo", "com.quantos.v4.demo"),
+            ("sentibot spot", "com.sentibot.spot"), ("sentibot perp", "com.sentibot.perp"),
+            ("dashboard", "com.quantos.dashboard"), ("hl copy", "com.quantos.hlcopy"))
+HLCOPY = Path.home() / "Library/Application Support/hl_copy/state"
+
+
+def services_view() -> list:
+    """launchd state per service (read-only `launchctl print`)."""
+    uid = subprocess.run(["id", "-u"], capture_output=True, text=True).stdout.strip()
+    out = []
+    for name, label in SERVICES:
+        r = subprocess.run(["launchctl", "print", f"gui/{uid}/{label}"], capture_output=True, text=True)
+        out.append({"name": name, "label": label, "running": "state = running" in r.stdout})
+    return out
+
+
+def hlcopy_view(now_ms: int) -> dict | None:
+    """Wallet-copy paper books (0/30/60 s delay); only numbers/tickers, already validated by the recorder."""
+    if not HLCOPY.exists():
+        return None
+    books = {}
+    for delay in ("0", "30", "60"):
+        b = _json(HLCOPY / f"books_{delay}.json", {})
+        opened = [{"symbol": o.get("sym"), "side": "LONG" if o.get("side") == 1 else "SHORT", "qty": o.get("qty"),
+                   "entry": o.get("entry"), "stop": o.get("stop"), "t_entry": o.get("t_entry")}
+                  for o in (b.get("open") or {}).values()]
+        books[delay] = {"equity": _json(HLCOPY / "summary.json", {}).get("books", {}).get(delay, {}).get("equity"),
+                        "start": b.get("equity0"), "realized": b.get("realized"), "open": opened,
+                        "closed": len(b.get("closed") or []), "skips": b.get("skip_counts")}
+    hb = _json(HLCOPY / "heartbeat.json", {})
+    return {"books": books, "heartbeat_utc": hb.get("utc"), "errors": hb.get("errors"),
+            "start_ts": _json(HLCOPY / "summary.json", {}).get("start_ts")}
+
+
 def snapshot(runs, sentibot) -> dict:
-    """The /api/state contract: {time_ms, runs: [run_view...], sentibot: {perp, spot}}."""
+    """The /api/state contract: {time_ms, services, runs: [run_view...], hlcopy, sentibot: {perp, spot}}."""
     now = int(time.time() * 1000)
     bots = None if sentibot is None else {
         "perp": sentibot_view(sentibot / "paper_perp_signals.jsonl", now),
         "spot": sentibot_view(sentibot / "paper_signals.jsonl", now)}
-    return {"time_ms": now, "runs": [run_view(n, s, now, *p) for n, s, *p in runs], "sentibot": bots}
+    return {"time_ms": now, "services": services_view(), "runs": [run_view(n, s, now, *p) for n, s, *p in runs],
+            "hlcopy": hlcopy_view(now), "sentibot": bots}
 
 
 PAGE = (Path(__file__).with_name("webdash.html"))
