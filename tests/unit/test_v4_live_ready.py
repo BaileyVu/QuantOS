@@ -180,3 +180,31 @@ class R5ScopeTests(unittest.TestCase):
         self.assertEqual(evaluate(tsmom, INS, quote(), account(), LiveR5Policy(), T).reason, "STRATEGY_DISABLED")
         self.assertTrue(evaluate(tsmom, INS, quote(), account(), LivePolicy(), T).approved)
         self.assertTrue(evaluate(event(), INS, quote(), account(), LiveR5Policy(), T).approved)
+
+
+class Cap200M10Tests(unittest.TestCase):
+    """Owner rule: margin = realized balance / 10, compounding on wins and losses."""
+    def decide(self, cash, ins=INS, s=None):
+        from quantos.paper.risk import Cap200M10Policy
+        a = replace(Account(D(cash), D(cash), D(200)), cash=D(cash))
+        return evaluate(s or event(), ins, quote(), a, Cap200M10Policy(), T)
+
+    def test_margin_is_tenth_of_realized_balance_and_compounds(self):
+        d200, d185 = self.decide(200), self.decide(185)
+        self.assertTrue(d200.approved and d185.approved)
+        # 25% stop -> safe leverage 1x -> position ~= margin ($20, then $18.50), rounded to the 0.001 step
+        self.assertLessEqual(d200.margin, D("20.00")); self.assertGreater(d200.margin, D("19.8"))
+        self.assertLessEqual(d185.margin, D("18.50")); self.assertGreater(d185.margin, D("18.3"))
+        self.assertEqual(d200.leverage, 1)
+
+    def test_tight_stop_uses_up_to_3x_on_the_same_margin(self):
+        tsmom = signal(strategy_id="tsmom_4h", strategy_version="1.0.0", entry_type="MARKET",
+                       take_profit=None, maximum_hold_seconds=259200, stop_loss=D("98.32"))
+        d = self.decide(200, s=tsmom)
+        self.assertTrue(d.approved, d)
+        self.assertEqual(d.leverage, 3)
+        self.assertLessEqual(d.notional, D("60")); self.assertGreater(d.notional, D("59"))
+
+    def test_below_exchange_minimum_is_skipped_not_bumped(self):
+        d = self.decide(200, ins=replace(INS, min_notional=D(25)))
+        self.assertEqual(d.reason, "BELOW_EXCHANGE_MINIMUM")

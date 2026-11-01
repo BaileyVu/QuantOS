@@ -126,7 +126,8 @@ class PaperEngine:
         return Account(equity, D(self.journal.get("day_equity")), high,
                        len(self.active()), self.connected and self.journal.get("reconciled", False),
                        bool(self.journal.get("paused", False)),
-                       gross, margin, long_risk, short_risk, tuple(symbols), tuple(strategies))
+                       gross, margin, long_risk, short_risk, tuple(symbols), tuple(strategies),
+                       self.journal.cash())
 
     def recover(self, now_ms):
         """Verify durable fill totals and restore known protection before new entries."""

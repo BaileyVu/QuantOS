@@ -30,7 +30,7 @@ from .engine import PaperEngine
 from .journal import Journal
 from .market import PublicMarket, RateLimited
 from .report import atomic_json, write_reports
-from .risk import LivePolicy, LiveR5Policy, Policy, valid_quote
+from .risk import Cap200M10Policy, LivePolicy, LiveR5Policy, Policy, valid_quote
 from .strategies import library
 from .announcements import BinanceAnnouncements
 from .types import D, Instrument, Snapshot, dumps
@@ -364,7 +364,7 @@ class Runtime:
             if run.get("portfolio", "legacy") != self.portfolio:
                 raise ValueError("existing run has a different portfolio")
             if self.portfolio == "live50":
-                run["profiles"] = ["pL", "pL5"] if self.execution == "paper" else ["pL"]
+                run["profiles"] = ["pL", "pL5", "pM10"] if self.execution == "paper" else ["pL"]
             run["min_quote_volume"] = str(self.min_quote_volume)
             if (self.state / "stop.request").exists():
                 (self.state / "stop.request").unlink()
@@ -377,14 +377,15 @@ class Runtime:
                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             engines = []
             # The demo mirror can only follow one profile (positions would net on one account).
-            profiles = ((("pL", None),) + ((("pL5", None),) if self.execution == "paper" else ())
+            profiles = ((("pL", None),) + ((("pL5", None), ("pM10", None)) if self.execution == "paper" else ())
                         if self.portfolio == "live50"
                         else (("p1", ".01"), ("p5", ".05"), ("pA", ".05")))
             for profile, fraction in profiles:
-                if profile in ("pL", "pL5"):
-                    j = Journal(self.state / f"journal_{profile}.db", profile, initial_balance="50")
+                if profile in ("pL", "pL5", "pM10"):
+                    j = Journal(self.state / f"journal_{profile}.db", profile,
+                                initial_balance="200" if profile == "pM10" else "50")
                     journals.append(j)
-                    e = PaperEngine(j, LivePolicy() if profile == "pL" else LiveR5Policy())
+                    e = PaperEngine(j, {"pL": LivePolicy, "pL5": LiveR5Policy, "pM10": Cap200M10Policy}[profile]())
                     e.recover(now); engines.append(e)
                     with j.transaction(): j.event(now, "START" if run["restarts"] == 0 else "RESTART", {"pid": os.getpid()})
                     continue
