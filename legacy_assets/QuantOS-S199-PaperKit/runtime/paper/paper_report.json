@@ -1,0 +1,52 @@
+{
+  "diagnostic_records": 9553,
+  "fills": 0,
+  "generated_utc": "2026-10-19T04:37:08.209291+00:00",
+  "market_evaluations": {
+    "missed": 0,
+    "total": 0
+  },
+  "portfolio": {
+    "cash": "200",
+    "equity_at_cost": "200",
+    "open_cost": "0",
+    "open_payout_if_won": "0",
+    "realized_pnl": "0",
+    "unresolved": "0"
+  },
+  "settlements": 0,
+  "shadow": {
+    "evaluations": 0,
+    "groups": {},
+    "settlements": 0
+  },
+  "status": {
+    "active_tokens": 2,
+    "candidate_id": "s199-1656ba6e3f44",
+    "cash": "200",
+    "diagnostics": 9139,
+    "healthy_markets": 1,
+    "live_checks": {
+      "binance_ws": true,
+      "clob_snapshot": true,
+      "gamma": true,
+      "polymarket_ws": true
+    },
+    "markets": 1,
+    "metrics": {
+      "book_failures": 4336,
+      "clob_404": 0,
+      "market_prunes": 246,
+      "subscription_updates": 414,
+      "websocket_reconnects": 42
+    },
+    "open_cost": "0",
+    "pid": 78027,
+    "process_alive": false,
+    "realized_pnl": "0",
+    "shutdown": "clean",
+    "state": "stopped",
+    "unresolved": 0,
+    "updated_utc": "2026-10-18T23:55:05.618642+00:00"
+  }
+}

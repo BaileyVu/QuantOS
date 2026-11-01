@@ -1,0 +1,41 @@
+Fear & Greed history: loaded, 3181 days
+Costs 0.15% per side. Portfolio = 1/3 each of BTCUSDT, ETHUSDT, SOLUSDT. Perps: 0.10% per side + funding. $/day at $200 from CAGR.
+
+
+## in-sample 2021-2023
+| Variant | Total | CAGR | Sharpe | MaxDD | $/day at $200 |
+|---|---|---|---|---|---|
+| momentum only | +62.9% | +18.8% | 0.79 | -37.0% | $0.10 |
+| pattern only | +2.1% | +0.7% | 0.15 | -47.2% | $0.00 |
+| momentum+pattern | +12.4% | +4.2% | 0.29 | -47.5% | $0.02 |
+| full technical (+fear&greed) | +14.7% | +4.9% | 0.32 | -46.0% | $0.03 |
+| hold | +210.0% | +49.0% | 0.90 | -86.1% | $0.27 |
+| perp 3-20x long+short | -99.9% | -92.6% | -0.52 | -100.0% | $-0.51 |
+| perp 3-20x long only | -95.4% | -66.3% | 0.04 | -99.8% | $-0.36 |
+| perp fixed 3x long+short | -85.2% | -49.1% | -0.29 | -92.1% | $-0.27 |
+| perp fixed 3x long only | -13.1% | -4.8% | 0.27 | -86.9% | $-0.03 |
+
+## out-of-sample 2024-now
+| Variant | Total | CAGR | Sharpe | MaxDD | $/day at $200 |
+|---|---|---|---|---|---|
+| momentum only | +15.1% | +5.1% | 0.32 | -40.2% | $0.03 |
+| pattern only | +33.9% | +11.0% | 0.54 | -28.1% | $0.06 |
+| momentum+pattern | +8.4% | +2.9% | 0.24 | -37.0% | $0.02 |
+| full technical (+fear&greed) | +6.5% | +2.3% | 0.21 | -38.0% | $0.01 |
+| hold | +45.1% | +14.2% | 0.52 | -65.4% | $0.08 |
+| perp 3-20x long+short | -99.3% | -82.6% | 0.46 | -99.8% | $-0.45 |
+| perp 3-20x long only | -97.0% | -71.4% | 0.17 | -99.4% | $-0.39 |
+| perp fixed 3x long+short | -63.1% | -29.9% | 0.11 | -84.6% | $-0.16 |
+| perp fixed 3x long only | -39.8% | -16.5% | 0.08 | -81.0% | $-0.09 |
+
+Perp variants (full technical composite): trades / stops / liquidations / avg leverage per coin
+- perp 3-20x long+short [in-]: BTC 188/25/0/7.4x; ETH 277/27/0/7.1x; SOL 284/35/0/5.5x
+- perp 3-20x long+short [out]: BTC 288/14/0/8.3x; ETH 302/25/0/7.8x; SOL 302/28/0/6.8x
+- perp 3-20x long only [in-]: BTC 150/14/0/7.5x; ETH 150/14/0/7.2x; SOL 152/18/0/5.4x
+- perp 3-20x long only [out]: BTC 161/7/0/8.2x; ETH 155/17/0/7.8x; SOL 149/12/0/6.6x
+- perp fixed 3x long+short [in-]: BTC 295/0/0/3.0x; ETH 298/0/0/3.0x; SOL 274/5/0/3.0x
+- perp fixed 3x long+short [out]: BTC 309/0/0/3.0x; ETH 298/0/0/3.0x; SOL 293/2/0/3.0x
+- perp fixed 3x long only [in-]: BTC 150/0/0/3.0x; ETH 146/0/0/3.0x; SOL 144/2/0/3.0x
+- perp fixed 3x long only [out]: BTC 158/0/0/3.0x; ETH 153/0/0/3.0x; SOL 146/2/0/3.0x
+
+Position changes over the whole history (all 3 coins): momentum only: 2013, pattern only: 1521, momentum+pattern: 1819, full technical (+fear&greed): 1833

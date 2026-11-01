@@ -1,0 +1,38 @@
+{
+  "README.md": {
+    "sha256": "d8524950f6aacfedf669ddf6cc9bf897684e68815ebe6d8b6a36198fcb4acd4d",
+    "bytes": 5363
+  },
+  "STATUS.json": {
+    "sha256": "c75eba0b3584bef7ae6b2703803ebce2a59b4a806cbcaea7636b4743d4935da9",
+    "bytes": 985
+  },
+  "TIBO_HANDOFF.md": {
+    "sha256": "146726515403169798650bd02a99dfb70cfba47159db505e97262623385086e7",
+    "bytes": 6136
+  },
+  "config.env": {
+    "sha256": "db9d2f2da859ff6c4597e399a67450e6caa549149159384a9c12a18b219cbdae",
+    "bytes": 1227
+  },
+  "doctor.py": {
+    "sha256": "4ba87d6a1e4c05a7988c089f3d64fd7051ed5fd0927391af9b9ccf56865f84e8",
+    "bytes": 5439
+  },
+  "install_mac.sh": {
+    "sha256": "50f776c2ac0259c402d72abed7a9bfb2ec3095b18af5b8a974a742747be4fe83",
+    "bytes": 1414
+  },
+  "run_s199.sh": {
+    "sha256": "ced37c21702c6e573d4ea89cf76867109878371b848fdfa8afcc5232aa54de60",
+    "bytes": 2887
+  },
+  "session_summary.py": {
+    "sha256": "641e12f7164f6b546fdd40b6f84dfb0f3051fadaae9547b0a71bf127427ad001",
+    "bytes": 1872
+  },
+  "tests/test_package.py": {
+    "sha256": "24bbeeedce753a9d4b5c054a322f486b36fb905c13136bbd0967c74d8292ff07",
+    "bytes": 3235
+  }
+}

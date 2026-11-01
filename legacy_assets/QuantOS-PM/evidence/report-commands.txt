@@ -1,0 +1,18 @@
+QuantOS-PM 5fef92fa92320fa15374 — paper / pessimistic (VIRTUAL ONLY)
+Equity: $200 → $196.48039201
+P&L: $-3.51960799 | realized $-3.51960799 | drawdown 0.01999999952039151711420447136360740 (fraction)
+Fills: 14 | pairs: 24.182861 | skipped: 0.8648648648648648648648648648648649 | stops: 0
+No demonstrated edge; no promotion or live authority.
+
+QuantOS-PM 150d189c891df6eee790 — paper / pessimistic (VIRTUAL ONLY)
+Equity: $350 → $343.31022860
+P&L: $-6.68977140 | realized $-6.68977140 | drawdown 0.01999999986982055464714226027156839 (fraction)
+Fills: 14 | pairs: 40.297142 | skipped: 0.8648648648648648648648648648648649 | stops: 0
+No demonstrated edge; no promotion or live authority.
+
+QuantOS-PM 43684903b25ad4ac9e49 — paper / pessimistic (VIRTUAL ONLY)
+Equity: $500 → $490.75000000
+P&L: $-9.25000000 | realized $-9.25000000 | drawdown 0.01958433253397282174260591526778577 (fraction)
+Fills: 14 | pairs: 52.000000 | skipped: 0.8648648648648648648648648648648649 | stops: 0
+No demonstrated edge; no promotion or live authority.
+

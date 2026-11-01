@@ -1,0 +1,24 @@
+{
+ "started": "2026-10-21T06:24:11.321513+00:00",
+ "cash": 64.9110198522331,
+ "qty": {
+  "BTCUSDT": 0.0008057154172199224,
+  "ETHUSDT": 0.027639147859899415,
+  "SOLUSDT": 0.0
+ },
+ "held": {
+  "BTCUSDT": true,
+  "ETHUSDT": true,
+  "SOLUSDT": false
+ },
+ "weight": {
+  "BTCUSDT": 1.0,
+  "ETHUSDT": 1.0,
+  "SOLUSDT": 0.0
+ },
+ "day": "2026-10-31",
+ "day_start_equity": 189.31290479455546,
+ "stopped_day": null,
+ "fees": 0.5717442380149476,
+ "trades": 10
+}

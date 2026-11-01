@@ -1,0 +1,89 @@
+{
+  "diagnostic_records": 17,
+  "fills": 0,
+  "generated_utc": "2026-10-19T04:31:22.436369+00:00",
+  "market_evaluations": {
+    "missed": 0,
+    "total": 0
+  },
+  "portfolio": {
+    "cash": "200",
+    "equity_at_cost": "200",
+    "open_cost": "0",
+    "open_payout_if_won": "0",
+    "realized_pnl": "0",
+    "unresolved": "0"
+  },
+  "settlements": 0,
+  "shadow": {
+    "evaluations": 4,
+    "groups": {
+      "current_120s": {
+        "entries": 0,
+        "evaluations": 1,
+        "net_pnl": "0",
+        "settled_entries": 0,
+        "wins": 0
+      },
+      "current_60s": {
+        "entries": 0,
+        "evaluations": 1,
+        "net_pnl": "0",
+        "settled_entries": 0,
+        "wins": 0
+      },
+      "rescue_120s": {
+        "entries": 0,
+        "evaluations": 1,
+        "net_pnl": "0",
+        "settled_entries": 0,
+        "wins": 0
+      },
+      "rescue_60s": {
+        "entries": 0,
+        "evaluations": 1,
+        "net_pnl": "0",
+        "settled_entries": 0,
+        "wins": 0
+      }
+    },
+    "settlements": 0
+  },
+  "status": {
+    "active_tokens": 2,
+    "candidate_id": "s199-1656ba6e3f44",
+    "cash": "200",
+    "diagnostics": 17,
+    "healthy_markets": 1,
+    "live_checks": {
+      "binance_ws": true,
+      "clob_snapshot": true,
+      "gamma": true,
+      "polymarket_ws": true
+    },
+    "markets": 1,
+    "metrics": {
+      "book_failures": 8,
+      "clob_404": 0,
+      "market_evaluations": 0,
+      "market_missed": 0,
+      "market_prunes": 1,
+      "shadow_evaluations": 4,
+      "subscription_updates": 2,
+      "websocket_reconnects": 0
+    },
+    "open_cost": "0",
+    "pid": 96120,
+    "process_alive": false,
+    "realized_pnl": "0",
+    "shadow": {
+      "evaluations": 4,
+      "settlements": 0
+    },
+    "shutdown": "clean",
+    "smoke_pass": true,
+    "state": "stopped",
+    "unresolved": 0,
+    "updated_utc": "2026-10-19T04:30:40.335268+00:00"
+  }
+}

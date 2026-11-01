@@ -1,0 +1,36 @@
+{
+  "active_tokens": 2,
+  "candidate_id": "s199-1656ba6e3f44",
+  "cash": "200",
+  "diagnostics": 7,
+  "healthy_markets": 1,
+  "live_checks": {
+    "binance_ws": true,
+    "clob_snapshot": true,
+    "gamma": true,
+    "polymarket_ws": true
+  },
+  "markets": 1,
+  "metrics": {
+    "book_failures": 2,
+    "clob_404": 0,
+    "market_evaluations": 0,
+    "market_missed": 0,
+    "market_prunes": 0,
+    "shadow_evaluations": 0,
+    "subscription_updates": 0,
+    "websocket_reconnects": 0
+  },
+  "open_cost": "0",
+  "pid": 96361,
+  "realized_pnl": "0",
+  "shadow": {
+    "evaluations": 2,
+    "settlements": 0
+  },
+  "shutdown": "clean",
+  "smoke_pass": true,
+  "state": "stopped",
+  "unresolved": 0,
+  "updated_utc": "2026-10-19T04:36:38.233046+00:00"
+}
