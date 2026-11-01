@@ -10,6 +10,8 @@ from `IMPLEMENTATION_CHECKPOINT.md`. At most two lower-cost subagents may handle
 independent components; main agent owns risk, accounting, order integration and
 final review. Existing unrelated processes and local state must remain untouched.
 
+> V1/V3 specifications are archived under `legacy/docs/` (frozen history); the running system is QuantOS V4.
+
 ## 1. Authority and Specification Precedence
 
 QuantOS V1 is specification-driven.

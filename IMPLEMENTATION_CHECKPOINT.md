@@ -120,6 +120,8 @@ worktree; same 4 at base). No mainnet/testnet orders sent; no key file read.
   new_listing_fade v1 near-miss (35 trades, survivors) -> v2 on 396 listings incl. delisted, 5m-wick stops,
   short funding, 2x cap: DEAD (+18.7bp CI [-30,+70], DSR z -1.79 at N=4170; only 34/396 listings had USDC).
 
+- 2026-11-01 repo cleanup (branch claude/repo-cleanup): legacy_assets → legacy/v1_v3, merged main (PR #25) archives → legacy/archive/, V1/V3 docs → legacy/docs/, README rewritten. Main 313 + legacy 1001 tests pass.
+
 ### Next step
 Keep runs stable; report at user check-ins. Paper run ends 2026-11-03 02:49 UTC -> final reports, then decide on live.
 
