@@ -182,6 +182,26 @@ class R5ScopeTests(unittest.TestCase):
         self.assertTrue(evaluate(event(), INS, quote(), account(), LiveR5Policy(), T).approved)
 
 
+class Demo200Tests(unittest.TestCase):
+    """Combined demo profile: balance/10 margin, leverage up to 5x on tight stops."""
+    def decide(self, cash, s=None):
+        from quantos.paper.risk import Demo200Policy
+        a = replace(Account(D(cash), D(cash), D(200)), cash=D(cash))
+        return evaluate(s or event(), INS, quote(), a, Demo200Policy(), T)
+
+    def test_tight_stop_uses_up_to_5x(self):
+        tsmom = signal(strategy_id="tsmom_4h", strategy_version="1.0.0", entry_type="MARKET",
+                       take_profit=None, maximum_hold_seconds=259200, stop_loss=D("98.32"))
+        d = self.decide(200, s=tsmom)
+        self.assertTrue(d.approved, d)
+        self.assertLessEqual(d.leverage, 5); self.assertGreater(d.leverage, 3)
+        self.assertLessEqual(d.margin, D("20.00"))
+
+    def test_leverage_ceiling_still_enforced(self):
+        from quantos.paper.risk import Demo200Policy
+        with self.assertRaises(ValueError): Demo200Policy(leverage=D("6"))
+
+
 class Cap200M5Tests(unittest.TestCase):
     """Owner high-risk rule: margin = realized balance / 5; crash/dip/delist only."""
     def decide(self, cash, s=None):

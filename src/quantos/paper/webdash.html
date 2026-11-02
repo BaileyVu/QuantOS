@@ -33,6 +33,7 @@ svg.spark{width:100%;height:56px;display:block;margin-top:6px}
 .chips button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:5px 14px;font:inherit;cursor:pointer}
 .chips button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .feed{background:var(--card);border:1px solid var(--line);border-radius:14px;max-height:520px;overflow:auto}
+.nw img{width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin:6px 0}.nw a{color:inherit;text-decoration:none}.nw a:hover{text-decoration:underline}
 .ev{display:grid;grid-template-columns:58px 74px 1fr;gap:8px;padding:7px 14px;border-bottom:1px solid var(--line);align-items:baseline}
 .ev:last-child{border:0}.ev .t{color:var(--mut);font-size:12px}
 .al{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);align-items:baseline;flex-wrap:wrap}
@@ -53,6 +54,7 @@ footer{margin-top:10px}
 <h2>Live activity</h2>
 <div class="chips" id="chips"></div><div class="feed" id="feed"></div>
 <h2>Alerts</h2><div class="card" id="alerts"></div>
+<h2>News</h2><div class="sub" id="newsstatus"></div><div class="grid" id="news"></div>
 <footer><h2>Controls (read-only)</h2><div class="card">
 <div class="sub">Copy and run in a terminal. Nothing on this page acts.</div>
 <div class="sub" style="margin-top:8px">Stop everything (run in ~/Desktop/PythonProject/QuantOS-mainnet-ready):</div>
@@ -164,6 +166,23 @@ function hlCard(h){
   card.appendChild(el("div","note",`Heartbeat ${h.heartbeat_utc||"–"} · errors ${h.errors??0}`));
   return card}
 function kv2(t,c){return el("b",c,t)}
+function hlCardNamed(h,title,note){const c=hlCard(h);c.firstChild.textContent=title;c.children[1].textContent=note;return c}
+function mlCard(m){
+  const card=el("div","card");card.appendChild(el("h3",null,"Alt-ML (demo executor)"));
+  card.appendChild(el("div","note","5m-candle model, 20 alts, long top 1% · limit in/out · shares the 3-position cap"));
+  if(!m){card.appendChild(el("div","note","Not running"));return card}
+  const top=el("div","row");add(top,kv2(`${(m.open||[]).length} open · ${m.closed} closed`,"mut"),kv2(money(m.realized_usd,true),cls(m.realized_usd)));card.appendChild(top);
+  if((m.open||[]).length)card.appendChild(table(["Symbol","State","Entry","Score"],m.open.map(o=>[base(o.sym),o.st,px(o.entry),(+o.score).toFixed(3)])));
+  const ev=(m.events||[]).slice(-6).reverse();if(ev.length)card.appendChild(table(["Time","Event","Symbol","Detail"],ev.map(e=>[String(e.ts||"").slice(11,16),e.ev,base(e.sym),e.why||e.err||(e.pnl_usd!=null?money(+e.pnl_usd,true):"")])));
+  return card}
+function safeUrl(u){return typeof u==="string"&&u.startsWith("https://")?u:null}
+function newsCard(n){const c=el("div","card nw"),a=el("a");const href=safeUrl(n.link);if(href){a.href=href;a.target="_blank";a.rel="noopener noreferrer"}
+  add(a,el("div","note",`${n.source} · ${String(n.time||"").slice(0,25)}`),el("b",null,n.title));
+  const img=safeUrl(n.image);if(img){const i=el("img");i.src=img;i.loading="lazy";i.referrerPolicy="no-referrer";i.alt="";a.appendChild(i)}
+  if(n.summary)a.appendChild(el("div","note",n.summary));c.appendChild(a);return c}
+async function loadNews(){try{const r=await fetch("/api/news",{cache:"no-store"});if(!r.ok)return;const d=await r.json();
+  $("newsstatus").textContent=Object.entries(d.status||{}).map(([k,v])=>k+": "+v).join(" · ");
+  const g=$("news");g.replaceChildren();for(const n of (d.items||[]).slice(0,45))g.appendChild(newsCard(n))}catch(e){}}
 
 function sentCard(s){
   const card=el("div","card");card.appendChild(el("h3",null,"Sentibot"));
@@ -220,7 +239,9 @@ function render(d){
     p.appendChild(pill)}
   const cards=$("cards");cards.replaceChildren();
   for(const r of runs)cards.appendChild(quantCard(r));
-  cards.appendChild(hlCard(d.hlcopy));cards.appendChild(sentCard(d.sentibot));
+  if(d.hlcopy)cards.appendChild(hlCard(d.hlcopy));
+  if(d.hlreverse)cards.appendChild(hlCardNamed(d.hlreverse,"HL copy (reversed)","Fades the same wallets: their long = our short, 0 / 30 / 60 s delay"));
+  cards.appendChild(mlCard(d.mlalts));cards.appendChild(sentCard(d.sentibot));
   EVENTS=allEvents(d);drawFeed();drawAlerts(d);
   const k=$("kills");k.replaceChildren();
   const seen=new Set();for(const r of runs){if(!r.state||seen.has(r.state))continue;seen.add(r.state);
@@ -239,5 +260,5 @@ async function load(){
     const d=await r.json();FAILED=false;LAST_OK=Date.now();render(d)}
   catch(e){FAILED=true;if(!LAST)$("status").textContent="Waiting for data…"}
   tick()}
-drawChips();load();setInterval(load,5000);setInterval(tick,1000);
+drawChips();load();setInterval(load,5000);setInterval(tick,1000);loadNews();setInterval(loadNews,300000);
 </script></body></html>

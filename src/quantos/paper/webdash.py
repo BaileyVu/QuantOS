@@ -132,10 +132,13 @@ def sentibot_view(path: Path | None, now_ms: int) -> dict | None:
             "sources": (r.get("sentiment") or {}).get("status"), "counts": (r.get("sentiment") or {}).get("counts")}
 
 
-SERVICES = (("paper", "com.quantos.v4.paper"), ("demo", "com.quantos.v4.demo"),
-            ("sentibot spot", "com.sentibot.spot"), ("sentibot perp", "com.sentibot.perp"),
-            ("dashboard", "com.quantos.dashboard"), ("hl copy", "com.quantos.hlcopy"))
+# Combined $200 demo run (2026-11-02); the earlier paper/demo/hl-copy services are retired.
+SERVICES = (("demo", "com.quantos.v4.demo200"), ("sentibot spot", "com.sentibot.spot"),
+            ("sentibot perp", "com.sentibot.perp"), ("dashboard", "com.quantos.dashboard"),
+            ("hl reverse", "com.quantos.hlcopy.reverse"), ("alt-ML", "com.quantos.mlalts"))
 HLCOPY = Path.home() / "Library/Application Support/hl_copy/state"
+HLREVERSE = Path.home() / "Library/Application Support/hl_copy_reverse/state"
+MLALTS = Path.home() / "Library/Application Support/mlalts/app"
 
 
 def services_view() -> list:
@@ -157,7 +160,7 @@ def services_view() -> list:
     return out
 
 
-def hlcopy_view(now_ms: int) -> dict | None:
+def hlcopy_view(now_ms: int, HLCOPY: Path = HLCOPY) -> dict | None:
     """Wallet-copy paper books (0/30/60 s delay); only numbers/tickers, already validated by the recorder."""
     if not HLCOPY.exists():
         return None
@@ -175,6 +178,19 @@ def hlcopy_view(now_ms: int) -> dict | None:
             "start_ts": _json(HLCOPY / "summary.json", {}).get("start_ts")}
 
 
+def mlalts_view(now_ms: int) -> dict | None:
+    """Alt-ML demo executor (edge_data/ml5m/shadow/demo_exec.py): open positions and recent events."""
+    log = MLALTS / "exec_log_testnet.jsonl"
+    if not log.exists():
+        return None
+    rows = _tail(log, 400)
+    exits = [r for r in rows if r.get("ev") == "exit"]
+    keep = [{k: r.get(k) for k in ("ts", "ev", "sym", "why", "score", "px", "qty", "pnl_usd", "err")}
+            for r in rows if r.get("ev") in ("signal", "exit", "nofill", "order_error", "error", "start")][-25:]
+    return {"open": _json(MLALTS / "exec_state_testnet.json", []), "events": keep, "closed": len(exits),
+            "realized_usd": sum(float(r.get("pnl_usd") or 0) for r in exits)}
+
+
 def snapshot(runs, sentibot) -> dict:
     """The /api/state contract: {time_ms, services, runs: [run_view...], hlcopy, sentibot: {perp, spot}}."""
     now = int(time.time() * 1000)
@@ -182,7 +198,8 @@ def snapshot(runs, sentibot) -> dict:
         "perp": sentibot_view(sentibot / "paper_perp_signals.jsonl", now),
         "spot": sentibot_view(sentibot / "paper_signals.jsonl", now)}
     return {"time_ms": now, "services": services_view(), "runs": [run_view(n, s, now, *p) for n, s, *p in runs],
-            "hlcopy": hlcopy_view(now), "sentibot": bots}
+            "hlcopy": None, "hlreverse": hlcopy_view(now, HLREVERSE), "mlalts": mlalts_view(now),
+            "sentibot": bots}
 
 
 PAGE = (Path(__file__).with_name("webdash.html"))
@@ -193,6 +210,9 @@ def serve(runs, sentibot, port=8787):
         def do_GET(self):
             if self.path.startswith("/api/state"):
                 body, kind = json.dumps(snapshot(runs, sentibot), default=str).encode(), "application/json"
+            elif self.path.startswith("/api/news"):
+                from .news import news
+                body, kind = json.dumps(news(), default=str).encode(), "application/json"
             elif self.path in ("/", "/index.html"):
                 body, kind = PAGE.read_bytes(), "text/html; charset=utf-8"
             else:
