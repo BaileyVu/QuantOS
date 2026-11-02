@@ -130,10 +130,10 @@ function quantCard(r){
   const h=el("h3",null,r.name),run=r.run||{};
   const st=run.status||"unknown",tg=el("span","tag "+(st==="running"?"good":"warn"),st);h.appendChild(tg);card.appendChild(h);
   card.appendChild(el("div","note",five?"crash & dip rules only":demo?"Binance Demo money, real exchange orders":"standard rules, paper money"));
-  const eq=num(eng.equity),start=50,chg=eq==null?null:eq-start;
+  const eq=num(eng.equity),start=/\$200/.test(r.name)?200:50,chg=eq==null?null:eq-start;
   card.appendChild(el("div","big "+cls(chg),eq==null?"–":money(eq)));
   const pc=chg==null?"":` (${chg>=0?"+":"−"}${Math.abs(chg/start*100).toFixed(2)}%)`;
-  card.appendChild(el("div",cls(chg),eq==null?"No data yet":`${money(chg,true)}${pc} vs $50 start`));
+  card.appendChild(el("div",cls(chg),eq==null?"No data yet":`${money(chg,true)}${pc} vs $${start} start`));
   const dp=num(eng.day_pnl),dd=num(eng.drawdown);
   const row=el("div","row");
   const kv=(k,v,c)=>{const s=el("span",null,k+" ");s.appendChild(el("b",c||"",v));return s};
