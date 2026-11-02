@@ -190,5 +190,81 @@ function sourceCard(name,items,status){const c=el("div","card");const h=el("div"
   const m=el("a","more","See more →");m.href=SITES[name];m.target="_blank";m.rel="noopener noreferrer";c.appendChild(m);return c}
 async function loadNews(){try{const r=await fetch("/api/news",{cache:"no-store"});if(!r.ok)return;const d=await r.json();
   const g=$("news");g.replaceChildren();for(const name of Object.keys(SITES))g.appendChild(sourceCard(name,(d.items||[]).filter(n=>n.source===name),(d.status||{})[name]||"error"))}catch(e){}}
+function sentCard(s){
+  const card=el("div","card");card.appendChild(el("h3",null,"Sentibot"));
+  card.appendChild(el("div","note","Market mood per coin: left = bearish, right = bullish"));
+  if(!s){card.appendChild(el("div","note","No data"));return card}
+  const row=el("div","row");
+  for(const k of["perp","spot"]){const v=s[k]||{};row.appendChild(kv2(k+" "+(v.available?money(v.equity):"–"),""))}
+  card.appendChild(row);
+  const v=(s.perp&&s.perp.available?s.perp:s.spot)||{};
+  const comp=v.composite||{};
+  for(const k of Object.keys(comp)){const x=num(comp[k]);if(x==null)continue;
+    const r=el("div","sent"),bar=el("div","bar"),sp=el("span");
+    const w=Math.min(50,Math.abs(x)*50);sp.style.width=w+"%";sp.style.left=(x<0?50-w:50)+"%";sp.style.background=x<0?"var(--bad)":"var(--good)";
+    bar.appendChild(sp);add(r,el("span",null,base(k)),bar,el("span","n "+cls(x),(x>0?"+":x<0?"−":"")+Math.abs(x).toFixed(2)));card.appendChild(r)}
+  const src=v.sources||{},bad=Object.keys(src).filter(k=>!/^ok/.test(String(src[k])));
+  if(bad.length)card.appendChild(el("div","note",bad.map(k=>k+": "+String(src[k]).split(" (")[0]).join(" · ")));
+  if(v.time)card.appendChild(el("div","note","Last reading "+v.time.replace("T"," ").slice(0,16)+" UTC"));
+  return card}
+
+function allEvents(d){const out=[];
+  for(const r of d.runs||[])for(const f of r.feed||[]){const x=describe(f);if(x)out.push({ms:f.time_ms,run:r.name,...x})}
+  for(const r of d.runs||[])for(const a of r.alerts||[])out.push({ms:a.time_ms||Date.parse(a.iso),run:r.name,cat:"alert",tone:a.level==="critical"?"bad":a.level==="warn"?"warn":"good",text:a.message});
+  out.sort((a,b)=>b.ms-a.ms);return out.slice(0,50)}
+function drawFeed(){const f=$("feed");f.replaceChildren();
+  const rows=EVENTS.filter(e=>FILTER==="all"||e.cat===FILTER);
+  if(!rows.length)f.appendChild(el("div","ev")).appendChild(el("span","mut","Nothing here yet"));
+  for(const e of rows){const r=el("div","ev"),t=el("span","t",hhmm(e.ms)),run=el("span","tag r",e.run);
+    r.appendChild(t);r.appendChild(run);r.appendChild(el("span",(e.tone||"")+(e.faint?" mut":""),e.text));f.appendChild(r)}}
+
+function drawAlerts(d){const c=$("alerts");c.replaceChildren();const all=[];
+  for(const r of d.runs||[])for(const a of r.alerts||[])all.push({...a,run:r.name,ms:a.time_ms||Date.parse(a.iso)});
+  all.sort((a,b)=>b.ms-a.ms);
+  if(!all.length)c.appendChild(el("div","mut","No alerts"));
+  for(const a of all.slice(0,20)){const row=el("div","al"),t=a.level==="critical"?"bad":a.level==="warn"?"warn":"good";
+    add(row,el("span","tag "+t,a.level||"?"),el("span","t mut",new Date(a.ms).toISOString().slice(5,16).replace("T"," ")),el("span","tag",a.run),el("span",null,a.message||a.key));c.appendChild(row)}}
+
+function countdown(ms){const left=ms-Date.now();
+  if(!ms)return"";const d=new Date(ms).toISOString().slice(0,16).replace("T"," ")+" UTC";
+  if(left<=0)return"Run ended "+d;
+  const h=Math.floor(left/3.6e6),m=Math.floor(left%3.6e6/6e4);return`Run ends in ${h>=24?Math.floor(h/24)+"d "+h%24+"h":h+"h "+m+"m"} (${d})`}
+
+function render(d){
+  LAST=d;const runs=d.runs||[],svc=d.services||[];
+  const down=svc.filter(s=>!s.running).map(s=>s.name+" is down");
+  for(const r of runs){const a=r.heartbeat_age_s;if(a==null||a>120)down.push(r.name+" heartbeat "+(a==null?"missing":"stale ("+ago(a)+")"));
+    if((r.status||{}).kill_switch_active)down.push(r.name+" kill switch on")}
+  const st=$("status");st.textContent=down.length?`${down.length} issue${down.length>1?"s":""}: ${down.join(", ")}`:`All ${svc.length} services healthy`;
+  st.className=down.length?"bad":"good";
+  const dl=Math.max(0,...runs.map(r=>(r.run||{}).deadline_ms||0));$("deadline").textContent=countdown(dl);
+  const p=$("pills");p.replaceChildren();
+  for(const s of svc){const r=runs.find(x=>x.name.split(" ")[0]===s.name),pill=el("span","pill"+(s.running?"":" down"));
+    pill.appendChild(el("i"));pill.appendChild(document.createTextNode(s.name));
+    if(r&&r.heartbeat_age_s!=null&&(s.name==="paper"||s.name==="demo")){const a=r.heartbeat_age_s,e=el("span",a>120?"bad":a>30?"warn":"mut",ago(a));pill.appendChild(e)}
+    p.appendChild(pill)}
+  const cards=$("cards");cards.replaceChildren();
+  for(const r of runs)cards.appendChild(quantCard(r));
+  if(d.hlcopy)cards.appendChild(hlCard(d.hlcopy));
+  if(d.hlreverse)cards.appendChild(hlCardNamed(d.hlreverse,"HL copy (reversed)","Fades the same wallets: their long = our short, 0 / 30 / 60 s delay"));
+  cards.appendChild(mlCard(d.mlalts));cards.appendChild(sentCard(d.sentibot));
+  EVENTS=allEvents(d);drawFeed();drawAlerts(d);
+  const k=$("kills");k.replaceChildren();
+  const seen=new Set();for(const r of runs){if(!r.state||seen.has(r.state))continue;seen.add(r.state);
+    k.appendChild(el("div","sub",r.name+(runs.filter(x=>x.state===r.state).length>1?" (and siblings sharing this folder)":"")));
+    k.appendChild(el("code",null,`touch "${r.state}/KILL"`))}
+}
+function tick(){
+  const age=LAST?(Date.now()-LAST.time_ms)/1000:null,b=$("banner");
+  const stale=LAST_OK&&(Date.now()-LAST_OK)/1000>30;
+  if(FAILED||stale||(age!=null&&age>30)){b.style.display="block";b.textContent=FAILED?"Can't reach the dashboard server – showing old data.":"Data is more than 30 seconds old."}
+  else b.style.display="none";
+  $("updated").textContent=LAST_OK?`updated ${Math.round((Date.now()-LAST_OK)/1000)}s ago`:"";
+  if(LAST){const dl=Math.max(0,...(LAST.runs||[]).map(r=>(r.run||{}).deadline_ms||0));$("deadline").textContent=countdown(dl)}}
+async function load(){
+  try{const r=await fetch("/api/state",{cache:"no-store"});if(!r.ok)throw new Error(r.status);
+    const d=await r.json();FAILED=false;LAST_OK=Date.now();render(d)}
+  catch(e){FAILED=true;if(!LAST)$("status").textContent="Waiting for data…"}
+  tick()}
 drawChips();load();setInterval(load,5000);setInterval(tick,1000);loadNews();setInterval(loadNews,300000);
 </script></body></html>
