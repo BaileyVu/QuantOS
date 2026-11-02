@@ -3,21 +3,20 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>QuantOS</title>
 <style>
-:root{--bg:#f5f6f8;--card:#fff;--ink:#1b2230;--mut:#667085;--line:#e4e7ec;--good:#15803d;--bad:#c2261f;--warn:#b45309;--acc:#2f6fed;--goodbg:#e7f6ec;--badbg:#fdeceb;--warnbg:#fff4e0;--chip:#eef1f6}
-@media (prefers-color-scheme:dark){:root{--bg:#10141b;--card:#181e28;--ink:#e6e9ef;--mut:#8b95a7;--line:#2a3140;--good:#4ade80;--bad:#f87171;--warn:#fbbf24;--acc:#7aa2ff;--goodbg:#14301f;--badbg:#3a1b1b;--warnbg:#3a2b10;--chip:#222a38}}
+:root{--bg:#0b0e11;--card:#161a1e;--ink:#eaecef;--mut:#848e9c;--line:#2b3139;--good:#0ecb81;--bad:#f6465d;--warn:#f0b90b;--acc:#f0b90b;--goodbg:rgba(14,203,129,.12);--badbg:rgba(246,70,93,.12);--warnbg:rgba(240,185,11,.12);--chip:#1e2329;--gold:#f0b90b;--gold2:#fcd535}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums;overflow-x:hidden}
 main{max-width:1180px;margin:0 auto;padding:16px}
-h1{font-size:20px;margin:0}h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:24px 0 10px}
+h1{font-size:22px;margin:0;font-weight:700;background:linear-gradient(90deg,var(--gold),var(--gold2));-webkit-background-clip:text;background-clip:text;color:transparent}h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin:28px 0 12px;display:flex;align-items:center;gap:8px}h2::before{content:"";width:3px;height:14px;background:var(--gold);border-radius:2px}
 header{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;justify-content:space-between}
 .sub{color:var(--mut)}.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}.mut{color:var(--mut)}
 #banner{display:none;background:var(--bad);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600}
 .pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.pill{display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border-radius:99px;background:var(--chip);font-size:13px}
+.pill{display:inline-flex;gap:6px;align-items:center;padding:4px 12px;border-radius:99px;background:var(--chip);border:1px solid var(--line);font-size:13px}
 .pill i{width:8px;height:8px;border-radius:50%;background:var(--good)}
 .pill.down{background:var(--badbg)}.pill.down i{background:var(--bad)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.card{background:linear-gradient(180deg,#181c21,#13171b);border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0;transition:border-color .2s,transform .2s}.card:hover{border-color:rgba(240,185,11,.45)}
 .card h3{margin:0;font-size:15px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .card .note{color:var(--mut);font-size:12px;margin:2px 0 8px}
 .big{font-size:30px;font-weight:700;margin-top:6px}
@@ -31,9 +30,15 @@ td.n,th.n{text-align:right}
 svg.spark{width:100%;height:56px;display:block;margin-top:6px}
 .chips{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
 .chips button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:5px 14px;font:inherit;cursor:pointer}
-.chips button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.chips button.on{background:var(--gold);border-color:var(--gold);color:#0b0e11;font-weight:600}
 .feed{background:var(--card);border:1px solid var(--line);border-radius:14px;max-height:520px;overflow:auto}
-.nw img{width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin:6px 0}.nw a{color:inherit;text-decoration:none}.nw a:hover{text-decoration:underline}
+.newsgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.src{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.src b{color:var(--gold)}
+.ni{display:grid;grid-template-columns:72px 1fr;gap:10px;padding:9px 0;border-top:1px solid var(--line);color:inherit;text-decoration:none}
+.ni:hover .tt{color:var(--gold2)}.ni img,.ni .ph{width:72px;height:54px;object-fit:cover;border-radius:8px;background:var(--chip)}
+.ni .tt{font-size:13px;line-height:1.35;font-weight:500;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ni .tm{color:var(--mut);font-size:11px;margin-top:3px}
+.more{display:inline-block;margin-top:10px;padding:6px 14px;border-radius:99px;border:1px solid var(--gold);color:var(--gold);text-decoration:none;font-size:12px;font-weight:600}.more:hover{background:var(--gold);color:#0b0e11}
 .ev{display:grid;grid-template-columns:58px 74px 1fr;gap:8px;padding:7px 14px;border-bottom:1px solid var(--line);align-items:baseline}
 .ev:last-child{border:0}.ev .t{color:var(--mut);font-size:12px}
 .al{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);align-items:baseline;flex-wrap:wrap}
@@ -54,7 +59,7 @@ footer{margin-top:10px}
 <h2>Live activity</h2>
 <div class="chips" id="chips"></div><div class="feed" id="feed"></div>
 <h2>Alerts</h2><div class="card" id="alerts"></div>
-<h2>News</h2><div class="sub" id="newsstatus"></div><div class="grid" id="news"></div>
+<h2>News</h2><div class="newsgrid" id="news"></div>
 <footer><h2>Controls (read-only)</h2><div class="card">
 <div class="sub">Copy and run in a terminal. Nothing on this page acts.</div>
 <div class="sub" style="margin-top:8px">Stop everything (run in ~/Desktop/PythonProject/QuantOS-mainnet-ready):</div>
@@ -176,89 +181,14 @@ function mlCard(m){
   const ev=(m.events||[]).slice(-6).reverse();if(ev.length)card.appendChild(table(["Time","Event","Symbol","Detail"],ev.map(e=>[String(e.ts||"").slice(11,16),e.ev,base(e.sym),e.why||e.err||(e.pnl_usd!=null?money(+e.pnl_usd,true):"")])));
   return card}
 function safeUrl(u){return typeof u==="string"&&u.startsWith("https://")?u:null}
-function newsCard(n){const c=el("div","card nw"),a=el("a");const href=safeUrl(n.link);if(href){a.href=href;a.target="_blank";a.rel="noopener noreferrer"}
-  add(a,el("div","note",`${n.source} · ${String(n.time||"").slice(0,25)}`),el("b",null,n.title));
-  const img=safeUrl(n.image);if(img){const i=el("img");i.src=img;i.loading="lazy";i.referrerPolicy="no-referrer";i.alt="";a.appendChild(i)}
-  if(n.summary)a.appendChild(el("div","note",n.summary));c.appendChild(a);return c}
+const SITES={"CoinDesk":"https://www.coindesk.com","Cointelegraph":"https://cointelegraph.com","Watcher Guru":"https://watcher.guru/news"};
+function newsItem(n){const a=el("a","ni"),href=safeUrl(n.link);if(href){a.href=href;a.target="_blank";a.rel="noopener noreferrer"}
+  const img=safeUrl(n.image);if(img){const i=el("img");i.src=img;i.loading="lazy";i.referrerPolicy="no-referrer";i.alt="";a.appendChild(i)}else a.appendChild(el("div","ph"));
+  const t=el("div");add(t,el("div","tt",n.title),el("div","tm",String(n.time||"").replace("T"," ").slice(0,22)));a.appendChild(t);return a}
+function sourceCard(name,items,status){const c=el("div","card");const h=el("div","src");add(h,el("b",null,name),el("span","tag"+(String(status).startsWith("ok")?" good":" bad"),String(status).startsWith("ok")?"live":"offline"));c.appendChild(h);
+  for(const n of items.slice(0,5))c.appendChild(newsItem(n));
+  const m=el("a","more","See more →");m.href=SITES[name];m.target="_blank";m.rel="noopener noreferrer";c.appendChild(m);return c}
 async function loadNews(){try{const r=await fetch("/api/news",{cache:"no-store"});if(!r.ok)return;const d=await r.json();
-  $("newsstatus").textContent=Object.entries(d.status||{}).map(([k,v])=>k+": "+v).join(" · ");
-  const g=$("news");g.replaceChildren();for(const n of (d.items||[]).slice(0,45))g.appendChild(newsCard(n))}catch(e){}}
-
-function sentCard(s){
-  const card=el("div","card");card.appendChild(el("h3",null,"Sentibot"));
-  card.appendChild(el("div","note","Market mood per coin: left = bearish, right = bullish"));
-  if(!s){card.appendChild(el("div","note","No data"));return card}
-  const row=el("div","row");
-  for(const k of["perp","spot"]){const v=s[k]||{};row.appendChild(kv2(k+" "+(v.available?money(v.equity):"–"),""))}
-  card.appendChild(row);
-  const v=(s.perp&&s.perp.available?s.perp:s.spot)||{};
-  const comp=v.composite||{};
-  for(const k of Object.keys(comp)){const x=num(comp[k]);if(x==null)continue;
-    const r=el("div","sent"),bar=el("div","bar"),sp=el("span");
-    const w=Math.min(50,Math.abs(x)*50);sp.style.width=w+"%";sp.style.left=(x<0?50-w:50)+"%";sp.style.background=x<0?"var(--bad)":"var(--good)";
-    bar.appendChild(sp);add(r,el("span",null,base(k)),bar,el("span","n "+cls(x),(x>0?"+":x<0?"−":"")+Math.abs(x).toFixed(2)));card.appendChild(r)}
-  const src=v.sources||{},bad=Object.keys(src).filter(k=>!/^ok/.test(String(src[k])));
-  if(bad.length)card.appendChild(el("div","note",bad.map(k=>k+": "+String(src[k]).split(" (")[0]).join(" · ")));
-  if(v.time)card.appendChild(el("div","note","Last reading "+v.time.replace("T"," ").slice(0,16)+" UTC"));
-  return card}
-
-function allEvents(d){const out=[];
-  for(const r of d.runs||[])for(const f of r.feed||[]){const x=describe(f);if(x)out.push({ms:f.time_ms,run:r.name,...x})}
-  for(const r of d.runs||[])for(const a of r.alerts||[])out.push({ms:a.time_ms||Date.parse(a.iso),run:r.name,cat:"alert",tone:a.level==="critical"?"bad":a.level==="warn"?"warn":"good",text:a.message});
-  out.sort((a,b)=>b.ms-a.ms);return out.slice(0,50)}
-function drawFeed(){const f=$("feed");f.replaceChildren();
-  const rows=EVENTS.filter(e=>FILTER==="all"||e.cat===FILTER);
-  if(!rows.length)f.appendChild(el("div","ev")).appendChild(el("span","mut","Nothing here yet"));
-  for(const e of rows){const r=el("div","ev"),t=el("span","t",hhmm(e.ms)),run=el("span","tag r",e.run);
-    r.appendChild(t);r.appendChild(run);r.appendChild(el("span",(e.tone||"")+(e.faint?" mut":""),e.text));f.appendChild(r)}}
-
-function drawAlerts(d){const c=$("alerts");c.replaceChildren();const all=[];
-  for(const r of d.runs||[])for(const a of r.alerts||[])all.push({...a,run:r.name,ms:a.time_ms||Date.parse(a.iso)});
-  all.sort((a,b)=>b.ms-a.ms);
-  if(!all.length)c.appendChild(el("div","mut","No alerts"));
-  for(const a of all.slice(0,20)){const row=el("div","al"),t=a.level==="critical"?"bad":a.level==="warn"?"warn":"good";
-    add(row,el("span","tag "+t,a.level||"?"),el("span","t mut",new Date(a.ms).toISOString().slice(5,16).replace("T"," ")),el("span","tag",a.run),el("span",null,a.message||a.key));c.appendChild(row)}}
-
-function countdown(ms){const left=ms-Date.now();
-  if(!ms)return"";const d=new Date(ms).toISOString().slice(0,16).replace("T"," ")+" UTC";
-  if(left<=0)return"Run ended "+d;
-  const h=Math.floor(left/3.6e6),m=Math.floor(left%3.6e6/6e4);return`Run ends in ${h>=24?Math.floor(h/24)+"d "+h%24+"h":h+"h "+m+"m"} (${d})`}
-
-function render(d){
-  LAST=d;const runs=d.runs||[],svc=d.services||[];
-  const down=svc.filter(s=>!s.running).map(s=>s.name+" is down");
-  for(const r of runs){const a=r.heartbeat_age_s;if(a==null||a>120)down.push(r.name+" heartbeat "+(a==null?"missing":"stale ("+ago(a)+")"));
-    if((r.status||{}).kill_switch_active)down.push(r.name+" kill switch on")}
-  const st=$("status");st.textContent=down.length?`${down.length} issue${down.length>1?"s":""}: ${down.join(", ")}`:`All ${svc.length} services healthy`;
-  st.className=down.length?"bad":"good";
-  const dl=Math.max(0,...runs.map(r=>(r.run||{}).deadline_ms||0));$("deadline").textContent=countdown(dl);
-  const p=$("pills");p.replaceChildren();
-  for(const s of svc){const r=runs.find(x=>x.name.split(" ")[0]===s.name),pill=el("span","pill"+(s.running?"":" down"));
-    pill.appendChild(el("i"));pill.appendChild(document.createTextNode(s.name));
-    if(r&&r.heartbeat_age_s!=null&&(s.name==="paper"||s.name==="demo")){const a=r.heartbeat_age_s,e=el("span",a>120?"bad":a>30?"warn":"mut",ago(a));pill.appendChild(e)}
-    p.appendChild(pill)}
-  const cards=$("cards");cards.replaceChildren();
-  for(const r of runs)cards.appendChild(quantCard(r));
-  if(d.hlcopy)cards.appendChild(hlCard(d.hlcopy));
-  if(d.hlreverse)cards.appendChild(hlCardNamed(d.hlreverse,"HL copy (reversed)","Fades the same wallets: their long = our short, 0 / 30 / 60 s delay"));
-  cards.appendChild(mlCard(d.mlalts));cards.appendChild(sentCard(d.sentibot));
-  EVENTS=allEvents(d);drawFeed();drawAlerts(d);
-  const k=$("kills");k.replaceChildren();
-  const seen=new Set();for(const r of runs){if(!r.state||seen.has(r.state))continue;seen.add(r.state);
-    k.appendChild(el("div","sub",r.name+(runs.filter(x=>x.state===r.state).length>1?" (and siblings sharing this folder)":"")));
-    k.appendChild(el("code",null,`touch "${r.state}/KILL"`))}
-}
-function tick(){
-  const age=LAST?(Date.now()-LAST.time_ms)/1000:null,b=$("banner");
-  const stale=LAST_OK&&(Date.now()-LAST_OK)/1000>30;
-  if(FAILED||stale||(age!=null&&age>30)){b.style.display="block";b.textContent=FAILED?"Can't reach the dashboard server – showing old data.":"Data is more than 30 seconds old."}
-  else b.style.display="none";
-  $("updated").textContent=LAST_OK?`updated ${Math.round((Date.now()-LAST_OK)/1000)}s ago`:"";
-  if(LAST){const dl=Math.max(0,...(LAST.runs||[]).map(r=>(r.run||{}).deadline_ms||0));$("deadline").textContent=countdown(dl)}}
-async function load(){
-  try{const r=await fetch("/api/state",{cache:"no-store"});if(!r.ok)throw new Error(r.status);
-    const d=await r.json();FAILED=false;LAST_OK=Date.now();render(d)}
-  catch(e){FAILED=true;if(!LAST)$("status").textContent="Waiting for data…"}
-  tick()}
+  const g=$("news");g.replaceChildren();for(const name of Object.keys(SITES))g.appendChild(sourceCard(name,(d.items||[]).filter(n=>n.source===name),(d.status||{})[name]||"error"))}catch(e){}}
 drawChips();load();setInterval(load,5000);setInterval(tick,1000);loadNews();setInterval(loadNews,300000);
 </script></body></html>
