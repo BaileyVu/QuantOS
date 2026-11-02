@@ -69,7 +69,7 @@ class MarketUniverseTests(unittest.TestCase):
 
     def test_batch_quotes_reject_stale_book_or_mark(self):
         for books, marks in (
-            ([self.book("BTCUSDC", 94_999)], [self.mark("BTCUSDC")]),
+            ([self.book("BTCUSDC", 39_999)], [self.mark("BTCUSDC")]),  # book may be quiet up to 60 s
             ([self.book("BTCUSDC")], [self.mark("BTCUSDC", 94_999)]),
         ):
             with self.subTest(books=books, marks=marks), self.assertRaises(ValueError):

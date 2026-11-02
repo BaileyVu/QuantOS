@@ -65,7 +65,7 @@ class PublicMarketTests(unittest.TestCase):
                 response = super().__call__(request, timeout)
                 if len(self.requests) == 2: now[0] = 7000
                 return response
-        tr = SlowTransport([{"symbol":"BTCUSDC","bidPrice":"10","askPrice":"10.1","bidQty":"2","askQty":"3","time":1000},{"symbol":"BTCUSDC","markPrice":"10.05","time":6999}])
+        tr = SlowTransport([{"symbol":"BTCUSDC","bidPrice":"10","askPrice":"10.1","bidQty":"2","askQty":"3","time":6999},{"symbol":"BTCUSDC","markPrice":"10.05","time":1000}])
         with self.assertRaises(ValueError): PublicMarket(transport=tr, clock_ms=lambda:now[0]).quote("BTCUSDC")
 
     def test_aggregate_trade_shape_chronology_and_cursor(self):

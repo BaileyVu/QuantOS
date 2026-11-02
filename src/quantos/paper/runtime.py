@@ -328,8 +328,9 @@ class Runtime:
                         records.insert(0, ("quote", market.quote(symbol)))
                 if self.portfolio == "live50":
                     batch = market.quotes(symbols, skip_invalid=True)
-                    if len(batch) != len(symbols): raise ValueError("invalid or stale quote")
-                    records[0:0] = [("quote", batch[s]) for s in symbols]
+                    # One quiet thin book must not blank the whole batch (11-02 run: ~4.2k feed errors).
+                    if not batch: raise ValueError("invalid or stale quote")
+                    records[0:0] = [("quote", batch[s]) for s in symbols if s in batch]
                 if now >= next_funding: next_funding = now + 60000
                 self.emit("feed", records)
                 backoff = 2

@@ -469,7 +469,9 @@ class PaperEngine:
                         # Reject gaps beyond risk allowance instead of inventing fills at trigger.
                         depth = q.ask_qty if long else q.bid_qty
                         quantity = D(o["remaining"])
-                        if quantity > depth * D(".1"):
+                        # Default: <=10% of top-of-book. Profiles may set depth_fraction (e.g. 1.0) because thin
+                        # USDC books made every $60 pM10 entry cancel in the 10-31 run (top level only is observed).
+                        if quantity > depth * getattr(self.policy, "depth_fraction", D(".1")):
                             self._cancel(o, now_ms, "INSUFFICIENT_EXECUTABLE_DEPTH")
                         elif abs(price - D(s["entry_price"])) > D(s["entry_price"]) * self.policy.slippage * 2:
                             self._cancel(o, now_ms, "ENTRY_GAP_EXCEEDS_ALLOWANCE")

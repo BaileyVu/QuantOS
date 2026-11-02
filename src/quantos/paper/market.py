@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 from .types import Candle, D, Funding, Instrument, Quote, Trade
 
 BASE = "https://fapi.binance.com"
+BOOK_MAX_AGE_MS = 60000
 ENDPOINTS = {
     "/fapi/v1/exchangeInfo", "/fapi/v1/time", "/fapi/v1/klines",
     "/fapi/v1/ticker/24hr",
@@ -202,6 +203,8 @@ class PublicMarket:
         return self._make_quote(symbol, b, m, self._clock_ms())
 
     @staticmethod
+    # bookTicker "time" only moves when the top of book changes, so a quiet thin USDC book looks
+    # stale while still being valid; the mark (updated every second) stays held to 5 s.
     def _make_quote(symbol: str, b: object, m: object, received: int) -> Quote:
         if not isinstance(b, dict) or not isinstance(m, dict):
             raise ValueError("malformed quote row")
@@ -216,7 +219,7 @@ class PublicMarket:
         except KeyError:
             raise ValueError("malformed quote row") from None
         if (any(v <= 0 for v in (bid, ask, bq, aq, mark)) or bid > ask
-                or not 0 <= received-ts <= 5000 or not 0 <= received-mark_ts <= 5000):
+                or not 0 <= received-ts <= BOOK_MAX_AGE_MS or not 0 <= received-mark_ts <= 5000):
             raise ValueError("invalid or stale quote")
         return Quote(symbol, ts, received, bid, ask, bq, aq, mark, mark_ts)
 
