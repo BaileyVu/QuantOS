@@ -177,6 +177,9 @@ function mlCard(m){
   card.appendChild(el("div","note","5m-candle model, 20 alts, long top 1% · limit in/out · shares the 3-position cap"));
   if(!m){card.appendChild(el("div","note","Not running"));return card}
   const top=el("div","row");add(top,kv2(`${(m.open||[]).length} open · ${m.closed} closed`,"mut"),kv2(money(m.realized_usd,true),cls(m.realized_usd)));card.appendChild(top);
+  const hb=m.heartbeat_ms?(Date.now()-m.heartbeat_ms)/1000:null,sc=(m.scores||{}).scores||{},thr=(m.scores||{}).thr;
+  const best=Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>base(k)+" "+v.toFixed(3)).join(" · ");
+  card.appendChild(el("div","note "+(hb==null||hb>420?"bad":""),`Last check ${hb==null?"–":ago(hb)} ago (every 5 min) · top scores ${best||"–"} · entry at ≥ ${thr?(+thr).toFixed(3):"–"}`));
   if((m.open||[]).length)card.appendChild(table(["Symbol","State","Entry","Score"],m.open.map(o=>[base(o.sym),o.st,px(o.entry),(+o.score).toFixed(3)])));
   const ev=(m.events||[]).slice(-6).reverse();if(ev.length)card.appendChild(table(["Time","Event","Symbol","Detail"],ev.map(e=>[String(e.ts||"").slice(11,16),e.ev,base(e.sym),e.why||e.err||(e.pnl_usd!=null?money(+e.pnl_usd,true):"")])));
   return card}
