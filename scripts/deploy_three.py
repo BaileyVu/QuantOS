@@ -112,6 +112,7 @@ def install_dashboard():
              "ProgramArguments": [str(python()), "-m", "quantos.paper.webdash",
                                   "--run", f"paper 2%={QOS / 'v4-live50'}#pL", "--run", f"paper 5%={QOS / 'v4-live50'}#pL5",
                                   "--run", f"paper $200={QOS / 'v4-live50'}#pM10",
+                                  "--run", f"paper $200 m/5={QOS / 'v4-live50'}#pM5",
                                   "--run", f"demo 2%={QOS / 'v4-live50-demo'}#pL",
                                   "--sentibot", str(SB / "app"), "--port", "8787"],
              "EnvironmentVariables": {"PYTHONPATH": str(app)}, "WorkingDirectory": str(QOS),

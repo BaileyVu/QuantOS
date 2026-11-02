@@ -96,7 +96,7 @@ def write_reports(state: Path, run: dict, day: int | None = None, final=False):
                   "R divides net trade PnL by cost-inclusive approved risk of the actually filled size."],
               "profiles": {}}
     profiles = run.get("profiles", ["p1", "p5", "pA"])
-    if profiles not in (["p1", "p5", "pA"], ["pR"], ["pL"], ["pL", "pL5"], ["pL", "pL5", "pM10"]):
+    if profiles not in (["p1", "p5", "pA"], ["pR"], ["pL"], ["pL", "pL5"], ["pL", "pL5", "pM10"], ["pL", "pL5", "pM10", "pM5"]):
         raise ValueError("invalid report profile set")
     if profiles[0] == "pL":
         result["assumptions"] = [x for x in result["assumptions"] if not x.startswith(("p5 ", "pA "))]
@@ -105,6 +105,8 @@ def write_reports(state: Path, run: dict, day: int | None = None, final=False):
             result["assumptions"].append("pL5: same, 5% risk/trade, 15% daily stop, 35% drawdown pause.")
         if "pM10" in profiles:
             result["assumptions"].append("pM10: $200 start, margin per trade = realized balance / 10, leverage <= 3x.")
+        if "pM5" in profiles:
+            result["assumptions"].append("pM5: $200 start, margin per trade = realized balance / 5, leverage <= 3x, crash/dip/delist only.")
     if profiles == ["pR"]:
         result["assumptions"] = [x for x in result["assumptions"] if not x.startswith(("p5 ", "pA "))]
         result["assumptions"].append("pR is isolated USDT research; no candidate is promoted by replay success.")

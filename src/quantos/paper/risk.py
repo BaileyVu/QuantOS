@@ -140,6 +140,21 @@ class LiveR5Policy(LivePolicy):
     enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17"})
 
 
+@dataclass(frozen=True)
+class Cap200M5Policy(Cap200M10Policy):
+    """Owner's high-risk rule (2026-11-02): MARGIN = realized balance / 5, compounding, leverage <= 3x.
+    Only rules with held-out support (crash/dip) plus delist, like the 5% profile. A 25%-stop dip trade
+    at 1x then loses ~5% of balance at the stop. Breakers as the 5% profile: 15% daily, 35% drawdown."""
+    margin_per_trade: Decimal = D(".20")
+    portfolio_risk_fraction: Decimal = D(".05")
+    daily_loss: Decimal = D(".15")
+    drawdown: Decimal = D(".35")
+
+    daily_loss_ceiling = ".15"
+    drawdown_ceiling = ".35"
+    enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17"})
+
+
 def portfolio_risk_caps(policy: Policy) -> tuple[Decimal, Decimal]:
     """Frozen same-direction and total fractions; independent of signal order."""
     base = getattr(policy, "portfolio_risk_fraction", D(0)) or policy.risk_fraction

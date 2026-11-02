@@ -182,6 +182,24 @@ class R5ScopeTests(unittest.TestCase):
         self.assertTrue(evaluate(event(), INS, quote(), account(), LiveR5Policy(), T).approved)
 
 
+class Cap200M5Tests(unittest.TestCase):
+    """Owner high-risk rule: margin = realized balance / 5; crash/dip/delist only."""
+    def decide(self, cash, s=None):
+        from quantos.paper.risk import Cap200M5Policy
+        a = replace(Account(D(cash), D(cash), D(200)), cash=D(cash))
+        return evaluate(s or event(), INS, quote(), a, Cap200M5Policy(), T)
+
+    def test_margin_is_fifth_of_realized_balance(self):
+        d = self.decide(200)
+        self.assertTrue(d.approved, d)
+        self.assertLessEqual(d.margin, D("40.00")); self.assertGreater(d.margin, D("39.6"))
+
+    def test_trend_rules_blocked(self):
+        tsmom = signal(strategy_id="tsmom_4h", strategy_version="1.0.0", entry_type="MARKET",
+                       take_profit=None, maximum_hold_seconds=259200, stop_loss=D("98.32"))
+        self.assertFalse(self.decide(200, s=tsmom).approved)
+
+
 class Cap200M10Tests(unittest.TestCase):
     """Owner rule: margin = realized balance / 10, compounding on wins and losses."""
     def decide(self, cash, ins=INS, s=None):
