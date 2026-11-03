@@ -165,7 +165,7 @@ class Demo200Policy(Cap200M10Policy):
     daily_loss: Decimal = D(".15")
     drawdown: Decimal = D(".35")
     portfolio_risk_fraction: Decimal = D(".05")
-    depth_fraction: Decimal = D("1")
+    depth_fraction: Decimal = D("5")  # 11-03: $100 5x entries kept cancelling on 1x top-of-book; a market order walks the book
 
     leverage_ceiling = "5"
     daily_loss_ceiling = ".15"
