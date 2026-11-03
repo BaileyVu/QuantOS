@@ -135,7 +135,7 @@ def sentibot_view(path: Path | None, now_ms: int) -> dict | None:
 # Combined $200 demo run (2026-11-02); the earlier paper/demo/hl-copy services are retired.
 SERVICES = (("demo", "com.quantos.v4.demo200"), ("sentibot spot", "com.sentibot.spot"),
             ("sentibot perp", "com.sentibot.perp"), ("dashboard", "com.quantos.dashboard"),
-            ("hl reverse", "com.quantos.hlcopy.reverse"), ("alt-ML", "com.quantos.mlalts"))
+            ("alt-ML", "com.quantos.mlalts"))  # HL copy dropped 2026-11-03 (no edge: short beta only)
 HLCOPY = Path.home() / "Library/Application Support/hl_copy/state"
 HLREVERSE = Path.home() / "Library/Application Support/hl_copy_reverse/state"
 MLALTS = Path.home() / "Library/Application Support/mlalts/app"
@@ -199,7 +199,7 @@ def snapshot(runs, sentibot) -> dict:
         "perp": sentibot_view(sentibot / "paper_perp_signals.jsonl", now),
         "spot": sentibot_view(sentibot / "paper_signals.jsonl", now)}
     return {"time_ms": now, "services": services_view(), "runs": [run_view(n, s, now, *p) for n, s, *p in runs],
-            "hlcopy": None, "hlreverse": hlcopy_view(now, HLREVERSE), "mlalts": mlalts_view(now),
+            "hlcopy": None, "hlreverse": None, "mlalts": mlalts_view(now),
             "sentibot": bots}
 
 
