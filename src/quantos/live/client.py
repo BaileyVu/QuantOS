@@ -142,8 +142,9 @@ class SignedClient:
         try:
             status, body, headers = self._transport(req, 5)
         except Exception as e:
-            if mutating: raise AmbiguousOrderState(f"{method} {path}: transport failure {type(e).__name__}") from None
-            raise ConnectionError(f"{method} {path}: transport failure {type(e).__name__}") from None
+            why = f"transport failure {type(e).__name__}: {getattr(e, 'reason', e)!r}"
+            if mutating: raise AmbiguousOrderState(f"{method} {path}: {why}") from None
+            raise ConnectionError(f"{method} {path}: {why}") from None
         try:
             data = json.loads(body)
         except (ValueError, TypeError):

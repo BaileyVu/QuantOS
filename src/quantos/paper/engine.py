@@ -60,8 +60,9 @@ class PaperEngine:
         return [o for o in self.journal.orders() if o["state"] not in TERMINAL]
 
     def entry_allowed(self):
+        # exchange_hold: the live mirror's soft pause while the exchange is unreachable (in memory only).
         return (self.connected and self.journal.get("reconciled", False)
-                and not self.journal.get("paused", False))
+                and not self.journal.get("paused", False) and not getattr(self, "exchange_hold", False))
 
     def query_order(self, order_id):
         row = self.journal.db.execute("SELECT payload FROM orders WHERE id=?", (order_id,)).fetchone()
