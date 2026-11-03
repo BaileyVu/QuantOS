@@ -102,7 +102,7 @@ class LivePolicy(Policy):
     limit_entries = False  # live50 polls no trade prints, so a LIMIT entry could never be filled honestly
     risk_headroom = D("0.9")
     enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17",
-                                    "tsmom_4h", "turtle_55", "vol_squeeze_breakout"})
+                                    "tsmom_4h", "turtle_55", "vol_squeeze_breakout", "ml1h_pattern"})
 
     def __post_init__(self):
         super().__post_init__()

@@ -38,7 +38,8 @@ def live_library():
     from .alt_dip_reversal import AltDipReversalStrategy
     from .candidate_features import ALT_SOURCE_UNIVERSE
     from .usdc_mapped import UsdcMapped
-    return (Tsmom4hStrategy(), Turtle55Strategy(), VolSqueezeBreakoutStrategy(), DelistShortE17Strategy(),
+    from .ml1h_pattern import Ml1hPatternStrategy
+    return (Ml1hPatternStrategy(), Tsmom4hStrategy(), Turtle55Strategy(), VolSqueezeBreakoutStrategy(), DelistShortE17Strategy(),
             UsdcMapped(CrashFlushE2Strategy(oi_mode="tolerant"), MAJORS),
             UsdcMapped(AltDipReversalStrategy(D("0.01"), 24), frozenset(ALT_SOURCE_UNIVERSE)))
 

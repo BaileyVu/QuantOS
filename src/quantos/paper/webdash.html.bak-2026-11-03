@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QuantOS</title>
+<style>
+:root{--bg:#0b0e11;--card:#161a1e;--ink:#eaecef;--mut:#848e9c;--line:#2b3139;--good:#0ecb81;--bad:#f6465d;--warn:#f0b90b;--acc:#f0b90b;--goodbg:rgba(14,203,129,.12);--badbg:rgba(246,70,93,.12);--warnbg:rgba(240,185,11,.12);--chip:#1e2329;--gold:#f0b90b;--gold2:#fcd535}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums;overflow-x:hidden}
+main{max-width:1180px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:0;font-weight:700;background:linear-gradient(90deg,var(--gold),var(--gold2));-webkit-background-clip:text;background-clip:text;color:transparent}h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin:28px 0 12px;display:flex;align-items:center;gap:8px}h2::before{content:"";width:3px;height:14px;background:var(--gold);border-radius:2px}
+header{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;justify-content:space-between}
+.sub{color:var(--mut)}.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}.mut{color:var(--mut)}
+#banner{display:none;background:var(--bad);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pill{display:inline-flex;gap:6px;align-items:center;padding:4px 12px;border-radius:99px;background:var(--chip);border:1px solid var(--line);font-size:13px}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--good)}
+.pill.down{background:var(--badbg)}.pill.down i{background:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.card{background:linear-gradient(180deg,#181c21,#13171b);border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0;transition:border-color .2s,transform .2s}.card:hover{border-color:rgba(240,185,11,.45)}
+.card h3{margin:0;font-size:15px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.card .note{color:var(--mut);font-size:12px;margin:2px 0 8px}
+.big{font-size:30px;font-weight:700;margin-top:6px}
+.row{display:flex;flex-wrap:wrap;gap:4px 18px;margin:6px 0;color:var(--mut)}.row b{color:var(--ink);font-weight:600}
+.tag{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--chip);color:var(--mut);font-weight:500}
+.tag.bad{background:var(--badbg);color:var(--bad)}.tag.good{background:var(--goodbg);color:var(--good)}.tag.warn{background:var(--warnbg);color:var(--warn)}
+.scroll{overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{color:var(--mut);font-weight:500;text-align:left}th,td{padding:4px 8px 4px 0;white-space:nowrap;border-bottom:1px solid var(--line)}
+td.n,th.n{text-align:right}
+svg.spark{width:100%;height:56px;display:block;margin-top:6px}
+.chips{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.chips button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:5px 14px;font:inherit;cursor:pointer}
+.chips button.on{background:var(--gold);border-color:var(--gold);color:#0b0e11;font-weight:600}
+.feed{background:var(--card);border:1px solid var(--line);border-radius:14px;max-height:520px;overflow:auto}
+.newsgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.src{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.src b{color:var(--gold)}
+.ni{display:grid;grid-template-columns:72px 1fr;gap:10px;padding:9px 0;border-top:1px solid var(--line);color:inherit;text-decoration:none}
+.ni:hover .tt{color:var(--gold2)}.ni img,.ni .ph{width:72px;height:54px;object-fit:cover;border-radius:8px;background:var(--chip)}
+.ni .tt{font-size:13px;line-height:1.35;font-weight:500;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ni .tm{color:var(--mut);font-size:11px;margin-top:3px}
+.more{display:inline-block;margin-top:10px;padding:6px 14px;border-radius:99px;border:1px solid var(--gold);color:var(--gold);text-decoration:none;font-size:12px;font-weight:600}.more:hover{background:var(--gold);color:#0b0e11}
+.ev{display:grid;grid-template-columns:58px 74px 1fr;gap:8px;padding:7px 14px;border-bottom:1px solid var(--line);align-items:baseline}
+.ev:last-child{border:0}.ev .t{color:var(--mut);font-size:12px}
+.al{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);align-items:baseline;flex-wrap:wrap}
+.sent{display:grid;grid-template-columns:48px 1fr 46px;gap:8px;align-items:center;margin:4px 0;font-size:12.5px}
+.bar{position:relative;height:8px;background:var(--chip);border-radius:4px}
+.bar::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--mut)}
+.bar span{position:absolute;top:0;bottom:0;border-radius:4px}
+.mini{border-top:1px solid var(--line);padding:8px 0}
+code{display:block;background:var(--chip);padding:8px 10px;border-radius:8px;margin:4px 0 10px;user-select:all;overflow-x:auto;white-space:pre;font:12px ui-monospace,Menlo,monospace}
+footer{margin-top:10px}
+@media (max-width:720px){.grid{grid-template-columns:1fr}.big{font-size:26px}.ev{grid-template-columns:50px 1fr}.ev .r{display:none}main{padding:12px}}
+</style></head><body><main>
+<div id="banner"></div>
+<header><div><h1>QuantOS</h1><div id="status" class="sub">Loading…</div></div>
+<div class="sub" style="text-align:right"><div id="deadline"></div><div id="updated"></div></div></header>
+<div class="pills" id="pills"></div>
+<h2>Runs</h2><div class="grid" id="cards"></div>
+<h2>Live activity</h2>
+<div class="chips" id="chips"></div><div class="feed" id="feed"></div>
+<h2>Alerts</h2><div class="card" id="alerts"></div>
+<h2>News</h2><div class="newsgrid" id="news"></div>
+<footer><h2>Controls (read-only)</h2><div class="card">
+<div class="sub">Copy and run in a terminal. Nothing on this page acts.</div>
+<div class="sub" style="margin-top:8px">Stop everything (run in ~/Desktop/PythonProject/QuantOS-mainnet-ready):</div>
+<code>../QuantOS/.venv/bin/python scripts/deploy_three.py uninstall</code>
+<div class="sub">Emergency stop one run:</div><div id="kills"></div></div></footer>
+</main>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const num=v=>{const x=parseFloat(v);return isFinite(x)?x:null};
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function add(p,...kids){for(const k of kids)if(k!=null)p.appendChild(k);return p}
+const money=(v,sign)=>{const x=num(v);if(x==null)return"–";const s=Math.abs(x).toFixed(2);return(x<0?"−":sign?"+":"")+"$"+s};
+const px=v=>{const x=num(v);return x==null?"–":Number(x.toPrecision(5)).toString()};
+const cls=x=>x==null||x===0?"":x>0?"good":"bad";
+const SLOT_NAMES={SLOT_FULL_TREND:"trend slot already used",SLOT_FULL_EVENT:"event slot already used",SLOT_FULL_CRASH:"crash slot already used",
+BELOW_EXCHANGE_MINIMUM:"below Binance minimum order",STRATEGY_DISABLED:"strategy switched off",EXISTING_EXPOSURE:"already holding it",
+ENTRY_COOLDOWN:"cooling down after last entry",COSTS_TOO_HIGH_FOR_STOP:"costs too high for the stop distance",
+FILL_EXCEEDS_APPROVED_RISK:"fill would exceed approved risk",INSUFFICIENT_EXECUTABLE_DEPTH:"not enough order-book depth"};
+const CLOSE_NAMES={RUN_END:"run ended",SL:"stop-loss hit",TIME_EXIT:"time exit",KILL_SWITCH:"kill switch"};
+function strat(s){s=String(s||"");if(/tsmom|trend/i.test(s))return"trend";if(/crash/i.test(s))return"crash";if(/event|dip|news/i.test(s))return"event";return s||"?"}
+function base(sym){return String(sym||"?").replace(/(USDC|USDT)$/,"")}
+function hhmm(ms){const d=new Date(ms);return d.toTimeString().slice(0,5)}
+function ago(s){if(s==null)return"–";s=Math.max(0,Math.round(s));return s<90?s+"s":s<5400?Math.round(s/60)+"m":Math.round(s/3600)+"h"}
+
+/* Turn one journal event into {cat, text, tone} or null to hide. */
+function describe(f){
+  const sym=base(f.symbol),side=f.side||"",st=strat(f.strategy),why=String(f.reason||"");
+  const nice=SLOT_NAMES[why]||why;
+  switch(f.kind){
+    case"FILLED":case"PARTIAL":return{cat:"trade",tone:"good",text:`${f.kind==="PARTIAL"?"Partly filled":"Opened"} ${side} ${sym} (${st})${f.detail?" – "+f.detail:""}`};
+    case"CLOSED":{const m=/pnl\s*([+-][\d.]+)/.exec(f.detail||"");const p=m?parseFloat(m[1]):null;
+      return{cat:"trade",tone:cls(p)||"",text:`Closed ${sym}: ${CLOSE_NAMES[why]||why||"closed"}${p!=null?", "+money(p,true):""}`}}
+    case"REJECTED_RISK":{let extra=f.detail?` (${f.detail})`:"";return{cat:"skip",tone:"",text:`Skipped ${sym}: ${nice||"rejected"}${extra}`}}
+    case"CANCELED":return{cat:"trade",tone:"warn",text:`Cancelled order ${sym}${why?": "+(CLOSE_NAMES[why]||why):""}`};
+    case"KILL_SWITCH":return{cat:"alert",tone:"bad",text:"Kill switch triggered"+(why?": "+why:"")};
+    case"LOSS_BREAKER":return{cat:"alert",tone:"bad",text:"Loss breaker tripped"+(why?": "+why:"")};
+    case"EXCHANGE_RECONCILE_FAILED":return{cat:"alert",tone:"bad",text:"Could not reconcile with the exchange"};
+    default:return null}
+}
+
+let FILTER="all",LAST=null,LAST_OK=0,FAILED=false,EVENTS=[];
+const FILTERS=[["all","All"],["trade","Trades"],["skip","Skips"],["alert","Alerts"]];
+function drawChips(){const c=$("chips");c.replaceChildren();
+  for(const[k,l]of FILTERS){const b=el("button",k===FILTER?"on":"",l);b.onclick=()=>{FILTER=k;drawChips();drawFeed()};c.appendChild(b)}}
+
+function spark(hist,base0){
+  const pts=(hist||[]).map(p=>[+p[0],num(p[1])]).filter(p=>p[1]!=null);
+  const NS="http://www.w3.org/2000/svg",svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("viewBox","0 0 300 56");svg.setAttribute("preserveAspectRatio","none");svg.setAttribute("class","spark");
+  if(pts.length<2)return svg;
+  const ys=pts.map(p=>p[1]).concat(base0);let lo=Math.min(...ys),hi=Math.max(...ys);if(hi-lo<0.05){lo-=.05;hi+=.05}
+  const t0=pts[0][0],t1=pts[pts.length-1][0]||t0+1,X=t=>4+292*(t-t0)/Math.max(1,t1-t0),Y=v=>52-48*(v-lo)/(hi-lo);
+  const mk=(n,a)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e};
+  mk("line",{x1:0,x2:300,y1:Y(base0),y2:Y(base0),stroke:"var(--mut)","stroke-dasharray":"3 3","stroke-width":1,"vector-effect":"non-scaling-stroke"});
+  const up=pts[pts.length-1][1]>=base0;
+  mk("polyline",{points:pts.map(p=>X(p[0]).toFixed(1)+","+Y(p[1]).toFixed(1)).join(" "),fill:"none",stroke:up?"var(--good)":"var(--bad)","stroke-width":2,"vector-effect":"non-scaling-stroke","stroke-linejoin":"round"});
+  return svg}
+
+function table(heads,rows){const w=el("div","scroll"),t=el("table"),h=el("tr");
+  heads.forEach((x,i)=>h.appendChild(el("th",i>=3?"n":"",x)));t.appendChild(h);
+  for(const r of rows){const tr=el("tr");r.forEach((c,i)=>{const td=el("td",(i>=3?"n ":"")+(c&&c.cls||""),c&&c.t!=null?c.t:c);tr.appendChild(td)});t.appendChild(tr)}
+  return add(w,t)}
+
+function quantCard(r){
+  const card=el("div","card"),eng=((r.status||{}).engines||[])[0]||{};
+  const five=/5%/.test(r.name),demo=/demo/i.test(r.name);
+  const h=el("h3",null,r.name),run=r.run||{};
+  const st=run.status||"unknown",tg=el("span","tag "+(st==="running"?"good":"warn"),st);h.appendChild(tg);card.appendChild(h);
+  card.appendChild(el("div","note",five?"crash & dip rules only":demo?"Binance Demo money, real exchange orders":"standard rules, paper money"));
+  const eq=num(eng.equity),start=/\$200/.test(r.name)?200:50,chg=eq==null?null:eq-start;
+  card.appendChild(el("div","big "+cls(chg),eq==null?"–":money(eq)));
+  const pc=chg==null?"":` (${chg>=0?"+":"−"}${Math.abs(chg/start*100).toFixed(2)}%)`;
+  card.appendChild(el("div",cls(chg),eq==null?"No data yet":`${money(chg,true)}${pc} vs $${start} start`));
+  const dp=num(eng.day_pnl),dd=num(eng.drawdown);
+  const row=el("div","row");
+  const kv=(k,v,c)=>{const s=el("span",null,k+" ");s.appendChild(el("b",c||"",v));return s};
+  add(row,kv("Today",money(dp,true),cls(dp)),kv("Drawdown",dd==null?"–":money(dd),dd>0.5?"warn":""),
+    kv("Heartbeat",ago(r.heartbeat_age_s),r.heartbeat_age_s>120?"bad":r.heartbeat_age_s>30?"warn":""),kv("Restarts",String(run.restarts??0)));
+  card.appendChild(row);
+  card.appendChild(spark(r.equity_history,start));
+  const tags=el("div","row");
+  if(eng.paused)tags.appendChild(el("span","tag warn","paused"));
+  if((r.status||{}).kill_switch_active)tags.appendChild(el("span","tag bad","KILL SWITCH ACTIVE"));
+  const sl=r.slots||{};for(const k of["crash","event","trend"])if(sl[k])tags.appendChild(el("span","tag "+(sl[k].used?"warn":""),`${k} ${sl[k].used}/${sl[k].max}`));
+  if(r.errors_last_15m)tags.appendChild(el("span","tag bad",r.errors_last_15m+" errors/15m"));
+  if(r.stale_quotes_last_15m)tags.appendChild(el("span","tag",r.stale_quotes_last_15m+" stale quotes/15m"));
+  card.appendChild(tags);
+  const ops=eng.open_positions||[];
+  if(!ops.length)card.appendChild(el("div","note","No open positions"));
+  else card.appendChild(table(["Symbol","Side","Rule","Entry","Stop","Target","Mark","Unreal."],ops.map(p=>{
+    const a=num(p.average),m=num(p.last_mark),q=num(p.filled),u=a==null||m==null||q==null?null:(m-a)*q*(p.side==="SHORT"?-1:1);
+    return[base(p.symbol),{t:p.side,cls:p.side==="LONG"?"good":"bad"},strat(p.strategy_id),px(p.average),px(p.stop_price),p.take_profit?px(p.take_profit):"time exit",px(p.last_mark),{t:money(u,true),cls:cls(u)}]})));
+  if(demo&&r.mirror){const n=Object.values(r.mirror).filter(x=>x&&x.state&&x.state!=="CLOSED").length;
+    card.appendChild(el("div","note",`Exchange mirror: ${n} live order${n===1?"":"s"} on Binance Demo`))}
+  return card}
+
+function hlCard(h){
+  const card=el("div","card");card.appendChild(el("h3",null,"HL copy"));
+  card.appendChild(el("div","note","Paper copy of a wallet's trades, at 0 / 30 / 60 s delay"));
+  if(!h){card.appendChild(el("div","note","No data"));return card}
+  for(const d of["0","30","60"]){const b=(h.books||{})[d];if(!b)continue;
+    const m=el("div","mini"),eq=num(b.equity),start=num(b.start)||50,chg=eq==null?null:eq-start;
+    const top=el("div","row");top.style.margin="0";
+    add(top,kv2("Delay "+d+" s",""),kv2(eq==null?"–":money(eq),cls(chg)),kv2(chg==null?"":money(chg,true),cls(chg)),kv2(`${(b.open||[]).length} open · ${b.closed??0} closed`,"mut"));
+    m.appendChild(top);
+    if((b.open||[]).length)m.appendChild(table(["Symbol","Side","Qty","Entry","Stop"],b.open.map(o=>[base(o.symbol),{t:o.side,cls:o.side==="LONG"?"good":"bad"},"" + px(o.qty),px(o.entry),px(o.stop)])));
+    card.appendChild(m)}
+  card.appendChild(el("div","note",`Heartbeat ${h.heartbeat_utc||"–"} · errors ${h.errors??0}`));
+  return card}
+function kv2(t,c){return el("b",c,t)}
+function hlCardNamed(h,title,note){const c=hlCard(h);c.firstChild.textContent=title;c.children[1].textContent=note;return c}
+function mlCard(m){
+  const card=el("div","card");card.appendChild(el("h3",null,"Alt-ML (demo executor)"));
+  card.appendChild(el("div","note","5m-candle model, 20 alts, long top 1% · limit in/out · shares the 3-position cap"));
+  if(!m){card.appendChild(el("div","note","Not running"));return card}
+  const top=el("div","row");add(top,kv2(`${(m.open||[]).length} open · ${m.closed} closed`,"mut"),kv2(money(m.realized_usd,true),cls(m.realized_usd)));card.appendChild(top);
+  const hb=m.heartbeat_ms?(Date.now()-m.heartbeat_ms)/1000:null,sc=(m.scores||{}).scores||{},thr=(m.scores||{}).thr;
+  const best=Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>base(k)+" "+v.toFixed(3)).join(" · ");
+  card.appendChild(el("div","note "+(hb==null||hb>420?"bad":""),`Last check ${hb==null?"–":ago(hb)} ago (every 5 min) · top scores ${best||"–"} · entry at ≥ ${thr?(+thr).toFixed(3):"–"}`));
+  if((m.open||[]).length)card.appendChild(table(["Symbol","State","Entry","Score"],m.open.map(o=>[base(o.sym),o.st,px(o.entry),(+o.score).toFixed(3)])));
+  const ev=(m.events||[]).slice(-6).reverse();if(ev.length)card.appendChild(table(["Time","Event","Symbol","Detail"],ev.map(e=>[String(e.ts||"").slice(11,16),e.ev,base(e.sym),e.why||e.err||(e.pnl_usd!=null?money(+e.pnl_usd,true):"")])));
+  return card}
+function safeUrl(u){return typeof u==="string"&&u.startsWith("https://")?u:null}
+const SITES={"CoinDesk":"https://www.coindesk.com","Cointelegraph":"https://cointelegraph.com","Watcher Guru":"https://watcher.guru/news"};
+function newsItem(n){const a=el("a","ni"),href=safeUrl(n.link);if(href){a.href=href;a.target="_blank";a.rel="noopener noreferrer"}
+  const img=safeUrl(n.image);if(img){const i=el("img");i.src=img;i.loading="lazy";i.referrerPolicy="no-referrer";i.alt="";a.appendChild(i)}else a.appendChild(el("div","ph"));
+  const t=el("div");add(t,el("div","tt",n.title),el("div","tm",String(n.time||"").replace("T"," ").slice(0,22)));a.appendChild(t);return a}
+function sourceCard(name,items,status){const c=el("div","card");const h=el("div","src");add(h,el("b",null,name),el("span","tag"+(String(status).startsWith("ok")?" good":" bad"),String(status).startsWith("ok")?"live":"offline"));c.appendChild(h);
+  for(const n of items.slice(0,5))c.appendChild(newsItem(n));
+  const m=el("a","more","See more →");m.href=SITES[name];m.target="_blank";m.rel="noopener noreferrer";c.appendChild(m);return c}
+async function loadNews(){try{const r=await fetch("/api/news",{cache:"no-store"});if(!r.ok)return;const d=await r.json();
+  const g=$("news");g.replaceChildren();for(const name of Object.keys(SITES))g.appendChild(sourceCard(name,(d.items||[]).filter(n=>n.source===name),(d.status||{})[name]||"error"))}catch(e){}}
+function sentCard(s){
+  const card=el("div","card");card.appendChild(el("h3",null,"Sentibot"));
+  card.appendChild(el("div","note","Market mood per coin: left = bearish, right = bullish"));
+  if(!s){card.appendChild(el("div","note","No data"));return card}
+  const row=el("div","row");
+  for(const k of["perp","spot"]){const v=s[k]||{};row.appendChild(kv2(k+" "+(v.available?money(v.equity):"–"),""))}
+  card.appendChild(row);
+  const v=(s.perp&&s.perp.available?s.perp:s.spot)||{};
+  const comp=v.composite||{};
+  for(const k of Object.keys(comp)){const x=num(comp[k]);if(x==null)continue;
+    const r=el("div","sent"),bar=el("div","bar"),sp=el("span");
+    const w=Math.min(50,Math.abs(x)*50);sp.style.width=w+"%";sp.style.left=(x<0?50-w:50)+"%";sp.style.background=x<0?"var(--bad)":"var(--good)";
+    bar.appendChild(sp);add(r,el("span",null,base(k)),bar,el("span","n "+cls(x),(x>0?"+":x<0?"−":"")+Math.abs(x).toFixed(2)));card.appendChild(r)}
+  const src=v.sources||{},bad=Object.keys(src).filter(k=>!/^ok/.test(String(src[k])));
+  if(bad.length)card.appendChild(el("div","note",bad.map(k=>k+": "+String(src[k]).split(" (")[0]).join(" · ")));
+  if(v.time)card.appendChild(el("div","note","Last reading "+v.time.replace("T"," ").slice(0,16)+" UTC"));
+  return card}
+
+function allEvents(d){const out=[];
+  for(const r of d.runs||[])for(const f of r.feed||[]){const x=describe(f);if(x)out.push({ms:f.time_ms,run:r.name,...x})}
+  for(const r of d.runs||[])for(const a of r.alerts||[])out.push({ms:a.time_ms||Date.parse(a.iso),run:r.name,cat:"alert",tone:a.level==="critical"?"bad":a.level==="warn"?"warn":"good",text:a.message});
+  out.sort((a,b)=>b.ms-a.ms);return out.slice(0,50)}
+function drawFeed(){const f=$("feed");f.replaceChildren();
+  const rows=EVENTS.filter(e=>FILTER==="all"||e.cat===FILTER);
+  if(!rows.length)f.appendChild(el("div","ev")).appendChild(el("span","mut","Nothing here yet"));
+  for(const e of rows){const r=el("div","ev"),t=el("span","t",hhmm(e.ms)),run=el("span","tag r",e.run);
+    r.appendChild(t);r.appendChild(run);r.appendChild(el("span",(e.tone||"")+(e.faint?" mut":""),e.text));f.appendChild(r)}}
+
+function drawAlerts(d){const c=$("alerts");c.replaceChildren();const all=[];
+  for(const r of d.runs||[])for(const a of r.alerts||[])all.push({...a,run:r.name,ms:a.time_ms||Date.parse(a.iso)});
+  all.sort((a,b)=>b.ms-a.ms);
+  if(!all.length)c.appendChild(el("div","mut","No alerts"));
+  for(const a of all.slice(0,20)){const row=el("div","al"),t=a.level==="critical"?"bad":a.level==="warn"?"warn":"good";
+    add(row,el("span","tag "+t,a.level||"?"),el("span","t mut",new Date(a.ms).toISOString().slice(5,16).replace("T"," ")),el("span","tag",a.run),el("span",null,a.message||a.key));c.appendChild(row)}}
+
+function countdown(ms){const left=ms-Date.now();
+  if(!ms)return"";const d=new Date(ms).toISOString().slice(0,16).replace("T"," ")+" UTC";
+  if(left<=0)return"Run ended "+d;
+  const h=Math.floor(left/3.6e6),m=Math.floor(left%3.6e6/6e4);return`Run ends in ${h>=24?Math.floor(h/24)+"d "+h%24+"h":h+"h "+m+"m"} (${d})`}
+
+function render(d){
+  LAST=d;const runs=d.runs||[],svc=d.services||[];
+  const down=svc.filter(s=>!s.running).map(s=>s.name+" is down");
+  for(const r of runs){const a=r.heartbeat_age_s;if(a==null||a>120)down.push(r.name+" heartbeat "+(a==null?"missing":"stale ("+ago(a)+")"));
+    if((r.status||{}).kill_switch_active)down.push(r.name+" kill switch on")}
+  const st=$("status");st.textContent=down.length?`${down.length} issue${down.length>1?"s":""}: ${down.join(", ")}`:`All ${svc.length} services healthy`;
+  st.className=down.length?"bad":"good";
+  const dl=Math.max(0,...runs.map(r=>(r.run||{}).deadline_ms||0));$("deadline").textContent=countdown(dl);
+  const p=$("pills");p.replaceChildren();
+  for(const s of svc){const r=runs.find(x=>x.name.split(" ")[0]===s.name),pill=el("span","pill"+(s.running?"":" down"));
+    pill.appendChild(el("i"));pill.appendChild(document.createTextNode(s.name));
+    if(r&&r.heartbeat_age_s!=null&&(s.name==="paper"||s.name==="demo")){const a=r.heartbeat_age_s,e=el("span",a>120?"bad":a>30?"warn":"mut",ago(a));pill.appendChild(e)}
+    p.appendChild(pill)}
+  const cards=$("cards");cards.replaceChildren();
+  for(const r of runs)cards.appendChild(quantCard(r));
+  if(d.hlcopy)cards.appendChild(hlCard(d.hlcopy));
+  if(d.hlreverse)cards.appendChild(hlCardNamed(d.hlreverse,"HL copy (reversed)","Fades the same wallets: their long = our short, 0 / 30 / 60 s delay"));
+  cards.appendChild(mlCard(d.mlalts));cards.appendChild(sentCard(d.sentibot));
+  EVENTS=allEvents(d);drawFeed();drawAlerts(d);
+  const k=$("kills");k.replaceChildren();
+  const seen=new Set();for(const r of runs){if(!r.state||seen.has(r.state))continue;seen.add(r.state);
+    k.appendChild(el("div","sub",r.name+(runs.filter(x=>x.state===r.state).length>1?" (and siblings sharing this folder)":"")));
+    k.appendChild(el("code",null,`touch "${r.state}/KILL"`))}
+}
+function tick(){
+  const age=LAST?(Date.now()-LAST.time_ms)/1000:null,b=$("banner");
+  const stale=LAST_OK&&(Date.now()-LAST_OK)/1000>30;
+  if(FAILED||stale||(age!=null&&age>30)){b.style.display="block";b.textContent=FAILED?"Can't reach the dashboard server – showing old data.":"Data is more than 30 seconds old."}
+  else b.style.display="none";
+  $("updated").textContent=LAST_OK?`updated ${Math.round((Date.now()-LAST_OK)/1000)}s ago`:"";
+  if(LAST){const dl=Math.max(0,...(LAST.runs||[]).map(r=>(r.run||{}).deadline_ms||0));$("deadline").textContent=countdown(dl)}}
+async function load(){
+  try{const r=await fetch("/api/state",{cache:"no-store"});if(!r.ok)throw new Error(r.status);
+    const d=await r.json();FAILED=false;LAST_OK=Date.now();render(d)}
+  catch(e){FAILED=true;if(!LAST)$("status").textContent="Waiting for data…"}
+  tick()}
+drawChips();load();setInterval(load,5000);setInterval(tick,1000);loadNews();setInterval(loadNews,300000);
+</script></body></html>
