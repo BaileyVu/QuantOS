@@ -7,7 +7,9 @@ The paper engine stays the single decision maker. Each cycle the mirror:
 3. closes (reduce-only) and cancels protection when the paper position closes;
 4. reconciles exchange positions/protection with what it placed. Two failed
    reconciliations in a row, or any protection failure, engage the kill switch
-   and flatten. Auth failures (e.g. a dynamic home IP falling off the API key
+   and flatten. A transport failure (network, timeout, 5xx, rate limit) is not a
+   failed reconciliation: it holds new entries, retries with backoff, and kills
+   only once it has lasted TRANSIENT_KILL_MS over TRANSIENT_KILL_CHECKS checks. Auth failures (e.g. a dynamic home IP falling off the API key
    whitelist) raise a critical alert.
 State lives in `<state>/mirror.json`, so a restart neither re-enters nor forgets.
 """
@@ -15,21 +17,32 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 
 from ..paper.types import D, Instrument
-from .client import BinanceError
+from .client import BinanceError, RateLimited
 from .kill import KillSwitch, flatten
 from .orders import (ProtectionFailed, client_order_id, place_with_protection, reduce_only_close,
                      stop_market_protect, submit)
 from .reconcile import reconcile
 
 AUTH_CODES = {-2015, -2014, -1022, -2008}
+# A home connection blips; two failed 30s checks used to flatten everything (2026-11-03, -$1.73).
+TRANSIENT_KILL_MS, TRANSIENT_KILL_CHECKS = 120_000, 4
+TRANSIENT_RETRY_MS = (5_000, 10_000, 20_000, 30_000)
 
 
 def is_auth_error(error: Exception) -> bool:
     return isinstance(error, BinanceError) and (
         getattr(error, "code", None) in AUTH_CODES or getattr(error, "status", None) in (401, 403))
+
+
+def is_transient_error(error: Exception) -> bool:
+    """The exchange could not be reached or asked us to back off; nothing was compared."""
+    if isinstance(error, RateLimited): return True
+    if isinstance(error, BinanceError): return getattr(error, "status", 0) >= 500
+    return isinstance(error, (ConnectionError, TimeoutError, OSError))
 
 
 def _instrument(fields: dict) -> Instrument:
@@ -43,6 +56,8 @@ class ExchangeMirror:
         self.alert = alert or (lambda level, key, message: None)
         self.kill = KillSwitch(self.state)
         self.margin_type, self.failures = margin_type, 0
+        # Soft pause: no new entries while the exchange is unreachable; open positions stay managed.
+        self.hold, self.transient, self.transient_since = False, 0, None
         # Reconciliation costs ~3 signed calls; every 2s it stalled the runtime's main loop until
         # quotes went stale. Check every 30s, and right after any exchange action.
         self.check_every_ms, self.last_check_ms = 30_000, 0
@@ -114,24 +129,35 @@ class ExchangeMirror:
                 else:
                     self.alert("warn", f"stop:{oid}", f"stop update failed on {m['symbol']}; old stop kept: {error}")
             self._save()
-        if json.dumps(self.book, sort_keys=True) == before and now_ms - self.last_check_ms < self.check_every_ms:
+        every = (TRANSIENT_RETRY_MS[min(self.transient, len(TRANSIENT_RETRY_MS)) - 1]
+                 if self.transient else self.check_every_ms)
+        if json.dumps(self.book, sort_keys=True) == before and now_ms - self.last_check_ms < every:
+            engine.exchange_hold = self.hold
             return {"ok": True, "skipped": "INTERVAL"}
         self.last_check_ms = now_ms
-        return self.check()
+        result = self.check(now_ms)
+        engine.exchange_hold = self.hold
+        return result
 
     def _cancel_stop(self, m):
         cancel = (self.client.cancel_algo_order if getattr(self.client, "conditional_api", "") == "algo"
                   else lambda cid: self.client.cancel_order(m["symbol"], cid))
         self._guard("cancel", lambda: cancel(m["stop_cid"]))
 
-    def check(self) -> dict:
+    def check(self, now_ms: int | None = None) -> dict:
         if getattr(self.client, "mode", "") == "dry-run":  # nothing real to compare against
             return {"ok": True, "report": "DRY_RUN_UNVERIFIED", "error": ""}
+        now_ms = int(time.time() * 1000) if now_ms is None else now_ms
         expected = {m["symbol"]: D(m["qty"]) * (1 if m["side"] == "BUY" else -1)
                     for m in self.book.values() if m["state"] == "OPEN"}
         orders = {m["stop_cid"] for m in self.book.values() if m["state"] == "OPEN"}
         report, error = self._guard("reconcile", lambda: reconcile(self.client, expected, orders))
+        if error is not None and is_transient_error(error):
+            return self._transient(error, now_ms)
         ok = error is None and report.ok
+        if self.hold or self.transient:
+            self.hold, self.transient, self.transient_since = False, 0, None
+            self.alert("recovered", "exchange_hold", "")
         self.failures = 0 if ok else self.failures + 1
         if not ok:
             self.alert("warn" if self.failures < 2 else "critical", "reconcile",
@@ -139,6 +165,19 @@ class ExchangeMirror:
             if self.failures >= 2:
                 self._halt("two consecutive reconciliation failures")
         return {"ok": ok, "report": None if report is None else report.__dict__, "error": str(error or "")}
+
+    def _transient(self, error, now_ms: int) -> dict:
+        self.transient += 1
+        self.transient_since = now_ms if self.transient_since is None else self.transient_since
+        lasted = now_ms - self.transient_since
+        if not self.hold:
+            self.hold = True
+            self.alert("warn", "exchange_hold", f"exchange unreachable; new entries held: {error}")
+        if self.transient >= TRANSIENT_KILL_CHECKS and lasted >= TRANSIENT_KILL_MS:
+            self.alert("critical", "reconcile", f"exchange unreachable for {lasted // 1000}s over "
+                                                f"{self.transient} checks: {error}")
+            self._halt(f"exchange unreachable for {lasted // 1000}s ({error})")
+        return {"ok": False, "report": None, "error": str(error), "transient": True, "hold": True}
 
     def _halt(self, reason: str):
         self.kill.engage(reason)

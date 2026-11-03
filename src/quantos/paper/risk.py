@@ -102,7 +102,7 @@ class LivePolicy(Policy):
     limit_entries = False  # live50 polls no trade prints, so a LIMIT entry could never be filled honestly
     risk_headroom = D("0.9")
     enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17",
-                                    "tsmom_4h", "turtle_55", "vol_squeeze_breakout"})
+                                    "tsmom_4h", "turtle_55", "vol_squeeze_breakout", "ml1h_pattern"})
 
     def __post_init__(self):
         super().__post_init__()
@@ -171,6 +171,9 @@ class Demo200Policy(Cap200M10Policy):
     daily_loss_ceiling = ".15"
     drawdown_ceiling = ".35"
     sentiment_gate = frozenset({"tsmom_4h", "turtle_55", "vol_squeeze_breakout"})
+    # Owner 2026-11-03: the unproven 1h ML rule stops opening trades after 5 losing closes in a row
+    # (same sizing and caps as every other rule). Delete journal key loss_streaks to resume.
+    loss_streak_pause = (("ml1h_pattern", 5),)
 
 
 def portfolio_risk_caps(policy: Policy) -> tuple[Decimal, Decimal]:

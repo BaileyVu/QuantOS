@@ -116,3 +116,75 @@ class IntervalTests(MirrorTests):
         self.assertNotIn("skipped", m.sync(e, 1_000))      # entry placed -> immediate check
         self.assertEqual(m.sync(e, 3_000)["skipped"], "INTERVAL")
         self.assertNotIn("skipped", m.sync(e, 40_000))     # 30s elapsed -> check
+
+
+class Unreachable(FakeExchange):
+    """Exchange whose reads fail with a transport error while `down` is set."""
+    down = True
+
+    def open_orders(self, symbol=None):
+        if self.down: raise ConnectionError("GET /fapi/v1/openOrders: transport failure URLError: timeout")
+        return []
+
+
+class TransientTests(MirrorTests):
+    def test_transport_blips_hold_entries_then_clear(self):
+        ex, e = Unreachable(), Engine()
+        m = self.mirror(ex)
+        for now in (1_000, 31_000):
+            result = m.check(now)
+            self.assertTrue(result["transient"])
+        self.assertFalse(m.kill.active)
+        self.assertTrue(m.hold)
+        self.assertIn(("warn", "exchange_hold"), self.alerts)
+        ex.down = False
+        self.assertTrue(m.sync(e, 60_000)["ok"])
+        self.assertFalse(m.hold)
+        self.assertFalse(e.exchange_hold)
+        self.assertIn(("recovered", "exchange_hold"), self.alerts)
+
+    def test_hold_reaches_engine_and_retries_with_backoff(self):
+        ex, e = Unreachable(), Engine()
+        m = self.mirror(ex)
+        m.sync(e, 40_000)
+        self.assertTrue(e.exchange_hold)
+        self.assertEqual(m.sync(e, 42_000)["skipped"], "INTERVAL")  # 5s backoff not yet up
+        self.assertTrue(e.exchange_hold)
+        self.assertTrue(m.sync(e, 45_500)["transient"])             # retried after 5s, not 30s
+
+    def test_sustained_transport_failure_kills(self):
+        ex = Unreachable()
+        m = self.mirror(ex)
+        for now in (0, 30_000, 60_000, 90_000):
+            m.check(now)
+        self.assertFalse(m.kill.active)                             # 4 checks but only 90s
+        m.check(120_000)
+        self.assertTrue(m.kill.active)
+        self.assertIn(("critical", "kill_switch"), self.alerts)
+
+    def test_many_fast_checks_alone_do_not_kill(self):
+        m = self.mirror(Unreachable())
+        for now in range(0, 60_000, 5_000):
+            m.check(now)
+        self.assertFalse(m.kill.active)
+
+    def test_rate_limit_and_5xx_are_transient_auth_is_not(self):
+        from quantos.live.bridge import is_transient_error
+        from quantos.live.client import RateLimited
+        self.assertTrue(is_transient_error(RateLimited(-1003, "rate limited", 429)))
+        self.assertTrue(is_transient_error(BinanceError(-1, "bad gateway", 502)))
+        self.assertTrue(is_transient_error(TimeoutError()))
+        self.assertFalse(is_transient_error(BinanceError(-2015, "Invalid API-key", 401)))
+        self.assertFalse(is_transient_error(ValueError("bad payload")))
+
+    def test_mismatch_after_blip_still_kills_on_second_check(self):
+        ex = Unreachable()
+        m = self.mirror(ex)
+        m.check(0)
+        ex.down = False
+        ex.pos["ETHUSDC"] = D("1")
+        self.assertFalse(m.check(5_000)["ok"])
+        self.assertFalse(m.hold)
+        self.assertFalse(m.kill.active)
+        m.check(35_000)
+        self.assertTrue(m.kill.active)

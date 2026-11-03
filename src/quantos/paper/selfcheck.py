@@ -30,6 +30,12 @@ def self_check(strategies, snapshots) -> dict:
             alts = [s for s in snapshots if s.quarterly_return_cutoff is not None]
             level = "ok" if alts else "critical"
             detail = f"quarterly cutoff attached to {len(alts)} symbols"
+        elif sid == "ml1h_pattern":
+            import os, time
+            path = getattr(strategy, "path", "")
+            age = time.time() - os.stat(path).st_mtime if path and os.path.exists(path) else None
+            level = "ok" if age is not None and age < 2 * 3600 else "critical"
+            detail = "signals file missing" if age is None else f"scorer signals {int(age // 60)} min old"
         elif sid in NEEDS:
             frame, need = NEEDS[sid]
             have = [len(getattr(s, frame)) for s in snapshots if s.instrument.symbol in ("BTCUSDC", "ETHUSDC")]

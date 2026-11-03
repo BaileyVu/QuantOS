@@ -119,6 +119,27 @@ class Inner:
                        features=(("catastrophe_stop_fraction", D(".25")),))
 
 
+class Ml1hPatternTests(unittest.TestCase):
+    """External 1h ML signals become MARKET signals with +-1.5 ATR target/stop; stale or other-symbol ones are ignored."""
+    def run_with(self, payload, at=None):
+        import json
+        from quantos.paper.strategies.ml1h_pattern import Ml1hPatternStrategy
+        ins = Instrument("SOLUSDC", "USDC", "TRADING", D(".01"), D(".01"), D(".01"), D(1000), D(5))
+        q = Quote("SOLUSDC", T, T, D("100.00"), D("100.03"), D(10), D(10), D("100.01"))
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "signals.json"; f.write_text(json.dumps(payload))
+            return Ml1hPatternStrategy(str(f)).evaluate(Snapshot(at or T, ins, q, (), ()))
+
+    def test_fresh_long_signal(self):
+        s = self.run_with({"bar_close_ms": T - 60_000, "signals": [{"symbol": "SOLUSDC", "side": "LONG", "atr": 2.0, "score": 0.61}]})
+        self.assertEqual((s.side, s.entry_type, s.entry_price), ("LONG", "MARKET", D("100.03")))
+        self.assertEqual((s.stop_loss, s.take_profit), (D("97.03"), D("103.03")))
+
+    def test_stale_or_other_symbol_ignored(self):
+        self.assertIsNone(self.run_with({"bar_close_ms": T - 700_000, "signals": [{"symbol": "SOLUSDC", "side": "LONG", "atr": 2.0, "score": 0.6}]}))
+        self.assertIsNone(self.run_with({"bar_close_ms": T - 60_000, "signals": [{"symbol": "ETHUSDC", "side": "LONG", "atr": 2.0, "score": 0.6}]}))
+
+
 class MappingTests(unittest.TestCase):
     def test_maps_usdt_rule_onto_usdc_quote_and_tick(self):
         ins = Instrument("SOLUSDC", "USDC", "TRADING", D(".01"), D(".01"), D(".01"), D(1000), D(5))
@@ -200,6 +221,18 @@ class Demo200Tests(unittest.TestCase):
     def test_leverage_ceiling_still_enforced(self):
         from quantos.paper.risk import Demo200Policy
         with self.assertRaises(ValueError): Demo200Policy(leverage=D("6"))
+
+
+class LossStreakPauseTests(unittest.TestCase):
+    def test_ml1h_paused_after_five_losses(self):
+        from quantos.paper.risk import Demo200Policy
+        with tempfile.TemporaryDirectory() as d:
+            j = Journal(Path(d) / "j.db", "pD", initial_balance="200"); e = PaperEngine(j, Demo200Policy())
+            with j.transaction(): j.set("loss_streaks", {"ml1h_pattern": 5})
+            s = signal(strategy_id="ml1h_pattern", strategy_version="0.1.0", entry_type="MARKET")
+            self.assertIsNone(e.propose(s, INS, quote(), T))
+            last = j.db.execute("SELECT payload FROM events WHERE kind='REJECTED_RISK' ORDER BY id DESC LIMIT 1").fetchone()[0]
+            self.assertIn("LOSS_STREAK_PAUSE", last)
 
 
 class Cap200M5Tests(unittest.TestCase):
