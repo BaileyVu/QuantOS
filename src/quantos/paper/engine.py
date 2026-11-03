@@ -197,6 +197,11 @@ class PaperEngine:
                 return None
             self.journal.db.execute("INSERT INTO signals VALUES(?,?)", (signal.signal_id, now_ms))
             self.journal.event(now_ms, "SIGNAL", asdict(signal))
+            limit = dict(getattr(self.policy, "loss_streak_pause", ())).get(signal.strategy_id)
+            if limit and self.journal.get("loss_streaks", {}).get(signal.strategy_id, 0) >= limit:
+                self.journal.event(now_ms, "REJECTED_RISK", {
+                    "signal_id": signal.signal_id, "approved": False, "reason": "LOSS_STREAK_PAUSE"})
+                return None
             cooldowns = self.journal.get("entry_cooldowns", {})
             if now_ms < cooldowns.get(f"{signal.strategy_id}:{signal.symbol}", 0):
                 self.journal.event(now_ms, "REJECTED_RISK", {
@@ -425,6 +430,11 @@ class PaperEngine:
         o["closed_ms"] = now_ms
         self.journal.event(now_ms, "CLOSED", {"id": o["id"], "reason": o["close_reason"],
                                              "price": str(price), "quantity": str(quantity), "pnl_gross": str(pnl)})
+        # Consecutive losing closes per strategy (net of this exit's fee), for policy.loss_streak_pause.
+        streaks = self.journal.get("loss_streaks", {})
+        sid = o["signal"]["strategy_id"]
+        streaks[sid] = streaks.get(sid, 0) + 1 if pnl - fee < 0 else 0
+        self.journal.set("loss_streaks", streaks)
 
     def quote(self, q: Quote, now_ms):
         if not self.journal.get("reconciled", False):

@@ -223,6 +223,18 @@ class Demo200Tests(unittest.TestCase):
         with self.assertRaises(ValueError): Demo200Policy(leverage=D("6"))
 
 
+class LossStreakPauseTests(unittest.TestCase):
+    def test_ml1h_paused_after_five_losses(self):
+        from quantos.paper.risk import Demo200Policy
+        with tempfile.TemporaryDirectory() as d:
+            j = Journal(Path(d) / "j.db", "pD", initial_balance="200"); e = PaperEngine(j, Demo200Policy())
+            with j.transaction(): j.set("loss_streaks", {"ml1h_pattern": 5})
+            s = signal(strategy_id="ml1h_pattern", strategy_version="0.1.0", entry_type="MARKET")
+            self.assertIsNone(e.propose(s, INS, quote(), T))
+            last = j.db.execute("SELECT payload FROM events WHERE kind='REJECTED_RISK' ORDER BY id DESC LIMIT 1").fetchone()[0]
+            self.assertIn("LOSS_STREAK_PAUSE", last)
+
+
 class Cap200M5Tests(unittest.TestCase):
     """Owner high-risk rule: margin = realized balance / 5; crash/dip/delist only."""
     def decide(self, cash, s=None):

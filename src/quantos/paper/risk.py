@@ -171,6 +171,9 @@ class Demo200Policy(Cap200M10Policy):
     daily_loss_ceiling = ".15"
     drawdown_ceiling = ".35"
     sentiment_gate = frozenset({"tsmom_4h", "turtle_55", "vol_squeeze_breakout"})
+    # Owner 2026-11-03: the unproven 1h ML rule stops opening trades after 5 losing closes in a row
+    # (same sizing and caps as every other rule). Delete journal key loss_streaks to resume.
+    loss_streak_pause = (("ml1h_pattern", 5),)
 
 
 def portfolio_risk_caps(policy: Policy) -> tuple[Decimal, Decimal]:
