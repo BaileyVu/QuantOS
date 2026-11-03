@@ -30,7 +30,7 @@ from .engine import PaperEngine
 from .journal import Journal
 from .market import PublicMarket, RateLimited
 from .report import atomic_json, write_reports
-from .risk import Cap200M5Policy, Cap200M10Policy, Demo200Policy, LivePolicy, LiveR5Policy, Policy, valid_quote
+from .risk import Cap200M5Policy, Cap200M10Policy, Demo200Policy, LivePolicy, LiveR5Policy, Policy, usable_quote
 from .strategies import library
 from .announcements import BinanceAnnouncements
 from .types import D, Instrument, Snapshot, dumps
@@ -67,7 +67,7 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
     """Identical state transitions for recorded input replay and natural runtime."""
     if kind == "feed":
         quotes = [v for event, v in payload if event == "quote"]
-        healthy = bool(quotes) and all(valid_quote(q, now) for q in quotes)
+        healthy = bool(quotes) and all(usable_quote(q, now) for q in quotes)
         for e in engines:
             if not healthy:
                 e.connection(False, now, "STALE_FEED_BATCH")

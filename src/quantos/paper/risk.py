@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from math import ceil, floor, lcm
 
-from .types import D, Instrument, Quote, Signal, floor_step
+from .types import BOOK_MAX_AGE_MS, D, Instrument, Quote, Signal, floor_step
 from .strategies.manifest import manifest_for
 
 
@@ -221,13 +221,20 @@ def quantity_step(instrument: Instrument) -> Decimal:
     return D(lcm(int(instrument.step * scale), int(instrument.market_step * scale))) / scale
 
 
-def valid_quote(q: Quote, now_ms: int) -> bool:
+def usable_quote(q: Quote, now_ms: int) -> bool:
+    """Fit for feed health, marking and managing open positions. A quiet thin book is still the real
+    top of book, so its age only has the outer bound; holding AAVE failed ~1 in 8 batches at 5s (11-03)."""
     values = (q.bid, q.ask, q.bid_qty, q.ask_qty, q.mark)
     return (all(x.is_finite() and x > 0 for x in values)
-            and q.bid <= q.ask and 0 <= now_ms - q.time_ms <= 5000
+            and q.bid <= q.ask and 0 <= now_ms - q.time_ms <= BOOK_MAX_AGE_MS
             and 0 <= now_ms - q.received_ms <= 5000
             and 0 <= now_ms - (q.mark_time_ms or q.time_ms) <= 5000
             and abs(q.mark / ((q.bid + q.ask) / 2) - 1) <= D(".02"))
+
+
+def valid_quote(q: Quote, now_ms: int) -> bool:
+    """Fit for new exposure (approvals and fills): usable, and the book itself moved within 5s."""
+    return usable_quote(q, now_ms) and now_ms - q.time_ms <= 5000
 
 
 def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
