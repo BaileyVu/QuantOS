@@ -1,7 +1,8 @@
 """Local live dashboard: `python -m quantos.paper.webdash --run NAME=STATE ... [--sentibot APP_DIR] [--port 8787]`.
 
 Serves http://127.0.0.1:PORT/ and /api/state (localhost only). Reads each run's status.json, heartbeat, alerts and its journal
-(SQLite read-only) plus sentibot's latest perp line. No network calls and no writes.
+(SQLite read-only) plus sentibot's latest perp line. No writes. Network only for the cached proxies: /api/news,
+/api/klines (Binance, 15 s) and /api/fng (alternative.me, 10 min).
 """
 from __future__ import annotations
 
@@ -9,9 +10,13 @@ import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import re
 import sqlite3
 import subprocess
+import threading
 import time
+from urllib.parse import parse_qs, urlparse
+from urllib.request import Request, urlopen
 
 DECISIONS = ("SIGNAL", "APPROVED", "REJECTED_RISK", "FILLED", "PARTIAL", "CLOSED", "CANCELED",
              "SENTIMENT_SHADOW", "KILL_SWITCH", "LOSS_BREAKER", "EXCHANGE_RECONCILE_FAILED")
@@ -203,6 +208,69 @@ def snapshot(runs, sentibot) -> dict:
             "sentibot": bots}
 
 
+def strategy_view(runs) -> dict:
+    """/api/strategies: per run, fills enriched with symbol/strategy and per-strategy fill count, realised PnL, fees."""
+    out = {}
+    for name, state, *p in runs:
+        profile = p[0] if p else "pL"
+        db_path = state / f"journal_{profile}.db"
+        if not db_path.exists():
+            continue
+        db = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
+        try:
+            orders = {}
+            for (payload,) in db.execute("SELECT payload FROM orders"):
+                o = json.loads(payload); sig = o.get("signal") or {}
+                orders[o["id"]] = {"symbol": sig.get("symbol"), "strategy": sig.get("strategy_id"), "side": sig.get("side")}
+            per, fills = {}, []
+            for t, k, oid, q, pr, f, pn in db.execute(
+                    "SELECT time_ms,kind,order_id,quantity,price,fee,pnl FROM fills ORDER BY time_ms DESC"):
+                o = orders.get(oid, {}); sid = o.get("strategy") or "?"
+                agg = per.setdefault(sid, {"fills": 0, "entries": 0, "pnl": 0.0, "fees": 0.0})
+                agg["fills"] += 1; agg["entries"] += k == "ENTRY"
+                agg["pnl"] += float(pn or 0); agg["fees"] += float(f or 0)
+                fills.append({"time_ms": t, "kind": k, "order_id": oid, "quantity": q, "price": pr, "fee": f, "pnl": pn, **o})
+            out[name] = {"profile": profile, "strategies": per, "fills": fills[:50]}
+        finally:
+            db.close()
+    return out
+
+
+_CACHE, _LOCK = {}, threading.Lock()
+
+
+def _cached_get(url: str, ttl: float):
+    """GET url as JSON, cached for ttl seconds; serves the stale copy if a refresh fails."""
+    with _LOCK:
+        hit = _CACHE.get(url)
+    if hit and time.time() - hit[0] < ttl:
+        return hit[1]
+    try:
+        with urlopen(Request(url, headers={"User-Agent": "quantos-webdash"}), timeout=6) as r:
+            data = json.loads(r.read())
+    except (OSError, ValueError):
+        if hit:
+            return hit[1]
+        raise
+    with _LOCK:
+        _CACHE[url] = (time.time(), data)
+    return data
+
+
+def klines(query: str):
+    q = parse_qs(query)
+    symbol = (q.get("symbol") or ["BTCUSDC"])[0].upper()
+    interval = (q.get("interval") or ["15m"])[0]
+    limit = min(max(int((q.get("limit") or ["96"])[0]), 1), 500)
+    if not re.fullmatch(r"[A-Z0-9]{2,20}", symbol) or interval not in ("1m", "5m", "15m", "1h", "4h", "1d"):
+        raise ValueError("bad symbol or interval")
+    return _cached_get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}", 15)
+
+
+def fng():
+    return _cached_get("https://api.alternative.me/fng/?limit=8", 600)
+
+
 PAGE = (Path(__file__).with_name("webdash.html"))
 
 
@@ -214,6 +282,14 @@ def serve(runs, sentibot, port=8787):
             elif self.path.startswith("/api/news"):
                 from .news import news
                 body, kind = json.dumps(news(), default=str).encode(), "application/json"
+            elif self.path.startswith(("/api/klines", "/api/fng", "/api/strategies")):
+                route = urlparse(self.path)
+                try:
+                    data = (klines(route.query) if route.path == "/api/klines" else fng() if route.path == "/api/fng"
+                            else strategy_view(runs))
+                except (OSError, ValueError) as e:
+                    self.send_error(502 if isinstance(e, OSError) else 400, str(e)); return
+                body, kind = json.dumps(data, default=str).encode(), "application/json"
             elif self.path in ("/", "/index.html"):
                 body, kind = PAGE.read_bytes(), "text/html; charset=utf-8"
             else:
