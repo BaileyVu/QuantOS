@@ -18,6 +18,9 @@ def dumps(value: object) -> str:
                       else asdict(x), sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
+# bookTicker time only moves when the top of book changes, so a quiet thin USDC book can be valid this old.
+BOOK_MAX_AGE_MS = 60000
+
 @dataclass(frozen=True)
 class Instrument:
     symbol: str

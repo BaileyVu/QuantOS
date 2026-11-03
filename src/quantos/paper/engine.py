@@ -6,7 +6,7 @@ import json
 from decimal import InvalidOperation
 
 from .journal import Journal
-from .risk import portfolio_risk_caps, Account, Policy, evaluate, valid_quote, quantity_step
+from .risk import portfolio_risk_caps, Account, Policy, evaluate, usable_quote, valid_quote, quantity_step
 from .types import D, Funding, Instrument, Quote, Signal, Trade, floor_step
 from .strategies.manifest import manifest_for
 
@@ -15,7 +15,7 @@ TERMINAL = {"CLOSED", "CANCELED", "EXPIRED", "REJECTED"}
 
 def record_path(o, q: Quote, limit=480):
     """Keep a 1-minute mark-price OHLC path while a position is open, for offline exit (TP/SL) studies."""
-    minute, price = q.time_ms // 60000, str(q.mark)
+    minute, price = q.received_ms // 60000, str(q.mark)
     path = o.setdefault("path", [])
     if path and path[-1][0] == minute:
         bar = path[-1]
@@ -440,7 +440,7 @@ class PaperEngine:
     def quote(self, q: Quote, now_ms):
         if not self.journal.get("reconciled", False):
             return
-        if not valid_quote(q, now_ms):
+        if not usable_quote(q, now_ms):
             self.connection(False, now_ms, "INVALID_DATA")
             return
         previous = self.quotes.get(q.symbol)
@@ -459,7 +459,7 @@ class PaperEngine:
                     record_path(o, q)
                 if now_ms >= s["expires_ms"] and D(o["remaining"]) > 0:
                     self._cancel(o, now_ms, "ENTRY_TTL")
-                if o["state"] == "CLOSING" and q.time_ms >= o["exit_after_ms"]:
+                if o["state"] == "CLOSING" and q.received_ms >= o["exit_after_ms"]:  # a quiet book is current as of receipt
                     self._exit(o, q, now_ms)
                 elif D(o["filled"]) > 0 and o["state"] != "CLOSING":
                     long = s["side"] == "LONG"
@@ -470,7 +470,8 @@ class PaperEngine:
                     if stop or target or now_ms >= o["first_fill_ms"] + s["maximum_hold_seconds"] * 1000:
                         self._closing(o, now_ms, "SL" if stop else "TP" if target else "TIME_EXIT")
                 elif (self.entry_allowed() and o["state"] not in TERMINAL and D(o["remaining"]) > 0
-                      and s["entry_type"] in {"MARKET", "STOP"} and q.time_ms >= o["eligible_ms"]):
+                      and s["entry_type"] in {"MARKET", "STOP"} and q.time_ms >= o["eligible_ms"]
+                      and valid_quote(q, now_ms)):
                     long = s["side"] == "LONG"
                     if s["entry_type"] == "STOP" and o["trigger_ms"] is None:
                         if (q.ask >= D(s["entry_price"]) if long else q.bid <= D(s["entry_price"])):

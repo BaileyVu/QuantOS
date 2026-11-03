@@ -11,10 +11,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request
 
-from .types import Candle, D, Funding, Instrument, Quote, Trade
+from .types import BOOK_MAX_AGE_MS, Candle, D, Funding, Instrument, Quote, Trade
 
 BASE = "https://fapi.binance.com"
-BOOK_MAX_AGE_MS = 60000
 ENDPOINTS = {
     "/fapi/v1/exchangeInfo", "/fapi/v1/time", "/fapi/v1/klines",
     "/fapi/v1/ticker/24hr",
