@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+import http.client
 import json
 import time
 from typing import Callable
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.parse import urlencode, urlsplit
+from urllib.request import Request
 
 from .types import Candle, D, Funding, Instrument, Quote, Trade
 
@@ -51,19 +52,59 @@ def _int(value, name: str) -> int:
     return out
 
 
+class KeepAliveTransport:
+    """One reused HTTPS connection per market client (each worker thread builds its own client).
+
+    A fresh TCP+TLS handshake on every 2s poll occasionally stalled ~2s on a retransmit, pushing
+    batches past the feed timeout (11-03). A dropped keep-alive is retried once on a new socket;
+    any other failure surfaces as URLError so PublicMarket's retry/backoff still applies.
+    """
+    def __init__(self, connection_factory: Callable | None = None):
+        self._factory = connection_factory or (lambda host, timeout: http.client.HTTPSConnection(host, timeout=timeout))
+        self._conn, self._host = None, None
+
+    def close(self):
+        if self._conn is not None:
+            self._conn.close()
+        self._conn = None
+
+    def __call__(self, request, timeout):
+        url = urlsplit(request.full_url)
+        if url.scheme != "https":
+            raise URLError("https only")
+        if self._host != url.netloc:
+            self.close()
+        path = url.path + ("?" + url.query if url.query else "")
+        headers = dict(request.header_items())
+        for attempt in range(2):
+            reused = self._conn is not None
+            if not reused:
+                self._conn, self._host = self._factory(url.netloc, timeout), url.netloc
+            try:
+                self._conn.timeout = timeout
+                if self._conn.sock is not None: self._conn.sock.settimeout(timeout)
+                self._conn.request(request.get_method(), path, headers=headers)
+                response = self._conn.getresponse()
+                body = response.read()
+                if response.will_close: self.close()
+                return response.status, body, response.headers
+            except TimeoutError:
+                self.close()
+                raise
+            except (http.client.HTTPException, OSError) as error:
+                self.close()
+                if not (reused and attempt == 0):
+                    raise URLError(error) from None
+
+
 class PublicMarket:
     """Public endpoints only. `transport` receives a fixed-host Request and timeout."""
     def __init__(self, *, transport: Callable | None = None,
                  clock_ms: Callable[[], int] | None = None,
                  sleep: Callable[[float], None] = time.sleep):
-        self._transport = transport or self._urlopen
+        self._transport = transport or KeepAliveTransport()
         self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
         self._sleep = sleep
-
-    @staticmethod
-    def _urlopen(request, timeout):
-        with urlopen(request, timeout=timeout) as response:
-            return response.status, response.read(), response.headers
 
     def _get(self, path: str, params: dict | None = None):
         if path not in ENDPOINTS:
