@@ -74,6 +74,29 @@ class KeepAliveTests(unittest.TestCase):
         t(self.req(), 5); t(self.req(), 5)
         self.assertEqual(len(self.made), 2)
 
+    def test_each_thread_gets_its_own_connection(self):
+        # The scanner maps candle loads over a 4-thread pool with one shared client (11-03 segfault).
+        import threading
+        lock, made = threading.Lock(), []
+
+        def factory(host, timeout):
+            conn = FakeConnection([FakeResponse() for _ in range(5)])
+            with lock: made.append(conn)
+            return conn
+
+        t = KeepAliveTransport(factory)
+        start = threading.Barrier(4)
+
+        def worker():
+            start.wait()
+            for _ in range(5): t(self.req(), 5)
+
+        threads = [threading.Thread(target=worker) for _ in range(4)]
+        for th in threads: th.start()
+        for th in threads: th.join()
+        self.assertEqual(len(made), 4)
+        self.assertTrue(all(len(c.requests) == 5 for c in made))
+
     def test_https_only(self):
         with self.assertRaises(URLError):
             KeepAliveTransport(self.factory)(Request("http://fapi.binance.com/x"), 5)
