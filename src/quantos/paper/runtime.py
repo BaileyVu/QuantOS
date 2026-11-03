@@ -30,10 +30,15 @@ from .engine import PaperEngine
 from .journal import Journal
 from .market import PublicMarket, RateLimited
 from .report import atomic_json, write_reports
-from .risk import Cap200M10Policy, LivePolicy, LiveR5Policy, Policy, valid_quote
+from .risk import Cap200M5Policy, Cap200M10Policy, Demo200Policy, LivePolicy, LiveR5Policy, Policy, valid_quote
 from .strategies import library
 from .announcements import BinanceAnnouncements
 from .types import D, Instrument, Snapshot, dumps
+
+
+# Profile the demo mirror follows (one per account). pD = combined $200 demo run (owner 2026-11-02).
+DEMO_PROFILE = os.environ.get("QUANTOS_DEMO_PROFILE", "pL")
+if DEMO_PROFILE not in ("pL", "pD"): raise ValueError("QUANTOS_DEMO_PROFILE must be pL or pD")
 
 
 def milliseconds():
@@ -113,9 +118,16 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
                 snapshot = lookup[proposal.symbol]
                 q = max((snapshot.quote, e.quotes.get(proposal.symbol, snapshot.quote)), key=lambda q:q.time_ms)
                 if sentiment is not None:
-                    # Shadow only: recorded, never consulted by risk or execution.
+                    # Shadow for most profiles; a profile's sentiment_gate lists rules a WOULD_BLOCK verdict blocks
+                    # (event rules stay exempt: crashes with bad news did not do worse, edge_vault/crash_cause_v1).
+                    verdict = sentiment.judge(proposal, now)
                     with e.journal.transaction():
-                        e.journal.event(now, "SENTIMENT_SHADOW", sentiment.judge(proposal, now))
+                        e.journal.event(now, "SENTIMENT_SHADOW", verdict)
+                        if (verdict.get("verdict") == "WOULD_BLOCK"
+                                and proposal.strategy_id in getattr(e.policy, "sentiment_gate", ())):
+                            e.journal.event(now, "REJECTED_RISK", {"signal_id": proposal.signal_id, "approved": False,
+                                                                   "reason": "SENTIMENT_BLOCK"})
+                            continue
                 e.propose(proposal, snapshot.instrument, q, now)
     elif kind == "restart":
         for e in engines:
@@ -328,8 +340,9 @@ class Runtime:
                         records.insert(0, ("quote", market.quote(symbol)))
                 if self.portfolio == "live50":
                     batch = market.quotes(symbols, skip_invalid=True)
-                    if len(batch) != len(symbols): raise ValueError("invalid or stale quote")
-                    records[0:0] = [("quote", batch[s]) for s in symbols]
+                    # One quiet thin book must not blank the whole batch (11-02 run: ~4.2k feed errors).
+                    if not batch: raise ValueError("invalid or stale quote")
+                    records[0:0] = [("quote", batch[s]) for s in symbols if s in batch]
                 if now >= next_funding: next_funding = now + 60000
                 self.emit("feed", records)
                 backoff = 2
@@ -364,7 +377,7 @@ class Runtime:
             if run.get("portfolio", "legacy") != self.portfolio:
                 raise ValueError("existing run has a different portfolio")
             if self.portfolio == "live50":
-                run["profiles"] = ["pL", "pL5", "pM10"] if self.execution == "paper" else ["pL"]
+                run["profiles"] = ["pL", "pL5", "pM10", "pM5"] if self.execution == "paper" else [DEMO_PROFILE]
             run["min_quote_volume"] = str(self.min_quote_volume)
             if (self.state / "stop.request").exists():
                 (self.state / "stop.request").unlink()
@@ -377,15 +390,17 @@ class Runtime:
                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             engines = []
             # The demo mirror can only follow one profile (positions would net on one account).
-            profiles = ((("pL", None),) + ((("pL5", None), ("pM10", None)) if self.execution == "paper" else ())
+            profiles = (((("pL", None), ("pL5", None), ("pM10", None), ("pM5", None)) if self.execution == "paper"
+                         else ((DEMO_PROFILE, None),))
                         if self.portfolio == "live50"
                         else (("p1", ".01"), ("p5", ".05"), ("pA", ".05")))
             for profile, fraction in profiles:
-                if profile in ("pL", "pL5", "pM10"):
+                if profile in ("pL", "pL5", "pM10", "pM5", "pD"):
                     j = Journal(self.state / f"journal_{profile}.db", profile,
-                                initial_balance="200" if profile == "pM10" else "50")
+                                initial_balance="200" if profile in ("pM10", "pM5", "pD") else "50")
                     journals.append(j)
-                    e = PaperEngine(j, {"pL": LivePolicy, "pL5": LiveR5Policy, "pM10": Cap200M10Policy}[profile]())
+                    e = PaperEngine(j, {"pL": LivePolicy, "pL5": LiveR5Policy, "pM10": Cap200M10Policy,
+                                         "pM5": Cap200M5Policy, "pD": Demo200Policy}[profile]())
                     e.recover(now); engines.append(e)
                     with j.transaction(): j.event(now, "START" if run["restarts"] == 0 else "RESTART", {"pid": os.getpid()})
                     continue

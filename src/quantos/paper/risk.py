@@ -28,13 +28,14 @@ class Policy:
                 raise ValueError(f"invalid policy {name}")
         for name, ceiling in (("risk_fraction", self.risk_ceiling), ("daily_loss", self.daily_loss_ceiling),
                               ("drawdown", self.drawdown_ceiling), ("gross_fraction", "3"),
-                              ("leverage", "3"), ("margin_fraction", "1")):
+                              ("leverage", self.leverage_ceiling), ("margin_fraction", "1")):
             if not 0 < getattr(self, name) <= D(ceiling):
                 raise ValueError(f"hard ceiling: {name}")
         if self.leverage < 1 or self.slippage < D(".0015"):
             raise ValueError("invalid leverage or execution cost allowance")
 
     risk_ceiling = ".05"
+    leverage_ceiling = "3"
     daily_loss_ceiling = ".10"
     drawdown_ceiling = ".25"
     max_positions = 1
@@ -138,6 +139,38 @@ class LiveR5Policy(LivePolicy):
     # delist; trend rules failed their held-out test (edge_vault/tsmom_4h_v2). Exits of any open trend
     # position are unaffected; only new entries are blocked.
     enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17"})
+
+
+@dataclass(frozen=True)
+class Cap200M5Policy(Cap200M10Policy):
+    """Owner's high-risk rule (2026-11-02): MARGIN = realized balance / 5, compounding, leverage <= 3x.
+    Only rules with held-out support (crash/dip) plus delist, like the 5% profile. A 25%-stop dip trade
+    at 1x then loses ~5% of balance at the stop. Breakers as the 5% profile: 15% daily, 35% drawdown."""
+    margin_per_trade: Decimal = D(".20")
+    portfolio_risk_fraction: Decimal = D(".05")
+    daily_loss: Decimal = D(".15")
+    drawdown: Decimal = D(".35")
+
+    daily_loss_ceiling = ".15"
+    drawdown_ceiling = ".35"
+    enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17"})
+
+
+@dataclass(frozen=True)
+class Demo200Policy(Cap200M10Policy):
+    """Owner's combined demo run (2026-11-02): $200, margin = realized balance / 10 (~$20, so 3 trades <= ~$60),
+    leverage <= 5x, at most 3 positions shared with the external alt-ML executor (it reads status.json),
+    all rules enabled, looser breakers, full top-of-book depth, and the sentiment gate on trend rules."""
+    leverage: Decimal = D("5")
+    daily_loss: Decimal = D(".15")
+    drawdown: Decimal = D(".35")
+    portfolio_risk_fraction: Decimal = D(".05")
+    depth_fraction: Decimal = D("5")  # 11-03: $100 5x entries kept cancelling on 1x top-of-book; a market order walks the book
+
+    leverage_ceiling = "5"
+    daily_loss_ceiling = ".15"
+    drawdown_ceiling = ".35"
+    sentiment_gate = frozenset({"tsmom_4h", "turtle_55", "vol_squeeze_breakout"})
 
 
 def portfolio_risk_caps(policy: Policy) -> tuple[Decimal, Decimal]:
