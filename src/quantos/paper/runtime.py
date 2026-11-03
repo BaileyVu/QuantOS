@@ -38,6 +38,9 @@ from .types import D, Instrument, Snapshot, dumps
 
 # Profile the demo mirror follows (one per account). pD = combined $200 demo run (owner 2026-11-02).
 DEMO_PROFILE = os.environ.get("QUANTOS_DEMO_PROFILE", "pL")
+# Gap between healthy batches before the feed counts as down. Polls run every 2s and each batch is
+# validated on its own; at 5s, ordinary slow polls (p99 ~7s) marked it down ~55 times/hour (11-03).
+FEED_TIMEOUT_MS = 10_000
 if DEMO_PROFILE not in ("pL", "pD"): raise ValueError("QUANTOS_DEMO_PROFILE must be pL or pD")
 
 
@@ -498,7 +501,7 @@ class Runtime:
                 elif kind in {"error", "disconnected"}:
                     self.record("disconnected", payload, now)
                     dispatch(engines, "disconnected", payload, now)
-                if last_feed and now-last_feed > 5000:
+                if last_feed and now-last_feed > FEED_TIMEOUT_MS:
                     if any(e.connected for e in engines):
                         detail = {"worker": "supervisor", "error": "FEED_TIMEOUT"}
                         self.record("disconnected", detail, now)
