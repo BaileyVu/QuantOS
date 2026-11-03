@@ -92,6 +92,7 @@ tbody tr:hover td{background:rgba(255,255,255,.025)}
 </section>
 <aside style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
 <section class="g" id="mlPanel" style="padding: 14px 18px;"></section>
+<section class="g" id="ml1hPanel" style="padding: 14px 18px;"></section>
 <section class="g" id="funnel" style="padding: 14px 18px;"></section>
 </aside>
 </div>
@@ -168,7 +169,7 @@ const UP = '#3DD68C', DN = '#F2637E', DIM = 'rgba(255,255,255,0.55)', AMB = '#F5
 const TABS = ['Overview', 'Strategies', 'Trades', 'Sentiment', 'Logs'];
 const SITE = { 'CoinDesk': ['https://www.coindesk.com/', 'CD', 'rgba(255,214,102,0.12)', '#FFD666'], 'Cointelegraph': ['https://cointelegraph.com/', 'CT', 'rgba(255,255,255,0.08)', '#E8E8E8'], 'Watcher Guru': ['https://t.me/s/WatcherGuru', 'WG', 'rgba(156,203,255,0.12)', '#9CCBFF'] };
 // Backtest edge per strategy (research notes, not live data).
-const EDGE = { alt_dip_reversal: '+2.5% / trade', crash_flush_e2: '+2.9% / trade', tsmom_4h: 'near miss', 'alt-ML 5m': '~+20bp / trade' };
+const EDGE = { alt_dip_reversal: '+2.5% / trade', crash_flush_e2: '+2.9% / trade', tsmom_4h: 'near miss', 'alt-ML 5m': '~+20bp / trade', ml1h_pattern: '1h LightGBM' };
 const SLOT = { crash_flush_e2: 'crash', alt_dip_reversal: 'event', delist_short_e17: 'event', tsmom_4h: 'trend', turtle_55: 'trend', vol_squeeze_breakout: 'trend' };
 const STOP_CMD = 'cd ~/Desktop/PythonProject/QuantOS-mainnet-ready && ../QuantOS/.venv/bin/python scripts/deploy_three.py uninstall';
 
@@ -269,7 +270,14 @@ function model() {
     const mlUp = positions.filter(p => p.book === 'alt-ML').reduce((s, p) => s + (p.up || 0), 0);
     strats.push({ n: 'alt-ML 5m', b: 'executor', slot: 'shared', st: stt, stc: open ? BLU : stt === 'Signal' ? UP : DIM, t: (ml.closed || 0) + open, p: (ml.realized_usd || 0) + mlUp, d: best ? `Top ${short(best[0])} ${best[1].toFixed(2)} vs ${thr != null ? thr.toFixed(3) : '?'} needed` : 'no scores yet', edge: EDGE['alt-ML 5m'] });
   }
-  return { run, st, eng, now, positions, unreal, hist, equity, start, strats, ml, mlTop };
+  let h1 = null;
+  if (S.ml1h) {
+    const o = S.ml1h, thr = o.thr || {}, sigs = (o.signals || []).slice().sort((a, b) => (b.generated_ms || 0) - (a.generated_ms || 0)).slice(0, 10);
+    const top = Object.entries(o.scores || {}).map(([k, v]) => { const [sym, side] = k.split(':'); return { sym, side: side || 'long', v: +v }; }).filter(x => isFinite(x.v)).sort((a, b) => b.v - a.v);
+    const age = o.ts_ms ? (now - o.ts_ms) / 60000 : null;
+    h1 = { ts: o.ts_ms, thr, top, sigs, stale: age == null || age > 75, fresh: sigs.filter(x => x.generated_ms && now - x.generated_ms < 3600000) };
+  }
+  return { run, st, eng, now, positions, unreal, hist, equity, start, strats, ml, mlTop, h1 };
 }
 
 // ---------- header ----------
@@ -364,6 +372,8 @@ function renderAlerts(M) {
   const rr = Object.entries(M.run.reject_reasons || {});
   if (rr.length) info(`${rr[0][1]} signals rejected as ${rr[0][0].toLowerCase().replace(/_/g, ' ')}`, rr.slice(1).map(([k, v]) => `${v} ${k.toLowerCase().replace(/_/g, ' ')}`).join(' · ') || 'only reason so far');
   if (M.ml && !(M.ml.closed || (M.ml.open || []).length) && M.mlTop && M.mlTop.top.length) info('alt-ML has not traded yet', `best score ${M.mlTop.top[0][1].toFixed(2)}, threshold ${M.mlTop.thr != null ? M.mlTop.thr.toFixed(3) : '?'}`);
+  if (M.h1 && M.h1.stale) warn('1h-ML scores stale', M.h1.ts ? 'last scored ' + md(M.h1.ts) + ' ' + hm(M.h1.ts) + 'Z' : 'no scores yet');
+  if (M.h1 && M.h1.fresh.length) info(`1h-ML: ${M.h1.fresh.length} signal${M.h1.fresh.length > 1 ? 's' : ''} in the last hour`, M.h1.fresh.slice(0, 4).map(x => `${short(x.symbol)} ${String(x.side || '').toLowerCase()} ${(+x.score).toFixed(3)}`).join(' · '));
   const sb = S.sentibot && S.sentibot.perp;
   if (sb && sb.sources) Object.entries(sb.sources).filter(([, v]) => !/^ok/.test(String(v))).forEach(([k, v]) => info(`${k === 'x' ? 'X' : k} sentiment source off`, String(v)));
   const nw = A.filter(a => a.w).length, ni = A.length - nw, stale = Object.keys((M.st.feed_health && M.st.feed_health.stale) || {}).length;
@@ -384,6 +394,22 @@ function renderMl(M) {
 ${M.mlTop.top.slice(0, 8).map(([s, v]) => `<div style="display: grid; grid-template-columns: 74px 1fr 44px; align-items: center; gap: 10px; font-size: 12px;"><span class="m">${esc(short(s))}</span><span style="position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.07);"><span style="position: absolute; left: 0; top: 0; height: 6px; border-radius: 3px; width: ${Math.min(100, v / scale * 100).toFixed(1)}%; background: ${v >= thr ? UP : ACC}; opacity: 0.7;"></span><span style="position: absolute; left: 99%; top: -3px; width: 1px; height: 12px; background: #F5B562;"></span></span><span class="m" style="text-align: right;">${v.toFixed(3)}</span></div>`).join('')}
 </div>
 <div class="m mut" style="font-size: 11px; margin-top: 10px;">amber tick = entry threshold ${thr.toFixed(3)}</div>`;
+}
+
+function renderMl1h(M) {
+  const h = M.h1;
+  if (!h) { $('ml1hPanel').innerHTML = '<h2 class="h">1h-ML pattern</h2><div class="mut" style="margin-top: 12px;">1h-ML scorer not found</div>'; return; }
+  const dc = h.stale ? AMB : UP, tl = +h.thr.long || 0.6, ts = +h.thr.short || 0.6;
+  const bar = x => { const t = x.side === 'short' ? ts : tl, scale = t / 0.99; return `<div style="display: grid; grid-template-columns: 74px 1fr 44px; align-items: center; gap: 10px; font-size: 12px;"><span class="m">${esc(short(x.sym))} <span style="color: ${x.side === 'short' ? DN : UP}; font-size: 10px;">${x.side === 'short' ? 'S' : 'L'}</span></span><span style="position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.07);"><span style="position: absolute; left: 0; top: 0; height: 6px; border-radius: 3px; width: ${Math.min(100, x.v / scale * 100).toFixed(1)}%; background: ${x.side === 'short' ? DN : x.v >= t ? UP : ACC}; opacity: ${x.v >= t ? 0.9 : 0.6};"></span><span style="position: absolute; left: 99%; top: -3px; width: 1px; height: 12px; background: #F5B562;"></span></span><span class="m" style="text-align: right;">${x.v.toFixed(3)}</span></div>`; };
+  const th = 'style="text-align: left; font-weight: 500; padding: 4px 6px; color: rgba(255,255,255,0.45);"', td = 'style="padding: 4px 6px; border-top: 1px solid rgba(255,255,255,0.055);"';
+  const rows = h.sigs.map(x => { const sd = String(x.side || '').toLowerCase(), t = sd === 'short' ? ts : tl, ok = +x.score >= t; return `<tr><td ${td}>${x.generated_ms ? md(x.generated_ms) + ' ' + hm(x.generated_ms) : '–'}</td><td ${td}>${esc(short(x.symbol))}</td><td ${td}><span style="color: ${sd === 'short' ? DN : UP};">${esc(sd.toUpperCase())}</span></td><td style="padding: 4px 6px; border-top: 1px solid rgba(255,255,255,0.055); text-align: right;">${x.score != null ? (+x.score).toFixed(3) : '–'}</td><td ${td}><span style="color: ${ok ? UP : DIM};">${ok ? 'yes' : 'no'}</span></td></tr>`; }).join('');
+  $('ml1hPanel').innerHTML = `<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;"><h2 class="h">1h-ML pattern</h2><span class="m" style="display: flex; align-items: center; gap: 6px; font-size: 11px;"><span class="live" style="width: 6px; height: 6px; border-radius: 50%; background: ${dc};"></span><span style="color: ${dc};">${h.stale ? 'STALE' : 'LIVE'}</span><span class="mut">${h.ts ? 'scored ' + hm(h.ts) + 'Z' : 'no scores'}</span></span></div>
+<div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+${h.top.slice(0, 8).map(bar).join('') || '<div class="mut">no scores yet</div>'}
+</div>
+<div class="m mut" style="font-size: 11px; margin-top: 10px;">amber tick = threshold · long ${tl.toFixed(3)} · short ${ts.toFixed(3)}</div>
+<div class="m mut" style="font-size: 11px; margin: 14px 0 4px;">Last signals</div>
+${rows ? `<div style="overflow-x: auto;"><table class="m" style="width: 100%; border-collapse: collapse; font-size: 11.5px;"><thead><tr><th ${th}>Time UTC</th><th ${th}>Symbol</th><th ${th}>Side</th><th style="text-align: right; font-weight: 500; padding: 4px 6px; color: rgba(255,255,255,0.45);">Score</th><th ${th}>Crossed</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="mut" style="font-size: 12px;">No signals yet</div>'}`;
 }
 
 function renderFunnel(M) {
@@ -563,7 +589,7 @@ $('srcs').addEventListener('click', e => { const b = e.target.closest('[data-s]'
 function render() {
   if (!S) return;
   let M; try { M = model(); } catch (e) { console.error(e); return; }
-  const parts = [renderHeader, renderEquity, renderAcct, renderStrats, renderAlerts, renderMl, renderFunnel, renderTrades, renderCharts, renderSenti, renderLogs];
+  const parts = [renderHeader, renderEquity, renderAcct, renderStrats, renderAlerts, renderMl, renderMl1h, renderFunnel, renderTrades, renderCharts, renderSenti, renderLogs];
   for (const f of parts) { try { f(M); } catch (e) { console.error(f.name, e); } }
 }
 async function getJSON(u) { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }
