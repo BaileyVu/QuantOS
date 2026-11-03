@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>QuantOS dashboard</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000}
+a{color:#9CCBFF}a:hover{color:#CFE5FF}
+.g{position:relative;border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.025) 100%);-webkit-backdrop-filter:blur(22px) saturate(150%);backdrop-filter:blur(22px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.13),inset 0 -1px 0 rgba(0,0,0,.4),0 18px 40px -18px rgba(0,0,0,.9)}
+.g::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;background:linear-gradient(150deg,rgba(255,255,255,.24),rgba(255,255,255,.05) 35%,rgba(255,255,255,.015) 65%,rgba(255,255,255,.09));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.g{background:rgba(14,15,18,.96)}}
+.m{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.k{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.h{margin:0;font-size:13px;font-weight:600;letter-spacing:.01em;color:rgba(255,255,255,.92)}
+.mut{color:rgba(255,255,255,.5)}
+.btn{min-height:32px;padding:0 12px;border-radius:8px;border:0;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.09),inset 0 1px 0 rgba(255,255,255,.08);color:rgba(255,255,255,.82);font:500 12px 'Inter Tight',sans-serif;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+.btn:hover{background:rgba(255,255,255,.1);color:#fff}
+.tab{min-height:32px;padding:0 12px;border-radius:8px;border:0;background:transparent;color:rgba(255,255,255,.6);font:400 13px 'Inter Tight',sans-serif;cursor:pointer}
+.tab:hover{color:#fff}
+.chip{min-height:30px;padding:0 10px;border-radius:999px;border:0;font:500 12px 'Inter Tight',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+th{font-weight:500;color:rgba(255,255,255,.5);text-align:left;padding:8px 10px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+td{padding:9px 10px;border-top:1px solid rgba(255,255,255,.055);white-space:nowrap}
+tbody tr:hover td{background:rgba(255,255,255,.025)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:2px 8px;border-radius:6px}
+.scroll{overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+.nl{color:rgba(255,255,255,.88);text-decoration:none;line-height:1.4;display:block}
+.nl:hover{color:#fff;text-decoration:underline;text-decoration-color:rgba(255,255,255,.3)}
+@media (prefers-reduced-motion:no-preference){.live{animation:lv 2s ease-in-out infinite}@keyframes lv{50%{opacity:.35}}}
+</style>
+</helmet>
+<div style="min-height: 100vh; position: relative; overflow: hidden; background: #000; color: rgba(255,255,255,0.92); font-family: 'Inter Tight', system-ui, sans-serif; font-size: 13px;">
+
+<div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none;">
+<div style="position: absolute; left: -10%; top: -200px; width: 700px; height: 480px; border-radius: 50%; background: #16365F; filter: blur(130px); opacity: 0.32;"></div>
+<div style="position: absolute; right: -8%; top: 300px; width: 600px; height: 480px; border-radius: 50%; background: #0C4A3D; filter: blur(140px); opacity: 0.25;"></div>
+<div style="position: absolute; left: 30%; top: 1050px; width: 640px; height: 400px; border-radius: 50%; background: #33205A; filter: blur(150px); opacity: 0.2;"></div>
+<svg viewBox="0 0 1440 640" preserveAspectRatio="none" style="position: absolute; left: 0; top: 70px; width: 100%; height: 640px; opacity: 0.3;">
+<sc-for list="{{bg}}" as="c" hint-placeholder-count="0">
+<line x1="{{c.x}}" x2="{{c.x}}" y1="{{c.hi}}" y2="{{c.lo}}" stroke="{{c.col}}" stroke-width="1"></line>
+<rect x="{{c.bx}}" y="{{c.top}}" width="9" height="{{c.bh}}" fill="{{c.col}}"></rect>
+</sc-for>
+</svg>
+<svg style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.06; mix-blend-mode: overlay;"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"></feTurbulence></filter><rect width="100%" height="100%" filter="url(#grain)"></rect></svg>
+</div>
+
+<div style="position: relative; max-width: 1440px; margin: 0 auto; padding: 16px 24px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px;">
+
+<header class="g" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 8px 10px 8px 16px;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="9.5" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.4"></circle><path d="M15.5 15.5 L19 19" stroke="rgba(255,255,255,.85)" stroke-width="1.4" stroke-linecap="round"></path><path d="M6.5 13 L9.5 9.5 L12 11.5 L15 7.5" fill="none" stroke="{{accent}}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-weight: 600; font-size: 15px; letter-spacing: -0.01em;">QuantOS</span>
+<span class="m pill" style="color: rgba(255,255,255,0.7); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);">PAPER · demo $200</span>
+</div>
+<nav aria-label="Sections" style="display: flex; flex-wrap: wrap; gap: 2px;">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+<button class="tab" type="button" onClick="{{t.pick}}" aria-pressed="{{t.on}}" style="{{t.st}}">{{t.n}}</button>
+</sc-for>
+</nav>
+<div class="m" style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-left: auto; font-size: 11.5px; color: rgba(255,255,255,0.55);">
+<span style="display: flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.85);"><span class="live" style="width: 6px; height: 6px; border-radius: 50%; background: #3DD68C;"></span>running · 5/5 services</span>
+<span>feed 1.2s</span><span>heartbeat 2.3s</span><span>02:31:04Z</span><span>9h 37m / 72h</span>
+</div>
+<button class="btn" type="button" style="color: #FF9AAE; box-shadow: inset 0 0 0 1px rgba(242,99,126,0.35);">Stop all</button>
+</header>
+
+<sc-if value="{{isOv}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<section class="g" style="flex: 999 1 700px; min-width: 0; padding: 18px 18px 12px;">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 40px;">
+<div>
+<div class="k">Equity · pD book</div>
+<div style="display: flex; align-items: baseline; gap: 12px; margin-top: 6px;"><span class="m" style="font-size: 40px; font-weight: 500; letter-spacing: -0.02em;">199.28</span><span class="m mut" style="font-size: 13px;">USD</span></div>
+<div class="m" style="margin-top: 4px; font-size: 12.5px;"><span style="color: #F2637E;">-0.72 (-0.36%)</span><span class="mut"> vs 200.00 start · HWM 200.01</span></div>
+</div>
+<dl style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 28px; margin: 6px 0 0 auto;">
+<sc-for list="{{kpis}}" as="k" hint-placeholder-count="4"><div><dt class="k">{{k.l}}</dt><dd class="m" style="margin: 4px 0 0; font-size: 15px; color: {{k.c}};">{{k.v}}</dd></div></sc-for>
+</dl>
+</div>
+<div style="display: flex; gap: 8px; margin-top: 18px;">
+<svg viewBox="0 0 1000 240" preserveAspectRatio="none" style="flex: 1; min-width: 0; height: 240px; display: block;" role="img" aria-label="pD equity since start, 200.00 to 199.28 USD">
+<defs><linearGradient id="ef" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{{accent}}" stop-opacity="0.14"></stop><stop offset="1" stop-color="{{accent}}" stop-opacity="0"></stop></linearGradient></defs>
+<sc-for list="{{grid}}" as="y" hint-placeholder-count="5"><line x1="0" x2="1000" y1="{{y}}" y2="{{y}}" stroke="rgba(255,255,255,.06)" stroke-dasharray="2 4"></line></sc-for>
+<line x1="0" x2="1000" y1="{{baseY}}" y2="{{baseY}}" stroke="rgba(255,255,255,.25)" stroke-dasharray="4 4"></line>
+<path d="{{eqArea}}" fill="url(#ef)"></path>
+<path d="{{eqLine}}" fill="none" stroke="{{accent}}" stroke-width="1.6" vector-effect="non-scaling-stroke"></path>
+</svg>
+<div class="m mut" style="display: flex; flex-direction: column; justify-content: space-between; font-size: 10.5px; padding: 0 0 2px;"><span>200.0</span><span>199.8</span><span>199.6</span><span>199.4</span><span>199.2</span></div>
+</div>
+<div class="m mut" style="position: relative; height: 14px; font-size: 10.5px; margin: 6px 40px 0 0;"><span style="position: absolute; left: 0;">Nov 02 17:00</span><span style="position: absolute; left: 42%;">21:00</span><span style="position: absolute; right: 0;">Nov 03 02:31</span></div>
+</section>
+<aside style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+<section class="g" style="padding: 16px 18px;">
+<h2 class="h">Account · pD</h2>
+<dl class="m" style="margin: 12px 0 0; display: grid; grid-template-columns: 1fr auto; gap: 9px 12px; font-size: 12.5px;">
+<sc-for list="{{acct}}" as="a" hint-placeholder-count="6"><dt style="color: rgba(255,255,255,0.55); font-family: 'Inter Tight',sans-serif;">{{a.l}}</dt><dd style="margin: 0; color: {{a.c}};">{{a.v}}</dd></sc-for>
+</dl>
+<div class="k" style="margin-top: 16px;">Slots</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px;">
+<sc-for list="{{slots}}" as="s" hint-placeholder-count="3"><div><span style="display: block; height: 4px; border-radius: 2px; background: {{s.bg}};"></span><div class="m" style="font-size: 11px; margin-top: 6px; color: rgba(255,255,255,0.7);">{{s.n}} {{s.u}}</div></div></sc-for>
+</div>
+</section>
+<dc-import name="FearGreed" hint-size="100%,170px"></dc-import>
+</aside>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<section class="g" style="flex: 999 1 700px; min-width: 0; padding: 14px 8px 6px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 10px 8px;"><h2 class="h">Strategies</h2><span class="mut">6 pD · alt-ML</span><button class="btn" type="button" style="margin-left: auto;" onClick="{{goSt}}">Details</button></div>
+<div style="overflow-x: auto;">
+<table class="m" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+<thead><tr><th>Strategy</th><th>Book</th><th>State</th><th style="text-align: right;">Trades</th><th style="text-align: right;">PnL</th><th>Self-check</th></tr></thead>
+<tbody><sc-for list="{{strats}}" as="s" hint-placeholder-count="7"><tr><td style="font-weight: 500;">{{s.n}}</td><td class="mut">{{s.b}}</td><td><span style="display: inline-flex; align-items: center; gap: 6px; color: {{s.stc}};"><span style="width: 6px; height: 6px; border-radius: 50%; background: {{s.stc}};"></span>{{s.st}}</span></td><td style="text-align: right;">{{s.t}}</td><td style="text-align: right; color: {{s.pc}};">{{s.p}}</td><td class="mut" style="font-family: 'Inter Tight', sans-serif;">{{s.d}}</td></tr></sc-for></tbody>
+</table>
+</div>
+</section>
+<section class="g" style="flex: 1 1 300px; min-width: 0; padding: 14px 18px 10px;">
+<div style="display: flex; align-items: center; gap: 8px;"><h2 class="h">Alerts</h2><span class="m pill" style="color: #F5B562; background: rgba(245,181,98,0.1);">1 warn</span><span class="m pill mut" style="background: rgba(255,255,255,0.05);">4 info</span></div>
+<ul style="list-style: none; margin: 10px 0 0; padding: 0;">
+<sc-for list="{{alerts}}" as="a" hint-placeholder-count="5"><li style="display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.055);"><span style="flex: none; width: 3px; border-radius: 2px; background: {{a.c}};"></span><div style="min-width: 0;"><div style="color: rgba(255,255,255,0.9); line-height: 1.4;">{{a.t}}</div><div class="m mut" style="font-size: 11px; margin-top: 3px;">{{a.d}}</div></div></li></sc-for>
+</ul>
+<div class="m" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.055); font-size: 11px;"><span class="pill" style="color: #3DD68C; background: rgba(61,214,140,0.08);">kill switch off</span><span class="pill" style="color: #3DD68C; background: rgba(61,214,140,0.08);">reconciled</span><span class="pill" style="color: #3DD68C; background: rgba(61,214,140,0.08);">0 stale feeds</span></div>
+</section>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isSt}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<section class="g" style="flex: 999 1 700px; min-width: 0; padding: 14px 8px 6px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 10px 8px;"><h2 class="h">Strategies</h2><span class="mut">7 running · 3 slots shared · margin = balance / 10</span></div>
+<div style="overflow-x: auto;">
+<table class="m" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+<thead><tr><th>Strategy</th><th>Book</th><th>Slot</th><th>State</th><th style="text-align: right;">Trades</th><th style="text-align: right;">PnL</th><th>Data / self-check</th><th>Edge (backtest)</th></tr></thead>
+<tbody><sc-for list="{{strats}}" as="s" hint-placeholder-count="7"><tr><td style="font-weight: 500;">{{s.n}}</td><td class="mut">{{s.b}}</td><td class="mut">{{s.slot}}</td><td><span style="display: inline-flex; align-items: center; gap: 6px; color: {{s.stc}};"><span style="width: 6px; height: 6px; border-radius: 50%; background: {{s.stc}};"></span>{{s.st}}</span></td><td style="text-align: right;">{{s.t}}</td><td style="text-align: right; color: {{s.pc}};">{{s.p}}</td><td class="mut" style="font-family: 'Inter Tight', sans-serif;">{{s.d}}</td><td class="mut">{{s.edge}}</td></tr></sc-for></tbody>
+</table>
+</div>
+</section>
+<aside style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+<section class="g" style="padding: 14px 18px;">
+<div style="display: flex; align-items: center; justify-content: space-between;"><h2 class="h">alt-ML candidates</h2><span class="m mut" style="font-size: 11px;">scored 02:20Z</span></div>
+<div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+<sc-for list="{{ml}}" as="r" hint-placeholder-count="8"><div style="display: grid; grid-template-columns: 74px 1fr 44px; align-items: center; gap: 10px; font-size: 12px;"><span class="m">{{r.s}}</span><span style="position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.07);"><span style="position: absolute; left: 0; top: 0; height: 6px; border-radius: 3px; width: {{r.w}}; background: {{accent}}; opacity: 0.7;"></span><span style="position: absolute; left: 99%; top: -3px; width: 1px; height: 12px; background: #F5B562;"></span></span><span class="m" style="text-align: right;">{{r.v}}</span></div></sc-for>
+</div>
+<div class="m mut" style="font-size: 11px; margin-top: 10px;">amber tick = entry threshold 0.597</div>
+</section>
+<section class="g" style="padding: 14px 18px;">
+<h2 class="h">Signal funnel</h2>
+<div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+<sc-for list="{{funnel}}" as="f" hint-placeholder-count="4"><div style="display: grid; grid-template-columns: 96px 1fr 30px; align-items: center; gap: 10px; font-size: 12px;"><span class="mut">{{f.n}}</span><span style="height: 6px; border-radius: 3px; width: {{f.w}}; background: {{f.c}};"></span><span class="m" style="text-align: right;">{{f.v}}</span></div></sc-for>
+</div>
+<div class="k" style="margin-top: 16px;">Reject reasons</div>
+<dl class="m" style="margin: 8px 0 0; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 12px;"><dt class="mut">SLOT_FULL_TREND</dt><dd style="margin: 0;">33</dd><dt class="mut">ENTRY_COOLDOWN</dt><dd style="margin: 0;">9</dd></dl>
+</section>
+</aside>
+</div>
+</sc-if>
+
+<sc-if value="{{isTr}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<section class="g" style="padding: 16px 18px 12px;">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;">
+<h2 class="h" style="font-size: 15px;">NEARUSDC</h2>
+<span class="m pill" style="color: #3DD68C; background: rgba(61,214,140,0.1);">LONG 5.0</span>
+<span class="m" style="font-size: 20px;">3.8384</span>
+<span class="m" style="color: #F2637E;">-3.54% vs entry</span>
+<span class="m mut" style="font-size: 11.5px;">15m · last 24h · Binance</span>
+<span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11.5px;" class="m"><span class="live" style="width: 6px; height: 6px; border-radius: 50%; background: #3DD68C;"></span><span style="color: #3DD68C;">LIVE</span><span class="mut">updates every 15s</span></span>
+</div>
+<div style="display: flex; gap: 8px; margin-top: 14px;">
+<svg viewBox="0 0 1000 320" preserveAspectRatio="none" style="flex: 1; min-width: 0; height: 320px; display: block;" role="img" aria-label="NEARUSDC 15 minute candles, falling from 4.33 to 3.84; entry 3.979, mark 3.838">
+<sc-for list="{{cGrid}}" as="y" hint-placeholder-count="5"><line x1="0" x2="1000" y1="{{y}}" y2="{{y}}" stroke="rgba(255,255,255,.06)" stroke-dasharray="2 4"></line></sc-for>
+<rect x="{{entryX}}" y="0" width="{{entryW}}" height="320" fill="rgba(156,203,255,0.04)"></rect>
+<sc-for list="{{candles}}" as="c" hint-placeholder-count="0">
+<line x1="{{c.x}}" x2="{{c.x}}" y1="{{c.hi}}" y2="{{c.lo}}" stroke="{{c.col}}" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+<rect x="{{c.bx}}" y="{{c.top}}" width="{{cw}}" height="{{c.bh}}" fill="{{c.col}}"></rect>
+</sc-for>
+<line x1="0" x2="1000" y1="{{entryY}}" y2="{{entryY}}" stroke="#9CCBFF" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"></line>
+<line x1="0" x2="1000" y1="{{markY}}" y2="{{markY}}" stroke="#F2637E" stroke-width="1" vector-effect="non-scaling-stroke"></line>
+</svg>
+<div class="m" style="position: relative; width: 74px; font-size: 10.5px;">
+<sc-for list="{{cAxis}}" as="a" hint-placeholder-count="5"><span class="mut" style="position: absolute; left: 0; top: {{a.y}};">{{a.v}}</span></sc-for>
+<span style="position: absolute; left: 0; top: {{entryTop}}; color: #000; background: #9CCBFF; padding: 1px 4px; border-radius: 3px;">E 3.9792</span>
+<span style="position: absolute; left: 0; top: {{markTop}}; color: #fff; background: #C2405A; padding: 1px 4px; border-radius: 3px;">3.8384</span>
+</div>
+</div>
+<div class="m mut" style="position: relative; height: 14px; font-size: 10.5px; margin: 6px 82px 0 0;"><span style="position: absolute; left: 0;">Nov 02 02:45</span><span style="position: absolute; left: 50%;">14:45</span><span style="position: absolute; right: 0;">Nov 03 02:30</span></div>
+<div class="m mut" style="display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 11px; margin-top: 10px;"><span>shaded = since entry (17:00Z)</span><span>stop 2.981 is 22% below mark, off this chart</span><span>no take-profit set</span></div>
+</section>
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<section class="g" style="flex: 999 1 640px; min-width: 0; padding: 14px 8px 6px;">
+<div style="padding: 0 10px 8px;"><h2 class="h">Open positions</h2></div>
+<div style="overflow-x: auto;">
+<table class="m" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+<thead><tr><th>Symbol</th><th>Side</th><th style="text-align: right;">Qty</th><th style="text-align: right;">Notional</th><th style="text-align: right;">Entry</th><th style="text-align: right;">Mark</th><th style="text-align: right;">uPnL</th><th>Opened</th><th>State</th></tr></thead>
+<tbody><tr><td><span style="font-family: 'Inter Tight', sans-serif; font-weight: 500;">NEARUSDC</span> <span class="mut" style="font-size: 11px;">alt dip</span></td><td style="color: #3DD68C;">Long</td><td style="text-align: right;">5.0</td><td style="text-align: right;">19.19</td><td style="text-align: right;">3.9792</td><td style="text-align: right;">3.8384</td><td style="text-align: right; color: #F2637E;">-0.70 (-3.54%)</td><td class="mut">Nov 02 17:00 · 9h 31m</td><td><span class="pill" style="color: #9CCBFF; background: rgba(156,203,255,0.1);">PROTECTED</span></td></tr></tbody>
+</table>
+</div>
+<div style="padding: 18px 10px 8px;"><h2 class="h">Open orders</h2></div>
+<div style="overflow-x: auto;">
+<table class="m" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+<thead><tr><th>Symbol</th><th>Type</th><th>Side</th><th style="text-align: right;">Qty</th><th style="text-align: right;">Trigger</th><th style="text-align: right;">Distance</th><th>Client ID</th><th></th></tr></thead>
+<tbody><tr><td style="font-family: 'Inter Tight', sans-serif; font-weight: 500;">NEARUSDC</td><td>Stop</td><td style="color: #F2637E;">Sell</td><td style="text-align: right;">5.0</td><td style="text-align: right;">2.9810</td><td style="text-align: right;" class="mut">-22.3%</td><td class="mut">qos-sl-31261b29…</td><td><button class="btn" type="button">Amend</button></td></tr></tbody>
+</table>
+</div>
+</section>
+<section class="g" style="flex: 1 1 360px; min-width: 0; padding: 14px 8px 6px;">
+<div style="padding: 0 10px 8px;"><h2 class="h">Fills</h2></div>
+<div style="overflow-x: auto;">
+<table class="m" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+<thead><tr><th>Time (UTC)</th><th>Symbol</th><th>Kind</th><th style="text-align: right;">Price</th><th style="text-align: right;">Fee</th></tr></thead>
+<tbody><tr><td class="mut">Nov 02 17:00:10</td><td style="font-family: 'Inter Tight', sans-serif; font-weight: 500;">NEARUSDC</td><td style="color: #3DD68C;">Entry 5.0</td><td style="text-align: right;">3.9792</td><td style="text-align: right;" class="mut">0.0119</td></tr></tbody>
+</table>
+</div>
+<div class="mut" style="padding: 12px 10px; font-size: 12px;">1 fill since start. alt-ML has not crossed its threshold yet.</div>
+</section>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isSe}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<section class="g" style="flex: 2 1 480px; min-width: 0; padding: 16px 18px;">
+<div style="display: flex; align-items: center; justify-content: space-between;"><h2 class="h">Sentibot composite</h2><span class="m pill" style="color: #F5B562; background: rgba(245,181,98,0.1);">gate · SHADOW</span></div>
+<div style="display: flex; align-items: baseline; gap: 8px; margin-top: 10px;"><span class="m" style="font-size: 26px;">-0.12</span><span class="mut">market news score · 01:01Z run</span></div>
+<div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+<sc-for list="{{senti}}" as="s" hint-placeholder-count="3"><div style="display: grid; grid-template-columns: 40px 1fr 48px; align-items: center; gap: 10px;"><span class="m" style="font-size: 12px;">{{s.n}}</span><span style="position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.07);"><span style="position: absolute; left: 50%; top: -3px; width: 1px; height: 12px; background: rgba(255,255,255,0.35);"></span><span style="position: absolute; top: 0; height: 6px; border-radius: 3px; left: {{s.l}}; width: {{s.w}}; background: {{s.c}};"></span></span><span class="m" style="font-size: 12px; text-align: right; color: {{s.c}};">{{s.v}}</span></div></sc-for>
+</div>
+<div class="m mut" style="font-size: 11px; margin-top: 14px; line-height: 1.7;">sources · reddit 147 ok · news 164 ok · X off (no token)<br>gate last 30 min: 25 × would block alt dip NEARUSDC long</div>
+</section>
+<div style="flex: 1 1 300px; min-width: 0;"><dc-import name="FearGreed" hint-size="100%,170px"></dc-import></div>
+</div>
+</sc-if>
+
+<sc-if value="{{isLg}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px;">
+<sc-for list="{{health}}" as="h" hint-placeholder-count="5"><section class="g" style="padding: 14px 16px;"><div class="k">{{h.l}}</div><div class="m" style="font-size: 22px; margin-top: 6px; color: {{h.c}};">{{h.v}}</div><div class="mut" style="font-size: 11.5px; margin-top: 2px;">{{h.d}}</div></section></sc-for>
+</div>
+<section class="g" style="padding: 14px 8px 6px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 10px 8px;"><h2 class="h">Event log</h2><span class="mut">last 25 · newest first</span><span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11.5px;" class="m"><span class="live" style="width: 6px; height: 6px; border-radius: 50%; background: #3DD68C;"></span><span style="color: #3DD68C;">LIVE</span></span></div>
+<div class="scroll" style="max-height: 460px; overflow-x: auto;">
+<table class="m" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+<thead><tr><th>Time (UTC)</th><th>Kind</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Result</th></tr></thead>
+<tbody><sc-for list="{{feed}}" as="f" hint-placeholder-count="10"><tr><td class="mut">{{f.t}}</td><td style="color: #F5B562;">SENTIMENT_SHADOW</td><td class="mut">alt_dip_reversal</td><td style="font-family: 'Inter Tight', sans-serif; font-weight: 500;">NEARUSDC</td><td>LONG</td><td class="mut">WOULD_BLOCK</td></tr></sc-for>
+<tr><td class="mut">Nov 02 17:00:10</td><td style="color: #3DD68C;">FILL</td><td class="mut">alt_dip_reversal</td><td style="font-family: 'Inter Tight', sans-serif; font-weight: 500;">NEARUSDC</td><td>LONG</td><td class="mut">ENTRY 5.0 @ 3.9792</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{showNews}}" hint-placeholder-val="{{true}}">
+<section class="g" style="padding: 14px 18px 8px;">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+<h2 class="h">News</h2>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 11.5px;" class="m"><span class="live" style="width: 6px; height: 6px; border-radius: 50%; background: #3DD68C;"></span><span style="color: #3DD68C;">LIVE</span><span class="mut">polled 02:31Z · 3/3 feeds ok</span></span>
+<div role="group" aria-label="Filter news by source" style="display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto;">
+<sc-for list="{{srcs}}" as="s" hint-placeholder-count="4"><button class="chip" type="button" onClick="{{s.pick}}" aria-pressed="{{s.on}}" style="{{s.st}}">{{s.n}} <span class="m" style="opacity: 0.6;">{{s.c}}</span></button></sc-for>
+</div>
+</div>
+<ul class="scroll" style="list-style: none; margin: 10px -6px 0 0; padding: 0 6px 0 0; max-height: 560px;">
+<sc-for list="{{news}}" as="n" hint-placeholder-count="8">
+<li style="display: flex; gap: 14px; align-items: center; border-top: 1px solid rgba(255,255,255,0.055); padding: 10px 0;">
+<sc-if value="{{n.img}}" hint-placeholder-val="{{true}}"><img src="{{n.img}}" alt="" style="flex: none; width: 72px; height: 48px; object-fit: cover; border-radius: 8px;"></sc-if>
+<sc-if value="{{n.noImg}}" hint-placeholder-val="{{false}}"><span class="m" style="flex: none; width: 72px; height: 48px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: {{n.tc}}; background: {{n.tb}};">{{n.ini}}</span></sc-if>
+<div style="flex: 1; min-width: 0;"><a class="nl" href="{{n.u}}" target="_blank" rel="noopener">{{n.h}}</a><div class="m mut" style="font-size: 11px; margin-top: 4px;">{{n.src}} · {{n.t}}</div></div>
+</li>
+</sc-for>
+</ul>
+<sc-if value="{{moreUrl}}" hint-placeholder-val="{{false}}">
+<div style="border-top: 1px solid rgba(255,255,255,0.055); padding: 12px 0 6px; display: flex; justify-content: center;"><a class="btn" href="{{moreUrl}}" target="_blank" rel="noopener">See more on {{moreName}}</a></div>
+</sc-if>
+</section>
+</sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#8EC5FF","options":["#8EC5FF","#B9A6FF","#7FE0C0","#E8C77A"]},"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { tab: 'Overview', src: 'All' }; }
+  renderVals() {
+    var self = this, st = this.state, UP = '#3DD68C', DN = '#F2637E', DIM = 'rgba(255,255,255,0.55)', AMB = '#F5B562', BLU = '#9CCBFF';
+    var accent = this.props.accent ?? '#8EC5FF';
+    var seed = 7, rnd = function () { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    var bg = [], p = 400;
+    for (var i = 0; i < 96; i++) { var o = p, c = o + (rnd() - 0.47) * 34, hi = Math.max(o, c) + rnd() * 16, lo = Math.min(o, c) - rnd() * 16; p = Math.max(120, Math.min(560, c)); var x = 8 + i * 15; bg.push({ x: x + 4.5, bx: x, hi: hi.toFixed(1), lo: lo.toFixed(1), top: Math.min(o, c).toFixed(1), bh: Math.max(1, Math.abs(c - o)).toFixed(1), col: c < o ? '#2F9E6F' : '#A6404F' }); }
+
+    // ---- live snapshot from localhost:8787 + Binance, 2026-11-03 02:31Z ----
+    var eq = [200.0,199.962,199.762,199.671,199.732,199.762,199.579,199.466,199.546,199.447,199.402,199.359,199.527,199.604,199.637,199.436,199.432,199.368,199.504,199.602,199.628,199.53,199.462,199.422,199.424,199.412,199.368,199.397,199.395,199.514,199.475,199.443,199.415,199.43,199.47,199.325,199.32,199.29,199.28];
+    var near = [[4.282,4.284,4.263,4.274],[4.273,4.294,4.272,4.282],[4.281,4.333,4.276,4.31],[4.309,4.324,4.3,4.305],[4.304,4.318,4.287,4.296],[4.294,4.294,4.275,4.288],[4.286,4.297,4.282,4.291],[4.293,4.294,4.267,4.272],[4.271,4.279,4.254,4.264],[4.266,4.266,4.248,4.258],[4.259,4.268,4.244,4.267],[4.267,4.279,4.256,4.271],[4.272,4.273,4.243,4.244],[4.244,4.244,4.195,4.201],[4.2,4.206,4.143,4.153],[4.153,4.17,4.134,4.137],[4.137,4.152,4.098,4.112],[4.114,4.142,4.108,4.108],[4.11,4.115,4.074,4.086],[4.085,4.091,4.075,4.084],[4.083,4.111,4.072,4.106],[4.107,4.136,4.08,4.086],[4.085,4.102,4.084,4.099],[4.1,4.136,4.1,4.123],[4.125,4.139,4.125,4.135],[4.135,4.151,4.134,4.134],[4.132,4.142,4.126,4.136],[4.138,4.138,4.116,4.127],[4.128,4.143,4.119,4.119],[4.119,4.124,4.107,4.117],[4.117,4.12,4.102,4.106],[4.106,4.114,4.093,4.099],[4.098,4.123,4.098,4.122],[4.123,4.128,4.096,4.107],[4.107,4.121,4.097,4.114],[4.116,4.136,4.114,4.129],[4.129,4.139,4.122,4.126],[4.128,4.147,4.125,4.143],[4.144,4.151,4.131,4.132],[4.133,4.133,4.083,4.102],[4.101,4.107,4.087,4.099],[4.099,4.107,4.085,4.09],[4.088,4.088,4.057,4.066],[4.067,4.133,4.053,4.112],[4.112,4.122,4.072,4.087],[4.084,4.098,4.064,4.07],[4.07,4.086,4.032,4.055],[4.054,4.1,4.049,4.07],[4.068,4.088,4.053,4.071],[4.07,4.086,4.058,4.064],[4.063,4.072,4.048,4.064],[4.062,4.066,4.037,4.062],[4.058,4.064,3.984,4.009],[4.009,4.022,4.0,4.012],[4.012,4.018,3.964,3.976],[3.975,3.996,3.964,3.987],[3.99,3.994,3.974,3.976],[3.98,3.987,3.965,3.974],[3.975,3.985,3.932,3.936],[3.936,3.938,3.904,3.918],[3.917,3.935,3.904,3.929],[3.928,3.947,3.92,3.936],[3.937,3.939,3.892,3.899],[3.898,3.911,3.873,3.877],[3.877,3.892,3.865,3.892],[3.893,3.901,3.864,3.872],[3.871,3.876,3.849,3.866],[3.868,3.875,3.841,3.854],[3.856,3.888,3.84,3.888],[3.884,3.927,3.881,3.904],[3.905,3.933,3.904,3.912],[3.911,3.912,3.869,3.869],[3.871,3.893,3.858,3.869],[3.868,3.884,3.851,3.856],[3.858,3.885,3.858,3.885],[3.885,3.91,3.875,3.905],[3.905,3.91,3.889,3.91],[3.911,3.918,3.887,3.888],[3.889,3.9,3.875,3.875],[3.874,3.878,3.861,3.87],[3.869,3.872,3.864,3.868],[3.867,3.878,3.849,3.866],[3.866,3.871,3.852,3.857],[3.858,3.866,3.849,3.863],[3.863,3.87,3.859,3.862],[3.862,3.89,3.856,3.886],[3.886,3.901,3.878,3.878],[3.878,3.894,3.872,3.872],[3.873,3.883,3.858,3.866],[3.864,3.877,3.854,3.87],[3.873,3.879,3.865,3.878],[3.876,3.876,3.846,3.847],[3.848,3.854,3.831,3.834],[3.833,3.84,3.815,3.827],[3.828,3.845,3.819,3.834],[3.833,3.84,3.833,3.84]];
+    var NEWS = [
+      ['CoinDesk','Big crypto wants the one thing it can’t buy: your vote',292,'https://www.coindesk.com/opinion/2026/11/02/big-crypto-wants-the-one-thing-it-can-t-buy-your-vote'],
+      ['CoinDesk','Bitcoin traders eye post-election rally as exchange outflows point to supply squeeze',497,'https://www.coindesk.com/markets/2026/11/02/bitcoin-traders-eye-post-election-rally-as-exchange-outflows-point-to-supply-squeeze'],
+      ['CoinDesk','EU entity suspected of losing $106 million from crypto exchange accounts, ZachXBT says',550,'https://www.coindesk.com/tech/2026/11/02/eu-entity-suspected-of-losing-usd106-million-from-crypto-exchange-accounts-zachxbt-says'],
+      ['CoinDesk','NYSE tokenized stock plans take shape as four more transfer agents join',589,'https://www.coindesk.com/business/2026/11/02/nyse-taps-wall-street-giant-broadridge-to-bring-shareholder-voting-onto-blockchain-rails'],
+      ['CoinDesk','Brazil’s Mercado Bitcoin halts withdrawals after $40 million drained across 10 chains',638,'https://www.coindesk.com/business/2026/11/02/brazil-s-mercado-bitcoin-halts-withdrawals-after-usd40-million-drained-across-10-chains'],
+      ['CoinDesk','Nvidia, Costco and Nike join pushback against OKX–ICE tokenized stock plans',664,'https://www.coindesk.com/business/2026/11/02/nvidia-costco-and-nike-join-pushback-against-okx-ice-tokenized-stock-plans'],
+      ['CoinDesk','Anthropic swings to third quarter operating loss as compute costs surge ahead of IPO',672,'https://www.coindesk.com/markets/2026/11/02/anthropic-swings-to-third-quarter-operating-loss-as-compute-costs-surge-ahead-of-ipo'],
+      ['CoinDesk','Standard Chartered debuts tokenized deposits in Hong Kong for corporate clients',686,'https://www.coindesk.com/business/2026/11/02/standard-chartered-debuts-tokenized-deposits-in-hong-kong-for-corporate-clients'],
+      ['CoinDesk','Crypto’s Washington playbook is working. Don’t abandon it now.',691,'https://www.coindesk.com/opinion/2026/11/02/crypto-s-washington-playbook-is-working-don-t-abandon-it-now'],
+      ['CoinDesk','Coinbase downgraded at Morgan Stanley; price target slashed 53% on weak earnings outlook',722,'https://www.coindesk.com/markets/2026/11/02/morgan-stanley-downgrades-coinbase-slashes-price-target-53-on-weak-earnings-outlook'],
+      ['CoinDesk','Tokenization firm tZERO plans to go public in $350 million SPAC deal',751,'https://www.coindesk.com/business/2026/11/01/tokenization-firm-tzero-plans-to-go-public-in-usd350-million-spac-deal'],
+      ['CoinDesk','XRP Ledger set to fix flaw that could have let stablecoin partners print new tokens',834,'https://www.coindesk.com/tech/2026/11/02/xrp-ledger-set-to-fix-flaw-that-could-let-stablecoin-partners-print-new-tokens'],
+      ['CoinDesk','Bitcoin’s ‘volatility curve’ has a midterm bump',841,'https://www.coindesk.com/daybook-us/2026/11/02/bitcoin-s-volatility-curve-has-a-midterm-bump'],
+      ['CoinDesk','No proof of AI in North Korean hackers move of stolen Binance funds',873,'https://www.coindesk.com/tech/2026/11/02/no-proof-of-ai-in-north-korean-hackers-move-of-stolen-binance-funds-through-thousands-of-wallets'],
+      ['CoinDesk','Bitcoin eases to $77,900 as Binance customers pull $3.6 billion after withdrawals reopen',901,'https://www.coindesk.com/markets/2026/11/02/bitcoin-eases-to-usd77-900-as-binance-customers-pull-usd3-6-billion-after-withdrawals-reopen'],
+      ['Cointelegraph','South Korea urges exchanges to boost cold storage after Binance hack',58,'https://cointelegraph.com/news/south-korea-urges-exchanges-to-boost-cold-storage-after-binance-hack','/_blob/1e25a9422d4ec3a6aa47055c4564d260'],
+      ['Cointelegraph','North Korea denies role in $6.3B Binance hack, points finger at US',204,'https://cointelegraph.com/news/north-korea-denies-role-in-63b-binance-hack-points-finger-at-us','/_blob/7364dddf6c8f928a4026859784dd342c'],
+      ['Cointelegraph','Here’s what happened in crypto today',235,'https://cointelegraph.com/news/what-happened-in-crypto-today','/_blob/60b9c8d2404dfdd0481a2f1d67e0b24d'],
+      ['Cointelegraph','New Jersey drops Coinbase staking order ahead of crypto’s midterm test',249,'https://cointelegraph.com/news/new-jersey-coinbase-staking','/_blob/16cde9645a56474a5b3b640f438f442a'],
+      ['Cointelegraph','AI poses greater threat to Bitcoin than quantum computing, Swan founder says',276,'https://cointelegraph.com/news/ai-hackers-threat-bitcoin-quantum-computing-swan','/_blob/3f563d65700dd75bcf57462ddf278030'],
+      ['Cointelegraph','Crypto investigators flag suspected $106M theft, $786K Solana bot drain',315,'https://cointelegraph.com/news/zachxbt-flags-suspected-106m-crypto-theft-as-solana-bot-faces-possible-786k-drain'],
+      ['Cointelegraph','Coinbase hit with 50% price target cut as post-earnings rout deepens',369,'https://cointelegraph.com/news/morgan-stanley-cuts-coinbase-target-to-120-as-earnings-recovery-outlook-weakens'],
+      ['Cointelegraph','Bitcoin risks drop below $76K as 7% oil slide fails to spark BTC price rally',423,'https://cointelegraph.com/markets/bitcoin-risks-sub-76k-drop-as-7-fall-in-oil-fails-to-spark-btc-price-rally'],
+      ['Cointelegraph','Mercado Bitcoin wallets show post-hack transfers after $46M theft',445,'https://cointelegraph.com/news/mercado-bitcoin-hack'],
+      ['Cointelegraph','Animoca Brands clears final hurdle for Abu Dhabi fund management',511,'https://cointelegraph.com/news/animoca-brands-expands-asset-management-business-with-abu-dhabi-approval'],
+      ['Cointelegraph','Strategy spends triple its weekly Bitcoin outlay on STRC buybacks',763,'https://cointelegraph.com/news/strategy-repurchases-208m-strc-65m-bitcoin'],
+      ['Cointelegraph','AI agent disputes head to ‘Internet Court’ — and a jury of AI agents',781,'https://cointelegraph.com/magazine/ai-agent-disputes-sent-to-internet-court-and-a-jury-of-ai-agents'],
+      ['Cointelegraph','Binance taps half its SAFU Bitcoin holdings, releases reserve proof',789,'https://cointelegraph.com/news/binance-safu-btc-balance-halves-recovery-unclear'],
+      ['Cointelegraph','FATF targets crypto hubs in review of money laundering controls',815,'https://cointelegraph.com/news/fatf-targeted-crypto-compliance-jurisdiction-reviews'],
+      ['Cointelegraph','Binance hackers begin swapping stolen Solana tokens for Bitcoin: Chainalysis',830,'https://cointelegraph.com/news/binance-hackers-solana-new-phase-laundering-chainalysis'],
+      ['Watcher Guru','Tether CEO Paulo Ardoino says the company now owns ~150,000 Bitcoin worth over $11.5B',81,'https://t.me/WatcherGuru/15775'],
+      ['Watcher Guru','Apple $AAPL reports $114.48 billion in revenue, beating expectations',301,'https://t.me/WatcherGuru/15773'],
+      ['Watcher Guru','North Korea says it is not responsible for the $6.3 billion Binance crypto hack',316,'https://t.me/WatcherGuru/15771'],
+      ['Watcher Guru','New Jersey officially drops lawsuit against Coinbase, users can resume crypto staking after 3+ years',437,'https://t.me/WatcherGuru/15770'],
+      ['Watcher Guru','North Korean hackers have stolen $12.8B in crypto since 2017, equal to 45% of the country’s GDP',460,'https://t.me/WatcherGuru/15768'],
+      ['Watcher Guru','Polymarket launches 24/7 perpetual futures for Anthropic $ANT pre-IPO with up to 10x leverage',479,'https://t.me/WatcherGuru/15767'],
+      ['Watcher Guru','Crypto dumping again: BTC under $77K, ETH under $2,250, XRP under $1.25, SOL under $95; $100M+ longs liquidated',518,'https://t.me/WatcherGuru/15763'],
+      ['Watcher Guru','Securitize launches trading for 13 new tokenized stocks on Solana',569,'https://t.me/WatcherGuru/15762'],
+      ['Watcher Guru','XRP Ledger to fix security flaw that could allow unauthorized creation of new stablecoins',628,'https://t.me/WatcherGuru/15761'],
+      ['Watcher Guru','SpaceX $SPCX in talks to acquire Boost Mobile to enter the mobile phone market, WaPo reports',683,'https://t.me/WatcherGuru/15759'],
+      ['Watcher Guru','Coinbase increases its Bitcoin holdings to 18,000 BTC, worth over $1.4B',701,'https://t.me/WatcherGuru/15757'],
+      ['Watcher Guru','Brazil’s largest crypto exchange, Mercado Bitcoin, suspends deposits and withdrawals after a reported $40M+ hack',713,'https://t.me/WatcherGuru/15756']
+    ];
+    var SITE = { 'CoinDesk': ['https://www.coindesk.com/', 'CD', 'rgba(255,214,102,0.12)', '#FFD666'], 'Cointelegraph': ['https://cointelegraph.com/', 'CT', 'rgba(255,255,255,0.08)', '#E8E8E8'], 'Watcher Guru': ['https://t.me/s/WatcherGuru', 'WG', 'rgba(156,203,255,0.12)', '#9CCBFF'] };
+
+    // equity chart
+    var lo = 199.2, hi = 200.0, H = 240, pad = 8;
+    var Y = function (v) { return pad + (H - 2 * pad) * (1 - (v - lo) / (hi - lo)); };
+    var line = eq.map(function (v, i) { return (i ? 'L' : 'M') + (i * 1000 / (eq.length - 1)).toFixed(1) + ' ' + Y(v).toFixed(1); }).join(' ');
+
+    // NEAR candle chart
+    var CH = 320, cl = 3.80, chh = 4.34, cp = 10, n = near.length, step = 1000 / n, cw = (step * 0.62).toFixed(2);
+    var CY = function (v) { return cp + (CH - 2 * cp) * (1 - (v - cl) / (chh - cl)); };
+    var candles = near.map(function (k, i) { var up = k[3] >= k[0], x = i * step + step / 2; return { x: x.toFixed(1), bx: (x - step * 0.31).toFixed(1), hi: CY(k[1]).toFixed(1), lo: CY(k[2]).toFixed(1), top: CY(Math.max(k[0], k[3])).toFixed(1), bh: Math.max(1, Math.abs(CY(k[0]) - CY(k[3]))).toFixed(1), col: up ? '#2FBF7F' : '#E0566F' }; });
+    var ticks = [4.3, 4.2, 4.1, 4.0, 3.9];
+    var pct = function (v) { return ((CY(v) / CH) * 100 - 2.5).toFixed(1) + '%'; };
+    var entryIdx = 57;
+
+    var S = function (nm, b, slot, stt, t, pn, d, edge) { var stc = stt === 'In position' ? BLU : (stt === 'Scanning' ? UP : DIM); return { n: nm, b: b, slot: slot, st: stt, stc: stc, t: t, p: pn, d: d, edge: edge, pc: pn.charAt(0) === '-' ? DN : DIM }; };
+    var A = function (lvl, t, d) { return { t: t, d: d, c: lvl === 'warn' ? AMB : 'rgba(255,255,255,0.25)' }; };
+    var SB = function (nm, v) { var w = Math.abs(v) * 50; return { n: nm, v: (v > 0 ? '+' : '') + v.toFixed(2), w: w + '%', l: (v < 0 ? 50 - w : 50) + '%', c: v < 0 ? DN : UP }; };
+    var FN = function (nm, v, c) { return { n: nm, v: String(v), w: Math.max(2, v / 46 * 100) + '%', c: c }; };
+    var age = function (m) { return m < 60 ? m + 'm' : Math.floor(m / 60) + 'h ' + (m % 60) + 'm'; };
+
+    var TABS = ['Overview', 'Strategies', 'Trades', 'Sentiment', 'Logs'];
+    var tabs = TABS.map(function (t) { var on = st.tab === t; return { n: t, on: on ? 'true' : 'false', st: on ? 'color: #fff; background: rgba(255,255,255,0.09);' : '', pick: function () { self.setState({ tab: t }); } }; });
+    var SRC = ['All', 'CoinDesk', 'Cointelegraph', 'Watcher Guru'];
+    var srcs = SRC.map(function (s) { var on = st.src === s; var cnt = s === 'All' ? NEWS.length : NEWS.filter(function (r) { return r[0] === s; }).length; return { n: s, c: String(cnt), on: on ? 'true' : 'false', st: on ? 'background: rgba(255,255,255,0.92); color: #000;' : 'background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);', pick: function () { self.setState({ src: s }); } }; });
+    var list = NEWS.slice().sort(function (a, b) { return a[2] - b[2]; });
+    if (st.src !== 'All') list = list.filter(function (r) { return r[0] === st.src; }).slice(0, 15);
+    var news = list.map(function (r) { var s = SITE[r[0]]; return { src: r[0], h: r[1], t: age(r[2]) + ' ago', u: r[3], img: r[4] || null, noImg: !r[4], ini: s[1], tb: s[2], tc: s[3] }; });
+    var tab = st.tab;
+
+    return {
+      accent: accent, bg: bg,
+      tabs: tabs, isOv: tab === 'Overview', isSt: tab === 'Strategies', isTr: tab === 'Trades', isSe: tab === 'Sentiment', isLg: tab === 'Logs',
+      showNews: tab === 'Overview' || tab === 'Sentiment',
+      goSt: function () { self.setState({ tab: 'Strategies' }); },
+      grid: [200.0, 199.8, 199.6, 199.4, 199.2].map(function (v) { return Y(v).toFixed(1); }), baseY: Y(200).toFixed(1),
+      eqLine: line, eqArea: line + ' L1000 ' + H + ' L0 ' + H + ' Z',
+      kpis: [{ l: 'Day PnL', v: '-0.11', c: DN }, { l: 'Drawdown', v: '-0.73%', c: DN }, { l: 'Fills', v: '1', c: 'inherit' }, { l: 'Fees', v: '0.01', c: 'inherit' }],
+      acct: [{ l: 'Cash', v: '199.99', c: 'inherit' }, { l: 'Unrealised', v: '-0.70', c: DN }, { l: 'Realised', v: '0.00', c: 'inherit' }, { l: 'High-water mark', v: '200.01', c: 'inherit' }, { l: 'Next margin (bal / 10)', v: '19.93', c: 'inherit' }, { l: 'Restarts', v: '0', c: 'inherit' }],
+      slots: [{ n: 'crash', u: '0/1', bg: 'rgba(255,255,255,0.12)' }, { n: 'event', u: '1/1', bg: accent }, { n: 'trend', u: '0/1', bg: 'rgba(255,255,255,0.12)' }],
+      strats: [
+        S('alt_dip_reversal', 'pD', 'event', 'In position', '1', '-0.70', 'Quarterly cutoff on 12 symbols', '+2.5% / trade'),
+        S('crash_flush_e2', 'pD', 'crash', 'Scanning', '0', '0.00', 'OI z + 1h bars ready, 9 majors', '+2.9% / trade'),
+        S('delist_short_e17', 'pD', 'event', 'Scanning', '0', '0.00', 'No feature precheck', '–'),
+        S('tsmom_4h', 'pD', 'trend', 'Scanning', '0', '0.00', '201 / 185 4h bars', 'near miss'),
+        S('turtle_55', 'pD', 'trend', 'Scanning', '0', '0.00', '201 / 60 4h bars', '–'),
+        S('vol_squeeze_breakout', 'pD', 'trend', 'Scanning', '0', '0.00', '200 / 60 1h bars', '–'),
+        S('alt-ML 5m', 'executor', 'shared', 'Below threshold', '0', '0.00', 'Top IOST 0.49 vs 0.597 needed', '~+20bp / trade')
+      ],
+      alerts: [
+        A('warn', '12 engine errors in the last hour', 'none in the last 15 min'),
+        A('info', 'Sentiment gate would block NEARUSDC long', 'shadow mode · 25 times in 30 min'),
+        A('info', '33 signals rejected as trend slot full', 'slot shows 0/1 now · plus 9 cooldowns'),
+        A('info', 'alt-ML has not traded yet', 'best score 0.49, threshold 0.597'),
+        A('info', 'X sentiment source off', 'no X_BEARER_TOKEN')
+      ],
+      ml: [['IOST', 0.4875], ['DASH', 0.4853], ['BAT', 0.4807], ['AVAX', 0.4551], ['IOTA', 0.4539], ['ADA', 0.4516], ['BCH', 0.4515], ['FIL', 0.446]].map(function (r) { return { s: r[0], v: r[1].toFixed(3), w: (r[1] / 0.6 * 100).toFixed(1) + '%' }; }),
+      funnel: [FN('Signals', 46, 'rgba(255,255,255,0.35)'), FN('Risk rejected', 42, DN), FN('Approved', 4, BLU), FN('Filled', 1, UP)],
+      senti: [SB('BTC', -0.7362), SB('ETH', 0.0656), SB('SOL', -0.6166)],
+      cw: cw, candles: candles,
+      cGrid: ticks.map(function (v) { return CY(v).toFixed(1); }),
+      cAxis: ticks.map(function (v) { return { v: v.toFixed(2), y: pct(v) }; }),
+      entryY: CY(3.9792).toFixed(1), markY: CY(3.8384).toFixed(1), entryTop: pct(3.9792), markTop: pct(3.8384),
+      entryX: (entryIdx * step).toFixed(1), entryW: (1000 - entryIdx * step).toFixed(1),
+      health: [
+        { l: 'Feed age', v: '1.2s', d: 'Binance websocket', c: UP }, { l: 'Heartbeat', v: '2.3s', d: 'demo engine', c: UP },
+        { l: 'Scans / hour', v: '120', d: 'every 30s', c: 'inherit' }, { l: 'Errors 15m', v: '0', d: '12 in last hour', c: 'inherit' },
+        { l: 'Run', v: '9h 37m', d: 'ends Nov 05 16:54Z', c: 'inherit' }
+      ],
+      feed: ['02:31:01','02:30:30','02:30:02','02:29:30','02:29:01','02:28:30','02:28:01','02:27:30','02:27:01','02:26:31','02:26:01','02:25:30','02:25:02','02:24:30','02:24:01','02:23:30','02:23:01','02:22:30','02:22:01','02:21:30','02:21:01','02:20:30','02:20:02','02:19:30','02:19:01'].map(function (t) { return { t: 'Nov 03 ' + t }; }),
+      srcs: srcs, news: news,
+      moreUrl: st.src === 'All' ? null : SITE[st.src][0], moreName: st.src
+    };
+  }
+}
+</script>
+</body>
+</html>
