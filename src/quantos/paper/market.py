@@ -4,6 +4,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 import http.client
 import json
+import threading
 import time
 from typing import Callable
 from urllib.error import HTTPError, URLError
@@ -53,7 +54,8 @@ def _int(value, name: str) -> int:
 
 
 class KeepAliveTransport:
-    """One reused HTTPS connection per market client (each worker thread builds its own client).
+    """One reused HTTPS connection per thread. The scanner shares one client across a 4-thread pool,
+    and an SSL socket read from two threads segfaults CPython (11-03 deploy), so never share it.
 
     A fresh TCP+TLS handshake on every 2s poll occasionally stalled ~2s on a retransmit, pushing
     batches past the feed timeout (11-03). A dropped keep-alive is retried once on a new socket;
@@ -61,12 +63,21 @@ class KeepAliveTransport:
     """
     def __init__(self, connection_factory: Callable | None = None):
         self._factory = connection_factory or (lambda host, timeout: http.client.HTTPSConnection(host, timeout=timeout))
-        self._conn, self._host = None, None
+        self._local = threading.local()
+
+    @property
+    def _conn(self): return getattr(self._local, "conn", None)
+
+    @property
+    def _host(self): return getattr(self._local, "host", None)
+
+    def _open(self, host, timeout):
+        self._local.conn, self._local.host = self._factory(host, timeout), host
 
     def close(self):
         if self._conn is not None:
             self._conn.close()
-        self._conn = None
+        self._local.conn = None
 
     def __call__(self, request, timeout):
         url = urlsplit(request.full_url)
@@ -79,7 +90,7 @@ class KeepAliveTransport:
         for attempt in range(2):
             reused = self._conn is not None
             if not reused:
-                self._conn, self._host = self._factory(url.netloc, timeout), url.netloc
+                self._open(url.netloc, timeout)
             try:
                 self._conn.timeout = timeout
                 if self._conn.sock is not None: self._conn.sock.settimeout(timeout)
