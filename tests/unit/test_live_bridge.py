@@ -188,3 +188,54 @@ class TransientTests(MirrorTests):
         self.assertFalse(m.kill.active)
         m.check(35_000)
         self.assertTrue(m.kill.active)
+
+
+class KillFlattenTests(MirrorTests):
+    class Flaky(FakeExchange):
+        down = False
+
+        def position_risk(self, symbol=None):
+            if self.down: raise ConnectionError("transport failure URLError: timeout")
+            return super().position_risk(symbol)
+
+    def held(self):
+        ex, e = self.Flaky(), Engine()
+        e.orders = [order()]
+        m = self.mirror(ex)
+        m.sync(e, 1)
+        return ex, e, m
+
+    def test_failed_flatten_retries_until_verified(self):
+        ex, e, m = self.held()
+        ex.down = True
+        m._halt("test")
+        self.assertFalse(m.flat_confirmed)
+        self.assertIn(("critical", "kill_flatten"), self.alerts)
+        self.assertEqual(ex.pos["SOLUSDC"], D("0.05"))
+        self.assertEqual(m.sync(e, 40_000), {"skipped": "KILL", "flat": False})
+        self.assertEqual(ex.pos["SOLUSDC"], D("0.05"))
+        ex.down = False
+        m.sync(e, 50_000)                                 # inside the 30s retry window
+        self.assertFalse(m.flat_confirmed)
+        self.assertEqual(m.sync(e, 70_000), {"skipped": "KILL"})
+        self.assertEqual((ex.pos["SOLUSDC"], ex.algo), (D(0), {}))
+        self.assertIn(("recovered", "kill_flatten"), self.alerts)
+        self.assertEqual({v["state"] for v in m.book.values()}, {"CLOSED"})
+
+    def test_restart_with_kill_file_flattens_open_exchange_position(self):
+        ex, e, m = self.held()
+        m.kill.engage("manual")                           # e.g. `touch KILL`, or restart during an outage
+        fresh = self.mirror(ex)
+        self.assertEqual(fresh.sync(e, 40_000), {"skipped": "KILL"})
+        self.assertEqual(ex.pos["SOLUSDC"], D(0))
+
+    def test_flat_book_closed_so_resume_does_not_rekill(self):
+        ex, e, m = self.held()
+        ex.pos["SOLUSDC"], ex.algo = D(0), {}             # closed by hand on the exchange
+        m._halt("test")
+        self.assertTrue(m.flat_confirmed)
+        m.kill.path.unlink()
+        e.orders = []
+        fresh = self.mirror(ex)
+        self.assertTrue(fresh.sync(e, 40_000)["ok"])
+        self.assertFalse(fresh.kill.active)

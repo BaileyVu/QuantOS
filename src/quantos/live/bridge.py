@@ -31,6 +31,8 @@ AUTH_CODES = {-2015, -2014, -1022, -2008}
 # A home connection blips; two failed 30s checks used to flatten everything (2026-11-03, -$1.73).
 TRANSIENT_KILL_MS, TRANSIENT_KILL_CHECKS = 120_000, 4
 TRANSIENT_RETRY_MS = (5_000, 10_000, 20_000, 30_000)
+# A kill's one flatten failed on the network on 11-03 and NEAR/ADA stayed open 3.5h; retry until verified flat.
+FLATTEN_RETRY_MS = 30_000
 
 
 def is_auth_error(error: Exception) -> bool:
@@ -58,6 +60,7 @@ class ExchangeMirror:
         self.margin_type, self.failures = margin_type, 0
         # Soft pause: no new entries while the exchange is unreachable; open positions stay managed.
         self.hold, self.transient, self.transient_since = False, 0, None
+        self.flat_confirmed, self.next_flatten_ms = False, 0
         # Reconciliation costs ~3 signed calls; every 2s it stalled the runtime's main loop until
         # quotes went stale. Check every 30s, and right after any exchange action.
         self.check_every_ms, self.last_check_ms = 30_000, 0
@@ -81,7 +84,11 @@ class ExchangeMirror:
 
     def sync(self, engine, now_ms: int) -> dict:
         if self.kill.active:
-            return {"skipped": "KILL"}
+            if not self.flat_confirmed and now_ms >= self.next_flatten_ms:
+                self.next_flatten_ms = now_ms + FLATTEN_RETRY_MS
+                self._flatten()
+            return {"skipped": "KILL"} if self.flat_confirmed else {"skipped": "KILL", "flat": False}
+        self.flat_confirmed = False
         before = json.dumps(self.book, sort_keys=True)
         live = {o["id"]: o for o in engine.active() if D(o["filled"]) > 0 and o["state"] != "CLOSING"}
         for oid, o in live.items():
@@ -182,5 +189,29 @@ class ExchangeMirror:
     def _halt(self, reason: str):
         self.kill.engage(reason)
         self.alert("critical", "kill_switch", f"exchange kill switch engaged: {reason}")
+        self._flatten()
+
+    def _flatten(self):
+        """Close everything on the exchange, then verify it. Unverified stays critical and is retried."""
+        if getattr(self.client, "mode", "") == "dry-run":
+            self.flat_confirmed = True
+            return
         instruments = {m["symbol"]: _instrument(m["instrument"]) for m in self.book.values() if "instrument" in m}
-        self._guard("flatten", lambda: flatten(self.client, None, instruments, tag=self.run_id))
+        result, error = self._guard("flatten", lambda: flatten(self.client, None, instruments, tag=self.run_id))
+        left, check_error = self._guard("flatten", self._exchange_exposure)
+        if error is None and check_error is None and not result.errors and not left:
+            self.flat_confirmed = True
+            for m in self.book.values():
+                if m["state"] == "OPEN": m["state"] = "CLOSED"
+            self._save()
+            self.alert("recovered", "kill_flatten", "")
+        else:
+            self.alert("critical", "kill_flatten", "kill switch on but exchange NOT verified flat, retrying: "
+                       f"{left if left else ''} {error or check_error or result.errors}")
+
+    def _exchange_exposure(self) -> list:
+        left = [p["symbol"] for p in self.client.position_risk() if D(str(p["positionAmt"])) != 0]
+        left += [o["symbol"] for o in self.client.open_orders()]
+        if getattr(self.client, "conditional_api", "legacy") == "algo":
+            left += [o.get("symbol") for o in self.client.open_algo_orders()]
+        return sorted(set(left))
