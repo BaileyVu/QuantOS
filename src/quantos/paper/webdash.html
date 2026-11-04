@@ -544,7 +544,10 @@ function setTab(t, fromHash = false) {
   if (t === 'Trades') loadKlines();
 }
 window.setTab = setTab;
+let newsScrollTop = 0;
 function renderTabs() {
+  const newsPanel = $('newsPanel');
+  if (!newsPanel.hidden && !newsPanel.closest('[data-tab][hidden]')) newsScrollTop = $('news').scrollTop;
   if (!$('tabs').children.length) {
     NAV.forEach(n => {
       const a = document.createElement('a');
@@ -564,11 +567,10 @@ function renderTabs() {
   // Move the shared feed without recreating it or losing filters and scroll state.
   const newsHost = tab === 'Overview' ? $('overviewMain') : $('views');
   if ($('newsPanel').parentElement !== newsHost) {
-    const scrollTop = $('news').scrollTop;
-    newsHost.append($('newsPanel'));
-    $('news').scrollTop = scrollTop;
+    newsHost.append(newsPanel);
   }
-  $('newsPanel').hidden = !(tab === 'Overview' || tab === 'Sentiment');
+  newsPanel.hidden = !(tab === 'Overview' || tab === 'Sentiment');
+  if (!newsPanel.hidden) $('news').scrollTop = newsScrollTop;
 }
 function routeHash() {
   const n = NAV.find(n => n.route === location.hash);
