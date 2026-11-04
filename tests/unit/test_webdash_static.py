@@ -18,6 +18,7 @@ class StaticAssetTests(unittest.TestCase):
         self.assets.mkdir(parents=True)
         (self.assets / 'icon.svg').write_text('<svg/>')
         (self.assets / 'secret.txt').write_text('private')
+        (self.assets / 'font.woff2').write_bytes(b'wOF2test')
         (root / 'outside.svg').write_text('outside')
         (self.assets / 'linked.svg').symlink_to(root / 'outside.svg')
         with patch.object(webdash, 'ThreadingHTTPServer') as server:
@@ -41,6 +42,12 @@ class StaticAssetTests(unittest.TestCase):
         h.send_response.assert_called_once_with(200)
         h.send_header.assert_any_call('Content-Type', 'image/svg+xml')
         self.assertEqual(h.wfile.getvalue(), b'<svg/>')
+
+    def test_serves_local_font_with_font_mime(self):
+        h = self.request('/static/aura-zenith/font.woff2')
+        h.send_response.assert_called_once_with(200)
+        h.send_header.assert_any_call('Content-Type', 'font/woff2')
+        self.assertEqual(h.wfile.getvalue(), b'wOF2test')
 
     def test_traversal_unknown_types_and_symlinks_are_rejected(self):
         for path in ('../outside.svg', '%2e%2e/outside.svg', 'secret.txt', 'linked.svg', 'missing.svg', ''):

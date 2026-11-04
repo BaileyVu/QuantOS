@@ -305,7 +305,7 @@ def serve(runs, sentibot, port=8787):
             elif urlparse(self.path).path.startswith("/static/aura-zenith/"):
                 # Dashboard-owned assets only; no arbitrary paths or state access.
                 asset = urlparse(self.path).path.removeprefix("/static/aura-zenith/")
-                kinds = {".svg": "image/svg+xml", ".webp": "image/webp", ".ico": "image/x-icon"}
+                kinds = {".svg": "image/svg+xml", ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2"}
                 path = PAGE.parent / "static" / "aura-zenith" / asset
                 if not asset or Path(asset).name != asset or path.suffix not in kinds or not path.is_file() or path.is_symlink():
                     self.send_error(404); return
