@@ -302,6 +302,14 @@ def serve(runs, sentibot, port=8787):
                 body, kind = json.dumps(data, default=str).encode(), "application/json"
             elif self.path in ("/", "/index.html"):
                 body, kind = PAGE.read_bytes(), "text/html; charset=utf-8"
+            elif urlparse(self.path).path.startswith("/static/aura-zenith/"):
+                # Dashboard-owned assets only; no arbitrary paths or state access.
+                asset = urlparse(self.path).path.removeprefix("/static/aura-zenith/")
+                kinds = {".svg": "image/svg+xml", ".webp": "image/webp", ".ico": "image/x-icon"}
+                path = PAGE.parent / "static" / "aura-zenith" / asset
+                if not asset or Path(asset).name != asset or path.suffix not in kinds or not path.is_file() or path.is_symlink():
+                    self.send_error(404); return
+                body, kind = path.read_bytes(), kinds[path.suffix]
             else:
                 self.send_error(404); return
             self.send_response(200)
