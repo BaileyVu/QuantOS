@@ -34,6 +34,9 @@ class Faults:
     manual_position: bool = False
 
 
+EXIT_IMPACT_CAP = D(".01")
+
+
 class PaperEngine:
     latency_ms = 500
     participation = D(".01")
@@ -419,7 +422,8 @@ class PaperEngine:
         quantity = D(o["filled"])
         side = D(o["direction"])
         depth = q.bid_qty if side > 0 else q.ask_qty
-        impact = self.policy.slippage + D(".01") * quantity / depth
+        # Capped: 0.1 lot showing on a thin ask once simulated a 7% exit that never happened (11-04).
+        impact = min(self.policy.slippage + D(".01") * quantity / depth, EXIT_IMPACT_CAP)
         price = (q.bid if side > 0 else q.ask) * max(D(".01"), (1 - side * impact))
         fee = price * quantity * self.policy.taker_fee
         pnl = quantity * (price - D(o["average"])) * side

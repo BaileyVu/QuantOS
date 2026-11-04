@@ -92,6 +92,20 @@ class EngineTests(unittest.TestCase):
         self.assertGreater(D(self.j.orders()[0]["filled"]), 0)
 
 
+class ExitImpactTests(EngineTests):
+    def test_thin_ask_cannot_simulate_a_wild_exit(self):
+        self.assertIsNotNone(self.e.propose(signal(side="SHORT", stop_loss=D("102"), take_profit=D("94"),
+                                                   entry_type="MARKET"), INS, quote(), T))
+        self.e.quote(quote(book=T + 1000, seen=T + 1000), T + 1000)
+        o = self.j.orders()[0]
+        self.assertGreater(D(o["filled"]), 0)
+        self.e.kill(T + 2000)
+        thin = replace(quote(book=T + 9000, seen=T + 9000), ask_qty=D(".001"))
+        self.e.quote(thin, T + 9000)
+        row = self.j.db.execute("SELECT price FROM fills WHERE kind='EXIT'").fetchone()
+        self.assertLessEqual(D(row[0]), thin.ask * D("1.01"))
+
+
 class DispatchTests(EngineTests):
     def batch(self, *quotes): return [("quote", q) for q in quotes]
 
