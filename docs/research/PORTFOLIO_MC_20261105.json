@@ -1,0 +1,77 @@
+{
+  "conditional_crash_diagnostics": {
+    "base": {
+      "block_days": 7,
+      "daily_block_bootstrap_p_dd50": 0.055,
+      "draws": 1000,
+      "interpretation": "conditional historical resampling; not future ruin probability",
+      "seed": 28102026,
+      "trade_reshuffle_p_dd50": 0.0
+    },
+    "crash_matched_random": {
+      "block_days": 7,
+      "daily_block_bootstrap_p_dd50": 0.062,
+      "draws": 1000,
+      "interpretation": "conditional historical resampling; not future ruin probability",
+      "seed": 28102026,
+      "trade_reshuffle_p_dd50": 0.0
+    },
+    "crash_price_only": {
+      "block_days": 7,
+      "daily_block_bootstrap_p_dd50": 0.175,
+      "draws": 1000,
+      "interpretation": "conditional historical resampling; not future ruin probability",
+      "seed": 28102026,
+      "trade_reshuffle_p_dd50": 0.0
+    },
+    "delay_1h": {
+      "block_days": 7,
+      "daily_block_bootstrap_p_dd50": 0.034,
+      "draws": 1000,
+      "interpretation": "conditional historical resampling; not future ruin probability",
+      "seed": 28102026,
+      "trade_reshuffle_p_dd50": 0.0
+    },
+    "slippage_2x": {
+      "block_days": 7,
+      "daily_block_bootstrap_p_dd50": 0.061,
+      "draws": 1000,
+      "interpretation": "conditional historical resampling; not future ruin probability",
+      "seed": 28102026,
+      "trade_reshuffle_p_dd50": 0.0
+    },
+    "stop_15pct": {
+      "block_days": 7,
+      "daily_block_bootstrap_p_dd50": 0.287,
+      "draws": 1000,
+      "interpretation": "conditional historical resampling; not future ruin probability",
+      "seed": 28102026,
+      "trade_reshuffle_p_dd50": 0.0
+    }
+  },
+  "frozen_portfolio": null,
+  "heldout_exploratory_zero_trade": {
+    "job_key": "1db234fd5d3123ba3318913dfc8fe22076bc16b8a1101e92b159b8ec02d0cf20",
+    "monte_carlo": {
+      "block_days": 7,
+      "daily_block_bootstrap_p_dd50": 0.0,
+      "draws": 1000,
+      "interpretation": "conditional historical resampling; not future ruin probability",
+      "seed": 28102026,
+      "trade_reshuffle_p_dd50": null
+    },
+    "role": "EXPLORATORY_ONLY"
+  },
+  "reason": "INVALID_DATA; no portfolio path exists",
+  "training_frozen_pick": {
+    "monte_carlo": {
+      "block_days": 7,
+      "daily_block_bootstrap_p_dd50": 0.001,
+      "draws": 1000,
+      "interpretation": "conditional historical resampling; not future ruin probability",
+      "seed": 28102026,
+      "trade_reshuffle_p_dd50": 0.0
+    },
+    "training_cell_key": "ff17ca540d737dc6df6189e612e34e723df070038b848a3f93f905ef004d504b"
+  }
+}
