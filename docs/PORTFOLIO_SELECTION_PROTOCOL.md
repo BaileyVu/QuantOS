@@ -47,7 +47,8 @@ baselines remain separately labelled diagnostics, not selection options.
 Matched randomness uses seed 28102026 and compares eligible crash-price bars
 within the same symbol/calendar month without using subsequent returns. The
 sampling protocol is implemented in `quantos.paper.research.baselines` before either
-window's baseline outcomes; no baseline or sensitivity has run yet.
+window's baseline outcomes. Both windows' saved diagnostics are now reported
+in [final results](PORTFOLIO_EVAL_20261105.md).
 
 Existing V4 library entries must be listed with their actual evaluation status.
 The main comparison cannot invent pre-listing USDC history, delisting events or
@@ -56,8 +57,9 @@ not assigned zero-trade performance or silently replaced with a USDT adaptation.
 
 Completed cells are reused only under an identical experiment claim. Changed
 source or input data require a separate diagnostic run with its reason retained,
-not an overwrite of prior results. No selection seal exists yet; final review,
-baseline implementation and the data/source limitations remain outstanding.
+not an overwrite of prior results. The seal and single held-out wave are now
+complete. The frozen portfolio failed funding validation; no alternate held-out
+winner was promoted. See the final report for hashes and limitations.
 
 ## Crash baselines (frozen before outcomes)
 

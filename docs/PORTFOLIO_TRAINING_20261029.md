@@ -1,8 +1,9 @@
 # Portfolio training results — preliminary, not a released recommendation
 
 The preregistered 2022–2024 batch completed 159 cells (147 individuals and
-12 derived combinations), with zero invalid-data cells. No 2025+ outcomes have
-been acquired or evaluated. The selection below is fixed by the published
+12 derived combinations), with zero invalid-data cells. At the original training checkpoint, no 2025+ outcomes had
+been acquired or evaluated. The later [final report](PORTFOLIO_EVAL_20261105.md)
+records the completed wave and the invalid frozen-portfolio evaluation. The selection below is fixed by the published
 training algorithm; diagnostic comparisons cannot change it.
 
 | Saved setting | Final equity from $200 | CAGR | Hourly MTM DD | Adverse-bar stress DD | Trades | Net PF |
@@ -60,8 +61,10 @@ source was commit `834e30b`, with source-content hash
 The training pick key is
 `ff17ca540d737dc6df6189e612e34e723df070038b848a3f93f905ef004d504b`.
 
-Training baseline/sensitivity execution, final evaluation-adapter review,
-selection seal, one held-out wave, final report/configuration and a PR remain.
+The original checkpoint still required diagnostics, evaluation review and seal.
+These and the single held-out wave are now complete; this document preserves
+the training-only evidence. No trading configuration is supported by the final
+evaluation.
 The held-out endpoint is preregistered as 2026-10-29 00:00 UTC exclusive. All
 159 primary cells are exploratory in that window; the training pick remains the
 candidate recommendation regardless of which held-out cell wins.
