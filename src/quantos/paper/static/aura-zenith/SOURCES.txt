@@ -1,0 +1,19 @@
+Aura Zenith V2 font staging inventory
+
+Source stylesheet (Google Fonts CSS API, queried for Sora 600/700, Inter 400/500/600, JetBrains Mono 400/500):
+https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap
+
+Latin-subset WOFF2 files (served by fonts.gstatic.com):
+- Sora-Latin.woff2 — Sora, weights 600/700
+  https://fonts.gstatic.com/s/sora/v17/xMQ9uFFYT72X5wkB_18qmnndmSdSnh2BAfO5mnuyOo1lfiQwV6-xo6eeIw.woff2
+- Inter-Latin.woff2 — Inter, weights 400/500/600
+  https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2
+- JetBrainsMono-Latin.woff2 — JetBrains Mono, weights 400/500
+  https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxDcwgknk-4.woff2
+
+License texts (SIL Open Font License 1.1), copied from Google's official fonts repository:
+- OFL-Sora.txt: https://raw.githubusercontent.com/google/fonts/main/ofl/sora/OFL.txt
+- OFL-Inter.txt: https://raw.githubusercontent.com/google/fonts/main/ofl/inter/OFL.txt
+- OFL-JetBrainsMono.txt: https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/OFL.txt
+
+The Google Fonts CSS response uses the same Latin WOFF2 URL for each requested weight within each family. The WOFF2 files are each 1 Latin subset file; total font payload is 105,012 bytes. No repository files were changed.
