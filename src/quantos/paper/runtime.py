@@ -3,6 +3,7 @@ from dataclasses import asdict, replace
 import math
 import fcntl
 import gzip
+import collections
 import json
 import os
 from pathlib import Path
@@ -30,6 +31,7 @@ from .engine import PaperEngine
 from .journal import Journal
 from .market import PublicMarket, RateLimited
 from .report import atomic_json, write_reports
+from .stream import QuoteStream
 from .risk import Cap200M5Policy, Cap200M10Policy, Demo200Policy, LivePolicy, LiveR5Policy, Policy, usable_quote
 from .strategies import library
 from .announcements import BinanceAnnouncements
@@ -43,6 +45,7 @@ DEMO_PROFILE = os.environ.get("QUANTOS_DEMO_PROFILE", "pL")
 FEED_TIMEOUT_MS = 10_000
 # Dashboard status/heartbeat cadence. Was 10s; with the 5s page poll the display ran up to 15s behind.
 STATUS_EVERY_MS = 2_000
+STREAM_EMIT_S = 0.5  # at most two price batches a second off the stream
 # Messages waiting in the main queue. Each feed batch is ~2s, so 15 queued ~ 30s behind live (11-05: 31 min).
 QUEUE_LAG_WARN = 15
 if DEMO_PROFILE not in ("pL", "pD"): raise ValueError("QUANTOS_DEMO_PROFILE must be pL or pD")
@@ -159,6 +162,11 @@ class Runtime:
         self.state, self.hours, self.market_factory = state, hours, market_factory
         self.shutdown = threading.Event()
         self.messages = queue.Queue(maxsize=1000)
+        self.backlog = collections.deque()
+        self.last_rest, self.last_emit, self.last_stamp = 0.0, 0.0, None
+        # Live prices for real runs only; injected test markets stay offline. QUANTOS_WS=0 forces REST polling.
+        self.stream_factory = (QuoteStream if market_factory is PublicMarket
+                               and os.environ.get("QUANTOS_WS", "1") != "0" else None)
         if portfolio not in ("legacy", "live50"): raise ValueError("portfolio must be legacy or live50")
         self.portfolio = portfolio
         self.strategies = live_library() if portfolio == "live50" else library()
@@ -190,6 +198,21 @@ class Runtime:
         path = os.environ.get("QUANTOS_KEY_FILE")
         if not path: raise ValueError("QUANTOS_KEY_FILE must name the testnet key file")
         return SignedClient(self.execution, load_keys(path))
+
+    def next_message(self, timeout=.25):
+        """Oldest message, skipping quote-only batches that a newer one replaces: acting on old prices is
+        worthless and a backlog never catches up (11-05: 31 min behind). Trade batches are never dropped."""
+        if not self.backlog:
+            try: self.backlog.append(self.messages.get(timeout=timeout))
+            except queue.Empty: return "tick", None
+        try:
+            while True: self.backlog.append(self.messages.get_nowait())
+        except queue.Empty:
+            pass
+        quote_only = [i for i, (kind, payload) in enumerate(self.backlog)
+                      if kind == "feed" and all(event == "quote" for event, _ in payload)]
+        for i in reversed(quote_only[:-1]): del self.backlog[i]
+        return self.backlog.popleft()
 
     def emit(self, kind, payload):
         try: self.messages.put((kind, payload), timeout=1)
@@ -307,8 +330,31 @@ class Runtime:
             next_scan = time.monotonic() + (30 - time.time() % 30)
             self.shutdown.wait(max(0, next_scan - time.monotonic()))
 
+    def live_quotes(self, stream, market, symbols):
+        """Newest quotes: stream first, REST (at most every 2s) for anything it can't supply fresh. None if no change."""
+        if stream is None:
+            return market.quotes(symbols, skip_invalid=True)
+        stream.watch(symbols)
+        batch = stream.quotes(symbols)
+        missing = [s for s in symbols if s not in batch]
+        if missing:
+            mono = time.monotonic()
+            if mono - self.last_rest < 2 and batch:
+                pass  # the fresh symbols still go out; the missing ones wait for the next REST turn
+            elif mono - self.last_rest < 2:
+                return None
+            else:
+                self.last_rest = mono
+                batch = {**market.quotes(missing, skip_invalid=True), **batch}
+        stamp = tuple(sorted((s, q.time_ms, q.mark_time_ms) for s, q in batch.items()))
+        if stamp == self.last_stamp and time.monotonic() - self.last_emit < 2:
+            return None
+        self.last_stamp, self.last_emit = stamp, time.monotonic()
+        return batch
+
     def feed(self, started_ms, requested_symbol):
         market = self.market_factory()
+        stream = self.stream_factory() if self.portfolio == "live50" and requested_symbol == 0 and self.stream_factory else None
         cursors, funding_since = {}, {}
         next_funding, backoff = 0, 2
         while not self.shutdown.is_set():
@@ -346,7 +392,9 @@ class Runtime:
                     if self.portfolio != "live50":
                         records.insert(0, ("quote", market.quote(symbol)))
                 if self.portfolio == "live50":
-                    batch = market.quotes(symbols, skip_invalid=True)
+                    batch = self.live_quotes(stream, market, symbols)
+                    if batch is None:  # nothing moved since the last batch
+                        self.shutdown.wait(.1); continue
                     # One quiet thin book must not blank the whole batch (11-02 run: ~4.2k feed errors).
                     if not batch: raise ValueError("invalid or stale quote")
                     records[0:0] = [("quote", batch[s]) for s in symbols if s in batch]
@@ -359,7 +407,8 @@ class Runtime:
                 delay = error.retry_after_seconds if isinstance(error, RateLimited) else backoff
                 self.shutdown.wait(delay)
                 backoff = min(60, backoff * 2)
-            self.shutdown.wait(max(0, 2 - (time.monotonic() - start)))
+            pause = STREAM_EMIT_S if stream is not None and self.portfolio == "live50" else 2
+            self.shutdown.wait(max(0, pause - (time.monotonic() - start)))
 
     def run(self):
         self.state.mkdir(parents=True, exist_ok=True)
@@ -478,8 +527,7 @@ class Runtime:
                 if finishing:
                     finishing_since = finishing_since or now
                     run["status"] = "closing"
-                try: kind, payload = self.messages.get(timeout=.25)
-                except queue.Empty: kind, payload = "tick", None
+                kind, payload = self.next_message()
                 now = milliseconds()
                 if kind == "feed":
                     interval = (now-last_feed)/1000 if last_feed else 0
