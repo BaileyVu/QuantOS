@@ -70,7 +70,8 @@ def arbitrate(signals, adaptive=None):
     return sorted((s for s in signals if s.symbol not in conflicts), key=rank), conflicts
 
 
-def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, sentiment=None):
+def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, sentiment=None,
+             sentiment_fail_closed=False):
     """Identical state transitions for recorded input replay and natural runtime."""
     if kind == "feed":
         quotes = [v for event, v in payload if event == "quote"]
@@ -133,10 +134,11 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
                     verdict = sentiment.judge(proposal, now)
                     with e.journal.transaction():
                         e.journal.event(now, "SENTIMENT_SHADOW", verdict)
-                        if (verdict.get("verdict") == "WOULD_BLOCK"
+                        unavailable = verdict.get("verdict") in {"UNAVAILABLE", "NO_SCORE"}
+                        if ((verdict.get("verdict") == "WOULD_BLOCK" or sentiment_fail_closed and unavailable)
                                 and proposal.strategy_id in getattr(e.policy, "sentiment_gate", ())):
                             e.journal.event(now, "REJECTED_RISK", {"signal_id": proposal.signal_id, "approved": False,
-                                                                   "reason": "SENTIMENT_BLOCK"})
+                                                                   "reason": "SENTIMENT_UNAVAILABLE" if unavailable else "SENTIMENT_BLOCK"})
                             continue
                 e.propose(proposal, snapshot.instrument, q, now)
     elif kind == "restart":
@@ -158,7 +160,7 @@ class Runtime:
     def __init__(self, state: Path, hours=72, market_factory=PublicMarket,
                  min_quote_volume=D("20000000"), announcement_factory=BinanceAnnouncements,
                  portfolio="legacy", sentiment_path=None, notify=True, execution="paper", client_factory=None,
-                 stream=True):
+                 stream=True, sentiment_fail_closed=False):
         if not (hours == 0 or 0 < hours <= 72): raise ValueError("duration must be 0 (until stopped) or 0-72 hours")
         self.state, self.hours, self.market_factory = state, hours, market_factory
         self.shutdown = threading.Event()
@@ -170,7 +172,8 @@ class Runtime:
         # Live WebSocket quotes for the live50 feed; REST polling remains the fallback. Real market only.
         self.stream = (QuoteStream(self._stream_symbols) if stream and portfolio == "live50"
                        and market_factory is PublicMarket else None)
-        self.sentiment = SentimentShadow(sentiment_path) if sentiment_path else None
+        self.sentiment = SentimentShadow(sentiment_path) if sentiment_path or sentiment_fail_closed else None
+        self.sentiment_fail_closed = sentiment_fail_closed
         self.notify = notify
         if execution not in ("paper", "dry-run", "testnet"):
             raise ValueError("execution must be paper, dry-run or testnet (mainnet is not enabled here)")
@@ -519,7 +522,8 @@ class Runtime:
                         monitor.note("feed", now)
                 elif kind in {"funding", "diagnostic"} or (kind == "scan" and not finishing):
                     self.record(kind, payload, now)
-                    dispatch(engines, kind, payload, now, strategies=self.strategies, sentiment=self.sentiment)
+                    dispatch(engines, kind, payload, now, strategies=self.strategies, sentiment=self.sentiment,
+                             sentiment_fail_closed=self.sentiment_fail_closed)
                     if kind == "scan":
                         scan_monitor.note("scan", now)
                         if now >= next_check and payload:
@@ -580,8 +584,9 @@ class Runtime:
                         self._sentiment_checked = now
                         feed = self.sentiment.read(now)
                         if feed["available"]: alerter.clear("sentiment", now)
-                        else: alerter.alert("warn", "sentiment", "sentiment gate OFF (trend rules trade ungated): "
-                                                                  f"{feed['reason']}", now)
+                        else:
+                            effect = "trend entries blocked" if self.sentiment_fail_closed else "trend rules trade ungated"
+                            alerter.alert("warn", "sentiment", f"sentiment unavailable ({effect}): {feed['reason']}", now)
                     backlog = self.messages.qsize()
                     if backlog >= QUEUE_LAG_WARN:
                         alerter.alert("critical", "queue_lag", f"main loop {backlog} messages behind the feed", now)

@@ -1,13 +1,14 @@
-"""Shadow-only sentiment gate fed by sentibot's signal log.
+"""Sentiment observations fed by sentibot's signal log.
 
-It never blocks: it records what a gate *would* have done so its value can be
-measured later. The newest line of sentibot's `paper_perp_signals.jsonl`
+The reader only returns verdicts; runtime applies the profile's optional gate.
+The newest line of sentibot's `paper_perp_signals.jsonl`
 holds per-symbol scores (`signals[SYM].scores.news`, `sentiment_raw.news[SYM]`,
 keyed by USDT symbols). Stale or unreadable input is reported as unavailable.
 """
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import InvalidOperation
 import json
 from pathlib import Path
 
@@ -36,6 +37,7 @@ class SentimentShadow:
             return {"available": False, "reason": "NOT_CONFIGURED"}
         try:
             row = json.loads(_last_line(self.path) or "null")
+            if not isinstance(row, dict): raise ValueError("invalid sentiment record")
             at = int(datetime.fromisoformat(row["time"]).timestamp() * 1000)
         except PermissionError:
             return {"available": False, "reason": "PERMISSION_DENIED"}
@@ -43,12 +45,15 @@ class SentimentShadow:
             return {"available": False, "reason": "UNREADABLE"}
         if not 0 <= now_ms - at <= MAX_AGE_MS:
             return {"available": False, "reason": "STALE", "age_s": (now_ms - at) // 1000}
-        return {"available": True, "time_ms": at, "news": (row.get("sentiment_raw") or {}).get("news") or {},
-                "composite": {k: v.get("composite") for k, v in (row.get("signals") or {}).items()
+        raw, signals = row.get("sentiment_raw") or {}, row.get("signals") or {}
+        if not isinstance(raw, dict) or not isinstance(signals, dict) or not isinstance(raw.get("news", {}), dict):
+            return {"available": False, "reason": "UNREADABLE"}
+        return {"available": True, "time_ms": at, "news": raw.get("news") or {},
+                "composite": {k: v.get("composite") for k, v in signals.items()
                               if isinstance(v, dict)}}
 
     def judge(self, signal, now_ms: int) -> dict:
-        """Would-block verdict for one signal; never used to block."""
+        """Verdict for one signal; runtime owns whether the profile blocks it."""
         data = self.read(now_ms)
         if not data["available"]:
             return {"signal_id": signal.signal_id, "verdict": "UNAVAILABLE", "reason": data["reason"]}
@@ -56,7 +61,11 @@ class SentimentShadow:
         raw = data["news"].get(twin, data["news"].get("_market"))
         if raw is None:
             return {"signal_id": signal.signal_id, "verdict": "NO_SCORE", "symbol": twin}
-        score = D(str(raw))
+        try:
+            score = D(str(raw))
+            if not score.is_finite(): raise ValueError("nonfinite sentiment")
+        except (ValueError, InvalidOperation):
+            return {"signal_id": signal.signal_id, "verdict": "UNAVAILABLE", "reason": "INVALID_SCORE"}
         block = score < LONG_BLOCK_BELOW if signal.side == "LONG" else score > SHORT_BLOCK_ABOVE
         return {"signal_id": signal.signal_id, "verdict": "WOULD_BLOCK" if block else "WOULD_ALLOW",
                 "symbol": twin, "news": str(score), "composite": data["composite"].get(twin),

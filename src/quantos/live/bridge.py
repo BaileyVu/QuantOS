@@ -24,7 +24,7 @@ from ..paper.types import D, Instrument
 from .client import AmbiguousOrderState, BinanceError, RateLimited, UnknownOrder
 from .kill import KillSwitch, flatten
 from .orders import (ProtectionFailed, client_order_id, place_with_protection, reduce_only_close,
-                     stop_market_protect, submit)
+                     stop_market_protect, submit, verify_position_leverage)
 from .reconcile import reconcile
 
 AUTH_CODES = {-2015, -2014, -1022, -2008}
@@ -135,7 +135,8 @@ class ExchangeMirror:
                     self._void(engine, oid, ins.symbol, now_ms, f"leverage/margin setup rejected: {setup}")
                 continue  # transient: retry at the next sync
             placed, error = self._guard("entry", lambda: place_with_protection(
-                self.client, ins, side, D(o["filled"]), D(o["stop_price"]), self.run_id, oid[:20]))
+                self.client, ins, side, D(o["filled"]), D(o["stop_price"]), self.run_id, oid[:20],
+                expected_leverage=D(o["decision"]["leverage"])))
             if error is not None:
                 if isinstance(error, ProtectionFailed):
                     self.book[oid] = {"symbol": ins.symbol, "state": "FAILED", "error": type(error).__name__}
@@ -145,6 +146,7 @@ class ExchangeMirror:
                     # Outcome unknown: it may have filled. Resolve by client id before anything else.
                     self.book[oid] = {"symbol": ins.symbol, "side": side, "qty": o["filled"], "stop": o["stop_price"],
                                       "state": "PENDING", "instrument": o["instrument"], "opened_ms": now_ms,
+                                      "leverage": o["decision"]["leverage"],
                                       "pending_since": now_ms, "stop_n": 0, "booked": ""}
                     self._save()
                     self.alert("warn", f"entry:{oid}", f"entry outcome unknown on {ins.symbol}; resolving: {error}")
@@ -266,6 +268,15 @@ class ExchangeMirror:
             return self._void(engine, oid, m["symbol"], now_ms, "entry never filled on the exchange")
         filled = D(str(entry.get("executedQty", "0"))) if error is None else D(0)
         if error is None and filled > 0 and entry.get("status") in ("FILLED", "PARTIALLY_FILLED", "CANCELED", "EXPIRED"):
+            # Older persisted PENDING records can recover the original approval
+            # from the engine; never infer leverage from the exchange itself.
+            expected = m.get("leverage")
+            if expected is None:
+                o = next((o for o in engine.active() if o["id"] == oid), None)
+                expected = o["decision"]["leverage"] if o else None
+            _, lev_error = self._guard("leverage", lambda: verify_position_leverage(self.client, m["symbol"], expected))
+            if lev_error is not None:
+                return self._halt(f"leverage unverified on {m['symbol']} after resolved entry: {lev_error}")
             sl, sl_error = self._guard("stop", lambda: submit(self.client, stop_market_protect(
                 m["symbol"], opp, D(m["stop"]), client_order_id(self.run_id, oid[:20], "sl"), ins)))
             if sl_error is not None:

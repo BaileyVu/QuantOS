@@ -18,6 +18,19 @@ class EntryNotFilled(RuntimeError): pass
 class OrderRejected(ValueError): pass
 
 
+def verify_position_leverage(client, symbol, expected):
+    """Verify authoritative leverage on the filled one-way position before its stop."""
+    if getattr(client, "mode", "") == "dry-run":
+        return
+    rows = [r for r in client.position_risk(symbol) if r.get("symbol") == symbol
+            and D(str(r.get("positionAmt", "0"))) != 0]
+    if len(rows) != 1 or rows[0].get("positionSide", "BOTH") != "BOTH":
+        raise OrderRejected("filled one-way position unavailable")
+    actual = D(str(rows[0].get("leverage", "NaN")))
+    if not actual.is_finite() or actual != D(str(expected)):
+        raise OrderRejected("exchange position leverage differs from approval")
+
+
 def client_order_id(run_id: str, signal_id: str, leg: str) -> str:
     if leg not in LEGS or not run_id or not signal_id: raise ValueError("bad id parts")
     h = hashlib.sha256(f"{run_id}\x1f{signal_id}\x1f{leg}".encode()).hexdigest()[:24]
@@ -107,7 +120,7 @@ class Placement:
 
 
 def place_with_protection(client, inst: Instrument, side, qty, stop_price, run_id, signal_id,
-                          tp_price=None, close_position: bool = True) -> Placement:
+                          tp_price=None, close_position: bool = True, expected_leverage=None) -> Placement:
     sym, opp = inst.symbol, _opp(side)
     cid = lambda leg: client_order_id(run_id, signal_id, leg)
     entry = submit(client, market_entry(sym, side, qty, cid("entry"), inst))
@@ -117,6 +130,8 @@ def place_with_protection(client, inst: Instrument, side, qty, stop_price, run_i
     if entry.get("status") not in ("FILLED", "PARTIALLY_FILLED") or filled <= 0:
         raise EntryNotFilled(f"entry status {entry.get('status')}")
     try:
+        if expected_leverage is not None:
+            verify_position_leverage(client, sym, expected_leverage)
         sl = submit(client, stop_market_protect(sym, opp, stop_price, cid("sl"), inst, None if close_position else filled))
     except Exception as e:
         try:
