@@ -7,6 +7,8 @@ Mainnet is never configured here. The demo run uses Binance Demo futures (fake f
 import os
 from pathlib import Path
 import plistlib
+import re
+import shutil
 import subprocess
 import sys
 
@@ -28,12 +30,58 @@ def python():
     return Path(out.stdout.strip())
 
 
-def jobs(resume=False):
-    commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
+def clean_snapshot(repo=REPO, snapshots=QOS / "app-v4"):
+    """Return src/ from an immutable, clean worktree of the current full commit."""
+    repo = Path(repo).resolve()
+    status = subprocess.run(
+        ["git", "-C", str(repo), "status", "--porcelain=v1", "--untracked-files=all",
+         "--ignore-submodules=none"], capture_output=True, text=True, check=True).stdout
+    if status:
+        raise SystemExit(f"refusing deployment from dirty source tree {repo}: {status.splitlines()[0]}")
+    commit = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
                             capture_output=True, text=True, check=True).stdout.strip()
-    app = QOS / "app-v4" / commit / "src"
-    app.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["rsync", "-a", "--delete", "--exclude", "__pycache__", f"{REPO / 'src'}/", f"{app}/"], check=True)
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise SystemExit("git returned an invalid full commit SHA")
+
+    worktree = Path(snapshots).expanduser().resolve() / commit / "source"
+    source = worktree / "src"
+    if worktree.exists():
+        actual = subprocess.run(["git", "-C", str(worktree), "rev-parse", "HEAD"],
+                                capture_output=True, text=True, check=True).stdout.strip()
+        snapshot_status = subprocess.run(
+            ["git", "-C", str(worktree), "status", "--porcelain=v1", "--untracked-files=all",
+             "--ignore-submodules=none"], capture_output=True, text=True, check=True).stdout
+        if actual != commit or snapshot_status or not source.is_dir():
+            raise SystemExit(f"existing deployment snapshot is invalid or dirty: {worktree}")
+        return source
+
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach", str(worktree), commit],
+                       capture_output=True, text=True, check=True)
+        actual = subprocess.run(["git", "-C", str(worktree), "rev-parse", "HEAD"],
+                                capture_output=True, text=True, check=True).stdout.strip()
+        snapshot_status = subprocess.run(
+            ["git", "-C", str(worktree), "status", "--porcelain=v1", "--untracked-files=all",
+             "--ignore-submodules=none"], capture_output=True, text=True, check=True).stdout
+        if actual != commit or snapshot_status or not source.is_dir():
+            raise RuntimeError("new worktree failed commit, cleanliness, or source checks")
+        return source
+    except Exception:
+        # The destination did not exist before this attempt, so cleanup cannot remove
+        # a previously installed snapshot. Remove Git's registration before any residue.
+        try:
+            subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(worktree)],
+                           capture_output=True, text=True, check=False)
+        except Exception:
+            # Keep the failure that caused cleanup as the actionable exception.
+            pass
+        shutil.rmtree(worktree, ignore_errors=True)
+        raise
+
+
+def jobs(resume=False):
+    app = clean_snapshot()
     py, out = python(), {}
     for name, execution, env in (("paper", "paper", {}),
                                  ("demo", "testnet", {"QUANTOS_KEY_FILE": str(KEY), "QUANTOS_TESTNET_HOST": "demo"})):
@@ -99,11 +147,7 @@ def restart_quantos():
 
 def install_dashboard(runs=None, exchange=None):
     """Local read-only dashboard on http://127.0.0.1:8787 (launchd com.quantos.dashboard)."""
-    commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
-                            capture_output=True, text=True, check=True).stdout.strip()
-    app = QOS / "app-v4" / commit / "src"
-    app.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["rsync", "-a", "--delete", "--exclude", "__pycache__", f"{REPO / 'src'}/", f"{app}/"], check=True)
+    app = clean_snapshot()
     label = "com.quantos.dashboard"
     if loaded(label):
         subprocess.run(["launchctl", "bootout", f"{DOMAIN}/{label}"], check=False)
@@ -145,11 +189,7 @@ def install_demo200(hours=0):
     import time
     if not KEY.is_file() or KEY.stat().st_mode & 0o077:
         raise SystemExit("demo key copy missing or not mode 600")
-    commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
-                            capture_output=True, text=True, check=True).stdout.strip()
-    app = QOS / "app-v4" / commit / "src"
-    app.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["rsync", "-a", "--delete", "--exclude", "__pycache__", f"{REPO / 'src'}/", f"{app}/"], check=True)
+    app = clean_snapshot()
     state, py, plan = QOS / "v4-demo200", python(), {}
     if (state / "run.json").exists(): raise SystemExit(f"{state} already has a run; use a fresh folder")
     (state / "logs").mkdir(parents=True, exist_ok=True); state.chmod(0o700)
