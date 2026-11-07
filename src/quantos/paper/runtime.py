@@ -157,7 +157,9 @@ class Runtime:
                  min_quote_volume=D("20000000"), announcement_factory=BinanceAnnouncements,
                  portfolio="legacy", sentiment_path=None, notify=True, execution="paper", client_factory=None,
                  stream=True):
-        if not 0 < hours <= 72: raise ValueError("duration must be >0 and <=72 hours")
+        # live50 runs until stopped on command; 10 years stands in for "no end". Research runs stay bounded.
+        limit = 87600 if portfolio == "live50" else 72
+        if not 0 < hours <= limit: raise ValueError(f"duration must be >0 and <={limit} hours")
         self.state, self.hours, self.market_factory = state, hours, market_factory
         self.shutdown = threading.Event()
         self.messages = queue.Queue(maxsize=1000)
