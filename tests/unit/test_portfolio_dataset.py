@@ -19,6 +19,19 @@ def archive(name: str, csv: str) -> bytes:
 
 
 class PortfolioDatasetTests(unittest.TestCase):
+    def test_full_manifest_hash_binds_source_metadata_beyond_partition_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "manifest.json"
+            manifest = {"window": {"start": "2021-10-01", "end": "2024-12-31"},
+                        "universe": {"symbols": []}, "tasks": [], "source": "fixture one"}
+            path.write_text(json.dumps(manifest))
+            first = build_index(path)
+            manifest["source"] = "fixture two"
+            path.write_text(json.dumps(manifest))
+            second = build_index(path)
+            self.assertEqual(first.content_hash, second.content_hash)
+            self.assertNotEqual(first.manifest_hash, second.manifest_hash)
+
     def test_loads_sorted_bars_and_reports_gaps_with_exact_timestamp_lookup(self):
         header = "open_time,open,high,low,close,volume,close_time,quote_volume,count,taker_buy_volume,taker_buy_quote_volume,ignore\n"
         base = 1633046400000  # 2021-10-01 UTC

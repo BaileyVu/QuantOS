@@ -50,6 +50,7 @@ class DatasetIndex:
     overlay_manifest: str | None = None
     overlay_hash: str | None = None
     overlay_rows: int = 0
+    manifest_hash: str | None = None
 
 
 def _window_bounds(start: str, end: str) -> tuple[int, int]:
@@ -213,6 +214,10 @@ def build_index(manifest_path: str | Path, *, symbols: tuple[str, ...] | None = 
         overlay_manifest=overlay_path,
         overlay_hash=overlay_hash,
         overlay_rows=overlay_rows,
+        manifest_hash=hashlib.sha256(json.dumps({"base": manifest,
+            "overlay": repair if overlay_manifest is not None else None,
+            "selected_symbols": sorted(wanted)}, sort_keys=True, separators=(",", ":"),
+            allow_nan=False).encode()).hexdigest(),
     )
 
 
@@ -221,6 +226,7 @@ def persist_audit(index: DatasetIndex, path: str | Path) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     payload = {"window": list(index.window), "content_hash": index.content_hash,
+               "manifest_hash": index.manifest_hash,
                "overlay_manifest": index.overlay_manifest,
                "overlay_hash": index.overlay_hash, "overlay_rows": index.overlay_rows,
                "series": [{"symbol": x.symbol, "dataset": x.dataset, "rows": x.rows,
