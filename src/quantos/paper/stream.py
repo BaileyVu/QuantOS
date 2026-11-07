@@ -98,34 +98,47 @@ class WebSocket:
 
 
 class QuoteStream:
-    """Background thread holding the latest book and mark per symbol. `symbols()` is read every second;
-    a changed set reconnects with the new subscriptions."""
+    """Background threads holding the latest book and mark per symbol. Binance serves high-frequency
+    book streams on /public and mark-price streams on /market (a bookTicker+markPrice subscription on
+    plain /stream delivered books only, 11-07), so each runs on its own socket. `symbols()` is read every
+    second; a changed set reconnects with the new subscriptions."""
+    CHANNELS = {"book": ("/public/stream?streams=", "{}@bookTicker", 60_000),
+                "mark": ("/market/stream?streams=", "{}@markPrice@1s", SILENT_MS)}
+
     def __init__(self, symbols: Callable[[], set], connect: Callable = WebSocket,
                  clock_ms: Callable[[], int] = lambda: int(time.time() * 1000), on_event: Callable = None):
         self.symbols, self.connect, self.clock_ms = symbols, connect, clock_ms
         self.on_event = on_event or (lambda kind, detail: None)
         self.lock = threading.Lock()
-        self.books, self.marks, self.subscribed = {}, {}, frozenset()
-        self.last_ms, self.connected = 0, False
+        self.books, self.marks = {}, {}
+        self.subscribed = {c: frozenset() for c in self.CHANNELS}
+        self.last = {c: 0 for c in self.CHANNELS}
+        self.up = {c: False for c in self.CHANNELS}
         self.messages = self.reconnects = 0
 
-    def handle(self, text: str):
+    @property
+    def connected(self) -> bool: return all(self.up.values())
+
+    def handle(self, text: str, channel: str | None = None):
         msg = json.loads(text).get("data") or {}
         s, kind = msg.get("s"), msg.get("e")
         with self.lock:
             if kind == "bookTicker":
                 self.books[s] = {"symbol": s, "bidPrice": msg["b"], "bidQty": msg["B"], "askPrice": msg["a"],
                                  "askQty": msg["A"], "time": msg["T"]}
+                self.last["book"] = self.clock_ms()
             elif kind == "markPriceUpdate":
                 self.marks[s] = {"symbol": s, "markPrice": msg["p"], "time": msg["E"]}
-            self.last_ms, self.messages = self.clock_ms(), self.messages + 1
+                self.last["mark"] = self.clock_ms()
+            self.messages += 1
 
     def healthy(self, now_ms: int) -> bool:
-        return self.connected and now_ms - self.last_ms <= SILENT_MS
+        """Both sockets up and each heard within its silence limit (marks tick every 1s; a quiet book may not)."""
+        return all(self.up[c] and now_ms - self.last[c] <= limit for c, (_, _, limit) in self.CHANNELS.items())
 
     def quotes(self, symbols, now_ms: int) -> dict[str, Quote] | None:
         """Validated quotes for every requested symbol, or None so the caller polls REST instead."""
-        if not self.healthy(now_ms) or not set(symbols) <= self.subscribed:
+        if not self.healthy(now_ms) or not all(set(symbols) <= sub for sub in self.subscribed.values()):
             return None
         out = {}
         with self.lock:
@@ -137,37 +150,44 @@ class QuoteStream:
         return out or None
 
     def run(self, shutdown: threading.Event):
+        marks = threading.Thread(target=self._loop, args=(shutdown, "mark"), daemon=True)
+        marks.start()
+        self._loop(shutdown, "book")
+        marks.join(timeout=5)
+
+    def _loop(self, shutdown: threading.Event, channel: str):
+        prefix, stream, silent_ms = self.CHANNELS[channel]
         backoff = 1
         while not shutdown.is_set():
             wanted = frozenset(s for s in self.symbols() if s)
             if not wanted:
                 shutdown.wait(1); continue
-            streams = "/".join(f"{s.lower()}@bookTicker/{s.lower()}@markPrice@1s" for s in sorted(wanted))
             ws = None
             try:
-                ws = self.connect(HOST, f"/stream?streams={streams}")
+                ws = self.connect(HOST, prefix + "/".join(stream.format(s.lower()) for s in sorted(wanted)))
                 ws.settimeout(1)
                 with self.lock:
-                    self.books = {k: v for k, v in self.books.items() if k in wanted}
-                    self.marks = {k: v for k, v in self.marks.items() if k in wanted}
-                self.subscribed, self.connected, opened = wanted, True, self.clock_ms()
-                self.on_event("connected", {"symbols": len(wanted)})
+                    table = self.books if channel == "book" else self.marks
+                    for k in [k for k in table if k not in wanted]: del table[k]
+                    self.subscribed[channel], self.up[channel] = wanted, True
+                opened = self.last[channel] = self.clock_ms()
+                self.on_event("connected", {"channel": channel, "symbols": len(wanted)})
                 backoff = 1
                 while not shutdown.is_set():
                     try:
-                        self.handle(ws.recv())
+                        self.handle(ws.recv(), channel)
                     except socket.timeout:
                         pass
                     now = self.clock_ms()
-                    if now - self.last_ms > SILENT_MS and now - opened > SILENT_MS:
-                        raise ConnectionError("stream silent")
+                    if now - self.last[channel] > silent_ms:
+                        raise ConnectionError(f"{channel} stream silent")
                     if now - opened > ROTATE_MS or frozenset(s for s in self.symbols() if s) != wanted:
                         break  # reconnect with fresh subscriptions
             except Exception as error:
-                self.on_event("disconnected", {"error": f"{type(error).__name__}: {error}"[:200]})
+                self.on_event("disconnected", {"channel": channel, "error": f"{type(error).__name__}: {error}"[:200]})
                 shutdown.wait(backoff)
                 backoff = min(30, backoff * 2)
             finally:
-                self.connected = False
+                self.up[channel] = False
                 if ws is not None: ws.close()
                 self.reconnects += 1

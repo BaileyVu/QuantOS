@@ -57,7 +57,8 @@ class WebSocketTests(unittest.TestCase):
 class QuoteStreamTests(unittest.TestCase):
     def stream(self, now):
         q = QuoteStream(lambda: {"NEARUSDC"}, clock_ms=lambda: now[0])
-        q.subscribed, q.connected = frozenset({"NEARUSDC"}), True
+        q.subscribed = {c: frozenset({"NEARUSDC"}) for c in q.CHANNELS}
+        q.up = {c: True for c in q.CHANNELS}
         return q
 
     def test_quotes_validated_like_rest(self):
@@ -73,8 +74,8 @@ class QuoteStreamTests(unittest.TestCase):
         now = [1_500]
         q = self.stream(now)
         q.handle(msg("bookTicker", "NEARUSDC", **BOOK)); q.handle(msg("markPriceUpdate", "NEARUSDC", **MARK))
-        self.assertIsNone(q.quotes(["NEARUSDC"], 1_500 + 6_000))  # silent > 5s
-        q.connected = False
+        self.assertIsNone(q.quotes(["NEARUSDC"], 1_500 + 6_000))  # marks silent > 5s
+        q.up["mark"] = False
         self.assertIsNone(q.quotes(["NEARUSDC"], 1_500))
 
     def test_stale_mark_is_skipped_not_served(self):
@@ -83,26 +84,35 @@ class QuoteStreamTests(unittest.TestCase):
         q.handle(msg("bookTicker", "NEARUSDC", **BOOK)); q.handle(msg("markPriceUpdate", "NEARUSDC", **MARK))
         self.assertIsNone(q.quotes(["NEARUSDC"], 10_000))  # mark 9s old: invalid -> nothing -> REST
 
-    def test_reconnects_after_failure_and_on_symbol_change(self):
+    def test_book_and_mark_use_separate_endpoints_and_reconnect(self):
         wanted, opened = [{"NEARUSDC"}], []
         stop = threading.Event()
 
         class Conn:
             def __init__(self, host, path):
                 opened.append(path)
-                if len(opened) == 1: raise OSError("refused")
+                if path.startswith("/public") and sum(p.startswith("/public") for p in opened) == 1:
+                    raise OSError("refused")
             def settimeout(self, s): pass
             def recv(self):
-                if len(opened) == 2: wanted[0] = {"NEARUSDC", "BTCUSDC"}
-                else: stop.set()
+                books = [p for p in opened if p.startswith("/public")]
+                if len(books) == 2: wanted[0] = {"NEARUSDC", "BTCUSDC"}
+                elif len(books) >= 3: stop.set()
                 return msg("markPriceUpdate", "NEARUSDC", **MARK)
             def close(self): pass
 
-        q = QuoteStream(lambda: wanted[0], connect=Conn)
+        q = QuoteStream(lambda: wanted[0], connect=Conn, clock_ms=lambda: 0)
         stop.wait = lambda t=None: None  # no real backoff sleep
-        q.run(stop)
-        self.assertEqual(len(opened), 3)
-        self.assertIn("btcusdc@bookTicker", opened[2])
+        q._loop(stop, "book")
+        books = [p for p in opened if p.startswith("/public")]
+        self.assertEqual(len(books), 3)
+        self.assertIn("btcusdc@bookTicker", books[2])
+        stop.clear()
+        marks = []
+        q2 = QuoteStream(lambda: {"NEARUSDC"}, connect=lambda h, p: (marks.append(p), stop.set(), Conn(h, "/x"))[2],
+                         clock_ms=lambda: 0)
+        q2._loop(stop, "mark")
+        self.assertEqual(marks, ["/market/stream?streams=nearusdc@markPrice@1s"])
 
 
 if __name__ == "__main__":

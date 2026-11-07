@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import re
 import sqlite3
@@ -293,7 +294,11 @@ def exchange_view():
                      for r in client.position_risk() if float(r.get("positionAmt") or 0) != 0]
         acct = client.account()
         return {"enabled": True, "mode": _EXCHANGE["mode"], "time_ms": int(time.time() * 1000), "positions": positions,
-                "wallet": float(acct.get("totalWalletBalance") or 0), "upnl": float(acct.get("totalUnrealizedProfit") or 0)}
+                # Multi-asset accounts report totals in USDT; the bot trades USDC margin, so show that asset.
+                **next(({"wallet": float(x["walletBalance"]), "upnl": float(x.get("unrealizedProfit") or 0)}
+                        for x in acct.get("assets", []) if x.get("asset") == "USDC"),
+                       {"wallet": float(acct.get("totalWalletBalance") or 0),
+                        "upnl": float(acct.get("totalUnrealizedProfit") or 0)})}
     with _LOCK:
         hit = _CACHE.get("exchange")
     if hit and time.time() - hit[0] < 2:
@@ -367,6 +372,8 @@ def main(argv=None):
         from ..live.client import SignedClient
         from ..live.keys import load_keys
         mode, _, key_file = a.exchange.partition("=")
+        if mode == "demo":  # Demo Trading is the testnet mode on the demo host
+            os.environ["QUANTOS_TESTNET_HOST"], mode = "demo", "testnet"
         _EXCHANGE.update(mode=mode, client=SignedClient(mode, load_keys(str(Path(key_file).expanduser()))))
     runs = []
     for r in a.run:  # NAME=STATE or NAME=STATE#PROFILE
