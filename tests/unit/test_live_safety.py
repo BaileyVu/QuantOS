@@ -48,12 +48,15 @@ class KillTests(unittest.TestCase):
             k.engage("test\nreason"); self.assertTrue(k.active); self.assertEqual(k.reason(), "test reason")
 
     def test_flatten(self):
+        position = {"qty": "-2.5"}
         def h(m, p, q):
             if p == "/fapi/v2/positionRisk":
-                return 200, [{"symbol": "SOLUSDC", "positionAmt": "-2.5"}, {"symbol": "ETHUSDC", "positionAmt": "0"}]
+                return 200, [{"symbol": "SOLUSDC", "positionAmt": position["qty"]}, {"symbol": "ETHUSDC", "positionAmt": "0"}]
             if p == "/fapi/v1/openOrders": return 200, [{"symbol": "SOLUSDC"}]
             if p == "/fapi/v1/openAlgoOrders": return 200, []
-            if p == "/fapi/v1/order": return 200, {"clientOrderId": q["newClientOrderId"], "status": "FILLED"}
+            if p == "/fapi/v1/order":
+                position["qty"] = "0"
+                return 200, {"clientOrderId": q["newClientOrderId"], "status": "FILLED"}
             return 200, {"code": 200}
         f = Fake(h); c = SignedClient("testnet", KEYS, transport=f, clock_ms=lambda: 1)
         res = flatten(c, None)

@@ -301,6 +301,9 @@ class FillsExchange(FakeExchange):
         if self.hide: return []
         return [t for t in self.trades if start_time is None or t["time"] >= start_time]
 
+    def order_trades(self, symbol, order_id, start_time=None):
+        return [t for t in self.user_trades(symbol, start_time) if str(t["orderId"]) == str(order_id)]
+
 
 class BookingEngine(Engine):
     def __init__(self):
@@ -339,6 +342,8 @@ class RealFillTests(unittest.TestCase):
         ex.price = D("75.10")                         # stop triggered on Binance
         ex.fill("SELL", D("0.05"), 999)
         ex.pos["SOLUSDC"], ex.algo, ex.reject_reduce = D(0), {}, True
+        # The historical Algo query links its matching-engine order id.
+        ex.get_algo_order = lambda cid: {"actualOrderId": "999"}
         e.orders = []
         m.sync(e, 5000)
         self.assertFalse(m.kill.active)
@@ -368,7 +373,9 @@ class RealFillTests(unittest.TestCase):
         ex.price = D("75.10")                         # stop filled on Binance
         ex.fill("SELL", D("0.05"), 999)
         ex.pos["SOLUSDC"], ex.algo, ex.reject_reduce = D(0), {}, True
-        m.sync(e, 3000, [{"e": "ACCOUNT_UPDATE", "a": {"P": [{"s": "SOLUSDC", "pa": "0"}]}}])
+        m.sync(e, 3000, [{"e": "ORDER_TRADE_UPDATE", "o": {"s": "SOLUSDC", "X": "FILLED",
+                         "c": m.book["a" * 32]["stop_cid"], "i": 999}},
+                        {"e": "ACCOUNT_UPDATE", "a": {"P": [{"s": "SOLUSDC", "pa": "0"}]}}])
         self.assertEqual(closed, [("a" * 32, "EXCHANGE_CLOSED")])
         self.assertFalse(m.kill.active)
         e.orders = []                                 # paper is now CLOSING, so not live

@@ -29,10 +29,11 @@ class KillSwitch:
 class FlattenResult:
     closed: list = field(default_factory=list)
     errors: dict = field(default_factory=dict)
+    order_ids: dict = field(default_factory=dict)
 
 
 def flatten(client, symbols=None, instruments: dict | None = None, tag: str = "kill", scope=None) -> FlattenResult:
-    """Cancel all open orders, then reduce-only close every nonzero position (only symbols `scope` accepts,
+    """Reduce-only close, verify flat, then cancel protection (only symbols `scope` accepts,
     when given). Per-symbol errors are collected."""
     res = FlattenResult()
     positions = {p["symbol"]: D(str(p["positionAmt"])) for p in client.position_risk()}
@@ -43,13 +44,16 @@ def flatten(client, symbols=None, instruments: dict | None = None, tag: str = "k
         if scope is not None: symbols = [s for s in symbols if scope(s)]
     for sym in symbols:
         try:
-            client.cancel_all(sym)
-            if getattr(client, "conditional_api", "legacy") == "algo": client.cancel_all_algo(sym)
             q = positions.get(sym, D("0"))
             if q != 0:
                 cid = client_order_id(tag, f"{sym}-{abs(q)}", "close")
-                submit(client, reduce_only_close(sym, "SELL" if q > 0 else "BUY", abs(q), cid, (instruments or {}).get(sym)))
+                closed = submit(client, reduce_only_close(sym, "SELL" if q > 0 else "BUY", abs(q), cid, (instruments or {}).get(sym)))
+                if closed.get("orderId") is not None: res.order_ids[sym] = closed["orderId"]
+                if any(D(str(p["positionAmt"])) != 0 for p in client.position_risk(sym) if p.get("symbol") == sym):
+                    raise ValueError("close not confirmed flat; protection retained")
                 res.closed.append(sym)
+            client.cancel_all(sym)
+            if getattr(client, "conditional_api", "legacy") == "algo": client.cancel_all_algo(sym)
         except Exception as e:
             res.errors[sym] = type(e).__name__
     return res
