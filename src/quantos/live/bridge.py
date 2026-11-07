@@ -116,7 +116,9 @@ class ExchangeMirror:
         with mirror_lock(self.state):
             self.book = json.loads(self.path.read_text()) if self.path.exists() else {}
             for oid, m in self.book.items():
-                if m.get("watchdog_closed") and hasattr(engine, "close_external"):
+                if m.get("entry_void") and hasattr(engine, "void_entry"):
+                    engine.void_entry(oid, now_ms, "exchange entry confirmed unfilled")
+                elif m.get("watchdog_closed") and hasattr(engine, "close_external"):
                     engine.close_external(oid, now_ms, "WATCHDOG_EXIT")
             return self._sync(engine, now_ms, events)
 
@@ -358,7 +360,10 @@ class ExchangeMirror:
 
     def _flat_on_exchange(self, symbol) -> bool:
         rows, error = self._guard("close", lambda: self.client.position_risk(symbol))
-        return error is None and all(D(str(r["positionAmt"])) == 0 for r in rows if r.get("symbol") == symbol)
+        if error is not None: return False
+        matches = [r for r in rows if r.get("symbol") == symbol]
+        return (len(matches) == 1 and matches[0].get("positionSide", "BOTH") == "BOTH"
+                and D(str(matches[0]["positionAmt"])) == 0)
 
     @staticmethod
     def _remember_exit(m, order_id):
@@ -480,7 +485,11 @@ class ExchangeMirror:
             self.flat_confirmed = True
             return
         instruments = {m["symbol"]: _instrument(m["instrument"]) for m in self.book.values() if "instrument" in m}
-        result, error = self._guard("flatten", lambda: flatten(self.client, None, instruments, tag=self.run_id, scope=self.scope))
+        close_ids = {m["symbol"]: client_order_id(self.run_id, oid[:20], "close")
+                     for oid, m in self.book.items()
+                     if m["state"] in ("OPEN", "PENDING", "CLOSE_FAILED", "FAILED") and "instrument" in m}
+        result, error = self._guard("flatten", lambda: flatten(self.client, None, instruments, tag=self.run_id,
+                                                             scope=self.scope, close_ids=close_ids))
         unresolved = False
         for oid, m in self.book.items():
             if result is not None: self._remember_exit(m, result.order_ids.get(m["symbol"]))
@@ -488,6 +497,11 @@ class ExchangeMirror:
                 entry, query_error = self._guard("resolve", lambda: self.client.get_order(m["symbol"], client_order_id(self.run_id, oid[:20], "entry")))
                 if query_error is None and entry.get("status") in ("FILLED", "CANCELED", "EXPIRED", "REJECTED"):
                     m["entry_order"] = entry.get("orderId")
+                    m["qty"] = str(D(str(entry.get("executedQty", "0"))))
+                    if D(m["qty"]) == 0:
+                        m.update(state="VOID", entry_void=True)
+                elif isinstance(query_error, UnknownOrder):
+                    m.update(state="VOID", entry_void=True)
                 elif not isinstance(query_error, UnknownOrder): unresolved = True
         self._save()  # preserve any successful close ids even when another leg fails
         left, check_error = self._guard("flatten", self._exchange_exposure)

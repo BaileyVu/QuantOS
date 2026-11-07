@@ -97,6 +97,46 @@ class ProtectionTests(unittest.TestCase):
         self.assertTrue(self.m.kill.active)
         self.assertEqual(self.ex.pos["SOLUSDC"], 0)
 
+    def test_terminal_zero_fill_is_voided_on_engine_recovery(self):
+        self.m.sync(self.e, 1000)
+        record = self.m.book["a" * 32]
+        record.update(state="PENDING", pending_since=1000)
+        self.m._save()
+        entry = next(iter(self.ex.orders.values()))
+        entry.update(status="EXPIRED", executedQty="0")
+        self.ex.pos["SOLUSDC"], self.ex.algo = D(0), {}
+        self.assertEqual(protect_once(self.state, self.ex, now_ms=200_000)["errors"], {})
+        voided, closed = [], []
+        self.e.void_entry = lambda *args: voided.append(args)
+        self.e.close_external = lambda *args: closed.append(args)
+        self.m.sync(self.e, 201_000)
+        self.assertEqual(voided[0][0], "a" * 32)
+        self.assertEqual(closed, [])
+        self.assertEqual(self.m.book["a" * 32]["state"], "VOID")
+
+    def test_kill_settles_exact_real_exit_and_retains_id_across_restart(self):
+        self.m.sync(self.e, 1000)
+        self.ex.price = D("81.25")
+        self.m._halt("test kill")
+        # Simulate lost final mirror write after the close. Recover its stable cid.
+        self.m.book["a" * 32].pop("exit_orders")
+        self.m._save()
+        closed = []
+        self.e.close_external = lambda *args: closed.append(args)
+        fresh = ExchangeMirror(self.ex, "r", self.state, lambda *a: None)
+        fresh.sync(self.e, 2000)
+        self.assertEqual(fresh.book["a" * 32]["booked"], "all")
+        self.assertEqual(self.e.booked[-1], ("exit", (D("81.25"), D("0.00203125"))))
+        self.assertEqual(closed[0][2], "KILL_EXIT")
+
+    def test_missing_position_response_does_not_confirm_flat(self):
+        self.m.sync(self.e, 1000)
+        self.ex.position_risk = lambda symbol=None: []
+        self.assertFalse(self.m._flat_on_exchange("SOLUSDC"))
+        result = protect_once(self.state, self.ex, now_ms=200_000)
+        self.assertIn("a" * 32, result["errors"])
+        self.assertTrue(self.ex.algo)
+
     def test_process_dies_after_entry_before_stop_and_restart_adopts_once(self):
         # Actual subprocess exit, not an exception swallowed by the order wrapper.
         program = '''
@@ -125,6 +165,33 @@ ExchangeMirror(ex, "r", Path(sys.argv[1]), lambda *a: None).sync(e, 1000)
         fresh.sync(self.e, 3000)
         self.assertEqual(fresh.book["a" * 32]["state"], "OPEN")
         self.assertEqual((len(ex.orders), ex.algo_posts), (1, 1))
+
+    def test_watchdog_closes_without_main_runtime_after_process_death(self):
+        program = '''
+import json, os, sys
+from pathlib import Path
+from tests.unit.test_live_bridge import FakeExchange, Engine, order
+from quantos.live.bridge import ExchangeMirror
+ex, e = FakeExchange(), Engine()
+e.orders = [order()]
+original = ex.new_order
+def crash(p):
+    result = original(p)
+    Path(sys.argv[1], "fake-exchange.json").write_text(json.dumps({"orders": ex.orders, "pos": ex.pos}, default=str))
+    os._exit(23)
+ex.new_order = crash
+ExchangeMirror(ex, "r", Path(sys.argv[1]), lambda *a: None).sync(e, 1000)
+'''
+        child = subprocess.run([sys.executable, "-c", program, str(self.state)], check=False)
+        self.assertEqual(child.returncode, 23)
+        saved = json.loads((self.state / "fake-exchange.json").read_text())
+        ex = FakeExchange()
+        ex.orders, ex.pos = saved["orders"], {s: D(q) for s, q in saved["pos"].items()}
+        # No main runtime or engine recovery: only independent watchdog code runs.
+        result = protect_once(self.state, ex, now_ms=200_000)
+        self.assertEqual(result, {"closed": ["a" * 32], "errors": {}})
+        self.assertEqual(ex.pos["SOLUSDC"], 0)
+        self.assertEqual(len(ex.orders), 2)
 
     def test_watchdog_plist_is_separate_and_demo_only(self):
         p = build_watchdog_plist(Path(sys.executable), self.state, self.state, execution="testnet")

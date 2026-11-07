@@ -1,4 +1,25 @@
-## Infrastructure v5 — quota handoff, 2026-11-07 (LATEST; resume here)
+## Infrastructure v5 — PR3 review, 2026-11-07 (LATEST)
+
+Five-hour reset verified:99% remaining at resume, weekly85%, banked1remaining.
+Active branch codex/infra-exchange-protection; prior source0de3d30 + current review
+fixes. Main review corrected terminal zero-fill recovery to durable VOID, idempotent
+paper void, explicit one-way flat confirmation (missing rows are not flat), and
+stable close IDs for kill-path settlement even after a lost mirror write.
+New regressions cover independent watchdog after actual process death, zero-fill
+void, missing position response, kill-path exact fill booking and repeated void.
+Full suite439tests12.500s OK(4existing skips), /tmp/quantos-infra-pr3-review-tests.log;
+additional idempotent-void focused suite recorded in commit preparation. Earlier
+focused command accidentally named nonexistent test_live_kill; import error only,
+corrected by full discovery above. No soak/orders/deploy. Acceptance UNVERIFIED.
+Source rollback: revert the PR3 source and review commits in reverse order.
+Next: publish draft PR3 on resolver base, integrate clean-deploy commits17da410,
+9702f21 as own ordered PR4, then implement PR5. Prior detailed handoff below stands.
+Active agents: existing two lower-cost agents preparing isolated PR7 replay and
+PR8 Sentibot respectively. No live runtime/test processes owned after suite exit.
+
+---
+
+## Infrastructure v5 — quota handoff, 2026-11-07 (historical)
 
 Active worktree `/Users/bailey12/Desktop/PythonProject/QuantOS-infra-v5`, branch
 `codex/infra-exchange-protection`, source commit `0de3d30`. PR3 is LOCAL ONLY,

@@ -46,15 +46,28 @@ def protect_once(state, client, now_ms=None, max_age_s=120, alert=lambda *a: Non
                 continue
             if stale: mirror.kill.engage("runtime heartbeat stale or clock moved backward")
             try:
-                if m["state"] == "PENDING":
+                if m["state"] in ("PENDING", "FAILED"):
                     # Require a definite terminal entry outcome before calling a leg flat.
                     entry = client.get_order(m["symbol"], client_order_id(run_id, oid[:20], "entry"))
                     if entry.get("status") not in ("FILLED", "CANCELED", "EXPIRED", "REJECTED"):
                         raise ValueError("entry outcome not terminal")
                     m["entry_order"] = entry.get("orderId")
+                    m["qty"] = str(D(str(entry.get("executedQty", "0"))))
+                    if D(m["qty"]) == 0:
+                        # Persist for the engine to void on recovery; no synthetic exit/P&L.
+                        m.update(state="VOID", entry_void=True)
+                        mirror._save()
+                        continue
+                    # The process may have died after placing brackets but before
+                    # saving their replies. Deterministic ids recover those legs.
+                    m.setdefault("stop_cid", client_order_id(run_id, oid[:20], "sl"))
+                    if m.get("target") is not None:
+                        m.setdefault("tp_cid", client_order_id(run_id, oid[:20], "tp"))
                 rows = client.position_risk(m["symbol"])
                 amounts = [D(str(r["positionAmt"])) for r in rows if r.get("symbol") == m["symbol"]]
-                if len(amounts) != 1: raise ValueError("one-way position unavailable")
+                if len(amounts) != 1 or any(r.get("positionSide", "BOTH") != "BOTH" for r in rows
+                                          if r.get("symbol") == m["symbol"]):
+                    raise ValueError("one-way position unavailable")
                 qty = amounts[0]
                 if qty:
                     close = submit(client, reduce_only_close(m["symbol"], "SELL" if qty > 0 else "BUY", abs(qty),

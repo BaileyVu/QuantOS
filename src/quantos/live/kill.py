@@ -32,7 +32,8 @@ class FlattenResult:
     order_ids: dict = field(default_factory=dict)
 
 
-def flatten(client, symbols=None, instruments: dict | None = None, tag: str = "kill", scope=None) -> FlattenResult:
+def flatten(client, symbols=None, instruments: dict | None = None, tag: str = "kill", scope=None,
+            close_ids=None) -> FlattenResult:
     """Reduce-only close, verify flat, then cancel protection (only symbols `scope` accepts,
     when given). Per-symbol errors are collected."""
     res = FlattenResult()
@@ -46,10 +47,12 @@ def flatten(client, symbols=None, instruments: dict | None = None, tag: str = "k
         try:
             q = positions.get(sym, D("0"))
             if q != 0:
-                cid = client_order_id(tag, f"{sym}-{abs(q)}", "close")
+                cid = (close_ids or {}).get(sym) or client_order_id(tag, f"{sym}-{abs(q)}", "close")
                 closed = submit(client, reduce_only_close(sym, "SELL" if q > 0 else "BUY", abs(q), cid, (instruments or {}).get(sym)))
                 if closed.get("orderId") is not None: res.order_ids[sym] = closed["orderId"]
-                if any(D(str(p["positionAmt"])) != 0 for p in client.position_risk(sym) if p.get("symbol") == sym):
+                confirmed = [p for p in client.position_risk(sym) if p.get("symbol") == sym]
+                if (len(confirmed) != 1 or confirmed[0].get("positionSide", "BOTH") != "BOTH"
+                        or D(str(confirmed[0]["positionAmt"])) != 0):
                     raise ValueError("close not confirmed flat; protection retained")
                 res.closed.append(sym)
             client.cancel_all(sym)

@@ -186,3 +186,11 @@ class ManualPauseTests(EngineTests):
         self.assertTrue(self.e.void_entry(oid, T + 2000, "never filled on the exchange"))
         self.assertEqual((self.j.cash(), self.j.orders()[0]["state"]), (D(200), "CANCELED"))
         self.assertEqual(self.e.active(), [])
+
+    def test_recovered_zero_fill_void_is_idempotent(self):
+        self.held()
+        oid = self.j.orders()[0]["id"]
+        self.assertTrue(self.e.void_entry(oid, T + 2000, "unfilled"))
+        self.assertFalse(self.e.void_entry(oid, T + 3000, "unfilled"))
+        count = self.j.db.execute("SELECT COUNT(*) FROM events WHERE kind='VOIDED'").fetchone()[0]
+        self.assertEqual(count, 1)
