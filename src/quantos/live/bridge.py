@@ -31,6 +31,7 @@ AUTH_CODES = {-2015, -2014, -1022, -2008}
 # A home connection blips; two failed 30s checks used to flatten everything (2026-11-03, -$1.73).
 TRANSIENT_KILL_MS, TRANSIENT_KILL_CHECKS = 120_000, 4
 TRANSIENT_RETRY_MS = (5_000, 10_000, 20_000, 30_000)
+STOP_RETRY_MS = (30_000, 60_000, 120_000, 300_000)
 # A kill's one flatten failed on the network on 11-03 and NEAR/ADA stayed open 3.5h; retry until verified flat.
 FLATTEN_RETRY_MS = 30_000
 
@@ -61,6 +62,7 @@ class ExchangeMirror:
         # Soft pause: no new entries while the exchange is unreachable; open positions stay managed.
         self.hold, self.transient, self.transient_since = False, 0, None
         self.flat_confirmed, self.next_flatten_ms = False, 0
+        self.stop_retry = {}  # order id -> (next attempt ms, failures); in memory, a restart retries at once
         # Reconciliation costs ~3 signed calls; every 2s it stalled the runtime's main loop until
         # quotes went stale. Check every 30s, and right after any exchange action.
         self.check_every_ms, self.last_check_ms = 30_000, 0
@@ -125,16 +127,29 @@ class ExchangeMirror:
                 m["state"] = "CLOSED" if error is None else "CLOSE_FAILED"
                 if error is not None:
                     self._halt(f"reduce-only close failed on {m['symbol']}: {error}")
-            elif D(o["stop_price"]) != D(m["stop"]):
-                m["stop_n"] += 1
-                cid = client_order_id(self.run_id, f"{oid[:16]}-{m['stop_n']}", "sl")
+            elif D(o["stop_price"]) != D(m["stop"]) and now_ms >= self.stop_retry.get(oid, (0, 0))[0]:
+                # The replacement is reduce-only with the position's quantity: Binance allows only one
+                # closePosition stop per side (-4130), so a second closePosition stop was rejected on every
+                # trailing move (11-05, NEAR). Place first, then cancel, so the position is never unprotected.
+                fails = self.stop_retry.get(oid, (0, 0))[1]
+                n = m["stop_n"] + 1
+                cid = client_order_id(self.run_id, f"{oid[:16]}-{n}" + (f"-r{fails}" if fails else ""), "sl")
                 placed, error = self._guard("stop", lambda: submit(self.client, stop_market_protect(
-                    m["symbol"], opp, D(o["stop_price"]), cid, ins)))
+                    m["symbol"], opp, D(o["stop_price"]), cid, ins, qty=D(m["qty"]))))
                 if error is None:
                     self._cancel_stop(m)
-                    m.update(stop=o["stop_price"], stop_cid=placed.get("clientAlgoId") or placed.get("clientOrderId"))
+                    m.update(stop=o["stop_price"], stop_n=n,
+                             stop_cid=placed.get("clientAlgoId") or placed.get("clientOrderId"))
+                    if self.stop_retry.pop(oid, None): self.alert("recovered", f"stop:{oid}", "")
                 else:
-                    self.alert("warn", f"stop:{oid}", f"stop update failed on {m['symbol']}; old stop kept: {error}")
+                    # Back off instead of retrying on every 2s sync: each failed signed call blocked the
+                    # main loop and the feed queue fell up to 31 minutes behind (11-05).
+                    delay = STOP_RETRY_MS[min(fails, len(STOP_RETRY_MS) - 1)]
+                    self.stop_retry[oid] = (now_ms + delay, fails + 1)
+                    if fails in (0, 2):
+                        self.alert("warn" if fails == 0 else "critical", f"stop:{oid}",
+                                   f"stop update failed {fails + 1}x on {m['symbol']}; old stop kept, "
+                                   f"retrying with backoff: {error}")
             self._save()
         every = (TRANSIENT_RETRY_MS[min(self.transient, len(TRANSIENT_RETRY_MS)) - 1]
                  if self.transient else self.check_every_ms)

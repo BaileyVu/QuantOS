@@ -277,6 +277,37 @@ def klines(query: str):
     return _cached_get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}", 15)
 
 
+_EXCHANGE = {}  # {"client": SignedClient, "mode": str}; set by --exchange
+
+
+def exchange_view():
+    """/api/exchange: the execution account's own positions (Binance mark price and unrealised PnL), so the
+    dashboard shows what Binance shows instead of the paper engine's mainnet-priced marks. Signed GETs only,
+    cached 2s (weight 10 per refresh)."""
+    client = _EXCHANGE.get("client")
+    if client is None:
+        return {"enabled": False}
+    def fetch():
+        positions = [{"symbol": r["symbol"], "amount": float(r["positionAmt"]), "entry": float(r["entryPrice"]),
+                      "mark": float(r["markPrice"]), "upnl": float(r["unRealizedProfit"])}
+                     for r in client.position_risk() if float(r.get("positionAmt") or 0) != 0]
+        acct = client.account()
+        return {"enabled": True, "mode": _EXCHANGE["mode"], "time_ms": int(time.time() * 1000), "positions": positions,
+                "wallet": float(acct.get("totalWalletBalance") or 0), "upnl": float(acct.get("totalUnrealizedProfit") or 0)}
+    with _LOCK:
+        hit = _CACHE.get("exchange")
+    if hit and time.time() - hit[0] < 2:
+        return hit[1]
+    try:
+        data = fetch()
+    except Exception as error:  # never break the page; show the last good copy marked stale
+        if hit: return {**hit[1], "stale": True, "error": type(error).__name__}
+        return {"enabled": True, "error": f"{type(error).__name__}: {error}"[:200]}
+    with _LOCK:
+        _CACHE["exchange"] = (time.time(), data)
+    return data
+
+
 def fng():
     return _cached_get("https://api.alternative.me/fng/?limit=8", 600)
 
@@ -289,6 +320,8 @@ def serve(runs, sentibot, port=8787):
         def do_GET(self):
             if self.path.startswith("/api/state"):
                 body, kind = json.dumps(snapshot(runs, sentibot), default=str).encode(), "application/json"
+            elif self.path.startswith("/api/exchange"):
+                body, kind = json.dumps(exchange_view(), default=str).encode(), "application/json"
             elif self.path.startswith("/api/news"):
                 from .news import news
                 body, kind = json.dumps(news(), default=str).encode(), "application/json"
@@ -327,7 +360,14 @@ def main(argv=None):
     p.add_argument("--run", action="append", required=True, help="NAME=STATE_DIR")
     p.add_argument("--sentibot", type=Path, help="sentibot app folder")
     p.add_argument("--port", type=int, default=8787)
+    p.add_argument("--exchange", help="MODE=KEY_FILE (e.g. demo=~/.quantos/demo.env): show the account's live "
+                                      "Binance positions; read-only signed GETs")
     a = p.parse_args(argv)
+    if a.exchange:
+        from ..live.client import SignedClient
+        from ..live.keys import load_keys
+        mode, _, key_file = a.exchange.partition("=")
+        _EXCHANGE.update(mode=mode, client=SignedClient(mode, load_keys(str(Path(key_file).expanduser()))))
     runs = []
     for r in a.run:  # NAME=STATE or NAME=STATE#PROFILE
         name, rest = r.split("=", 1)

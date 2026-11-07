@@ -548,7 +548,7 @@ function niceTicks(lo, hi, n) {
 }
 const tickTxt = (v, step) => v.toFixed(Math.max(0, Math.min(8, -Math.floor(Math.log10(step)) + (step / Math.pow(10, Math.floor(Math.log10(step))) === 2.5 ? 1 : 0))));
 
-let S = null, X = null, NEWS = null, FNG = null, KL = {};
+let S = null, X = null, NEWS = null, FNG = null, KL = {}, EX = null;
 let tab = 'Overview', src = 'All';
 try { const t = localStorage.getItem('qos.tab'); if (TABS.includes(t)) tab = t; } catch (e) { }
 
@@ -663,9 +663,14 @@ $('stopAll').addEventListener('click', () => {
 // ---------- derived model ----------
 function model() {
   const run = (S.runs || [])[0] || {}, st = run.status || {}, eng = (st.engines || [])[0] || {}, now = S.time_ms;
+  let engUnreal = 0;
   const positions = (eng.open_positions || []).map(p => {
-    const q = num(p.filled) || 0, e = num(p.average), m = num(p.last_mark), dir = p.side === 'SHORT' ? -1 : 1;
+    const q = num(p.filled) || 0, e = num(p.average), dir = p.side === 'SHORT' ? -1 : 1;
+    // Prefer the execution account's own mark (what Binance shows) over the paper engine's last mark.
+    const xp = EX && EX.positions ? EX.positions.find(r => r.symbol === p.symbol) : null;
+    const m = xp ? xp.mark : num(p.last_mark), engUp = e != null && num(p.last_mark) != null ? (num(p.last_mark) - e) * q * dir : 0;
     const up = e != null && m != null ? (m - e) * q * dir : null;
+    engUnreal += engUp || 0;
     let oid = null; for (const [k, v] of Object.entries(run.mirror || {})) if (v.symbol === p.symbol && v.state === 'OPEN') oid = k;
     const xf = ((X && X[run.name] && X[run.name].fills) || run.fills || []).filter(f => f.order_id === oid && f.kind === 'ENTRY').pop();
     return { book: run.profile || 'pD', sym: p.symbol, strat: p.strategy_id, side: p.side, q, e, m, up, upPct: up != null && e ? up / (e * q) * 100 : null, stop: num(p.stop_price || p.stop_loss), tp: num(p.take_profit), state: p.state, opened: xf ? xf.time_ms : null, cid: oid && run.mirror[oid].stop_cid };
@@ -678,7 +683,8 @@ function model() {
   });
   const unreal = positions.filter(p => p.book !== 'alt-ML').reduce((a, p) => a + (p.up || 0), 0);
   const hist = (run.equity_history || []).slice();
-  const equity = num(eng.equity);
+  // Re-mark equity with live exchange prices: engine equity minus its own unrealised, plus the live one.
+  const equity = num(eng.equity) != null ? num(eng.equity) - engUnreal + unreal : null;
   if (equity != null) hist.push([st.time_ms || now, equity]);
   const start = hist.length ? num(hist[0][1]) : null;
   const per = (X && X[run.name] && X[run.name].strategies) || {};
@@ -1060,6 +1066,7 @@ async function loadState() {
   try { S = await getJSON('/api/state'); render(); }
   catch (e) { updateHTML($('hdr'), `<span class="status-pill" aria-live="polite" style="display: flex; align-items: center; gap: 6px; color: ${DN};">${dot(DN)}dashboard API unreachable · retrying</span>`); }
 }
+async function loadExchange() { try { const x = await getJSON('/api/exchange'); EX = x && x.enabled && x.positions ? x : null; if (S) render(); } catch (e) { EX = null; } }
 async function loadExtra() { try { X = await getJSON('/api/strategies'); render(); } catch (e) { } }
 async function loadNews() { try { NEWS = await getJSON('/api/news'); newsPolledAt = Date.now(); renderNews(); } catch (e) { $('newsLive').textContent = 'UNAVAILABLE'; $('newsMeta').textContent = 'news unavailable · retrying'; $('newsDot').style.background = DN; $('newsLive').style.color = DN; } }
 async function loadFng() { try { FNG = await getJSON('/api/fng'); } catch (e) { if (!FNG) FNG = false; } renderFng(); }
@@ -1073,9 +1080,11 @@ async function loadKlines() {
 
 routeHash(); renderFng();
 loadState().then(() => { if (tab === 'Trades') loadKlines(); loadExtra(); });
+loadExchange();
 loadNews(); loadFng();
 setInterval(() => { if ($('utcClock')) $('utcClock').textContent = hms(Date.now()) + ' UTC'; }, 1000);
-setInterval(loadState, 5000);
+setInterval(loadState, 2000);
+setInterval(loadExchange, 2000);
 setInterval(loadExtra, 30000);
 setInterval(loadNews, 60000);
 setInterval(loadFng, 600000);

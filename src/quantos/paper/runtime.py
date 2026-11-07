@@ -41,6 +41,10 @@ DEMO_PROFILE = os.environ.get("QUANTOS_DEMO_PROFILE", "pL")
 # Gap between healthy batches before the feed counts as down. Polls run every 2s and each batch is
 # validated on its own; at 5s, ordinary slow polls (p99 ~7s) marked it down ~55 times/hour (11-03).
 FEED_TIMEOUT_MS = 10_000
+# Dashboard status/heartbeat cadence. Was 10s; with the 5s page poll the display ran up to 15s behind.
+STATUS_EVERY_MS = 2_000
+# Messages waiting in the main queue. Each feed batch is ~2s, so 15 queued ~ 30s behind live (11-05: 31 min).
+QUEUE_LAG_WARN = 15
 if DEMO_PROFILE not in ("pL", "pD"): raise ValueError("QUANTOS_DEMO_PROFILE must be pL or pD")
 
 
@@ -527,14 +531,20 @@ class Runtime:
                     killed = True
                     for e in engines: e.kill(now)
                     alerter.alert("critical", "kill_switch", "KILL file present: entries paused, positions closing", now)
-                if now-last_status >= 10000:
+                if now-last_status >= STATUS_EVERY_MS:
                     stale = {**dict(monitor.stale(now)), **dict(scan_monitor.stale(now))}
                     for name in ("feed", "scan"):
                         if name in stale:
                             alerter.alert("critical", f"stale:{name}", f"{name} stale for {stale[name]:.0f}s", now)
                         else:
                             alerter.clear(f"stale:{name}", now)
+                    backlog = self.messages.qsize()
+                    if backlog >= QUEUE_LAG_WARN:
+                        alerter.alert("critical", "queue_lag", f"main loop {backlog} messages behind the feed", now)
+                    else:
+                        alerter.clear("queue_lag", now)
                     heartbeat.beat(now, {"status": run["status"], "feed_age_ms": now-last_feed if last_feed else None,
+                                         "queue": backlog,
                                          "stale": sorted(stale)})
                     try:
                         with ExitStack() as stack:
