@@ -40,6 +40,17 @@ Fivehourreset2026-11-08 08:13:03Vietnam; SAMEautomationconfirmedupdatedACTIVE to
 atthreshold. Sourceagentfinishing boundedcollector checkpoint; captureitsfinal
 commit/tests below beforehandoff. PR9agentidle. Noownedruntime/testprocessactive.
 
+Sourceagent FINISHED clean44055cf in QuantOS-infra-sentibot. EXACT NEXT STEP:
+review/cherry-pick44055cf onto activebranch (do not re-cherrypick its priorcommits).
+Changes: collection completion timestamps/injectableclock, rejectfuture/nonfinite
+publishtimes, fixedpublicexchangeInfo loader8stimeout/2MBcap; dynamicTRADINGUSDC
+PERPETUAL assets/aliases, roundrobin12Exaqueries/sample, explicitcoveragefields;
+deterministiclexicon scorer name/version/SHA instead of ambientVADER; READMEupdated.
+Agent13focusedtests PASS anddiffcheckPASS (beforemainintegration). No externalfetches.
+Mainmustreview first_seen timing, actualuniversefield semantics and fullcyclebudget:
+Exacap doesNOTboundRSS/Reddit/Jina work. Then25mainreport/stalenesstests integration
+and needed regressions only, snapshot/plisthelper/docs, ownPR8draft. Bothagentsidle.
+
 ---
 
 ## Infrastructure v5 — third-window resume, 2026-11-08 (historical)
