@@ -156,3 +156,16 @@ class RealFillBookingTests(EngineTests):
         self.assertFalse(r["has_exit"])
         self.assertEqual(D(self.j.orders()[0]["average"]), D("100.10"))
         self.assertIsNone(self.e.book_real_fills("nope", T + 2000, entry=(D(1), None)))
+
+    def test_booking_inside_the_runtime_transaction(self):
+        """The runtime calls mirror.sync inside journal.transaction(); booking must nest, not fail."""
+        self.held()
+        oid = self.j.orders()[0]["id"]
+        with self.j.transaction():
+            self.assertTrue(self.e.book_real_fills(oid, T + 2000, entry=(D("100.20"), None))["changed"])
+            with self.assertRaises(RuntimeError):
+                with self.j.transaction():
+                    self.j.set("probe", 1)
+                    raise RuntimeError("inner failure")
+        self.assertEqual(D(self.j.orders()[0]["average"]), D("100.20"))
+        self.assertIsNone(self.j.get("probe"))
