@@ -29,6 +29,7 @@ from .strategies.usdc_mapped import usdt_twin
 from .engine import PaperEngine
 from .journal import Journal
 from .market import PublicMarket, RateLimited
+from .stream import QuoteStream
 from .report import atomic_json, write_reports
 from .risk import Cap200M5Policy, Cap200M10Policy, Demo200Policy, LivePolicy, LiveR5Policy, Policy, usable_quote
 from .strategies import library
@@ -154,7 +155,8 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
 class Runtime:
     def __init__(self, state: Path, hours=72, market_factory=PublicMarket,
                  min_quote_volume=D("20000000"), announcement_factory=BinanceAnnouncements,
-                 portfolio="legacy", sentiment_path=None, notify=True, execution="paper", client_factory=None):
+                 portfolio="legacy", sentiment_path=None, notify=True, execution="paper", client_factory=None,
+                 stream=True):
         if not 0 < hours <= 72: raise ValueError("duration must be >0 and <=72 hours")
         self.state, self.hours, self.market_factory = state, hours, market_factory
         self.shutdown = threading.Event()
@@ -162,6 +164,9 @@ class Runtime:
         if portfolio not in ("legacy", "live50"): raise ValueError("portfolio must be legacy or live50")
         self.portfolio = portfolio
         self.strategies = live_library() if portfolio == "live50" else library()
+        # Live WebSocket quotes for the live50 feed; REST polling remains the fallback. Real market only.
+        self.stream = (QuoteStream(self._stream_symbols) if stream and portfolio == "live50"
+                       and market_factory is PublicMarket else None)
         self.sentiment = SentimentShadow(sentiment_path) if sentiment_path else None
         self.notify = notify
         if execution not in ("paper", "dry-run", "testnet"):
@@ -190,6 +195,10 @@ class Runtime:
         path = os.environ.get("QUANTOS_KEY_FILE")
         if not path: raise ValueError("QUANTOS_KEY_FILE must name the testnet key file")
         return SignedClient(self.execution, load_keys(path))
+
+    def _stream_symbols(self):
+        with self.instrument_lock:
+            return set(self.watched_symbols).intersection(self.instruments)
 
     def emit(self, kind, payload):
         try: self.messages.put((kind, payload), timeout=1)
@@ -323,6 +332,7 @@ class Runtime:
                     symbols = tuple(choices) if requested_symbol == 0 else ()
             if not symbols:
                 self.shutdown.wait(1); continue
+            streamed = False
             try:
                 records = []
                 now = milliseconds()
@@ -346,7 +356,9 @@ class Runtime:
                     if self.portfolio != "live50":
                         records.insert(0, ("quote", market.quote(symbol)))
                 if self.portfolio == "live50":
-                    batch = market.quotes(symbols, skip_invalid=True)
+                    batch = self.stream.quotes(symbols, now) if self.stream else None
+                    streamed = batch is not None
+                    if not streamed: batch = market.quotes(symbols, skip_invalid=True)
                     # One quiet thin book must not blank the whole batch (11-02 run: ~4.2k feed errors).
                     if not batch: raise ValueError("invalid or stale quote")
                     records[0:0] = [("quote", batch[s]) for s in symbols if s in batch]
@@ -359,7 +371,8 @@ class Runtime:
                 delay = error.retry_after_seconds if isinstance(error, RateLimited) else backoff
                 self.shutdown.wait(delay)
                 backoff = min(60, backoff * 2)
-            self.shutdown.wait(max(0, 2 - (time.monotonic() - start)))
+            # Streamed quotes are already live, so hand them over every 1s; REST polls stay at 2s.
+            self.shutdown.wait(max(0, (1 if streamed else 2) - (time.monotonic() - start)))
 
     def run(self):
         self.state.mkdir(parents=True, exist_ok=True)
@@ -428,6 +441,8 @@ class Runtime:
             workers = [threading.Thread(target=self.scanner, daemon=True)] + [
                 threading.Thread(target=self.feed, args=(run["started_ms"], slot), daemon=True)
                 for slot in range(5)]  # Two baseline symbols plus at most three distinct held symbols.
+            if self.stream is not None:
+                workers.append(threading.Thread(target=self.stream.run, args=(self.shutdown,), daemon=True))
             for worker in workers: worker.start()
             previous_handlers = {}
             if threading.current_thread() is threading.main_thread():
@@ -545,6 +560,8 @@ class Runtime:
                         alerter.clear("queue_lag", now)
                     heartbeat.beat(now, {"status": run["status"], "feed_age_ms": now-last_feed if last_feed else None,
                                          "queue": backlog,
+                                         **({"stream": {"live": self.stream.healthy(now), "messages": self.stream.messages,
+                                                        "reconnects": self.stream.reconnects}} if self.stream else {}),
                                          "stale": sorted(stale)})
                     try:
                         with ExitStack() as stack:
