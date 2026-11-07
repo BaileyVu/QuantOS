@@ -33,6 +33,13 @@ Latestusage25%five-hour,57%weekly remaining,1bankedreset; noownedruntimeprocesse
 Currentwindowreset1794100383; nextquota threshold updateSAMEautomation from03:13
 toafterthisnewreset. Do notrepeatpassingtests/import/soak withoutchangedreason.
 
+FINAL QUOTA HANDOFF: threshold19%five-hour,56%weekly left,1banked reset. Source
+commitc5da97a oncodex/infra-sentibot-integration isLOCALONLY,PR8notpublished.
+Fivehourreset2026-11-08 08:13:03Vietnam; SAMEautomationconfirmedupdatedACTIVE to
+08:18Vietnam daily firstNov8, thischat. No extraresetused. Mainimplementationstopped
+atthreshold. Sourceagentfinishing boundedcollector checkpoint; captureitsfinal
+commit/tests below beforehandoff. PR9agentidle. Noownedruntime/testprocessactive.
+
 ---
 
 ## Infrastructure v5 — third-window resume, 2026-11-08 (historical)
