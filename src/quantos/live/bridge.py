@@ -155,7 +155,8 @@ class ExchangeMirror:
             stop_cid = placed.sl.get("clientAlgoId") or placed.sl.get("clientOrderId")
             self.book[oid] = {"symbol": ins.symbol, "side": side, "qty": str(qty), "stop": o["stop_price"],
                               "stop_cid": stop_cid, "stop_n": 0, "state": "OPEN", "instrument": o["instrument"],
-                              "opened_ms": now_ms, "entry_order": placed.entry.get("orderId"), "booked": ""}
+                              "opened_ms": now_ms, "entry_order": placed.entry.get("orderId"), "booked": "",
+                              "entry_average": str(placed.entry.get("avgPrice", "0"))}
             self._save()
         for oid, m in list(self.book.items()):
             if m["state"] == "PENDING":
@@ -164,12 +165,22 @@ class ExchangeMirror:
                 continue
             ins, opp = _instrument(m["instrument"]), "SELL" if m["side"] == "BUY" else "BUY"
             o = live.get(oid)
+            if m.get("risk_close"):
+                if hasattr(engine, "close_external"):
+                    engine.close_external(oid, now_ms, "REALISED_RISK_EXCEEDED")
+                o = None  # durable even if the journal transaction rolled back on a crash
+            if o is not None and hasattr(engine, "check_realised_risk") and not m.get("risk_verified"):
+                if self._check_entry_risk(engine, oid, m, now_ms) is False:
+                    o = None  # close this leg immediately in the ordinary reduce-only path
+                if self.kill.active:
+                    return {"skipped": "KILL"}
             if o is None:  # paper closed or closing: flatten this leg and drop protection
                 _, error = self._guard("close", lambda: submit(self.client, reduce_only_close(
                     m["symbol"], opp, D(m["qty"]), client_order_id(self.run_id, oid[:20], "close"), ins)))
-                self._cancel_stop(m)
                 if error is not None and self._flat_on_exchange(m["symbol"]):
                     error = None  # the exchange stop filled first; the reduce-only close had nothing to close
+                if error is None:
+                    self._cancel_stop(m)  # keep protection until the close is confirmed
                 m["state"] = "CLOSED" if error is None else "CLOSE_FAILED"
                 if error is not None:
                     self._halt(f"reduce-only close failed on {m['symbol']}: {error}")
@@ -206,12 +217,36 @@ class ExchangeMirror:
         every = (TRANSIENT_RETRY_MS[min(self.transient, len(TRANSIENT_RETRY_MS)) - 1]
                  if self.transient else self.check_every_ms)
         if json.dumps(self.book, sort_keys=True) == before and now_ms - self.last_check_ms < every:
-            engine.exchange_hold = self.hold
+            engine.exchange_hold = self.hold or any("risk_pending" in m for m in self.book.values())
             return {"ok": True, "skipped": "INTERVAL"}
         self.last_check_ms = now_ms
         result = self.check(now_ms)
-        engine.exchange_hold = self.hold
+        engine.exchange_hold = self.hold or any("risk_pending" in m for m in self.book.values())
         return result
+
+    def _check_entry_risk(self, engine, oid, m, now_ms):
+        """Keep protection while resolving a missing average; hold entries, then kill at 90s."""
+        if getattr(self.client, "mode", "") == "dry-run":
+            return True  # synthetic dry-run acknowledgements have no exchange price
+        try:
+            price = D(m.get("entry_average", "0"))
+            if not price.is_finite() or price <= 0:
+                entry = self.client.get_order(m["symbol"], client_order_id(self.run_id, oid[:20], "entry"))
+                price = D(str(entry.get("avgPrice", "0")))
+                if not price.is_finite() or price <= 0:
+                    raise ValueError("exchange entry average unavailable")
+            result = engine.check_realised_risk(oid, now_ms, price, D(m["qty"]))
+            m.update(entry_average=str(price), risk_verified=True, risk_close=not result)
+            m.pop("risk_pending", None)
+            self._save()
+            return result
+        except Exception as error:
+            m.setdefault("risk_pending", now_ms)
+            self._save()
+            self.alert("warn", f"risk:{oid}", f"real fill risk unverified on {m['symbol']}: {error}")
+            if now_ms - m["risk_pending"] >= PENDING_KILL_MS:
+                self._halt(f"real fill risk unverified on {m['symbol']} for 90s")
+            return None
 
     def _void(self, engine, oid, symbol, now_ms, why):
         """Nothing was opened on the exchange: remove the paper entry too, so the books match Binance."""
@@ -236,6 +271,7 @@ class ExchangeMirror:
             if sl_error is not None:
                 return self._halt(f"protection failed on {m['symbol']} after a resolved entry: {sl_error}")
             m.update(state="OPEN", qty=str(filled), entry_order=entry.get("orderId"),
+                     entry_average=str(entry.get("avgPrice", "0")),
                      stop_cid=sl.get("clientAlgoId") or sl.get("clientOrderId"))
             m.pop("pending_since", None)
             self._save()
@@ -278,8 +314,12 @@ class ExchangeMirror:
             if error is not None: raise error
             asset = m["instrument"].get("margin_asset")
             entry = [t for t in trades if str(t.get("orderId")) == str(m.get("entry_order"))]
-            if m["booked"] == "" and entry:
-                engine.book_real_fills(oid, now_ms, entry=_vwap(entry, None, asset))
+            # Do not label a partial userTrades response as complete fees/risk.
+            if m["booked"] == "" and entry and sum(D(str(t["qty"])) for t in entry) == D(m["qty"]):
+                booked = engine.book_real_fills(oid, now_ms, entry=_vwap(entry, None, asset))
+                if booked is not None and "risk_safe" in booked:
+                    m.update(risk_verified=True, risk_close=not booked["risk_safe"])
+                    m.pop("risk_pending", None)
                 m["booked"] = "entry"
             if m["state"] == "CLOSED" and m["booked"] == "entry":
                 since = min((int(t["time"]) for t in entry), default=m["opened_ms"] - 60_000)

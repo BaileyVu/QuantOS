@@ -5,6 +5,7 @@ from math import ceil, floor, lcm
 
 from .types import BOOK_MAX_AGE_MS, D, Instrument, Quote, Signal, floor_step
 from .strategies.manifest import manifest_for
+from .stop_cost import price_stop
 
 
 @dataclass(frozen=True)
@@ -330,7 +331,16 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
         return reject("LIQUIDATION_BUFFER")
     entry_fee = policy.maker_fee if signal.entry_type == "LIMIT" else policy.taker_fee
     costs = entry * (entry_fee + policy.taker_fee + 2 * policy.slippage)
-    unit_loss = distance + costs
+    # Keep the historical two-sided allowance as a floor. Charge taker on entry
+    # too: a crossed LIMIT or the exchange mirror's MARKET entry pays taker.
+    try:
+        stressed = price_stop(entry, stop, signal.side,
+                              max(2 * entry * policy.slippage, quote.ask - quote.bid),
+                              max(entry_fee, policy.taker_fee), policy.taker_fee)
+    except ValueError:
+        return reject("UNPRICEABLE_STOP")
+    unit_loss = max(distance + costs, stressed.loss_per_unit)
+    costs = unit_loss - distance
     if no_target and costs > D(".25") * distance:
         return reject("COSTS_TOO_HIGH_FOR_STOP")
     if not no_target and (abs(target - entry) - costs) / unit_loss < policy.min_net_rr:
