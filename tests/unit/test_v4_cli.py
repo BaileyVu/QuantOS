@@ -63,7 +63,7 @@ class V4CliTests(unittest.TestCase):
             self.assertEqual(Decimal(reference["pA"]["risk_fraction"]),Decimal(0))
 
     def test_each_preregistered_backtest_config_resolves_manifest(self):
-        configs = sorted(Path("configs/strategies").glob("*.toml"))
+        configs = sorted(Path("tests/fixtures/strategy_contracts").glob("*.toml"))
         self.assertEqual(len(configs), 9)
         for config in configs:
             with self.subTest(config=config.name):
@@ -72,6 +72,7 @@ class V4CliTests(unittest.TestCase):
 
     def test_duplicate_family_manifest_lookup_prefers_unique_promoted_version(self):
         from quantos.paper.strategies.manifest import MANIFESTS
+        self.assertEqual(len(MANIFESTS), len({m.manifest_id for m in MANIFESTS}))
         for strategy_id in ("crash_flush_e2", "alt_dip_reversal"):
             rows = [m for m in MANIFESTS if m.strategy_id == strategy_id]
             self.assertEqual(len(rows), 2)
@@ -84,7 +85,7 @@ class V4CliTests(unittest.TestCase):
         self.assertEqual(manifest_for("ml1h_pattern", "0.1.0").status, "candidate")
 
     def test_backtest_config_dispatches_canonical_strategy(self):
-        config = Path("configs/strategies/ema_atr_ref.toml")
+        config = Path("tests/fixtures/strategy_contracts/ema_atr_ref.toml")
         with patch("quantos.paper.replay.replay", return_value={"ok": True}) as replay:
             status, stdout, _stderr = self.invoke([
                 "backtest", "--input", "record.jsonl", "--state", "output", "--config", str(config)])
@@ -93,7 +94,7 @@ class V4CliTests(unittest.TestCase):
         replay.assert_called_once_with([Path("record.jsonl")], Path("output"), "ema_atr_ref")
 
     def test_backtest_config_rejects_unknown_or_tuned_parameters(self):
-        original = Path("configs/strategies/ema_atr_ref.toml").read_text()
+        original = Path("tests/fixtures/strategy_contracts/ema_atr_ref.toml").read_text()
         with tempfile.TemporaryDirectory() as directory:
             bad_config = Path(directory) / "bad.toml"
             state = Path(directory) / "untouched"

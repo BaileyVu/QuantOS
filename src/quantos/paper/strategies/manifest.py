@@ -17,6 +17,10 @@ class Manifest:
     aliases: tuple[str, ...] = ()
     status: str = "library"
 
+    @property
+    def manifest_id(self):
+        return f"{self.strategy_id}@{self.version}"
+
 
 MANIFESTS = (
     Manifest('ema_atr_ref', '1.0.0', 'reference', 'QuantOS V3 EMA/ATR reference',
@@ -98,9 +102,15 @@ MANIFESTS = (
 )
 
 
+if len({m.manifest_id for m in MANIFESTS}) != len(MANIFESTS):
+    raise ValueError("duplicate versioned strategy manifest identity")
+
+
 def manifest_for(strategy_id: str, version: str | None = None) -> Manifest | None:
     matches = [m for m in MANIFESTS if strategy_id in (m.strategy_id, *m.aliases)
                and (version is None or version == m.version)]
+    if version is not None and len(matches) > 1:
+        raise ValueError("ambiguous exact strategy manifest identity")
     if version is not None or len(matches) <= 1:
         return matches[0] if matches else None
     # Research and USDC-mapped production variants intentionally share a family ID.

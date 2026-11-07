@@ -19,7 +19,7 @@ class CandidateIntegrationTests(unittest.TestCase):
         candidates = library(True)[6:]
         self.assertEqual(len(candidates), 3)
         for s in candidates:
-            path = Path("configs/strategies") / f"{s.strategy_id}.toml"
+            path = Path("tests/fixtures/strategy_contracts") / f"{s.strategy_id}.toml"
             self.assertEqual(_strategy_from_config(path), s.strategy_id)
         with tempfile.TemporaryDirectory() as tmp:
             rows = _strategy_listing(Path(tmp)/"absent", True)

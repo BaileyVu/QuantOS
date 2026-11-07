@@ -71,7 +71,7 @@ def arbitrate(signals, adaptive=None):
 
 
 def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, sentiment=None,
-             sentiment_fail_closed=False, sentiment_trace=None):
+             sentiment_fail_closed=False, sentiment_trace=None, external_trace=None):
     """Identical state transitions for recorded input replay and natural runtime."""
     for e in engines: shadow_call(e, "advance", now, kind, payload, now)
     if kind == "feed":
@@ -110,6 +110,9 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
             for strategy in strategies:
                 proposal = strategy.evaluate(snapshot)
                 if proposal: proposal = replace(proposal, **tags)
+                if external_trace is not None and strategy.strategy_id == "ml1h_pattern":
+                    external_trace.setdefault(strategy.strategy_id, {})[snapshot.instrument.symbol] = (
+                        asdict(proposal) if proposal else None)
                 if proposal: signals.append(proposal)
                 for e in engines:
                     with e.journal.transaction():
@@ -162,6 +165,14 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
         for e in engines:
             e.connection(False, now, payload["error"])
             with e.journal.transaction(): e.journal.event(now, "ERROR", payload)
+    elif kind == "exchange":
+        from .replay_effects import apply_effects
+        for e in engines:
+            if e.journal.profile == payload["profile"]: apply_effects(e, payload)
+    elif kind == "control":
+        for e in engines:
+            if "manual_pause" in payload: e.manual_pause = bool(payload["manual_pause"])
+            if payload.get("kill"): e.kill(now)
     else:
         raise ValueError(f"unknown input kind: {kind}")
     return False
@@ -479,7 +490,7 @@ class Runtime:
                                         for k, v in fields.items()})
                     self.instruments[ins.symbol] = ins
                 with j.transaction(): j.event(now, "START" if run["restarts"] == 0 else "RESTART", {"pid": os.getpid()})
-            self.record("restart", {}, now)
+            self.record("restart", {}, now, context={"execution": self.execution, "exchange_effects": True})
             from .shadow import ShadowBook
             for e in engines:
                 try: e.shadow = ShadowBook(self.state / f"shadow_{e.journal.profile}.db", e, now)
@@ -559,12 +570,14 @@ class Runtime:
                         monitor.note("feed", now)
                 elif kind in {"funding", "diagnostic"} or (kind == "scan" and not finishing):
                     sentiment_trace = {} if kind == "scan" else None
+                    external_trace = {} if kind == "scan" else None
                     dispatch(engines, kind, payload, now, strategies=self.strategies, sentiment=self.sentiment,
                              sentiment_fail_closed=self.sentiment_fail_closed,
-                             sentiment_trace=sentiment_trace)
+                             sentiment_trace=sentiment_trace, external_trace=external_trace)
                     self.record(kind, payload, now, context=(
                         {"sentiment_enabled": self.sentiment is not None,
                          "sentiment_fail_closed": self.sentiment_fail_closed,
+                         "external_proposals": external_trace,
                          "sentiment_verdicts": sentiment_trace}
                         if sentiment_trace is not None else None))
                     if kind == "scan":
@@ -597,20 +610,27 @@ class Runtime:
                 if mirror is not None and now - last_mirror >= 2000:
                     last_mirror = now
                     try:
+                        from .replay_effects import TraceEngine
+                        traced = TraceEngine(engines[0])
                         with engines[0].journal.transaction():
-                            result = mirror.sync(engines[0], now, user.drain() if user else ())
+                            result = mirror.sync(traced, now, user.drain() if user else ())
                             if not result.get("ok", True):
                                 engines[0].journal.event(now, "EXCHANGE_RECONCILE_FAILED", result)
+                        self.record("exchange", {"profile": engines[0].journal.profile,
+                            "effects": traced.events, "exchange_hold": getattr(engines[0], "exchange_hold", False)}, now)
                     except Exception as error:
                         alerter.alert("critical", "mirror", f"exchange mirror error: {error}", now)
                 for e in engines:
                     shadow_call(e, "advance", now, "tick", {"finish": finishing}, now)
                 if (self.state / "KILL").exists() and not killed:
                     killed = True
+                    self.record("control", {"kill": True}, now)
                     for e in engines: e.kill(now)
                     alerter.alert("critical", "kill_switch", "KILL file present: entries paused, positions closing", now)
                 if now-last_status >= STATUS_EVERY_MS:
                     paused = (self.state / "PAUSE").exists()
+                    if any(getattr(e, "manual_pause", False) != paused for e in engines):
+                        self.record("control", {"manual_pause": paused}, now)
                     for e in engines: e.manual_pause = paused
                     for e in engines:
                         if getattr(e, "shadow_error", None):

@@ -42,10 +42,25 @@ gate (mean > 0, CI90 lower bound > 0, above placebo/random p90, stress >= 0,
 and at least 150 trades or 30 episodes), then evaluate HELD once per family.
 Replay does not synthesize these inputs or assert an L2 pass.
 
-`configs/strategies/*.toml` remains a backtest-only locked manifest check, not
-the runtime strategy source. Replacing that with configuration-driven strategy
-construction is deferred: the files include USDT research variants while the
-live library wraps selected rules as USDC-mapped versions with different IDs'
-distinct version contracts. Deleting the files would remove the existing
-`backtest --config` interface; a safe source-of-truth change needs a separate
-versioned-config design decision.
+Unused `configs/strategies/*.toml` have been removed from runtime configuration.
+Their frozen examples now live only in `tests/fixtures/strategy_contracts` for
+backtest-parser contract tests. Canonical code manifests and strategy constructors
+are the runtime source of truth. The optional `backtest --config` interface still
+validates caller-provided files against exact versioned contracts; it cannot tune
+or override runtime parameters.
+
+New captures retain per-scan sentiment and external ml1h proposals, plus committed
+exchange observations (`book_real_fills`, realised-risk checks, voids, external
+closes and entry holds) and pause/kill controls. Replay applies these only to a
+replay-identity PaperEngine, never an exchange client or today's signal file.
+Ordinary strategies still evaluate the recorded snapshots through their real
+implementation. Missing historical external/exchange/sentiment context makes
+parity incomplete; it is never silently substituted with current data. Canonical
+decompressed input hashes are recorded for reproducibility. Versioned manifest
+identities use `strategy_id@version`; unversioned ambiguous lookup fails closed.
+
+Actual diagnostic: the 648.454-second no-order soak recording replayed 694 events
+and 21 scans. It predates this capture protocol and reports all three context
+flags false, so exact parity is explicitly unverified. The soak itself raised a
+critical missing-ml1h-file self-check and is not a clean deployment soak. This
+operational replay is not strategy selection or an L2 backtest.

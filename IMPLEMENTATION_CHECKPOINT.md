@@ -1,4 +1,35 @@
-## Infrastructure v5 — second-window handoff, 2026-11-07 (LATEST)
+## Infrastructure v5 — third-window resume, 2026-11-08 (LATEST)
+
+Reset verified:98%five-hour/69%weekly remaining, banked1. PR7 integrated locally
+as2f4e8ca on codex/infra-replay-integration; main review in progress. Runtime merge
+retained PR5 hooks. Source-audit agent preparing missing PR8 offline reports;
+validation agent preparing isolated PR9 TimesFM2.5 research harness. Max2lower-cost.
+Soak989770c COMPLETED648.454seconds:635OBSERVATION,2058SCAN,zeroERROR/SHADOW_ERROR,
+zeroapproved/fills/openexposure. BUT critical selfcheck:ml1h_pattern signals file
+missing at1794065137189: clean deployment soak FAIL (not waived). State/log retained
+/tmp/quantos-infra-soak-989770c; processfinished, noownedruntimeactive.
+Next main: PR7 capture external ML/protection/control inputs for truthful replay,
+configcleanup (move unused TOMLs to testfixtures; canonical code manifests remain
+runtime truth), reviewduplicate versionedIDs, integrate/tests. Need actual pD
+recording/journal audit and first turtle/volsqueeze L2 only with complete manifested
+BUILD data; no fabricated/parity/HELD/soak claims. Prior handoff below detailsrest.
+
+PR7 main review complete for draft: captures sentiment/external ML proposals,
+committed mirror book effects and pause/KILL controls; offline apply explicitly
+requires replay journal identity. Real risk/engine unchanged. Canonical versioned
+manifest IDs unique; unused TOMLs moved to testfixtures, optional backtestconfig
+still validates caller files against manifests. Full474tests13.146s OK(4skipped),
+/tmp/quantos-infra-pr7-tests.log; focused24tests0.178s PASS; diffcheckPASS.
+Actual saved soak replay exit0:694events,21scans; exactparityINCOMPLETE because
+historical sentiment/external/exchange context absent (truthful rejection).
+Output /tmp/quantos-infra-replay-soak-2f4e8ca, log /tmp/quantos-infra-replay-soak.log.
+NoactualpDperiodL1pass, turtle/volsqueezeL2,orclean soak claimed. Nextcommit/publish
+draftPR7 thenPR8 integrate1ad4f09,17463a0,a20a5d5; lastaddsforwardreport10testsPASS
+agentreported. PR9 agentpreparingharness. Lastusage61%fivehour/63%weekly.
+
+---
+
+## Infrastructure v5 — second-window handoff, 2026-11-07 (historical)
 
 Active worktree QuantOS-infra-v5; branch codex/infra-registry-manifests, source
 989770c. Working tree clean before this checkpoint. Published stacked draft PRs:

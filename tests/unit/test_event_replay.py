@@ -12,10 +12,55 @@ from quantos.paper.runtime import Runtime, dispatch
 from quantos.paper.strategies import DonchianAtrStopStrategy, EmaAtrLimitStrategy
 from quantos.paper.types import D, Quote, Trade, dumps
 from quantos.paper.types import Candle, DelistEvent
+from quantos.paper.event_replay import RecordedExternalStrategy
+from quantos.paper.replay_effects import TraceEngine, apply_effects
+from quantos.live.bridge import ExchangeMirror
+from tests.unit.test_live_bridge import FillsExchange
+from tests.unit.test_thin_book import T, INS, signal, quote
 from tests.unit.test_v3_strategies import make_snapshot
 
 
 class EventReplayTests(unittest.TestCase):
+    def test_exchange_book_effects_replay_exactly_without_exchange_client(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            journals = [Journal(root / "natural.db", "p1", "natural"),
+                        Journal(root / "replay.db", "p1", "replay")]
+            try:
+                engines = [PaperEngine(j, Policy()) for j in journals]
+                for e in engines:
+                    e.recover(T); e.connection(True, T)
+                    e.propose(signal(), INS, quote(), T)
+                    e.trade(Trade("AAVEUSDC", 1, T+1000, D("99.99"), D(1000), True), T+1000)
+                ex = FillsExchange(); ex.price, ex.t0 = D("100.07"), T+2000
+                mirror = ExchangeMirror(ex, "record", root, lambda *a: None)
+                traced = TraceEngine(engines[0])
+                with journals[0].transaction(): mirror.sync(traced, T+2000)
+                payload = json.loads(dumps({"effects": traced.events, "exchange_hold": False}))
+                apply_effects(engines[1], payload)
+                self.assertTrue(any(e["method"] == "book_real_fills" for e in traced.events))
+                self.assertEqual(journals[0].orders(), journals[1].orders())
+                self.assertEqual(journals[0].cash(), journals[1].cash())
+                with self.assertRaisesRegex(ValueError, "replay-only"):
+                    apply_effects(engines[0], payload)
+                with self.assertRaisesRegex(ValueError, "unknown"):
+                    apply_effects(engines[1], {"effects": [{"method": "kill", "args": [], "kwargs": {}}], "exchange_hold": False})
+            finally:
+                for j in journals: j.close()
+
+    def test_external_ml_uses_captured_proposal_not_current_signal_file(self):
+        import json
+        from dataclasses import asdict
+        from quantos.paper.types import Snapshot
+        s = signal(strategy_id="ml1h_pattern", strategy_version="0.1.0")
+        strategy = RecordedExternalStrategy({"AAVEUSDC": json.loads(dumps(asdict(s)))})
+        snap = Snapshot(T, INS, quote(), (), ())
+        self.assertEqual(strategy.evaluate(snap), s)
+        self.assertIsNone(RecordedExternalStrategy(None).evaluate(snap))
+        with self.assertRaisesRegex(ValueError, "lacks external"):
+            RecordedExternalStrategy({}).evaluate(snap)
+
     def _quote(self, source, bid, ask, mark, now):
         return replace(source, time_ms=now, received_ms=now, bid=D(bid), ask=D(ask), mark=D(mark),
                        bid_qty=D("100"), ask_qty=D("100"))
