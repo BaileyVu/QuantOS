@@ -189,3 +189,31 @@ class RuntimeTests(unittest.TestCase):
             report = run_demo(Path(temp)/"demo")
             one, five = (report["profiles"][p] for p in ("p1", "p5"))
             self.assertNotEqual(D(one["net_cash_change"])*5, D(five["net_cash_change"]))
+
+
+class ContinuousRunTests(unittest.TestCase):
+    def test_hours_zero_runs_until_stop_and_pause_holds_entries(self):
+        import threading
+        from tests.unit.test_v3_engine import INS, quote
+        with tempfile.TemporaryDirectory() as temp:
+            state = Path(temp)
+            class Market:
+                def funding(self, *args): return ()
+            runtime = Runtime(state, hours=0, market_factory=Market)
+            runtime.scanner = lambda: runtime.instruments.update({'BTCUSDC': INS})
+            runtime.feed = lambda *_: runtime.emit('feed', [('quote', quote(time=int(time.time()*1000)))])
+            seen = {}
+            def operator():
+                time.sleep(1.5); (state / 'PAUSE').touch()
+                time.sleep(3); seen['heartbeat'] = json.loads((state / 'heartbeat.json').read_text())
+                seen['run'] = json.loads((state / 'run.json').read_text())
+                (state / 'stop.request').touch()
+            threading.Thread(target=operator, daemon=True).start()
+            with (patch.dict('os.environ', {}, clear=True),
+                  patch('urllib.request.urlopen', side_effect=AssertionError('unexpected HTTP')),
+                  patch('quantos.paper.runtime.subprocess.Popen')):
+                self.assertEqual(runtime.run(), 0)
+            self.assertIsNone(seen['run']['deadline_ms'])
+            self.assertEqual(seen['run']['status'], 'running')
+            self.assertTrue(seen['heartbeat']['detail'].get('paused'))
+            self.assertEqual(json.loads((state / 'run.json').read_text())['status'], 'stopped')

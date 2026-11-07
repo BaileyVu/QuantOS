@@ -24,10 +24,11 @@ def parser():
     p = argparse.ArgumentParser(prog="quantos", description="Unauthenticated Binance Futures paper engine")
     sub = p.add_subparsers(dest="command", required=True)
     default = Path.home() / "Library" / "Application Support" / "QuantOS" / "v4-paper"
-    for name in ("start", "status", "journal", "report", "stop", "install-service", "exits"):
+    for name in ("start", "status", "journal", "report", "stop", "pause", "resume", "install-service", "exits"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--state", type=Path, default=default)
-        if name in {"start", "install-service"}: cmd.add_argument("--hours", type=float, default=72)
+        if name in {"start", "install-service"}:
+            cmd.add_argument("--hours", type=float, default=72, help="run length; 0 = run until `stop`")
         if name in {"start", "install-service"}:
             cmd.add_argument("--min-quote-volume", type=_quote_volume, default=D("20000000"))
         if name == "start": cmd.add_argument("--mode", choices=["paper"], default="paper")
@@ -216,7 +217,14 @@ def main(argv=None):
         elif args.command == "stop":
             if not (args.state / "run.json").exists(): raise ValueError("no paper run in this state directory")
             (args.state / "stop.request").touch()
-            result = {"status": "graceful stop requested", "state": str(args.state)}
+            result = {"status": "graceful stop requested: open positions close and the run ends",
+                      "state": str(args.state)}
+        elif args.command in ("pause", "resume"):
+            if not (args.state / "run.json").exists(): raise ValueError("no paper run in this state directory")
+            flag = args.state / "PAUSE"
+            flag.touch() if args.command == "pause" else flag.unlink(missing_ok=True)
+            result = {"status": "paused: no new entries; open positions keep their stops and exits"
+                      if args.command == "pause" else "resumed: new entries allowed", "state": str(args.state)}
         else:
             run = json.loads((args.state / "run.json").read_text())
             if args.command == "exits":

@@ -169,3 +169,12 @@ class RealFillBookingTests(EngineTests):
                     raise RuntimeError("inner failure")
         self.assertEqual(D(self.j.orders()[0]["average"]), D("100.20"))
         self.assertIsNone(self.j.get("probe"))
+
+
+class ManualPauseTests(EngineTests):
+    def test_pause_blocks_new_entries_only(self):
+        self.assertTrue(self.e.entry_allowed())
+        self.e.manual_pause = True
+        self.assertFalse(self.e.entry_allowed())
+        self.e.manual_pause = False
+        self.assertTrue(self.e.entry_allowed())

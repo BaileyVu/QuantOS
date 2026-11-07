@@ -1,4 +1,5 @@
-"""Independent feed/scanner workers, single-owner execution, durable 72h deadline."""
+"""Independent feed/scanner workers, single-owner execution, durable deadline (or none: hours=0 runs until
+`quantos stop`; `quantos pause` / `resume` hold and allow new entries)."""
 from dataclasses import asdict, replace
 import math
 import fcntl
@@ -43,6 +44,7 @@ DEMO_PROFILE = os.environ.get("QUANTOS_DEMO_PROFILE", "pL")
 # validated on its own; at 5s, ordinary slow polls (p99 ~7s) marked it down ~55 times/hour (11-03).
 FEED_TIMEOUT_MS = 10_000
 # Dashboard status/heartbeat cadence. Was 10s; with the 5s page poll the display ran up to 15s behind.
+MARKET_KEEP_DAYS = 14  # raw market recordings kept per state dir
 STATUS_EVERY_MS = 2_000
 # Messages waiting in the main queue. Each feed batch is ~2s, so 15 queued ~ 30s behind live (11-05: 31 min).
 QUEUE_LAG_WARN = 15
@@ -157,7 +159,7 @@ class Runtime:
                  min_quote_volume=D("20000000"), announcement_factory=BinanceAnnouncements,
                  portfolio="legacy", sentiment_path=None, notify=True, execution="paper", client_factory=None,
                  stream=True):
-        if not 0 < hours <= 72: raise ValueError("duration must be >0 and <=72 hours")
+        if not (hours == 0 or 0 < hours <= 72): raise ValueError("duration must be 0 (until stopped) or 0-72 hours")
         self.state, self.hours, self.market_factory = state, hours, market_factory
         self.shutdown = threading.Event()
         self.messages = queue.Queue(maxsize=1000)
@@ -211,6 +213,10 @@ class Runtime:
         folder = self.state / "market"
         folder.mkdir(exist_ok=True)
         day = time.strftime("%Y-%m-%d", time.gmtime(now/1000))
+        if day != getattr(self, "_record_day", day):  # a non-stop run must not fill the disk
+            for old in sorted(folder.glob("*.jsonl.gz"))[:-MARKET_KEEP_DAYS]:
+                old.unlink(missing_ok=True)
+        self._record_day = day
         with gzip.open(folder / f"{day}.jsonl.gz", "at") as f:
             f.write(dumps({"schema": 2, "received_ms": now, "kind": kind,
                            "payload": payload, "active_seconds": active_seconds}) + "\n")
@@ -386,7 +392,7 @@ class Runtime:
             now = milliseconds()
             run_file = self.state / "run.json"
             run = json.loads(run_file.read_text()) if run_file.exists() else {
-                "started_ms": now, "deadline_ms": now+int(self.hours*3600000),
+                "started_ms": now, "deadline_ms": now+int(self.hours*3600000) if self.hours else None,
                 "evidence": "natural", "status": "starting", "restarts": -1,
                 "hours": self.hours, "reported_days": [], "portfolio": self.portfolio,
                 **({"profiles": ["pL"]} if self.portfolio == "live50" else {})}
@@ -492,7 +498,7 @@ class Runtime:
                             e.journal.event(now, "SUSPENDED", {"active": len(e.active())})
                     return 0
                 self.stop_requested = self.stop_requested or (self.state / "stop.request").exists()
-                finishing = self.stop_requested or now >= run["deadline_ms"]
+                finishing = self.stop_requested or (run["deadline_ms"] is not None and now >= run["deadline_ms"])
                 if finishing:
                     finishing_since = finishing_since or now
                     run["status"] = "closing"
@@ -550,6 +556,8 @@ class Runtime:
                     for e in engines: e.kill(now)
                     alerter.alert("critical", "kill_switch", "KILL file present: entries paused, positions closing", now)
                 if now-last_status >= STATUS_EVERY_MS:
+                    paused = (self.state / "PAUSE").exists()
+                    for e in engines: e.manual_pause = paused
                     stale = {**dict(monitor.stale(now)), **dict(scan_monitor.stale(now))}
                     for name in ("feed", "scan"):
                         if name in stale:
@@ -566,7 +574,7 @@ class Runtime:
                     else:
                         alerter.clear("queue_lag", now)
                     heartbeat.beat(now, {"status": run["status"], "feed_age_ms": now-last_feed if last_feed else None,
-                                         "queue": backlog,
+                                         "queue": backlog, "paused": paused,
                                          **({"stream": {"live": self.stream.healthy(now), "messages": self.stream.messages,
                                                         "reconnects": self.stream.reconnects}} if self.stream else {}),
                                          **({"user_stream": {"live": user.up, "messages": user.messages,
