@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import re
 import sqlite3
@@ -284,11 +285,47 @@ def fng():
 PAGE = (Path(__file__).with_name("webdash.html"))
 
 
+_exchange = {"at": 0.0, "data": None, "client": None}
+_exchange_lock = threading.Lock()
+
+
+def exchange_view(ttl=1.5):
+    """/api/exchange: the truth from Binance Demo itself (positions, P&L, stops, balance); GET requests only.
+    The run's books are the paper engine's estimate and never match real fills exactly."""
+    with _exchange_lock:
+        if _exchange["data"] is not None and time.time() - _exchange["at"] < ttl:
+            return _exchange["data"]
+        try:
+            if _exchange["client"] is None:
+                os.environ.setdefault("QUANTOS_TESTNET_HOST", "demo")
+                from ..live.client import SignedClient
+                from ..live.keys import load_keys
+                path = os.environ.get("QUANTOS_KEY_FILE") or (
+                    Path.home() / "Library/Application Support/QuantOS/keys/binance-futures-testnet.env")
+                _exchange["client"] = SignedClient("testnet", load_keys(path))  # never mainnet
+            c = _exchange["client"]
+            account = c.request("GET", "/fapi/v2/account")
+            data = {"ok": True, "time_ms": int(time.time() * 1000),
+                    "positions": [{"symbol": p["symbol"], "qty": p["positionAmt"], "entry": p.get("entryPrice"),
+                                   "mark": p.get("markPrice"), "pnl": p.get("unRealizedProfit")}
+                                  for p in c.position_risk() if float(p["positionAmt"]) != 0],
+                    "stops": [{"symbol": o.get("symbol"), "side": o.get("side"), "trigger": o.get("triggerPrice")}
+                              for o in c.open_algo_orders()],
+                    "assets": [{"asset": a["asset"], "wallet": a["walletBalance"], "pnl": a.get("unrealizedProfit")}
+                               for a in account.get("assets", []) if float(a["walletBalance"]) != 0]}
+        except Exception as error:
+            data = {"ok": False, "time_ms": int(time.time() * 1000), "error": f"{type(error).__name__}: {error}"[:200]}
+        _exchange.update(at=time.time(), data=data)
+        return data
+
+
 def serve(runs, sentibot, port=8787):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             if self.path.startswith("/api/state"):
                 body, kind = json.dumps(snapshot(runs, sentibot), default=str).encode(), "application/json"
+            elif self.path.startswith("/api/exchange"):
+                body, kind = json.dumps(exchange_view(), default=str).encode(), "application/json"
             elif self.path.startswith("/api/news"):
                 from .news import news
                 body, kind = json.dumps(news(), default=str).encode(), "application/json"

@@ -239,3 +239,76 @@ class KillFlattenTests(MirrorTests):
         fresh = self.mirror(ex)
         self.assertTrue(fresh.sync(e, 40_000)["ok"])
         self.assertFalse(fresh.kill.active)
+
+
+class StopMoveTests(MirrorTests):
+    class OneStop(FakeExchange):
+        """Like Binance: a second closePosition stop on the same side is rejected with -4130."""
+        fail_new, fail_restore, cancel_fail = False, False, False
+        placed = 0
+
+        def new_algo_order(self, p):
+            self.placed += 1
+            if self.algo: raise BinanceError(-4130, "An open stop or take profit order already exists", 400)
+            if self.fail_new and str(p["triggerPrice"]) != "75.00": raise BinanceError(-2021, "would trigger", 400)
+            if self.fail_restore: raise BinanceError(-2021, "would trigger", 400)
+            return super().new_algo_order(p)
+
+        def cancel_algo_order(self, cid):
+            if self.cancel_fail: raise ConnectionError("transport failure")
+            return super().cancel_algo_order(cid)
+
+    def held(self):
+        ex, e = self.OneStop(), Engine()
+        e.orders = [order()]
+        m = self.mirror(ex)
+        m.sync(e, 1)
+        e.orders = [order(stop="80.00")]
+        return ex, e, m
+
+    def triggers(self, ex): return [o["triggerPrice"] for o in ex.algo.values()]
+
+    def test_move_cancels_first_and_exchange_stop_follows(self):
+        ex, e, m = self.held()
+        self.assertTrue(m.sync(e, 40_000)["ok"])
+        self.assertEqual(self.triggers(ex), ["80.00"])
+        self.assertFalse(m.kill.active)
+
+    def test_moves_are_rate_limited(self):
+        ex, e, m = self.held()
+        m.sync(e, 40_000)
+        count = ex.placed
+        e.orders = [order(stop="81.00")]
+        m.sync(e, 42_000)
+        self.assertEqual((ex.placed, self.triggers(ex)), (count, ["80.00"]))
+        m.sync(e, 50_000)
+        self.assertEqual(self.triggers(ex), ["81.00"])
+
+    def test_rejected_move_restores_old_stop_and_backs_off(self):
+        ex, e, m = self.held()
+        ex.fail_new = True
+        m.sync(e, 40_000)
+        self.assertEqual(self.triggers(ex), ["75.00"])
+        self.assertFalse(m.kill.active)
+        self.assertIn(("warn", f"stop:{'a' * 32}"), self.alerts)
+        count = ex.placed
+        for now in range(42_000, 70_000, 2_000):           # the old bug retried here every 2s
+            m.sync(e, now)
+        self.assertEqual(ex.placed, count)
+        ex.fail_new = False
+        m.sync(e, 70_000)
+        self.assertEqual(self.triggers(ex), ["80.00"])
+
+    def test_failed_cancel_keeps_old_stop(self):
+        ex, e, m = self.held()
+        ex.cancel_fail = True
+        m.sync(e, 40_000)
+        self.assertEqual(self.triggers(ex), ["75.00"])
+        self.assertEqual(m.book["a" * 32]["stop"], "75.00")
+
+    def test_unprotected_after_failed_restore_halts(self):
+        ex, e, m = self.held()
+        ex.fail_restore = True
+        m.sync(e, 40_000)
+        self.assertTrue(m.kill.active)
+        self.assertIn(("critical", "kill_switch"), self.alerts)

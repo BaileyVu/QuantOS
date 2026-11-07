@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 from ..paper.types import D, Instrument
-from .client import BinanceError, RateLimited
+from .client import BinanceError, RateLimited, UnknownOrder
 from .kill import KillSwitch, flatten
 from .orders import (ProtectionFailed, client_order_id, place_with_protection, reduce_only_close,
                      stop_market_protect, submit)
@@ -33,6 +33,9 @@ TRANSIENT_KILL_MS, TRANSIENT_KILL_CHECKS = 120_000, 4
 TRANSIENT_RETRY_MS = (5_000, 10_000, 20_000, 30_000)
 # A kill's one flatten failed on the network on 11-03 and NEAR/ADA stayed open 3.5h; retry until verified flat.
 FLATTEN_RETRY_MS = 30_000
+# Exchange stop moves: each costs signed calls on the main loop. A rejected move retried every 2s starved the
+# loop and left quotes 31 min old (11-05), so moves are rate-limited and failures back off.
+STOP_MOVE_MIN_MS, STOP_RETRY_MS = 10_000, 30_000
 
 
 def is_auth_error(error: Exception) -> bool:
@@ -61,6 +64,7 @@ class ExchangeMirror:
         # Soft pause: no new entries while the exchange is unreachable; open positions stay managed.
         self.hold, self.transient, self.transient_since = False, 0, None
         self.flat_confirmed, self.next_flatten_ms = False, 0
+        self.next_stop_ms = {}
         # Reconciliation costs ~3 signed calls; every 2s it stalled the runtime's main loop until
         # quotes went stale. Check every 30s, and right after any exchange action.
         self.check_every_ms, self.last_check_ms = 30_000, 0
@@ -125,16 +129,8 @@ class ExchangeMirror:
                 m["state"] = "CLOSED" if error is None else "CLOSE_FAILED"
                 if error is not None:
                     self._halt(f"reduce-only close failed on {m['symbol']}: {error}")
-            elif D(o["stop_price"]) != D(m["stop"]):
-                m["stop_n"] += 1
-                cid = client_order_id(self.run_id, f"{oid[:16]}-{m['stop_n']}", "sl")
-                placed, error = self._guard("stop", lambda: submit(self.client, stop_market_protect(
-                    m["symbol"], opp, D(o["stop_price"]), cid, ins)))
-                if error is None:
-                    self._cancel_stop(m)
-                    m.update(stop=o["stop_price"], stop_cid=placed.get("clientAlgoId") or placed.get("clientOrderId"))
-                else:
-                    self.alert("warn", f"stop:{oid}", f"stop update failed on {m['symbol']}; old stop kept: {error}")
+            elif D(o["stop_price"]) != D(m["stop"]) and now_ms >= self.next_stop_ms.get(oid, 0):
+                self._move_stop(oid, m, o["stop_price"], ins, opp, now_ms)
             self._save()
         every = (TRANSIENT_RETRY_MS[min(self.transient, len(TRANSIENT_RETRY_MS)) - 1]
                  if self.transient else self.check_every_ms)
@@ -149,7 +145,37 @@ class ExchangeMirror:
     def _cancel_stop(self, m):
         cancel = (self.client.cancel_algo_order if getattr(self.client, "conditional_api", "") == "algo"
                   else lambda cid: self.client.cancel_order(m["symbol"], cid))
-        self._guard("cancel", lambda: cancel(m["stop_cid"]))
+        return self._guard("cancel", lambda: cancel(m["stop_cid"]))
+
+    def _place_stop(self, oid, m, price, ins, opp):
+        m["stop_n"] += 1
+        cid = client_order_id(self.run_id, f"{oid[:16]}-{m['stop_n']}", "sl")
+        placed, error = self._guard("stop", lambda: submit(self.client, stop_market_protect(
+            m["symbol"], opp, D(price), cid, ins)))
+        if error is None:
+            m["stop_cid"] = placed.get("clientAlgoId") or placed.get("clientOrderId")
+        return error
+
+    def _move_stop(self, oid, m, price, ins, opp, now_ms):
+        """Binance allows one closePosition stop per side (-4130), so the old stop must go first. If the new one
+        fails the old one goes back; if that fails too the position is unprotected, so halt."""
+        self.next_stop_ms[oid] = now_ms + STOP_MOVE_MIN_MS
+        _, error = self._cancel_stop(m)
+        if error is not None and not isinstance(error, UnknownOrder):
+            self.next_stop_ms[oid] = now_ms + STOP_RETRY_MS
+            self.alert("warn", f"stop:{oid}", f"stop move failed on {m['symbol']}; old stop kept: {error}")
+            return
+        error = self._place_stop(oid, m, price, ins, opp)
+        if error is None:
+            m["stop"] = price
+            self.alert("recovered", f"stop:{oid}", "")
+            return
+        self.next_stop_ms[oid] = now_ms + STOP_RETRY_MS
+        restore = self._place_stop(oid, m, m["stop"], ins, opp)
+        if restore is not None:
+            self._halt(f"{m['symbol']} unprotected: stop move failed ({error}), restore failed ({restore})")
+        else:
+            self.alert("warn", f"stop:{oid}", f"stop move failed on {m['symbol']}; old stop restored: {error}")
 
     def check(self, now_ms: int | None = None) -> dict:
         if getattr(self.client, "mode", "") == "dry-run":  # nothing real to compare against

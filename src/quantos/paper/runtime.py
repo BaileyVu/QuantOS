@@ -3,6 +3,7 @@ from dataclasses import asdict, replace
 import math
 import fcntl
 import gzip
+import collections
 import json
 import os
 from pathlib import Path
@@ -41,6 +42,7 @@ DEMO_PROFILE = os.environ.get("QUANTOS_DEMO_PROFILE", "pL")
 # Gap between healthy batches before the feed counts as down. Polls run every 2s and each batch is
 # validated on its own; at 5s, ordinary slow polls (p99 ~7s) marked it down ~55 times/hour (11-03).
 FEED_TIMEOUT_MS = 10_000
+STATUS_MS = 2_000  # status.json and the dashboard snapshot (was 10s)
 if DEMO_PROFILE not in ("pL", "pD"): raise ValueError("QUANTOS_DEMO_PROFILE must be pL or pD")
 
 
@@ -155,6 +157,7 @@ class Runtime:
         self.state, self.hours, self.market_factory = state, hours, market_factory
         self.shutdown = threading.Event()
         self.messages = queue.Queue(maxsize=1000)
+        self.backlog = collections.deque()
         if portfolio not in ("legacy", "live50"): raise ValueError("portfolio must be legacy or live50")
         self.portfolio = portfolio
         self.strategies = live_library() if portfolio == "live50" else library()
@@ -186,6 +189,21 @@ class Runtime:
         path = os.environ.get("QUANTOS_KEY_FILE")
         if not path: raise ValueError("QUANTOS_KEY_FILE must name the testnet key file")
         return SignedClient(self.execution, load_keys(path))
+
+    def next_message(self, timeout=.25):
+        """Oldest message, skipping quote-only batches that a newer one replaces: acting on old prices is
+        worthless and a backlog never catches up (11-05: 31 min behind). Trade batches are never dropped."""
+        if not self.backlog:
+            try: self.backlog.append(self.messages.get(timeout=timeout))
+            except queue.Empty: return "tick", None
+        try:
+            while True: self.backlog.append(self.messages.get_nowait())
+        except queue.Empty:
+            pass
+        quote_only = [i for i, (kind, payload) in enumerate(self.backlog)
+                      if kind == "feed" and all(event == "quote" for event, _ in payload)]
+        for i in reversed(quote_only[:-1]): del self.backlog[i]
+        return self.backlog.popleft()
 
     def emit(self, kind, payload):
         try: self.messages.put((kind, payload), timeout=1)
@@ -474,8 +492,7 @@ class Runtime:
                 if finishing:
                     finishing_since = finishing_since or now
                     run["status"] = "closing"
-                try: kind, payload = self.messages.get(timeout=.25)
-                except queue.Empty: kind, payload = "tick", None
+                kind, payload = self.next_message()
                 now = milliseconds()
                 if kind == "feed":
                     interval = (now-last_feed)/1000 if last_feed else 0
@@ -527,7 +544,7 @@ class Runtime:
                     killed = True
                     for e in engines: e.kill(now)
                     alerter.alert("critical", "kill_switch", "KILL file present: entries paused, positions closing", now)
-                if now-last_status >= 10000:
+                if now-last_status >= STATUS_MS:
                     stale = {**dict(monitor.stale(now)), **dict(scan_monitor.stale(now))}
                     for name in ("feed", "scan"):
                         if name in stale:

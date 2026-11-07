@@ -1075,7 +1075,30 @@ routeHash(); renderFng();
 loadState().then(() => { if (tab === 'Trades') loadKlines(); loadExtra(); });
 loadNews(); loadFng();
 setInterval(() => { if ($('utcClock')) $('utcClock').textContent = hms(Date.now()) + ' UTC'; }, 1000);
-setInterval(loadState, 5000);
+setInterval(loadState, 2000);
+async function loadExchange() {
+  const el = $('binanceLive'); if (!el) return;
+  const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  try {
+    const x = await getJSON('/api/exchange');
+    if (!x.ok) { el.textContent = 'Binance Demo: unavailable (' + x.error + ')'; return; }
+    const usdc = (x.assets || []).find(a => a.asset === 'USDC') || {};
+    const pos = (x.positions || []).map(p => {
+      const stop = (x.stops || []).find(s => s.symbol === p.symbol);
+      return `${esc(p.symbol)} ${+p.qty < 0 ? 'SHORT' : 'LONG'} ${esc(Math.abs(+p.qty))} @ ${esc(p.entry)} · mark ${esc(p.mark)} · P&L <b>${(+p.pnl).toFixed(3)}</b>${stop ? ' · stop ' + esc(stop.trigger) : ''}`;
+    }).join(' &nbsp;|&nbsp; ') || 'no positions';
+    el.innerHTML = `<b>Binance Demo (live)</b> &nbsp; USDC wallet ${(+usdc.wallet || 0).toFixed(2)} &nbsp;·&nbsp; ${pos} &nbsp;<span style="opacity:.6">${hms(x.time_ms)} UTC</span>`;
+  } catch (e) { el.textContent = 'Binance Demo: dashboard server unreachable'; }
+}
+{
+  const bar = document.createElement('div');
+  bar.id = 'binanceLive';
+  bar.style.cssText = 'padding:8px 16px;font-size:13px;line-height:1.5;border-bottom:1px solid rgba(255,255,255,.12);overflow-wrap:anywhere';
+  bar.textContent = 'Binance Demo: loading…';
+  document.body.prepend(bar);
+  loadExchange();
+  setInterval(loadExchange, 2000);
+}
 setInterval(loadExtra, 30000);
 setInterval(loadNews, 60000);
 setInterval(loadFng, 600000);
