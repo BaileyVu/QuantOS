@@ -278,7 +278,7 @@ class FillsExchange(FakeExchange):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.trades, self.price, self.trade_calls, self.next_id, self.hide = [], D("80.00"), 0, 100, False
-        self.reject_reduce = False
+        self.reject_reduce, self.t0 = False, 1000
 
     def new_order(self, p):
         if p.get("reduceOnly") and self.reject_reduce:
@@ -292,7 +292,7 @@ class FillsExchange(FakeExchange):
     def fill(self, side, qty, order_id):
         self.trades.append({"orderId": order_id, "side": side, "price": str(self.price), "qty": str(qty),
                             "commission": str(self.price * qty * D("0.0005")), "commissionAsset": "USDC",
-                            "time": 1000 + len(self.trades)})
+                            "time": self.t0 + len(self.trades)})
 
     def user_trades(self, symbol, start_time=None):
         self.trade_calls += 1
@@ -355,3 +355,44 @@ class RealFillTests(unittest.TestCase):
         ex.hide = False
         m.sync(e, 6001)
         self.assertEqual(len(e.booked), 1)
+
+    def test_account_stream_flat_position_closes_paper_and_books_the_stop(self):
+        ex, e = FillsExchange(), BookingEngine()
+        closed = []
+        e.close_external = lambda oid, now, reason: closed.append((oid, reason)) or True
+        m = self.mirror(ex)
+        e.orders = [order()]
+        m.sync(e, 1000)
+        ex.price = D("75.10")                         # stop filled on Binance
+        ex.fill("SELL", D("0.05"), 999)
+        ex.pos["SOLUSDC"], ex.algo, ex.reject_reduce = D(0), {}, True
+        m.sync(e, 3000, [{"e": "ACCOUNT_UPDATE", "a": {"P": [{"s": "SOLUSDC", "pa": "0"}]}}])
+        self.assertEqual(closed, [("a" * 32, "EXCHANGE_CLOSED")])
+        self.assertFalse(m.kill.active)
+        e.orders = []                                 # paper is now CLOSING, so not live
+        m.sync(e, 5000)
+        self.assertEqual(m.book["a" * 32]["state"], "CLOSED")
+        self.assertEqual(e.booked[-1][1][0], D("75.10"))
+
+    def test_real_engine_books_inside_the_runtime_transaction(self):
+        """End to end with the real engine and journal, called the way runtime.py calls it."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from test_thin_book import T, INS as AAVE, quote, signal
+        from quantos.paper.engine import PaperEngine
+        from quantos.paper.journal import Journal
+        from quantos.paper.risk import Policy
+        from quantos.paper.types import Trade
+        j = Journal(Path(self.dir.name) / "journal_p1.db", "p1", "synthetic")
+        self.addCleanup(j.close)
+        eng = PaperEngine(j, Policy())
+        eng.recover(T); eng.connection(True, T)
+        eng.propose(signal(), AAVE, quote(), T)
+        eng.trade(Trade("AAVEUSDC", 1, T + 1000, D("99.99"), D("1000"), True), T + 1000)
+        ex = FillsExchange()
+        ex.price, ex.t0 = D("100.07"), T + 2000
+        m = self.mirror(ex)
+        with j.transaction():
+            m.sync(eng, T + 2000)
+        self.assertEqual(D(j.orders()[0]["average"]), D("100.07"))
+        self.assertEqual(j.db.execute("SELECT COUNT(*) FROM events WHERE kind='BOOKS_CORRECTION'").fetchone()[0], 1)

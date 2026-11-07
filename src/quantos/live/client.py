@@ -44,8 +44,15 @@ ALLOWED = {
     ("POST", "/fapi/v1/algoOrder"), ("GET", "/fapi/v1/algoOrder"), ("DELETE", "/fapi/v1/algoOrder"),
     ("GET", "/fapi/v1/openAlgoOrders"), ("DELETE", "/fapi/v1/algoOpenOrders"),
     ("GET", "/fapi/v1/userTrades"),  # read-only: real fill prices and fees for the books
+    # User-data stream key: API-key header only, no signature; it cannot trade.
+    ("POST", "/fapi/v1/listenKey"), ("PUT", "/fapi/v1/listenKey"), ("DELETE", "/fapi/v1/listenKey"),
 }
 UNSIGNED = {"/fapi/v1/exchangeInfo", "/fapi/v1/time"}
+KEY_ONLY = {"/fapi/v1/listenKey"}
+# WebSocket hosts for the account (user-data) stream, per REST host.
+WS_HOSTS = {"https://fapi.binance.com": "fstream.binance.com",
+            "https://testnet.binancefuture.com": "stream.binancefuture.com",
+            "https://demo-fapi.binance.com": "demo-fstream.binance.com"}
 
 
 class BinanceError(RuntimeError):
@@ -128,7 +135,7 @@ class SignedClient:
         if (method, path) not in ALLOWED: raise ModeError("endpoint not allowlisted")
         p = {k: _fmt(v) for k, v in (params or {}).items() if v is not None}
         if self.mode == "dry-run": return self._dry(method, path, p)
-        return self._send(method, path, p, signed=path not in UNSIGNED)
+        return self._send(method, path, p, signed=path not in UNSIGNED and path not in KEY_ONLY)
 
     def _send(self, method, path, p, signed):
         mutating = method != "GET"
@@ -139,7 +146,7 @@ class SignedClient:
             q = urlencode(p)
         req = Request(self.base + path + ("?" + q if q else ""), method=method,
                       headers={"Accept": "application/json", "User-Agent": "QuantOS-live/1"})
-        if signed: req.add_header("X-MBX-APIKEY", self._keys.api_key)
+        if signed or path in KEY_ONLY: req.add_header("X-MBX-APIKEY", self._keys.api_key)
         try:
             status, body, headers = self._transport(req, 5)
         except Exception as e:
@@ -226,6 +233,11 @@ class SignedClient:
     def open_orders(self, symbol=None): return self.request("GET", "/fapi/v1/openOrders", {"symbol": symbol})
     def position_risk(self, symbol=None): return self.request("GET", "/fapi/v2/positionRisk", {"symbol": symbol})
     def account(self): return self.request("GET", "/fapi/v2/account")
+    def listen_key(self): return self.request("POST", "/fapi/v1/listenKey")["listenKey"]
+    def keepalive_listen_key(self): return self.request("PUT", "/fapi/v1/listenKey")
+    def close_listen_key(self): return self.request("DELETE", "/fapi/v1/listenKey")
+    @property
+    def ws_host(self): return WS_HOSTS.get(self.base)
     def user_trades(self, symbol, start_time=None): return self.request("GET", "/fapi/v1/userTrades", {"symbol": symbol, "startTime": start_time, "limit": 1000})
     def exchange_info(self): return self.request("GET", "/fapi/v1/exchangeInfo")
     def server_time(self): return self.request("GET", "/fapi/v1/time")

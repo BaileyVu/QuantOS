@@ -191,3 +191,70 @@ class QuoteStream:
                 self.up[channel] = False
                 if ws is not None: ws.close()
                 self.reconnects += 1
+
+
+class UserStream:
+    """Account events (ORDER_TRADE_UPDATE, ACCOUNT_UPDATE) on the private user-data stream. A background
+    thread keeps the listenKey alive (PUT every 30 min; Binance expires it after 60) and reconnects with
+    backoff; the main loop takes events with `drain()`. Nothing depends on it being up: the mirror still
+    reconciles every 30s by REST, the stream only makes it react within ~2s."""
+    PATH = "/private/ws/{}"   # fstream routes account data under /private (books /public, marks /market)
+    KEEPALIVE_MS = 30 * 60_000
+
+    def __init__(self, client, host: str | None = None, connect: Callable = WebSocket,
+                 clock_ms: Callable[[], int] = lambda: int(time.time() * 1000), on_event: Callable = None):
+        self.client, self.host, self.connect, self.clock_ms = client, host or client.ws_host, connect, clock_ms
+        self.on_event = on_event or (lambda kind, detail: None)
+        self.lock = threading.Lock()
+        self.events, self.up, self.down_since = [], False, None
+        self.messages = self.reconnects = 0
+
+    def drain(self) -> list:
+        with self.lock:
+            out, self.events = self.events, []
+        return out
+
+    def handle(self, text: str):
+        msg = json.loads(text)
+        msg = msg.get("data", msg)
+        if msg.get("e") == "listenKeyExpired":
+            raise ConnectionError("listenKey expired")
+        if msg.get("e") in ("ORDER_TRADE_UPDATE", "ACCOUNT_UPDATE"):
+            with self.lock:
+                self.events.append(msg)
+                del self.events[:-1000]  # bounded if nobody drains
+        self.messages += 1
+
+    def run(self, shutdown: threading.Event):
+        backoff = 1
+        while not shutdown.is_set():
+            ws = None
+            try:
+                key = self.client.listen_key()
+                ws = self.connect(self.host, self.PATH.format(key))
+                ws.settimeout(1)
+                self.up, self.down_since = True, None
+                opened = refreshed = self.clock_ms()
+                self.on_event("connected", {"channel": "user"})
+                backoff = 1
+                while not shutdown.is_set():
+                    try:
+                        self.handle(ws.recv())
+                    except socket.timeout:
+                        pass
+                    now = self.clock_ms()
+                    if now - refreshed > self.KEEPALIVE_MS:
+                        self.client.keepalive_listen_key()
+                        refreshed = now
+                    if now - opened > ROTATE_MS:
+                        break
+            except Exception as error:
+                self.on_event("disconnected", {"channel": "user", "error": f"{type(error).__name__}: {error}"[:200]})
+                shutdown.wait(backoff)
+                backoff = min(60, backoff * 2)
+            finally:
+                if self.up or self.down_since is None:
+                    self.down_since = self.clock_ms()
+                self.up = False
+                if ws is not None: ws.close()
+                self.reconnects += 1
