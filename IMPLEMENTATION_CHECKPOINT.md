@@ -1,4 +1,53 @@
-## Infrastructure v5 — PR6 review, 2026-11-07 (LATEST)
+## Infrastructure v5 — second-window handoff, 2026-11-07 (LATEST)
+
+Active worktree QuantOS-infra-v5; branch codex/infra-registry-manifests, source
+989770c. Working tree clean before this checkpoint. Published stacked draft PRs:
+PR3=50(dae73e8),PR4=51(4bf6102),PR5=52(a1942e8),PR6=53(989770c).
+Contract47 remains separate. PR48/49 earlier. Nothing merged or deployed.
+PR6 final audit-field check6tests0.006s PASS, in addition to23tests0.158s.
+
+EXACT NEXT STEP after reset: finish main review of prepared PR7 a93c6df in
+QuantOS-infra-replay, branch codex/infra-event-replay (base4e1eacf), then integrate
+onto current PR6 on new ordered branch. Agent111focusedtests PASS, CLIhelp/diffcheck
+PASS. Files: event_replay.py, cli/runtime recording context, manifest.py, tests/docs.
+Resolve overlap with PR5 runtime shadow hooks. Review replay correctness, candidate
+ml1h runtime implications, and actual duplicate manifest-ID requirement. Agent
+only made unversioned lookup prefer unique promoted version. Runtime-vs-backtest
+strategy TOML cleanup still unresolved: user explicitly permits load OR delete;
+main must select a coherent implementation without unnecessarily asking approval.
+Actual pD-period parity and first turtle/vol-squeeze BUILD+HELD L2 UNVERIFIED;
+requires sufficient recorded schema2 inputs/journal and manifested complete data,
+no2025+ model selection and no repeat HELD family evaluations.
+
+PR8 preparation in QuantOS-infra-sentibot, branch codex/infra-sentibot, commits
+1ad4f09 +17463a0, base4e1eacf. Agent7mockednetworktests PASS, help/diffcheckPASS;
+all8baseline source SHA manifests verified. Shadow collector only writes
+reach_shadow.jsonl in dedicated external state, no baseline imports/writes. Source
+baseline vendored separately reference-only, no credentials/logs/state. Main review
+still needed: security/fetches,29symbol coverage vsdynamicuniverse, source/licensing,
+snapshot/deploy procedure. Missing:30min runtime staleness integration, offline
+reach-vsbaseline/forward4h24h/gate-value report, actual3day shadow collection.
+PR9 TimesFM2.5 not started. Agents now stopped/idle; no nested delegation used.
+
+At handoff threshold:18%five-hour,72%weekly remaining;1banked reset remains.
+Five-hour reset2026-11-08 03:07:59 Vietnam(1794082079). Existing SAME automation
+continue-quantos-infrastructure-v5 updated ACTIVE for03:13 Vietnam daily, first
+Nov8 after reset, same chat; update confirmation returned. Do not create duplicates.
+
+ACTIVE VALIDATION PROCESS (follow to completion before final handoff): isolated
+real-entrypoint live-data dry-run soak of immutable989770c in detached worktree
+QuantOS-infra-soak-989770c. State /tmp/quantos-infra-soak-989770c; stdout log
+/tmp/quantos-infra-soak-989770c.log; PID45343, execsession57311. Started1794065112220,
+deadline1794065760220 (0.18h=648s). Command uses pD env, --execution dry-run,
+--portfolio live50 --min-quote-volume5000000 --modepaper. No keys/account/orders;
+existing demo and LaunchAgents untouched. First42s:40observations/98scans,0ERROR/
+SHADOW_ERROR. NOT a soak pass yet. Confirm exit + walltime, zero errors, feed/scan
+coverage and any unresolved exposure before claiming acceptance. Does not satisfy
+24h demo/3day sentiment acceptance. All other acceptance remainsUNVERIFIED.
+
+---
+
+## Infrastructure v5 — PR6 review, 2026-11-07 (historical)
 
 PR5 draft52 published: https://github.com/BaileyVu/QuantOS/pull/52 at a1942e8.
 Active branch codex/infra-registry-manifests; agent source integrated as8670366,
