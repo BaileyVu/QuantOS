@@ -367,7 +367,9 @@ class Runtime:
                 if self.portfolio == "live50":
                     batch = self.stream.quotes(symbols, now) if self.stream else None
                     streamed = batch is not None
-                    if not streamed: batch = market.quotes(symbols, skip_invalid=True)
+                    if not streamed:
+                        batch = market.quotes(symbols, skip_invalid=True)
+                        if self.stream: self.stream.seed_books(batch)
                     # One quiet thin book must not blank the whole batch (11-02 run: ~4.2k feed errors).
                     if not batch: raise ValueError("invalid or stale quote")
                     records[0:0] = [("quote", batch[s]) for s in symbols if s in batch]
