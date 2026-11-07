@@ -207,6 +207,7 @@ class ContinuousRunTests(unittest.TestCase):
                 time.sleep(1.5); (state / 'PAUSE').touch()
                 time.sleep(3); seen['heartbeat'] = json.loads((state / 'heartbeat.json').read_text())
                 seen['run'] = json.loads((state / 'run.json').read_text())
+                seen['status'] = json.loads((state / 'status.json').read_text())
                 (state / 'stop.request').touch()
             threading.Thread(target=operator, daemon=True).start()
             with (patch.dict('os.environ', {}, clear=True),
@@ -216,6 +217,7 @@ class ContinuousRunTests(unittest.TestCase):
             self.assertIsNone(seen['run']['deadline_ms'])
             self.assertEqual(seen['run']['status'], 'running')
             self.assertTrue(seen['heartbeat']['detail'].get('paused'))
+            self.assertIs(seen['status']['paused'], True)
             self.assertEqual(json.loads((state / 'run.json').read_text())['status'], 'stopped')
 
     def test_full_queue_drops_quotes_instead_of_closing_everything(self):

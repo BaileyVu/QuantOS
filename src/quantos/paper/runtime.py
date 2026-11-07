@@ -603,7 +603,7 @@ class Runtime:
                         write_status(self.state, status)
                     except Exception as error:
                         alerter.alert("warn", "dashboard", f"status write failed: {error}", now)
-                    atomic_json(self.state / "status.json", {"mode": "paper", "run": run, "updated_ms": now,
+                    atomic_json(self.state / "status.json", {"mode": "paper", "run": run, "updated_ms": now, "paused": paused,
                         "feed_age_ms": now-last_feed if last_feed else None,
                         "next_scan_ms": (now//30000+1)*30000,
                         "profiles": {e.journal.profile: {"cash": str(e.journal.cash()), "active": e.active(),
