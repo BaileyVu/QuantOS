@@ -29,6 +29,21 @@ class Engine:
         return {"has_exit": exit is not None}
 
 
+def run(m, e, now, oid, alerts):
+    m.sync(e, now())
+    for _ in range(15):
+        if e.booked: break
+        time.sleep(2); m.sync(e, now())
+    print("open:", m.book[oid]["state"], "qty", m.book[oid]["qty"], "booked", e.booked)
+    time.sleep(3)
+    e.orders = []
+    m.sync(e, now())
+    for _ in range(40):
+        if len(e.booked) >= 2: break
+        time.sleep(2); m.sync(e, now())
+    print("closed:", m.book[oid]["state"], "booked", e.booked, "alerts", alerts)
+
+
 def main(symbol="NEARUSDC"):
     client = SignedClient("testnet", load_keys(os.environ["QUANTOS_KEY_FILE"]))
     if any(D(str(p["positionAmt"])) != 0 for p in client.position_risk()):
@@ -47,18 +62,15 @@ def main(symbol="NEARUSDC"):
         e = Engine()
         e.orders = [order]
         now = lambda: int(time.time() * 1000)
-        m.sync(e, now())
-        for _ in range(15):
-            if e.booked: break
-            time.sleep(2); m.sync(e, now())
-        print("open:", m.book[oid]["state"], "qty", m.book[oid]["qty"], "booked", e.booked)
-        time.sleep(3)
-        e.orders = []
-        m.sync(e, now())
-        for _ in range(40):
-            if len(e.booked) >= 2: break
-            time.sleep(2); m.sync(e, now())
-        print("closed:", m.book[oid]["state"], "booked", e.booked, "alerts", alerts)
+        try:
+            run(m, e, now, oid, alerts)
+        except BaseException:
+            m._flatten()  # close the test position and its stop, then verify flat
+            print("ERROR: test position flattened, flat verified:", m.flat_confirmed)
+            raise
+        if any(D(str(p["positionAmt"])) != 0 for p in client.position_risk(symbol)):
+            m._flatten()
+            print("WARNING: position was left open; flattened, verified:", m.flat_confirmed)
         leg = m.book[oid]
         trades = client.user_trades(symbol, leg["opened_ms"] - 60_000)
     entry = [t for t in trades if str(t["orderId"]) == str(leg["entry_order"])]
