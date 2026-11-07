@@ -17,9 +17,10 @@ class FakeExchange:
     def __init__(self, fail_stop=False, auth=False):
         self.pos, self.algo, self.orders, self.fail_stop, self.auth = {}, {}, {}, fail_stop, auth
         self.algo_posts = 0
+        self.leverage = {}
 
     def set_margin_type(self, s, m): pass
-    def set_leverage(self, s, lev): pass
+    def set_leverage(self, s, lev): self.leverage[s] = str(lev)
 
     def new_order(self, p):
         if self.auth: raise BinanceError(-2015, "Invalid API-key, IP, or permissions", 401)
@@ -48,7 +49,8 @@ class FakeExchange:
     def cancel_algo_order(self, cid): return self.algo.pop(cid)
     def open_orders(self, symbol=None): return []
     def open_algo_orders(self, symbol=None): return list(self.algo.values())
-    def position_risk(self, symbol=None): return [{"symbol": s, "positionAmt": str(q)} for s, q in self.pos.items()]
+    def position_risk(self, symbol=None): return [{"symbol": s, "positionAmt": str(q),
+                                                  "leverage": self.leverage.get(s, "1")} for s, q in self.pos.items()]
     def cancel_all(self, s): pass
     def cancel_all_algo(self, s): self.algo = {k: v for k, v in self.algo.items() if v["symbol"] != s}
 

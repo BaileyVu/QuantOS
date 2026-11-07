@@ -38,6 +38,8 @@ def parser():
         if name in {"start", "install-service"}:
             cmd.add_argument("--portfolio", choices=["legacy", "live50"], default="legacy")
             cmd.add_argument("--sentiment-file", type=Path, help="sentibot paper_perp_signals.jsonl (shadow only)")
+            cmd.add_argument("--sentiment-fail-closed", action="store_true",
+                             help="block pD gated trend entries when sentiment is unavailable (opt-in)")
         if name == "install-service":
             cmd.add_argument("--pythonpath", type=Path, help="copied source dir outside ~/Desktop")
             cmd.add_argument("--watchdog", action="store_true")
@@ -204,10 +206,12 @@ def main(argv=None):
                             **({"research": True} if args.research else {}))
         elif args.command == "start": return Runtime(
             args.state, args.hours, min_quote_volume=args.min_quote_volume,
-            portfolio=args.portfolio, sentiment_path=args.sentiment_file, execution=args.execution).run()
+            portfolio=args.portfolio, sentiment_path=args.sentiment_file, execution=args.execution,
+            sentiment_fail_closed=args.sentiment_fail_closed).run()
         elif args.command == "install-service":
             from .service import install_service, install_watchdog
-            extra = ["--portfolio", args.portfolio, "--execution", args.execution] + (
+            extra = (["--portfolio", args.portfolio, "--execution", args.execution]
+                     + (["--sentiment-fail-closed"] if args.sentiment_fail_closed else [])) + (
                 ["--sentiment-file", str(args.sentiment_file)] if args.sentiment_file else [])
             result = {"plist": str(install_service(
                 Path(sys.executable), args.state, args.hours,
