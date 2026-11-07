@@ -29,7 +29,7 @@ from .strategies.usdc_mapped import usdt_twin
 from .engine import PaperEngine
 from .journal import Journal
 from .market import PublicMarket, RateLimited
-from .stream import QuoteStream
+from .stream import QuoteStream, UserStream
 from .report import atomic_json, write_reports
 from .risk import Cap200M5Policy, Cap200M10Policy, Demo200Policy, LivePolicy, LiveR5Policy, Policy, usable_quote
 from .strategies import library
@@ -457,13 +457,16 @@ class Runtime:
             # rule, scans get 150s (five missed 30s cycles), which still catches a real stall quickly.
             scan_monitor = FeedMonitor(stale_seconds=150, startup_grace_seconds=180)
             monitor.expect("feed", now); scan_monitor.expect("scan", now)
-            next_check, killed, last_mirror, mirror = 0, False, 0, None
+            next_check, killed, last_mirror, mirror, user = 0, False, 0, None, None
             if self.execution != "paper":
                 from ..live.bridge import ExchangeMirror
                 def mirror_alert(level, key, message):
                     if level == "recovered": alerter.clear(key, milliseconds())
                     else: alerter.alert(level, key, message, milliseconds())
                 mirror = ExchangeMirror(self._client(), f"q{run['started_ms'] // 1000}", self.state, mirror_alert)
+                if getattr(mirror.client, "ws_host", None) and mirror.client.mode != "dry-run":
+                    user = UserStream(mirror.client)
+                    threading.Thread(target=user.run, args=(self.shutdown,), daemon=True).start()
             last_wall, last_mono = milliseconds(), time.monotonic()
             last_feed, last_status, last_report = 0, 0, 0
             finishing_since = None
@@ -537,7 +540,7 @@ class Runtime:
                     last_mirror = now
                     try:
                         with engines[0].journal.transaction():
-                            result = mirror.sync(engines[0], now)
+                            result = mirror.sync(engines[0], now, user.drain() if user else ())
                             if not result.get("ok", True):
                                 engines[0].journal.event(now, "EXCHANGE_RECONCILE_FAILED", result)
                     except Exception as error:
@@ -553,6 +556,10 @@ class Runtime:
                             alerter.alert("critical", f"stale:{name}", f"{name} stale for {stale[name]:.0f}s", now)
                         else:
                             alerter.clear(f"stale:{name}", now)
+                    if user is not None and user.down_since and now - user.down_since > 120_000:
+                        alerter.alert("warn", "user_stream", "account stream down >2min; mirror falls back to 30s REST checks", now)
+                    elif user is not None and user.up:
+                        alerter.clear("user_stream", now)
                     backlog = self.messages.qsize()
                     if backlog >= QUEUE_LAG_WARN:
                         alerter.alert("critical", "queue_lag", f"main loop {backlog} messages behind the feed", now)
@@ -562,6 +569,8 @@ class Runtime:
                                          "queue": backlog,
                                          **({"stream": {"live": self.stream.healthy(now), "messages": self.stream.messages,
                                                         "reconnects": self.stream.reconnects}} if self.stream else {}),
+                                         **({"user_stream": {"live": user.up, "messages": user.messages,
+                                                             "reconnects": user.reconnects}} if user else {}),
                                          "stale": sorted(stale)})
                     try:
                         with ExitStack() as stack:

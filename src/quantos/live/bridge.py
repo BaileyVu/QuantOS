@@ -105,13 +105,15 @@ class ExchangeMirror:
                 self.alert("critical", "auth", f"Binance rejected the API key ({error}); check the IP whitelist")
             return None, error
 
-    def sync(self, engine, now_ms: int) -> dict:
+    def sync(self, engine, now_ms: int, events=()) -> dict:
+        """`events`: account events from the user-data stream since the last sync (may be empty)."""
         if self.kill.active:
             if not self.flat_confirmed and now_ms >= self.next_flatten_ms:
                 self.next_flatten_ms = now_ms + FLATTEN_RETRY_MS
                 self._flatten()
             return {"skipped": "KILL"} if self.flat_confirmed else {"skipped": "KILL", "flat": False}
         self.flat_confirmed = False
+        self._on_events(engine, events, now_ms)
         before = json.dumps(self.book, sort_keys=True)
         live = {o["id"]: o for o in engine.active() if D(o["filled"]) > 0 and o["state"] != "CLOSING"}
         for oid, o in live.items():
@@ -190,6 +192,27 @@ class ExchangeMirror:
         result = self.check(now_ms)
         engine.exchange_hold = self.hold
         return result
+
+    def _on_events(self, engine, events, now_ms):
+        """React to the account stream instead of waiting for the 30s REST check: a position that went flat
+        on the exchange (its stop filled) closes the paper side now, and a fill on a mirrored symbol
+        reconciles and books its real price at this sync."""
+        for ev in events:
+            if ev.get("e") == "ORDER_TRADE_UPDATE":
+                o = ev.get("o", {})
+                if o.get("X") in ("FILLED", "PARTIALLY_FILLED"):
+                    for oid, m in self.book.items():
+                        if m["symbol"] == o.get("s") and m["state"] in ("OPEN", "CLOSED"):
+                            self.settle_retry.pop(oid, None)
+                            self.last_check_ms = 0
+            elif ev.get("e") == "ACCOUNT_UPDATE":
+                flat = {p["s"] for p in ev.get("a", {}).get("P", []) if D(str(p.get("pa", "0"))) == 0}
+                for oid, m in self.book.items():
+                    if m["state"] == "OPEN" and m["symbol"] in flat:
+                        self.last_check_ms = 0
+                        if hasattr(engine, "close_external") and engine.close_external(oid, now_ms, "EXCHANGE_CLOSED"):
+                            self.alert("warn", f"exchange_closed:{oid}", f"{m['symbol']} closed on the exchange "
+                                       "(stop filled first); paper position closed to match")
 
     def _flat_on_exchange(self, symbol) -> bool:
         rows, error = self._guard("close", lambda: self.client.position_risk(symbol))

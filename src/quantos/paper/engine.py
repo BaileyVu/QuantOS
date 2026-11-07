@@ -441,6 +441,17 @@ class PaperEngine:
         streaks[sid] = streaks.get(sid, 0) + 1 if pnl - fee < 0 else 0
         self.journal.set("loss_streaks", streaks)
 
+    def close_external(self, order_id, now_ms, reason="EXCHANGE_CLOSED"):
+        """The exchange position is already gone (its stop filled first): close the paper side too, so the
+        mirror and the books stop disagreeing. The exit fill is then corrected to the real one."""
+        with self.journal.transaction():
+            for o in self.active():
+                if o["id"] == order_id and D(o["filled"]) > 0 and o["state"] != "CLOSING":
+                    self._closing(o, now_ms, reason)
+                    self.journal.save(o)
+                    return True
+        return False
+
     def book_real_fills(self, order_id, now_ms, entry=None, exit=None):
         """Replace simulated fill prices/fees with the exchange's. entry/exit = (price, fee or None);
         a None fee keeps the engine's rate at the real price. Cash and equity derive from fills, so they

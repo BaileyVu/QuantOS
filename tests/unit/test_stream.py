@@ -117,3 +117,42 @@ class QuoteStreamTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UserStreamTests(unittest.TestCase):
+    def test_keeps_key_alive_reconnects_on_expiry_and_hands_events_to_the_main_loop(self):
+        from quantos.paper.stream import UserStream
+        clock = [0]
+        stop = threading.Event()
+
+        class Client:
+            ws_host, keys, keepalives = "demo-fstream.binance.com", 0, 0
+            def listen_key(self): self.keys += 1; return f"k{self.keys}"
+            def keepalive_listen_key(self): self.keepalives += 1
+
+        paths = []
+
+        class Conn:
+            def __init__(self, host, path):
+                paths.append((host, path))
+                self.script = [json.dumps({"e": "ACCOUNT_UPDATE", "a": {"P": []}}),
+                               json.dumps({"e": "ORDER_TRADE_UPDATE", "o": {"X": "FILLED"}}), None,
+                               json.dumps({"e": "listenKeyExpired"})] if len(paths) == 1 else [None]
+            def settimeout(self, s): pass
+            def close(self): pass
+            def recv(self):
+                clock[0] += 31 * 60_000          # each read jumps past the keepalive interval
+                if len(paths) > 1: stop.set()
+                item = self.script.pop(0) if self.script else None
+                if item is None: raise socket.timeout()
+                return item
+
+        client = Client()
+        u = UserStream(client, connect=Conn, clock_ms=lambda: clock[0])
+        u.run(stop)
+        self.assertEqual(paths[0], ("demo-fstream.binance.com", "/private/ws/k1"))
+        self.assertEqual(paths[1][1], "/private/ws/k2")    # new key after listenKeyExpired
+        self.assertGreaterEqual(client.keepalives, 1)
+        self.assertEqual([e["e"] for e in u.drain()], ["ACCOUNT_UPDATE", "ORDER_TRADE_UPDATE"])
+        self.assertEqual(u.drain(), [])
+        self.assertFalse(u.up)
