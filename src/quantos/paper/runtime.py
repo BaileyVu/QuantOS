@@ -71,7 +71,7 @@ def arbitrate(signals, adaptive=None):
 
 
 def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, sentiment=None,
-             sentiment_fail_closed=False):
+             sentiment_fail_closed=False, sentiment_trace=None):
     """Identical state transitions for recorded input replay and natural runtime."""
     for e in engines: shadow_call(e, "advance", now, kind, payload, now)
     if kind == "feed":
@@ -133,6 +133,8 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
                     # Shadow for most profiles; a profile's sentiment_gate lists rules a WOULD_BLOCK verdict blocks
                     # (event rules stay exempt: crashes with bad news did not do worse, edge_vault/crash_cause_v1).
                     verdict = sentiment.judge(proposal, now)
+                    if sentiment_trace is not None:
+                        sentiment_trace[proposal.signal_id] = verdict
                     with e.journal.transaction():
                         e.journal.event(now, "SENTIMENT_SHADOW", verdict)
                         unavailable = verdict.get("verdict") in {"UNAVAILABLE", "NO_SCORE"}
@@ -239,7 +241,7 @@ class Runtime:
             return False
         return True
 
-    def record(self, kind, payload, now, active_seconds=0):
+    def record(self, kind, payload, now, active_seconds=0, *, context=None):
         folder = self.state / "market"
         folder.mkdir(exist_ok=True)
         day = time.strftime("%Y-%m-%d", time.gmtime(now/1000))
@@ -248,8 +250,11 @@ class Runtime:
                 old.unlink(missing_ok=True)
         self._record_day = day
         with gzip.open(folder / f"{day}.jsonl.gz", "at") as f:
-            f.write(dumps({"schema": 2, "received_ms": now, "kind": kind,
-                           "payload": payload, "active_seconds": active_seconds}) + "\n")
+            row = {"schema": 2, "received_ms": now, "kind": kind,
+                   "payload": payload, "active_seconds": active_seconds}
+            if context is not None:
+                row["context"] = context
+            f.write(dumps(row) + "\n")
 
     def scanner(self):
         market = self.market_factory()
@@ -553,9 +558,15 @@ class Runtime:
                         last_feed = now
                         monitor.note("feed", now)
                 elif kind in {"funding", "diagnostic"} or (kind == "scan" and not finishing):
-                    self.record(kind, payload, now)
+                    sentiment_trace = {} if kind == "scan" else None
                     dispatch(engines, kind, payload, now, strategies=self.strategies, sentiment=self.sentiment,
-                             sentiment_fail_closed=self.sentiment_fail_closed)
+                             sentiment_fail_closed=self.sentiment_fail_closed,
+                             sentiment_trace=sentiment_trace)
+                    self.record(kind, payload, now, context=(
+                        {"sentiment_enabled": self.sentiment is not None,
+                         "sentiment_fail_closed": self.sentiment_fail_closed,
+                         "sentiment_verdicts": sentiment_trace}
+                        if sentiment_trace is not None else None))
                     if kind == "scan":
                         scan_monitor.note("scan", now)
                         if now >= next_check and payload:

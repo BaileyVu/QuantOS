@@ -70,6 +70,19 @@ class V4CliTests(unittest.TestCase):
                 strategy_id = _strategy_from_config(config)
                 self.assertIsNotNone(manifest_for(strategy_id))
 
+    def test_duplicate_family_manifest_lookup_prefers_unique_promoted_version(self):
+        from quantos.paper.strategies.manifest import MANIFESTS
+        for strategy_id in ("crash_flush_e2", "alt_dip_reversal"):
+            rows = [m for m in MANIFESTS if m.strategy_id == strategy_id]
+            self.assertEqual(len(rows), 2)
+            promoted = [m for m in rows if m.status == "promoted"]
+            self.assertEqual(len(promoted), 1)
+            self.assertEqual(manifest_for(strategy_id), promoted[0])
+            self.assertNotEqual(manifest_for(strategy_id, "research-1.0.0"), promoted[0])
+
+    def test_ml1h_manifest_remains_a_candidate(self):
+        self.assertEqual(manifest_for("ml1h_pattern", "0.1.0").status, "candidate")
+
     def test_backtest_config_dispatches_canonical_strategy(self):
         config = Path("configs/strategies/ema_atr_ref.toml")
         with patch("quantos.paper.replay.replay", return_value={"ok": True}) as replay:
