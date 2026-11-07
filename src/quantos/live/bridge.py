@@ -76,8 +76,11 @@ def _vwap(trades, qty, asset):
 
 
 class ExchangeMirror:
-    def __init__(self, client, run_id: str, state_dir: Path, alert=None, margin_type="ISOLATED"):
+    def __init__(self, client, run_id: str, state_dir: Path, alert=None, margin_type="ISOLATED", quote_asset="USDC"):
         self.client, self.run_id, self.state = client, run_id, Path(state_dir)
+        # The mirror owns only its quote asset's symbols: the alt-ML executor trades USDT pairs on the same
+        # account, and its positions must neither fail reconciliation nor be flattened by this kill switch.
+        self.scope = lambda symbol: str(symbol).endswith(quote_asset)
         self.alert = alert or (lambda level, key, message: None)
         self.kill = KillSwitch(self.state)
         self.margin_type, self.failures = margin_type, 0
@@ -315,7 +318,7 @@ class ExchangeMirror:
         expected = {m["symbol"]: D(m["qty"]) * (1 if m["side"] == "BUY" else -1)
                     for m in self.book.values() if m["state"] == "OPEN"}
         orders = {m["stop_cid"] for m in self.book.values() if m["state"] == "OPEN"}
-        report, error = self._guard("reconcile", lambda: reconcile(self.client, expected, orders))
+        report, error = self._guard("reconcile", lambda: reconcile(self.client, expected, orders, self.scope))
         if error is not None and is_transient_error(error):
             return self._transient(error, now_ms)
         ok = error is None and report.ok
@@ -354,7 +357,7 @@ class ExchangeMirror:
             self.flat_confirmed = True
             return
         instruments = {m["symbol"]: _instrument(m["instrument"]) for m in self.book.values() if "instrument" in m}
-        result, error = self._guard("flatten", lambda: flatten(self.client, None, instruments, tag=self.run_id))
+        result, error = self._guard("flatten", lambda: flatten(self.client, None, instruments, tag=self.run_id, scope=self.scope))
         left, check_error = self._guard("flatten", self._exchange_exposure)
         if error is None and check_error is None and not result.errors and not left:
             self.flat_confirmed = True
@@ -371,4 +374,4 @@ class ExchangeMirror:
         left += [o["symbol"] for o in self.client.open_orders()]
         if getattr(self.client, "conditional_api", "legacy") == "algo":
             left += [o.get("symbol") for o in self.client.open_algo_orders()]
-        return sorted(set(left))
+        return sorted(s for s in set(left) if self.scope(s))

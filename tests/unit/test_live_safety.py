@@ -52,6 +52,7 @@ class KillTests(unittest.TestCase):
             if p == "/fapi/v2/positionRisk":
                 return 200, [{"symbol": "SOLUSDC", "positionAmt": "-2.5"}, {"symbol": "ETHUSDC", "positionAmt": "0"}]
             if p == "/fapi/v1/openOrders": return 200, [{"symbol": "SOLUSDC"}]
+            if p == "/fapi/v1/openAlgoOrders": return 200, []
             if p == "/fapi/v1/order": return 200, {"clientOrderId": q["newClientOrderId"], "status": "FILLED"}
             return 200, {"code": 200}
         f = Fake(h); c = SignedClient("testnet", KEYS, transport=f, clock_ms=lambda: 1)

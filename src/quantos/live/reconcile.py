@@ -44,8 +44,13 @@ def fetch_positions(client) -> dict:
     return out
 
 
-def reconcile(client, expected_positions: dict, expected_orders) -> Report:
+def reconcile(client, expected_positions: dict, expected_orders, scope=None) -> Report:
+    """`scope(symbol)`: only these symbols are ours (the alt-ML executor trades USDT pairs on the same account)."""
     orders = list(client.open_orders())
     if getattr(client, "conditional_api", "legacy") == "algo":
         orders += list(client.open_algo_orders())
-    return compare(fetch_positions(client), orders, expected_positions, expected_orders)
+    positions = fetch_positions(client)
+    if scope is not None:
+        orders = [o for o in orders if scope(o.get("symbol", ""))]
+        positions = {s: q for s, q in positions.items() if scope(s)}
+    return compare(positions, orders, expected_positions, expected_orders)

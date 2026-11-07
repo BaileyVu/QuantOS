@@ -476,3 +476,22 @@ class EntrySafetyTests(unittest.TestCase):
         e.orders = [order()]
         m.sync(e, 1000)
         self.assertEqual((e.voided, ex.orders), (["a" * 32], {}))
+
+
+class SharedAccountTests(unittest.TestCase):
+    setUp, tearDown, mirror = MirrorTests.setUp, MirrorTests.tearDown, MirrorTests.mirror
+
+    def test_alt_ml_usdt_positions_neither_fail_reconcile_nor_get_flattened(self):
+        ex, e = FakeExchange(), Engine()
+        m = self.mirror(ex)
+        e.orders = [order()]
+        ex.pos["NEARUSDT"] = D("-10")                 # the alt-ML executor's short on the same account
+        ex.algo["mlalts-sl"] = {"clientAlgoId": "mlalts-sl", "symbol": "NEARUSDT", "orderType": "STOP_MARKET",
+                                "side": "BUY", "closePosition": False, "reduceOnly": True, "triggerPrice": "5"}
+        for t in (1000, 40_000, 80_000):
+            self.assertTrue(m.sync(e, t)["ok"])
+        m._halt("test")
+        self.assertEqual(ex.pos["SOLUSDC"], D(0))
+        self.assertEqual(ex.pos["NEARUSDT"], D("-10"))
+        self.assertIn("mlalts-sl", ex.algo)
+        self.assertTrue(m.flat_confirmed)

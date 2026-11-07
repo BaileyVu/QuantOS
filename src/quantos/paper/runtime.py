@@ -44,7 +44,7 @@ DEMO_PROFILE = os.environ.get("QUANTOS_DEMO_PROFILE", "pL")
 # validated on its own; at 5s, ordinary slow polls (p99 ~7s) marked it down ~55 times/hour (11-03).
 FEED_TIMEOUT_MS = 10_000
 # Dashboard status/heartbeat cadence. Was 10s; with the 5s page poll the display ran up to 15s behind.
-MARKET_KEEP_DAYS = 14  # raw market recordings kept per state dir
+MARKET_KEEP_DAYS = 3  # raw market recordings kept per state dir (~1.2 GB/day on the Mac, 11-07)
 STATUS_EVERY_MS = 2_000
 # Messages waiting in the main queue. Each feed batch is ~2s, so 15 queued ~ 30s behind live (11-05: 31 min).
 QUEUE_LAG_WARN = 15
