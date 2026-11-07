@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 import gzip
 import json
 import math
+import random
 from pathlib import Path
 import sqlite3
 import sys
@@ -77,10 +78,11 @@ def load_market_quotes(market_dir: str | Path,
                     at = quote.get("received_ms", received_ms)
                     mark = quote.get("mark")
                     try:
-                        at, mark = int(at), float(mark)
+                        at, mark = max(int(at), int(received_ms)), float(mark)
+                        mark_at = int(quote.get("mark_time_ms", at))
                     except (TypeError, ValueError, OverflowError):
                         continue
-                    if at >= 0 and math.isfinite(mark) and mark > 0:
+                    if at >= 0 and 0 <= at - mark_at <= 60_000 and math.isfinite(mark) and mark > 0:
                         quotes[symbol].append((at, mark))
     for series in quotes.values():
         series.sort(key=lambda pair: pair[0])
@@ -115,6 +117,8 @@ def _forward_return(quotes: dict[str, list[tuple[int, float]]], symbol: str,
     exit_index = bisect_left(times, target_ms)
     if exit_index >= len(series):
         return None, "no_forward_quote"
+    if series[exit_index][0] - target_ms > max_entry_age_ms:
+        return None, "late_forward_quote"
     exit_mark = series[exit_index][1]
     return (exit_mark / entry_mark - 1) * 10000, None
 
@@ -155,25 +159,28 @@ def _candidate_map(events: Iterable[tuple[int, str, dict]]) -> dict[str, tuple[i
         if kind == "CANDIDATE" and isinstance(payload, dict):
             signal_id = payload.get("signal_id")
             if isinstance(signal_id, str):
-                candidates[signal_id] = (at_ms, payload)
+                candidates.setdefault(signal_id, (at_ms, payload))
     return candidates
 
 
 def _gate_observations(events: list[tuple[int, str, dict]],
                        candidates: dict[str, tuple[int, dict]],
                        gated_strategies: set[str]) -> tuple[list[tuple[int, str, str, str]], dict]:
-    observations, missing = [], Counter()
+    observations, missing, seen = [], Counter(), set()
     for at_ms, kind, verdict in events:
         if kind != "SENTIMENT_SHADOW" or not isinstance(verdict, dict):
             continue
         signal_id = verdict.get("signal_id")
+        if signal_id in seen:
+            missing["duplicate_signal_verdict"] += 1
+            continue
         candidate = candidates.get(signal_id) if isinstance(signal_id, str) else None
         if candidate is None:
             missing["candidate_not_found"] += 1
             continue
         candidate_ms, signal = candidate
-        # A shadow verdict may be logged after its candidate, but never use a
-        # quote window anchored after the candidate itself.
+        # A verdict cannot predate its candidate. Measure only once the verdict
+        # is actually available, not at an earlier candidate or collection start.
         if at_ms < candidate_ms:
             missing["verdict_precedes_candidate"] += 1
             continue
@@ -189,7 +196,8 @@ def _gate_observations(events: list[tuple[int, str, dict]],
         if label not in {"WOULD_BLOCK", "WOULD_ALLOW", "UNAVAILABLE", "NO_SCORE"}:
             missing["unknown_verdict"] += 1
             continue
-        observations.append((candidate_ms, symbol, side, label))
+        seen.add(signal_id)
+        observations.append((at_ms, symbol, side, label))
     return observations, dict(missing)
 
 
@@ -205,8 +213,12 @@ def analyze(reach_rows: list[dict], journal_events: list[tuple[int, str, dict]],
     candidates = _candidate_map(journal_events)
     gate_obs, gate_join_missing = _gate_observations(journal_events, candidates, gated)
     report = {"schema": 1, "scope": "offline descriptive only",
+              "returns": "gross mark returns, not tradable P&L or evidence of gate profitability",
+              "gate_sampling": "first observed verdict per signal, anchored at verdict availability",
+              "ci_method": "seeded iid percentile bootstrap; overlapping observations are dependent",
               "gated_strategies": sorted(gated), "minimum_observations": minimum_observations,
               "reach_rows": len(reach_rows), "journal_sentiment_events": sum(k == "SENTIMENT_SHADOW" for _, k, _ in journal_events),
+              "acceptance": "UNVERIFIED: requires three-day observation and gap review",
               "quote_symbols": sorted(quotes), "horizons": {}}
 
     for horizon_name, horizon_ms in HORIZONS_MS.items():
@@ -215,17 +227,21 @@ def analyze(reach_rows: list[dict], journal_events: list[tuple[int, str, dict]],
         score_total = 0
         for row in reach_rows:
             try:
-                at_ms = int(float(row["t"]) * 1000)
+                at_ms = int(float(row.get("available_at", row["t"])) * 1000)
             except (KeyError, TypeError, ValueError, OverflowError):
                 continue
-            for asset in ASSETS:
+            for asset in sorted({k for source in ("reach", "baseline_news")
+                                 for k in (row.get(source) or {}) if not k.startswith("_")}):
                 reach_score = _as_score((row.get("reach") or {}).get(asset))
                 baseline_score = _as_score((row.get("baseline_news") or {}).get(asset))
+                if (row.get("reach") or {}).get("_n") == 0: reach_score = None
+                if (row.get("baseline_news") or {}).get("_n") == 0: baseline_score = None
                 if reach_score is None and baseline_score is None:
                     continue
                 score_total += 1
                 symbol = _asset_quote_symbol(asset)
-                forward, reason = _forward_return(quotes, symbol, at_ms, horizon_ms, max_entry_age_ms)
+                forward, reason = (_forward_return(quotes, symbol, at_ms, horizon_ms, max_entry_age_ms)
+                                   if "available_at" in row else (None, "score_availability_unverified"))
                 for source, score in (("reach", reach_score), ("baseline", baseline_score)):
                     if score is None:
                         score_missing[source]["score_unavailable"] += 1
@@ -256,6 +272,7 @@ def analyze(reach_rows: list[dict], journal_events: list[tuple[int, str, dict]],
             gate_summary[label] = {
                 "n": len(returns), "mean_directional_return_bps": sum(returns) / len(returns) if returns else None,
                 "hit_rate": sum(x > 0 for x in returns) / len(returns) if returns else None,
+                "ci90_mean_bps": _ci90(returns),
             }
         blocked, allowed = gate_stats["WOULD_BLOCK"], gate_stats["WOULD_ALLOW"]
         gate_summary["blocked_minus_allowed_mean_bps"] = (
@@ -271,6 +288,13 @@ def analyze(reach_rows: list[dict], journal_events: list[tuple[int, str, dict]],
     return report
 
 
+def _ci90(values):
+    if len(values) < 2: return None
+    rng = random.Random(0)
+    means = sorted(sum(rng.choices(values, k=len(values))) / len(values) for _ in range(2000))
+    return [means[99], means[1899]]
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reach", required=True, help="precollected reach_shadow.jsonl")
@@ -284,6 +308,8 @@ def main(argv=None) -> int:
     reach_rows = load_reach_jsonl(args.reach)
     journal_events = load_journal_events(args.journal)
     needed = {_asset_quote_symbol(asset) for asset in ASSETS}
+    needed.update(_asset_quote_symbol(asset) for row in reach_rows for source in ("reach", "baseline_news")
+                  for asset in (row.get(source) or {}) if not asset.startswith("_"))
     for _at, kind, payload in journal_events:
         if kind == "CANDIDATE" and isinstance(payload, dict) and isinstance(payload.get("symbol"), str):
             needed.add(payload["symbol"])
@@ -292,8 +318,11 @@ def main(argv=None) -> int:
                      gated_strategies=set(args.gated_strategy) if args.gated_strategy else None,
                      minimum_observations=args.minimum_observations)
     target = Path(args.output)
+    if target.name == "paper_perp_signals.jsonl" or target.exists() or target.is_symlink():
+        raise ValueError("report output must be a new file, never a baseline signal file")
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(report, sort_keys=True, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    with target.open("x", encoding="utf-8") as handle:
+        handle.write(json.dumps(report, sort_keys=True, indent=2, allow_nan=False) + "\n")
     print(json.dumps({"output": str(target), "status": {
         horizon: {"reach": values["score_comparison"]["reach"]["status"],
                   "baseline": values["score_comparison"]["baseline"]["status"],

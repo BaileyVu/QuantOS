@@ -1,4 +1,41 @@
-## Infrastructure v5 — third-window resume, 2026-11-08 (LATEST)
+## Infrastructure v5 — PR8 review checkpoint, 2026-11-08 (LATEST)
+
+PR7 draft54 published https://github.com/BaileyVu/QuantOS/pull/54 at965168b.
+Active branch codex/infra-sentibot-integration, integrated PR8 agent commits as
+dbc703e,b3ec040,42ba8aa. Main reviewed collector, URL/pinnedDNS/redirect adapter,
+baseline scorer, forward report. Corrected report: use availability timestamps,
+reject t-onlylegacy score captures as unverified; dedup firstverdict per signal,
+anchor atverdictavailability, require horizonquote <=60s late, receipt time includes
+runtime delivery, rejectstale marks, discoverassets from rows. Returns explicitly
+gross/descriptive not P&L; gateCI90bootstrap disclosed iid. Report cannot overwrite
+existing file or writebaseline signal filename. Main changedstale threshold30min,
+rejectnaivetimestamps; optionalpDfailclosed remainsOFFdefault. Tests25 in0.032sPASS,
+diffcheckPASS. PR8 notyetpublished/accepted.
+
+NEXT: receive/sourceagentcollector followup (availability timestamp, dynamicUSDC
+universe, boundedfetches, scorerpin metadata), cherry-pick separatecommit, main
+review and tests. Add immutable Sentibot snapshot/plist preparation forowner;
+neverinstall/restartcurrentservices. Update staleREADME beforePR8publication.
+Noactual3dayshadowrun yet; noforwardreturnresultsclaimed. Agentforwardreport
+original a20a5d5 incorporated via42ba8aa, mainreview fixes in this checkpointcommit.
+
+PR9prepared QuantOS-infra-timesfm, branchcodex/infra-timesfm25, commitfa9febc,
+basea003409. Agent21synthetic testsPASS (TimesFM9+registry12), noinstall/inference/
+download/dataaccess. Mainreadfirst200lines timesfm_experiment.py once; outstanding
+review: EWMA is absolute-returnproxy not variance-basedvolatility, targethorizon
+alignment mustbeexplicit; registryconfig canoverridemodel key; fullmodeladapter/
+pins/docs notyetreviewed. Requirements exactpins timesfm[torch]2.0.2,torch2.7.1,
+numpy1.26.4,huggingface-hub0.28.1,safetensors0.5.3; model2.5revision
+2d1b32066b7f3950c45913d4a3849f3c75cb0312 (925MB notdownloaded). ActualCPUvenv/
+walkforward/L2/baseline comparisons/L3filter remainNOTRUN, noacceptanceclaims.
+
+Latestusage25%five-hour,57%weekly remaining,1bankedreset; noownedruntimeprocesses.
+Currentwindowreset1794100383; nextquota threshold updateSAMEautomation from03:13
+toafterthisnewreset. Do notrepeatpassingtests/import/soak withoutchangedreason.
+
+---
+
+## Infrastructure v5 — third-window resume, 2026-11-08 (historical)
 
 Reset verified:98%five-hour/69%weekly remaining, banked1. PR7 integrated locally
 as2f4e8ca on codex/infra-replay-integration; main review in progress. Runtime merge
