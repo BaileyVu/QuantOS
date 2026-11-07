@@ -16,6 +16,7 @@ class FakeExchange:
 
     def __init__(self, fail_stop=False, auth=False):
         self.pos, self.algo, self.orders, self.fail_stop, self.auth = {}, {}, {}, fail_stop, auth
+        self.algo_posts = 0
 
     def set_margin_type(self, s, m): pass
     def set_leverage(self, s, lev): pass
@@ -31,10 +32,16 @@ class FakeExchange:
     def get_order(self, s, cid): return self.orders[cid]
 
     def new_algo_order(self, p):
+        self.algo_posts += 1
         if self.fail_stop: raise BinanceError(-2021, "would trigger", 400)
+        close = str(p.get("closePosition", "")).lower() == "true"
+        if close and any(o["closePosition"] and o["symbol"] == p["symbol"] and o["side"] == p["side"]
+                         for o in self.algo.values()):
+            raise BinanceError(-4130, "An open stop or take profit order with GTE and closePosition in the "
+                                      "direction is existing.", 400)
         self.algo[p["clientAlgoId"]] = o = {"clientAlgoId": p["clientAlgoId"], "symbol": p["symbol"],
-                                            "orderType": p["type"], "side": p["side"], "closePosition": True,
-                                            "triggerPrice": str(p["triggerPrice"])}
+                                            "orderType": p["type"], "side": p["side"], "closePosition": close,
+                                            "reduceOnly": not close, "triggerPrice": str(p["triggerPrice"])}
         return o
 
     def get_algo_order(self, cid): return self.algo[cid]
@@ -81,6 +88,31 @@ class MirrorTests(unittest.TestCase):
         e.orders = []
         self.assertTrue(m.sync(e, 4)["ok"])
         self.assertEqual((ex.pos["SOLUSDC"], ex.algo), (D(0), {}))
+
+    def test_trailing_stop_moves_twice_without_closeposition_conflict(self):
+        ex, e = FakeExchange(), Engine()
+        m = self.mirror(ex)
+        for t, stop in enumerate(("75.00", "78.00", "80.00"), 1):
+            e.orders = [order(stop=stop)]
+            self.assertTrue(m.sync(e, t * 1000)["ok"])
+            self.assertEqual([o["triggerPrice"] for o in ex.algo.values()], [stop])
+        self.assertFalse([a for a in self.alerts if a[1].startswith("stop:")])
+
+    def test_failed_stop_update_backs_off_instead_of_retrying_every_sync(self):
+        ex, e = FakeExchange(), Engine()
+        m = self.mirror(ex)
+        e.orders = [order()]
+        m.sync(e, 0)
+        ex.fail_stop, posts = True, ex.algo_posts
+        e.orders = [order(stop="80.00")]
+        for t in range(0, 30_000, 2000):  # 15 syncs inside the first backoff window
+            m.sync(e, 1000 + t)
+        self.assertEqual(ex.algo_posts - posts, 1)
+        self.assertEqual([o["triggerPrice"] for o in ex.algo.values()], ["75.00"])  # old stop kept
+        ex.fail_stop = False
+        m.sync(e, 31_001)
+        self.assertEqual([o["triggerPrice"] for o in ex.algo.values()], ["80.00"])
+        self.assertEqual(self.alerts.count(("recovered", "stop:" + "a" * 32)), 1)
 
     def test_protection_failure_closes_and_kills(self):
         ex, e = FakeExchange(fail_stop=True), Engine()
