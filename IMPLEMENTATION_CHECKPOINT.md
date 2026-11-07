@@ -1,4 +1,29 @@
-## Infrastructure v5 — PR1 implementation checkpoint, 2026-11-07 (LATEST)
+## Infrastructure v5 — PR2 implementation checkpoint, 2026-11-07 (LATEST)
+
+Worktree `QuantOS-infra-v5`, branch `codex/infra-resolver-gaps`, source commit
+`3098c63`; PR1 draft https://github.com/BaileyVu/QuantOS/pull/48 is base, contract
+PR47 remains separate. PR2 checks filled one-way position leverage via existing
+positionRisk before stop placement, both direct and PENDING adoption. Mismatch
+or unverifiable leverage closes/halts. Added repeated lookup-failure/recovery test.
+Optional `--sentiment-fail-closed` blocks unavailable/no-score gated pD trend
+entries; OFF by default. Invalid sentiment shapes/nonfinite scores unavailable.
+
+Tests: 91 targeted PASS before final malformed-data test; final full suite
+425 tests in12.408s OK (4skipped), `/tmp/quantos-infra-pr2-tests.log`. Diff review
+and whitespace check PASS. Legacy1001 PASS retained (no legacy change). No live
+soak/account probe/orders/deployment; draft operational acceptance UNVERIFIED.
+Source rollback `git revert 3098c63`; operational rollback not yet verified.
+Active owned processes: registry subagent preparing PR6 in QuantOS-infra-registry;
+deploy subagent adding actual temporary-git tests for PR4 in QuantOS-infra-deploy.
+No runtime/soak active. Resets consumed1of2; one remains. Last usage78%five-hour,
+97%weekly; check periodically. No continuation scheduled.
+EXACT NEXT STEP: publish draftPR2 stacked on codex/infra-stressed-stop, then
+branch PR3 for native TP, independent watchdog, durable pre-entry intent and
+orderId/paginated settlement. Main owns all this risk/order/accounting work.
+
+---
+
+## Infrastructure v5 — PR1 implementation checkpoint, 2026-11-07 (historical)
 
 Active worktree: `/Users/bailey12/Desktop/PythonProject/QuantOS-infra-v5`.
 Branch `codex/infra-stressed-stop`, implementation commit `7f628ae`; parent
