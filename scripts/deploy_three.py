@@ -73,8 +73,10 @@ def clean_snapshot(repo=REPO, snapshots=QOS / "app-v4"):
         try:
             subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(worktree)],
                            capture_output=True, text=True, check=False)
-        finally:
-            shutil.rmtree(worktree, ignore_errors=True)
+        except Exception:
+            # Keep the failure that caused cleanup as the actionable exception.
+            pass
+        shutil.rmtree(worktree, ignore_errors=True)
         raise
 
 

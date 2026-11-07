@@ -64,7 +64,7 @@ class CleanSnapshotTests(unittest.TestCase):
                     (Path(args[-2]) / "src").mkdir(parents=True)
                     return subprocess.CompletedProcess(args, 0, "", "")
                 if args[3:5] == ["worktree", "remove"]:
-                    return subprocess.CompletedProcess(args, 0, "", "")
+                    raise OSError("simulated cleanup failure")
                 self.fail(f"unexpected command: {args}")
 
             with patch.object(deploy_three.subprocess, "run", side_effect=run) as mocked:
@@ -73,6 +73,83 @@ class CleanSnapshotTests(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertTrue(any(c.args[0][3:5] == ["worktree", "remove"]
                                 for c in mocked.call_args_list))
+
+
+class GitWorktreeIntegrationTests(unittest.TestCase):
+    def make_repo(self, root):
+        repo = root / "repo"
+        repo.mkdir()
+        self.git(repo, "init", "--quiet")
+        self.git(repo, "config", "user.name", "QuantOS test")
+        self.git(repo, "config", "user.email", "quantos-test@example.invalid")
+        (repo / "src").mkdir()
+        (repo / "src" / "sample.py").write_text("VALUE = 'committed'\n")
+        self.git(repo, "add", "src/sample.py")
+        self.git(repo, "commit", "--quiet", "-m", "test snapshot")
+        return repo, self.git(repo, "rev-parse", "HEAD")
+
+    @staticmethod
+    def git(repo, *args):
+        result = subprocess.run(["git", "-C", str(repo), *args], check=True,
+                                capture_output=True, text=True)
+        return result.stdout.strip()
+
+    def remove_snapshot(self, repo, snapshots, commit):
+        worktree = snapshots / commit / "source"
+        if worktree.exists():
+            self.git(repo, "worktree", "remove", "--force", str(worktree))
+
+    def test_real_worktree_is_at_full_commit_and_reused(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repo, commit = self.make_repo(root)
+            snapshots = root / "snapshots"
+            try:
+                source = deploy_three.clean_snapshot(repo, snapshots)
+                self.assertEqual(source, (snapshots / commit / "source" / "src").resolve())
+                self.assertEqual((source / "sample.py").read_text(), "VALUE = 'committed'\n")
+                self.assertEqual(self.git(source.parent, "rev-parse", "HEAD"), commit)
+                self.assertIn(str(source.parent), self.git(repo, "worktree", "list", "--porcelain"))
+                self.assertEqual(deploy_three.clean_snapshot(repo, snapshots), source)
+            finally:
+                self.remove_snapshot(repo, snapshots, commit)
+            self.assertNotIn(str(snapshots / commit / "source"),
+                             self.git(repo, "worktree", "list", "--porcelain"))
+
+    def test_real_git_refuses_dirty_tracked_and_untracked_source(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repo, commit = self.make_repo(root)
+            snapshots = root / "snapshots"
+            tracked = repo / "src" / "sample.py"
+            try:
+                tracked.write_text("VALUE = 'modified'\n")
+                with self.assertRaisesRegex(SystemExit, "dirty source tree"):
+                    deploy_three.clean_snapshot(repo, snapshots)
+                tracked.write_text("VALUE = 'committed'\n")
+                (repo / "untracked.txt").write_text("not in commit\n")
+                with self.assertRaisesRegex(SystemExit, "dirty source tree"):
+                    deploy_three.clean_snapshot(repo, snapshots)
+                self.assertFalse((snapshots / commit / "source").exists())
+            finally:
+                self.remove_snapshot(repo, snapshots, commit)
+            self.assertNotIn(str(snapshots / commit / "source"),
+                             self.git(repo, "worktree", "list", "--porcelain"))
+
+    def test_real_git_refuses_dirty_existing_snapshot(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repo, commit = self.make_repo(root)
+            snapshots = root / "snapshots"
+            worktree = snapshots / commit / "source"
+            try:
+                source = deploy_three.clean_snapshot(repo, snapshots)
+                (source / "intruder.txt").write_text("dirty snapshot\n")
+                with self.assertRaisesRegex(SystemExit, "existing deployment snapshot is invalid or dirty"):
+                    deploy_three.clean_snapshot(repo, snapshots)
+            finally:
+                self.remove_snapshot(repo, snapshots, commit)
+            self.assertNotIn(str(worktree), self.git(repo, "worktree", "list", "--porcelain"))
 
 
 if __name__ == "__main__":
