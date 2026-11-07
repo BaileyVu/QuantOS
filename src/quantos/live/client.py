@@ -43,6 +43,7 @@ ALLOWED = {
     # Conditional (STOP/TP) orders moved to the Algo Order API; verify on testnet.
     ("POST", "/fapi/v1/algoOrder"), ("GET", "/fapi/v1/algoOrder"), ("DELETE", "/fapi/v1/algoOrder"),
     ("GET", "/fapi/v1/openAlgoOrders"), ("DELETE", "/fapi/v1/algoOpenOrders"),
+    ("GET", "/fapi/v1/userTrades"),  # read-only: real fill prices and fees for the books
 }
 UNSIGNED = {"/fapi/v1/exchangeInfo", "/fapi/v1/time"}
 
@@ -225,6 +226,7 @@ class SignedClient:
     def open_orders(self, symbol=None): return self.request("GET", "/fapi/v1/openOrders", {"symbol": symbol})
     def position_risk(self, symbol=None): return self.request("GET", "/fapi/v2/positionRisk", {"symbol": symbol})
     def account(self): return self.request("GET", "/fapi/v2/account")
+    def user_trades(self, symbol, start_time=None): return self.request("GET", "/fapi/v1/userTrades", {"symbol": symbol, "startTime": start_time, "limit": 1000})
     def exchange_info(self): return self.request("GET", "/fapi/v1/exchangeInfo")
     def server_time(self): return self.request("GET", "/fapi/v1/time")
     def set_leverage(self, symbol, leverage): return self.request("POST", "/fapi/v1/leverage", {"symbol": symbol, "leverage": int(leverage)})

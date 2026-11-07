@@ -127,3 +127,32 @@ class DispatchTests(EngineTests):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RealFillBookingTests(EngineTests):
+    def test_books_take_exchange_entry_and_exit_and_cash_follows(self):
+        self.held()
+        self.e.quote(quote("97.9", book=T + 2000, seen=T + 20_000), T + 20_000)
+        self.e.quote(quote("97.9", book=T + 2000, seen=T + 25_000), T + 25_000)
+        o = self.j.orders()[0]
+        qty = self.j.db.execute("SELECT quantity FROM fills WHERE kind='EXIT'").fetchone()[0]
+        r = self.e.book_real_fills(o["id"], T + 30_000, entry=(D("100.05"), D("0.02")))
+        self.assertTrue(r["changed"] and r["has_exit"])
+        r = self.e.book_real_fills(o["id"], T + 31_000, exit=(D("97.80"), D("0.03")))
+        expected_pnl = D(qty) * (D("97.80") - D("100.05"))
+        self.assertEqual(D(r["new_pnl"]), expected_pnl)
+        self.assertEqual(self.j.cash(), D(200) + expected_pnl - D("0.05"))
+        self.assertEqual(self.j.orders()[0]["average"], "100.05")
+        closed = [e for e in self.j.db.execute("SELECT payload FROM events WHERE kind='CLOSED'")]
+        self.assertIn('"97.80"', closed[0][0])
+        self.assertFalse(self.e.book_real_fills(o["id"], T + 32_000, exit=(D("97.80"), D("0.03")))["changed"])
+        kinds = [k for (k,) in self.j.db.execute("SELECT kind FROM events WHERE kind='BOOKS_CORRECTION'")]
+        self.assertEqual(len(kinds), 2)
+
+    def test_open_position_entry_correction_and_unknown_order(self):
+        self.held()
+        o = self.j.orders()[0]
+        r = self.e.book_real_fills(o["id"], T + 2000, entry=(D("100.10"), None))
+        self.assertFalse(r["has_exit"])
+        self.assertEqual(D(self.j.orders()[0]["average"]), D("100.10"))
+        self.assertIsNone(self.e.book_real_fills("nope", T + 2000, entry=(D(1), None)))

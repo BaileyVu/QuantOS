@@ -441,6 +441,71 @@ class PaperEngine:
         streaks[sid] = streaks.get(sid, 0) + 1 if pnl - fee < 0 else 0
         self.journal.set("loss_streaks", streaks)
 
+    def book_real_fills(self, order_id, now_ms, entry=None, exit=None):
+        """Replace simulated fill prices/fees with the exchange's. entry/exit = (price, fee or None);
+        a None fee keeps the engine's rate at the real price. Cash and equity derive from fills, so they
+        follow. Re-applying the same values is a no-op. Returns {"changed", "has_exit", ...} (the
+        BOOKS_CORRECTION payload when changed), or None when the order has no entry fill."""
+        db = self.journal.db
+        with self.journal.transaction():
+            row = db.execute("SELECT payload FROM orders WHERE id=?", (order_id,)).fetchone()
+            entries = db.execute("SELECT id,quantity,price,fee FROM fills WHERE order_id=? AND kind='ENTRY'",
+                                 (order_id,)).fetchall()
+            if row is None or not entries:
+                return None
+            o = json.loads(row[0])
+            total = sum(D(r["quantity"]) for r in entries)
+            old_avg = sum(D(r["quantity"]) * D(r["price"]) for r in entries) / total
+            old_entry_fee = sum(D(r["fee"]) for r in entries)
+            avg, entry_fee = old_avg, old_entry_fee
+            if entry is not None:
+                avg = D(str(entry[0]))
+                entry_fee = old_entry_fee / old_avg * avg if entry[1] is None else D(str(entry[1]))
+            x = db.execute("SELECT quantity,price,fee,pnl FROM fills WHERE id=?", (order_id + ":EXIT",)).fetchone()
+            out = {"id": order_id, "symbol": o["signal"]["symbol"], "source": "exchange fills",
+                   "old_entry_price": str(old_avg), "new_entry_price": str(avg),
+                   "old_entry_fee": str(old_entry_fee), "new_entry_fee": str(entry_fee)}
+            changed = (avg, entry_fee) != (old_avg, old_entry_fee)
+            if x is not None:
+                qty, old_px, old_fee, old_pnl = D(x["quantity"]), D(x["price"]), D(x["fee"]), D(x["pnl"])
+                px, fee = old_px, old_fee
+                if exit is not None:
+                    px = D(str(exit[0]))
+                    fee = old_fee / old_px * px if exit[1] is None else D(str(exit[1]))
+                pnl = qty * (px - avg) * D(o["direction"])
+                out.update(old_price=str(old_px), new_price=str(px), old_fee=str(old_fee), new_fee=str(fee),
+                           old_pnl=str(old_pnl), new_pnl=str(pnl))
+                changed = changed or (px, fee, pnl) != (old_px, old_fee, old_pnl)
+            out["has_exit"] = x is not None
+            if not changed:
+                return {**out, "changed": False}
+            out["changed"] = True
+            before = self.journal.cash()
+            for r in entries:  # fee split by quantity across entry fills
+                db.execute("UPDATE fills SET price=?,fee=? WHERE id=?",
+                           (str(avg), str(entry_fee * D(r["quantity"]) / total), r["id"]))
+            o["average"] = str(avg)
+            self.journal.save(o)
+            for eid, raw in db.execute("SELECT id,payload FROM events WHERE kind IN ('FILLED','PARTIAL') "
+                                       "AND json_extract(payload,'$.id')=?", (order_id,)).fetchall():
+                p = json.loads(raw)
+                p.update(price=str(avg), fee=str(entry_fee * D(p.get("quantity", total)) / total))
+                db.execute("UPDATE events SET payload=? WHERE id=?", (json.dumps(p), eid))
+            if x is not None:
+                db.execute("UPDATE fills SET price=?,fee=?,pnl=? WHERE id=?", (str(px), str(fee), str(pnl), order_id + ":EXIT"))
+                for eid, raw in db.execute("SELECT id,payload FROM events WHERE kind='CLOSED' "
+                                           "AND json_extract(payload,'$.id')=?", (order_id,)).fetchall():
+                    db.execute("UPDATE events SET payload=? WHERE id=?",
+                               (json.dumps({**json.loads(raw), "price": str(px), "pnl_gross": str(pnl)}), eid))
+                was_loss, is_loss = old_pnl - old_fee < 0, pnl - fee < 0
+                if was_loss != is_loss:  # only the latest close can flip the streak it set
+                    streaks, sid = self.journal.get("loss_streaks", {}), o["signal"]["strategy_id"]
+                    streaks[sid] = streaks.get(sid, 0) + 1 if is_loss else 0
+                    self.journal.set("loss_streaks", streaks)
+            out.update(old_cash=str(before), new_cash=str(self.journal.cash()))
+            self.journal.event(now_ms, "BOOKS_CORRECTION", out)
+            return out
+
     def quote(self, q: Quote, now_ms):
         if not self.journal.get("reconciled", False):
             return
