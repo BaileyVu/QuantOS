@@ -217,3 +217,11 @@ class ContinuousRunTests(unittest.TestCase):
             self.assertEqual(seen['run']['status'], 'running')
             self.assertTrue(seen['heartbeat']['detail'].get('paused'))
             self.assertEqual(json.loads((state / 'run.json').read_text())['status'], 'stopped')
+
+    def test_full_queue_drops_quotes_instead_of_closing_everything(self):
+        with tempfile.TemporaryDirectory() as temp:
+            runtime = Runtime(Path(temp), hours=0)
+            for _ in range(1000): runtime.messages.put(("feed", []))
+            self.assertFalse(runtime.emit("feed", []))
+            self.assertFalse(runtime.stop_requested)
+            self.assertEqual(runtime.dropped, {"feed": 1})

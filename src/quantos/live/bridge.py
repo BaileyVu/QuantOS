@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 from ..paper.types import D, Instrument
-from .client import BinanceError, RateLimited
+from .client import AmbiguousOrderState, BinanceError, RateLimited, UnknownOrder
 from .kill import KillSwitch, flatten
 from .orders import (ProtectionFailed, client_order_id, place_with_protection, reduce_only_close,
                      stop_market_protect, submit)
@@ -36,6 +36,8 @@ STOP_RETRY_MS = (30_000, 60_000, 120_000, 300_000)
 # from Binance (+$3.05 booked vs +$4.04 real, 11-05). Retried with backoff while fills are not visible yet.
 SETTLE_RETRY_MS = (5_000, 15_000, 60_000, 300_000)
 SETTLE_GIVE_UP = 12
+# An entry whose outcome is unknown is resolved by client id each sync; past this it is treated as unsafe.
+PENDING_KILL_MS = 90_000
 # A kill's one flatten failed on the network on 11-03 and NEAR/ADA stayed open 3.5h; retry until verified flat.
 FLATTEN_RETRY_MS = 30_000
 
@@ -121,17 +123,30 @@ class ExchangeMirror:
                 continue
             s, ins = o["signal"], _instrument(o["instrument"])
             side = "BUY" if s["side"] == "LONG" else "SELL"
-            self._guard("setup", lambda: self.client.set_margin_type(ins.symbol, self.margin_type))
-            self._guard("setup", lambda: self.client.set_leverage(ins.symbol, D(o["decision"]["leverage"])))
+            _, setup = self._guard("setup", lambda: self.client.set_margin_type(ins.symbol, self.margin_type))
+            if setup is None:
+                _, setup = self._guard("setup", lambda: self.client.set_leverage(ins.symbol, D(o["decision"]["leverage"])))
+            if setup is not None:
+                # The size was approved for this leverage and margin type; never enter at the account's old ones.
+                if not is_transient_error(setup):
+                    self._void(engine, oid, ins.symbol, now_ms, f"leverage/margin setup rejected: {setup}")
+                continue  # transient: retry at the next sync
             placed, error = self._guard("entry", lambda: place_with_protection(
                 self.client, ins, side, D(o["filled"]), D(o["stop_price"]), self.run_id, oid[:20]))
             if error is not None:
-                self.book[oid] = {"symbol": ins.symbol, "state": "FAILED", "error": type(error).__name__}
-                self._save()
                 if isinstance(error, ProtectionFailed):
+                    self.book[oid] = {"symbol": ins.symbol, "state": "FAILED", "error": type(error).__name__}
+                    self._save()
                     self._halt(f"protection failed on {ins.symbol}: {error}")
-                else:
-                    self.alert("critical", f"entry:{oid}", f"exchange entry failed on {ins.symbol}: {error}")
+                elif isinstance(error, AmbiguousOrderState) or is_transient_error(error):
+                    # Outcome unknown: it may have filled. Resolve by client id before anything else.
+                    self.book[oid] = {"symbol": ins.symbol, "side": side, "qty": o["filled"], "stop": o["stop_price"],
+                                      "state": "PENDING", "instrument": o["instrument"], "opened_ms": now_ms,
+                                      "pending_since": now_ms, "stop_n": 0, "booked": ""}
+                    self._save()
+                    self.alert("warn", f"entry:{oid}", f"entry outcome unknown on {ins.symbol}; resolving: {error}")
+                else:  # definite rejection (filters, margin, not filled): nothing exists on the exchange
+                    self._void(engine, oid, ins.symbol, now_ms, f"exchange entry rejected: {error}")
                 continue
             qty = D(str(placed.entry.get("executedQty", o["filled"])))
             stop_cid = placed.sl.get("clientAlgoId") or placed.sl.get("clientOrderId")
@@ -140,6 +155,8 @@ class ExchangeMirror:
                               "opened_ms": now_ms, "entry_order": placed.entry.get("orderId"), "booked": ""}
             self._save()
         for oid, m in list(self.book.items()):
+            if m["state"] == "PENDING":
+                self._resolve(engine, oid, m, now_ms)
             if m["state"] != "OPEN":
                 continue
             ins, opp = _instrument(m["instrument"]), "SELL" if m["side"] == "BUY" else "BUY"
@@ -192,6 +209,37 @@ class ExchangeMirror:
         result = self.check(now_ms)
         engine.exchange_hold = self.hold
         return result
+
+    def _void(self, engine, oid, symbol, now_ms, why):
+        """Nothing was opened on the exchange: remove the paper entry too, so the books match Binance."""
+        self.book[oid] = {"symbol": symbol, "state": "FAILED", "error": why[:200]}
+        self._save()
+        if hasattr(engine, "void_entry"): engine.void_entry(oid, now_ms, why[:200])
+        self.alert("critical", f"entry:{oid}", f"{symbol}: {why}; paper entry voided")
+
+    def _resolve(self, engine, oid, m, now_ms):
+        """A PENDING entry: ask Binance by client id. Filled -> protect and adopt; absent -> void; still
+        unknown after PENDING_KILL_MS -> kill (flatten), never leave a possibly unprotected position."""
+        ins, opp = _instrument(m["instrument"]), "SELL" if m["side"] == "BUY" else "BUY"
+        entry, error = self._guard("resolve", lambda: self.client.get_order(m["symbol"], client_order_id(
+            self.run_id, oid[:20], "entry")))
+        if isinstance(error, UnknownOrder) or (error is None and entry.get("status") in ("CANCELED", "EXPIRED", "REJECTED")
+                                                and D(str(entry.get("executedQty", "0"))) == 0):
+            return self._void(engine, oid, m["symbol"], now_ms, "entry never filled on the exchange")
+        filled = D(str(entry.get("executedQty", "0"))) if error is None else D(0)
+        if error is None and filled > 0 and entry.get("status") in ("FILLED", "PARTIALLY_FILLED", "CANCELED", "EXPIRED"):
+            sl, sl_error = self._guard("stop", lambda: submit(self.client, stop_market_protect(
+                m["symbol"], opp, D(m["stop"]), client_order_id(self.run_id, oid[:20], "sl"), ins)))
+            if sl_error is not None:
+                return self._halt(f"protection failed on {m['symbol']} after a resolved entry: {sl_error}")
+            m.update(state="OPEN", qty=str(filled), entry_order=entry.get("orderId"),
+                     stop_cid=sl.get("clientAlgoId") or sl.get("clientOrderId"))
+            m.pop("pending_since", None)
+            self._save()
+            self.alert("recovered", f"entry:{oid}", "")
+            return None
+        if now_ms - m["pending_since"] > PENDING_KILL_MS:
+            self._halt(f"entry on {m['symbol']} unresolved for {PENDING_KILL_MS // 1000}s: {error or entry.get('status')}")
 
     def _on_events(self, engine, events, now_ms):
         """React to the account stream instead of waiting for the 30s REST check: a position that went flat
@@ -262,6 +310,8 @@ class ExchangeMirror:
         if getattr(self.client, "mode", "") == "dry-run":  # nothing real to compare against
             return {"ok": True, "report": "DRY_RUN_UNVERIFIED", "error": ""}
         now_ms = int(time.time() * 1000) if now_ms is None else now_ms
+        if any(m["state"] == "PENDING" for m in self.book.values()):
+            return {"ok": True, "report": "PENDING_ENTRY", "error": ""}  # bounded by PENDING_KILL_MS
         expected = {m["symbol"]: D(m["qty"]) * (1 if m["side"] == "BUY" else -1)
                     for m in self.book.values() if m["state"] == "OPEN"}
         orders = {m["stop_cid"] for m in self.book.values() if m["state"] == "OPEN"}

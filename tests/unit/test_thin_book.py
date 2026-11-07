@@ -178,3 +178,11 @@ class ManualPauseTests(EngineTests):
         self.assertFalse(self.e.entry_allowed())
         self.e.manual_pause = False
         self.assertTrue(self.e.entry_allowed())
+
+    def test_void_entry_restores_cash(self):
+        self.held()
+        oid = self.j.orders()[0]["id"]
+        self.assertNotEqual(self.j.cash(), D(200))   # entry fee booked
+        self.assertTrue(self.e.void_entry(oid, T + 2000, "never filled on the exchange"))
+        self.assertEqual((self.j.cash(), self.j.orders()[0]["state"]), (D(200), "CANCELED"))
+        self.assertEqual(self.e.active(), [])

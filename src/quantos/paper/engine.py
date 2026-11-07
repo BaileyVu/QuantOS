@@ -442,6 +442,18 @@ class PaperEngine:
         streaks[sid] = streaks.get(sid, 0) + 1 if pnl - fee < 0 else 0
         self.journal.set("loss_streaks", streaks)
 
+    def void_entry(self, order_id, now_ms, reason):
+        """The exchange never opened this position: drop its paper fills so cash and P&L match Binance."""
+        with self.journal.transaction():
+            row = self.journal.db.execute("SELECT payload FROM orders WHERE id=?", (order_id,)).fetchone()
+            if row is None: return False
+            o = json.loads(row[0])
+            self.journal.db.execute("DELETE FROM fills WHERE order_id=?", (order_id,))
+            o.update(state="CANCELED", filled="0", remaining="0", stop_active=False, target_active=False)
+            self.journal.save(o)
+            self.journal.event(now_ms, "VOIDED", {"id": order_id, "reason": reason})
+            return True
+
     def close_external(self, order_id, now_ms, reason="EXCHANGE_CLOSED"):
         """The exchange position is already gone (its stop filled first): close the paper side too, so the
         mirror and the books stop disagreeing. The exit fill is then corrected to the real one."""

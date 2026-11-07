@@ -163,6 +163,7 @@ class Runtime:
         self.state, self.hours, self.market_factory = state, hours, market_factory
         self.shutdown = threading.Event()
         self.messages = queue.Queue(maxsize=1000)
+        self.dropped = {}  # kind -> messages dropped on a full queue
         if portfolio not in ("legacy", "live50"): raise ValueError("portfolio must be legacy or live50")
         self.portfolio = portfolio
         self.strategies = live_library() if portfolio == "live50" else library()
@@ -203,9 +204,11 @@ class Runtime:
             return set(self.watched_symbols).intersection(self.instruments)
 
     def emit(self, kind, payload):
-        try: self.messages.put((kind, payload), timeout=1)
+        """A full queue means the main loop is behind. Quote batches are dropped (the next one supersedes
+        them); other messages wait longer. Never flatten for it: that used to close every position."""
+        try: self.messages.put((kind, payload), timeout=1 if kind == "feed" else 30)
         except queue.Full:
-            self.stop_requested = True
+            self.dropped[kind] = self.dropped.get(kind, 0) + 1
             return False
         return True
 
@@ -568,6 +571,15 @@ class Runtime:
                         alerter.alert("warn", "user_stream", "account stream down >2min; mirror falls back to 30s REST checks", now)
                     elif user is not None and user.up:
                         alerter.clear("user_stream", now)
+                    if self.dropped:
+                        alerter.alert("critical", "queue_full", f"main loop fell behind; dropped {self.dropped}", now)
+                        self.dropped = {}
+                    if self.sentiment is not None and now - getattr(self, "_sentiment_checked", 0) >= 60_000:
+                        self._sentiment_checked = now
+                        feed = self.sentiment.read(now)
+                        if feed["available"]: alerter.clear("sentiment", now)
+                        else: alerter.alert("warn", "sentiment", "sentiment gate OFF (trend rules trade ungated): "
+                                                                  f"{feed['reason']}", now)
                     backlog = self.messages.qsize()
                     if backlog >= QUEUE_LAG_WARN:
                         alerter.alert("critical", "queue_lag", f"main loop {backlog} messages behind the feed", now)
