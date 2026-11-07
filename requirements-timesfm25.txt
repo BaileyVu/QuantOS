@@ -1,0 +1,7 @@
+# Research-only optional environment; not installed by QuantOS.
+# TimesFM v2.0.2 is the official source release carrying its TimesFM 2.5 API.
+timesfm[torch]==2.0.2
+torch==2.7.1
+numpy==1.26.4
+huggingface-hub==0.28.1
+safetensors==0.5.3
