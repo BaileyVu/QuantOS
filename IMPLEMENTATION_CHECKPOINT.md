@@ -1,3 +1,99 @@
+## Infrastructure v5 — PR1 implementation checkpoint, 2026-11-07 (LATEST)
+
+Active worktree: `/Users/bailey12/Desktop/PythonProject/QuantOS-infra-v5`.
+Branch `codex/infra-stressed-stop`, implementation commit `7f628ae`; parent
+`2c52b60` is standalone V4 contract PR47 (open; owner alone merges/deploys).
+PR1 implemented: HyperGrok stressed-stop pricing with MIT notice + exact pinned
+upstream vectors; Binance quantity rounding; historical cost floors retained.
+Actual exchange entry/fee risk >1.2x approved requests a reduce-only close, with
+durable risk-close recovery, missing-price hold/90s kill and partial-fee retry.
+Main reviewed risk/accounting/order integration. No mainnet guards changed.
+
+Validation actually run: full current suite 416 tests in 12.381s OK, 4 skipped;
+after final restart/partial-fee fixes, 54 focused tests in 0.108s OK. Legacy
+suite 1001 tests in 44.382s OK. Synthetic `quantos demo` exit 0; compile/import
+and diff checks PASS. Logs: `/tmp/quantos-infra-pr1-tests.log`,
+`/tmp/quantos-infra-legacy-tests.log`; synthetic demo `/tmp/quantos-infra-pr1-demo`.
+No live-data soak or demo account test run: operational acceptance UNVERIFIED.
+No deployment: rollback operational command not yet verified; source revert
+would be `git revert 7f628ae` on the work-item branch (not run).
+
+Independent PR4 prepared by lower-cost agent at `17da410` in
+`/Users/bailey12/Desktop/PythonProject/QuantOS-infra-deploy`, branch
+`codex/infra-clean-snapshots`: 3 snapshot + 7 service tests reported PASS.
+Main review and ordered PR publication pending; do not treat as accepted yet.
+HyperGrok reference bundle is saved under `../research-3repos/hypergrok-stop-reference/`;
+commit `01c2a46c8a36656a2f958d9063201a77556cae5d`; no repeat retrieval needed.
+
+Usage/reset: weekly exhaustion confirmed at 100% used with 35% five-hour remaining.
+Owner manually redeemed FIRST authorized banked reset; tool now confirms one
+remaining, 98% five-hour / 100% weekly remaining. Total task reset budget consumed
+=1 of2. Only redeem the remaining one at weekly exhaustion. Computer Use explicitly
+blocks Codex settings and no redemption tool exists; owner action is needed then.
+New resetsAt: primary1794063907, secondary1794650707 (Unix seconds; display Vietnam).
+No continuation scheduled. No active owned processes; both agents idle.
+
+EXACT NEXT STEP: publish PR1 as draft (soak unverified), then branch PR2 from it.
+Implement exchange leverage verification before protection and a repeated-query-
+failure-then-success test; optional pD sentiment flag defaults unchanged. Continue
+PR3, review/integrate PR4, then PR5..9 in requested order. Do not rerun passing
+research/scans/tests without a concrete code/evidence change.
+
+---
+
+## Infrastructure v5 — initial preparation, 2026-11-07 (historical)
+
+Owner request: execute `/Users/bailey12/Desktop/TIBO_PROMPT_INFRA_v5.md` and
+`../research-3repos/QUANTOS_INFRA_PLAN.md`, nine ordered work-item PRs. Owner
+approved V4 contract separately; PR https://github.com/BaileyVu/QuantOS/pull/47
+is OPEN, not merged/deployed. Contract commit `2c52b605e77a047256f47ad56515b9449b9fcc83`.
+Active worktree `/Users/bailey12/Desktop/PythonProject/QuantOS-infra-v5`, branch
+`codex/infra-stressed-stop`, current implementation base = that contract commit.
+Original `QuantOS-mainnet-ready` UI checkout/local checkpoint/backups preserved.
+
+Completed: read prompt/design, AGENTS and latest existing checkpoint, frozen V1
+scope, evidence gates RISK_LAYER/HUNT_SUMMARY. GitHub verified PR43/44/45/46 merged;
+base main `ec587392fce12e09ac31dda670a5d54617e15593` contains all four. Do not redo
+their fixes. Fetch note: repository refspec tracks a historical branch only;
+`git fetch origin main` updates worktree-specific FETCH_HEAD, NOT origin/main.
+Two lower-cost gpt-6-luna agents successfully completed independent read-only
+source/validation audits; main retains risk/accounting/order integration/review.
+No code tests or soak run yet. Contract diff review and `git diff --check` PASS.
+No orders, deployment, service changes, credential reads, sealed-data access.
+
+Remaining, in order: PR1 stressed-stop sizing + actual-fill risk guard; PR2
+remaining resolver/leverage/sentiment gaps; PR3 TP/watchdog/orderId settlement;
+PR4 clean snapshot deployment; PR5 counterfactual shadow/report/dashboard + 24h
+acceptance; PR6 registry/manifests; PR7 replay + L2 evidence/config cleanup;
+PR8 Sentibot shadow + 3-day acceptance; PR9 isolated TimesFM 2.5 experiment.
+PR4 independent preparation uses `/Users/bailey12/Desktop/PythonProject/QuantOS-infra-deploy`
+on `codex/infra-clean-snapshots`; do not publish out of sequence.
+
+Source findings: HyperGrok absent locally; verified upstream
+`galleonlabs/hypergrok-trading-desk/scripts/stop_cost.py`, blob
+`065ea994c31ed2454551ddf9ae613510483ed1c2` via GitHub connector. price_stop uses
+stop +/- entry*slip_bps/10000, fees=(entry+stressed_stop_fill)*taker_rate,
+qty=floor(risk/stressed_distance); adapt rounding to Binance stepSize, retain MIT.
+Need fetch license and upstream expected vectors before port. Existing risk.py
+already has a cost allowance; inspect exact delta rather than duplicate it.
+
+Usage last observed: 86% five-hour / 8% weekly remaining; five-hour reset
+2026-11-07 21:54:06 Asia/Ho_Chi_Minh; weekly reset 2026-11-11 14:34:06.
+Banked resets available=2, used by this task=0. Redeem only at weekly exhaustion,
+maximum two; never for five-hour exhaustion. `get_usage_limits` available;
+no reset-redemption tool discovered. Check periodically and checkpoint/commit at
+~20% five-hour remaining; schedule thread heartbeat after confirmed reset if needed.
+No continuation scheduled yet. Do not claim one exists without tool confirmation.
+
+Active owned processes: none. No live state directories/LaunchAgents touched.
+Exact next step: inspect current risk/engine/live paths, obtain upstream license
+and vectors, implement PR1 with tests on this branch; review, commit, publish a
+separate PR based on the contract branch while PR47 is pending. Paper-only live
+data soak bypasses ExchangeMirror and therefore cannot validate account-stream
+threads; report that limitation, never claim a full service soak from it.
+
+---
+
 ## claude/mainnet-ready
 
 Updated 2026-10-31 ~02:10 UTC. Worktree `~/Desktop/PythonProject/QuantOS-mainnet-ready`, branch
