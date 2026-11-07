@@ -3,7 +3,7 @@
 There is no free history for these sources, so they cannot be backtested; they only feed the paper loop.
 Each coin gets a score in [-1, 1]: half from headlines that mention it, half from the overall market mood.
 """
-import html, json, math, re, time, urllib.request
+import hashlib, html, json, math, re, time, urllib.request
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 
@@ -71,18 +71,15 @@ CRYPTO_LEXICON = {
     "slump": -2.2, "tumbles": -2.4, "tumble": -2.4, "dip": -0.8, "correction": -1.2, "rekt": -2.5, "delisting": -2.4,
 }
 
-try:
-    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-    _vader = SentimentIntensityAnalyzer()
-    _vader.lexicon.update(CRYPTO_LEXICON)
-except Exception:  # fall back to the crypto lexicon alone
-    _vader = None
+SCORER_NAME = "sentibot-crypto-lexicon"
+SCORER_VERSION = "1"
+SCORER_LEXICON_SHA256 = hashlib.sha256(
+    json.dumps(CRYPTO_LEXICON, sort_keys=True, separators=(",", ":")).encode("utf-8")
+).hexdigest()
 
 
 def polarity(text):
     """Sentiment of one headline in [-1, 1]."""
-    if _vader:
-        return _vader.polarity_scores(text)["compound"]
     words = re.findall(r"[a-z\-]+", text.lower())
     s = sum(CRYPTO_LEXICON.get(w, 0) for w in words)
     return s / math.sqrt(s * s + 15) if s else 0.0  # same normalisation VADER uses
@@ -169,7 +166,7 @@ def news_items(now=None):
     return uniq
 
 
-def score_items(items):
+def score_items(items, symbols=None):
     """Per-coin scores in [-1, 1] plus counts. Coin score = 0.5 * coin headlines + 0.5 * all headlines."""
     def agg(rows):
         if not rows:
@@ -179,7 +176,13 @@ def score_items(items):
     scored = [(polarity(t), w, t) for t, w, _ in items]
     market = agg([(p, w) for p, w, _ in scored])
     out = {"_market": round(market, 4), "_n": len(scored)}
-    for sym, pat in COINS.items():
+    patterns = dict(COINS)
+    if symbols:
+        for sym, aliases in symbols.items():
+            escaped = "|".join(re.escape(str(alias)) for alias in aliases if str(alias))
+            if escaped:
+                patterns[sym] = r"\b(?:" + escaped + r")\b"
+    for sym, pat in patterns.items():
         rows = [(p, w) for p, w, t in scored if re.search(pat, t, re.I)]
         out[sym] = round(0.5 * agg(rows) + 0.5 * market, 4)
         out[f"_n_{sym}"] = len(rows)

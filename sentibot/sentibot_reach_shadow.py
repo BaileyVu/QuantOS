@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import time
 from datetime import datetime, timezone
@@ -15,10 +16,12 @@ from pathlib import Path
 
 try:
     from . import sentiment as sb
-    from .sentibot_reach_adapter import exa_search, jina_read, normalize_public_http_url, sanitize_text
+    from .sentibot_reach_adapter import (binance_usdc_perpetuals, exa_search, jina_read,
+                                         normalize_public_http_url, sanitize_text)
 except ImportError:  # direct script execution: python sentibot/sentibot_reach_shadow.py
     import sentiment as sb
-    from sentibot_reach_adapter import exa_search, jina_read, normalize_public_http_url, sanitize_text
+    from sentibot_reach_adapter import (binance_usdc_perpetuals, exa_search, jina_read,
+                                         normalize_public_http_url, sanitize_text)
 
 ASSETS = {
     "BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "SOLUSDT": "solana",
@@ -37,6 +40,7 @@ EXA_LIMIT = 3
 BODY_CHARS = 1500
 WINDOW_H = 24
 SEEN_DAYS = 7
+MAX_EXA_QUERIES_PER_SAMPLE = 12
 
 
 def _key(title: str) -> str:
@@ -46,7 +50,8 @@ def _key(title: str) -> str:
 
 def _published(value, now: float) -> float:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return float(value)
+        result = float(value)
+        return result if math.isfinite(result) else now
     if not isinstance(value, str) or not value.strip():
         return now
     try:
@@ -92,20 +97,25 @@ def _safe_event(event: dict, now: float) -> dict | None:
         return None
     url = normalize_public_http_url(url)
     text = sanitize_text(str(event.get("text") or ""), BODY_CHARS)
+    published = _published(event.get("published"), now)
+    if not math.isfinite(published) or published > now:
+        return None
     return {
         "src": str(event.get("src") or "unknown")[:16],
         "sym_hint": event.get("sym_hint"),
         "title": title,
         "url": url,
-        "published": _published(event.get("published"), now),
+        "published": published,
         "text": text,
     }
 
 
 def collect(*, state_dir: str | Path, now: float | None = None,
-            baseline_module=None, exa_search_fn=None, jina_read_fn=None) -> dict:
+            baseline_module=None, exa_search_fn=None, jina_read_fn=None,
+            universe_fn=None, clock_fn=None) -> dict:
     """Fetch one shadow sample and append it to the dedicated output JSONL."""
-    now = time.time() if now is None else now
+    started_at = time.time() if now is None else float(now)
+    clock = clock_fn or time.time
     state = Path(state_dir).expanduser().resolve()
     source_root = Path(__file__).resolve().parent
     if state == source_root or source_root in state.parents:
@@ -113,24 +123,51 @@ def collect(*, state_dir: str | Path, now: float | None = None,
     output = state / "reach_shadow.jsonl"
     if output.is_symlink():
         raise ValueError("shadow output must not be a symlink")
-    seen = _previous_first_seen(output, now)
+    seen = _previous_first_seen(output, started_at)
     base = baseline_module or sb
     search = exa_search_fn or exa_search
     read = jina_read_fn or jina_read
     status: dict[str, str] = {}
     events = []
-
-    for symbol, name in ASSETS.items():
+    universe = dict(ASSETS)
+    universe_complete = False
+    try:
+        contracts = (universe_fn or binance_usdc_perpetuals)()
+        aliases = getattr(base, "COIN_ALIASES", {})
+        for contract in contracts:
+            if isinstance(contract, str) and contract.endswith("USDC"):
+                asset = contract[:-4] + "USDT"
+                known = aliases.get(asset)
+                universe.setdefault(asset, known[0] if known else contract[:-4].lower())
+        universe_complete = True
+    except Exception as exc:
+        status["universe"] = f"INCOMPLETE ({type(exc).__name__}; {len(ASSETS)} fallback assets)"
+    symbols = list(universe.items())
+    try:
+        if output.exists():
+            with output.open(encoding="utf-8") as history:
+                prior_cycles = sum(1 for _ in history)
+        else:
+            prior_cycles = 0
+    except OSError:
+        prior_cycles = 0
+    start_index = (prior_cycles * MAX_EXA_QUERIES_PER_SAMPLE) % max(1, len(symbols))
+    sampled = [symbols[(start_index + i) % len(symbols)]
+               for i in range(min(MAX_EXA_QUERIES_PER_SAMPLE, len(symbols)))]
+    for symbol, name in sampled:
         try:
             for item in search(f"{name} cryptocurrency news", EXA_LIMIT):
-                published = _published(item.get("published"), now)
-                if now - published <= WINDOW_H * 3600:
-                    events.append(_safe_event({**item, "src": "exa", "sym_hint": symbol}, now))
+                published = _published(item.get("published"), started_at)
+                if published <= started_at and started_at - published <= WINDOW_H * 3600:
+                    events.append(_safe_event({**item, "src": "exa", "sym_hint": symbol}, started_at))
             status[f"exa_{symbol}"] = "ok"
         except Exception as exc:
             status[f"exa_{symbol}"] = f"EMPTY ({type(exc).__name__})"
+    coverage = ("complete" if universe_complete and len(sampled) == len(symbols)
+                else f"INCOMPLETE ({len(sampled)}/{len(symbols)} queried this sample)")
+    status["universe_coverage"] = coverage
 
-    rss_items = base.news_items(now) if hasattr(base, "news_items") else []
+    rss_items = base.news_items(started_at) if hasattr(base, "news_items") else []
     title_links = getattr(base, "LAST_LINKS", {})
     rss_sorted = sorted(rss_items, key=lambda row: -row[2])[:JINA_MAX]
     jina_ok = 0
@@ -149,8 +186,15 @@ def collect(*, state_dir: str | Path, now: float | None = None,
             continue
     status["jina"] = f"ok {jina_ok}/{len(rss_sorted)}" if title_links else "skipped (RSS title-link map empty)"
 
-    reddit_items = base.reddit_items(now) if hasattr(base, "reddit_items") else []
+    reddit_items = base.reddit_items(started_at) if hasattr(base, "reddit_items") else []
     status.update(getattr(base, "STATUS", {}))
+    available_at = float(clock())
+    if not math.isfinite(available_at) or available_at < started_at:
+        raise ValueError("completion clock must be finite and not precede collection start")
+    rss_items = [item for item in rss_items if len(item) >= 3 and
+                 isinstance(item[2], (int, float)) and math.isfinite(item[2]) and item[2] <= available_at]
+    reddit_items = [item for item in reddit_items if len(item) >= 3 and
+                    isinstance(item[2], (int, float)) and math.isfinite(item[2]) and item[2] <= available_at]
     unique: dict[str, dict] = {}
     for event in events:
         if not event:
@@ -161,16 +205,33 @@ def collect(*, state_dir: str | Path, now: float | None = None,
             unique[key] = event
     for key, event in unique.items():
         first_seen = seen.get(key)
-        event["first_seen"] = now if first_seen is None else first_seen
+        event["first_seen"] = available_at if first_seen is None else first_seen
         event["novel"] = first_seen is None
 
     reach_items = [(event["title"] + ". " + event["text"], 1.0, event["published"])
                    for event in unique.values()]
     baseline_items = list(rss_items) + list(reddit_items)
+    score_symbols = {asset: getattr(base, "COIN_ALIASES", {}).get(asset, (name, asset[:-4]))
+                     for asset, name in universe.items()}
+    score = lambda items: base.score_items(items, symbols=score_symbols)
+    try:
+        reach_score, baseline_score = score(reach_items), score(baseline_items)
+    except TypeError:
+        # Keep injected legacy test scorers usable; production sentiment supports symbols.
+        reach_score, baseline_score = base.score_items(reach_items), base.score_items(baseline_items)
     row = {
-        "t": now,
-        "reach": base.score_items(reach_items),
-        "baseline_news": base.score_items(baseline_items),
+        "started_at": started_at,
+        "available_at": available_at,
+        "t": available_at,
+        "universe_complete": universe_complete,
+        "universe_size": len(universe),
+        "universe_queried": len(sampled),
+        "universe_coverage": coverage,
+        "scorer": {"name": getattr(base, "SCORER_NAME", "injected-scorer"),
+                   "version": getattr(base, "SCORER_VERSION", "unknown"),
+                   "lexicon_sha256": getattr(base, "SCORER_LEXICON_SHA256", None)},
+        "reach": reach_score,
+        "baseline_news": baseline_score,
         "status": status,
         "n_events": len(unique),
         "n_novel": sum(event["novel"] for event in unique.values()),

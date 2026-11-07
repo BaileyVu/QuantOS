@@ -10,14 +10,24 @@ The collector emits only `reach_shadow.jsonl`, under a caller-selected
 dedicated state directory. It refuses to place state inside the vendored source
 directory and has no output-path option that could point at QuantOS signal or
 account files. It stores scored samples and event provenance, not scraped body
-text. No LLM is used; VADER remains optional and the existing lexicon fallback
-works without an extra dependency.
+text. No LLM is used. A bundled deterministic crypto lexicon is the only scorer,
+and each sample records its scorer version and lexicon hash so ambient package
+installations cannot silently change results.
 
 Coin aliases and per-coin subreddit names cover the 29 symbols in
 `quantos.paper.strategies.candidate_features.ALT_SOURCE_UNIVERSE` (USDT twins
 for QuantOS USDC contracts). The current source does not prove coverage of any
-additional dynamically eligible contract outside that explicit universe; add
-those symbols and aliases before claiming broader coverage.
+additional dynamically eligible contract outside that explicit universe. The
+collector now reads public Binance `exchangeInfo` for currently trading USDC
+perpetuals and derives USDT-style score keys for their base assets. Search is
+round-robin capped at 12 symbols per sample; rows report incomplete per-sample
+query coverage. If exchange metadata is unavailable, rows retain the known
+29-symbol fallback and explicitly mark universe coverage incomplete.
+
+Each row records collection `started_at` and `available_at`; `t` equals
+`available_at` because scoring completes after source fetches. Offline forward
+reports must use availability time to avoid lookahead. Tests inject the
+universe and completion clock and make no network requests.
 
 ## One offline check
 
@@ -53,10 +63,10 @@ Shift/Reddit from the runner; API availability and rate limits are unverified.
 Keep this collector isolated from the running Sentibot app and QuantOS state.
 
 The output provides reach scores, RSS/Reddit baseline scores, and per-event URL,
-published time, first-seen time, novelty, and coin hint. It does not itself
-compute forward 4-hour/24-hour returns or the value of the existing QuantOS
-sentiment gate. Those require same-clock mark/candle records and the main
-runtime's `SENTIMENT_SHADOW` events, which are outside this standalone change.
+published time, first-seen time, novelty, and coin hint. The offline
+`sentibot.forward_report` utility summarizes precollected 4-hour/24-hour returns
+and existing `SENTIMENT_SHADOW` gate outcomes when matching quote journals and
+events are available; it does not collect market history.
 The optional fail-closed stale-sentiment gate and >30-minute alert are also a
 separate main-agent integration task. A 72-hour soak, return report, gate-value
 report, and staleness alert remain unverified.

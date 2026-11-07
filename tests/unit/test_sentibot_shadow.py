@@ -90,9 +90,13 @@ class ShadowCollectorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, patch.object(adapter.socket, "getaddrinfo", side_effect=public_dns):
             state = Path(tmp) / "state"
             first = shadow.collect(state_dir=state, now=1200.0, baseline_module=Baseline,
-                                   exa_search_fn=search, jina_read_fn=read)
+                                   exa_search_fn=search, jina_read_fn=read,
+                                   universe_fn=lambda: ["BTCUSDC", "ETHUSDC"],
+                                   clock_fn=lambda: 1250.0)
             second = shadow.collect(state_dir=state, now=1300.0, baseline_module=Baseline,
-                                    exa_search_fn=search, jina_read_fn=read)
+                                    exa_search_fn=search, jina_read_fn=read,
+                                    universe_fn=lambda: ["BTCUSDC", "ETHUSDC"],
+                                    clock_fn=lambda: 1350.0)
             out = state / "reach_shadow.jsonl"
             lines = [json.loads(line) for line in out.read_text().splitlines()]
             self.assertEqual(first["n_novel"], 2)
@@ -102,6 +106,66 @@ class ShadowCollectorTest(unittest.TestCase):
             self.assertNotIn("text", first["events"][0])
             self.assertEqual({p.name for p in state.iterdir()}, {"reach_shadow.jsonl"})
             self.assertEqual(len(lines), 2)
+            self.assertEqual((first["started_at"], first["available_at"], first["t"]),
+                             (1200.0, 1250.0, 1250.0))
+            self.assertTrue(first["universe_complete"])
+
+    def test_universe_queries_are_bounded_and_future_results_excluded(self):
+        class Baseline:
+            LAST_LINKS = {}
+            STATUS = {}
+            COIN_ALIASES = {}
+
+            @staticmethod
+            def news_items(_now): return []
+
+            @staticmethod
+            def reddit_items(_now): return []
+
+            @staticmethod
+            def score_items(items, **_kwargs): return {"_n": len(items)}
+
+        called = []
+
+        def search(query, _limit):
+            called.append(query)
+            return [{"title": "future", "url": "https://example.com/future",
+                     "published": 2000.0, "text": "future"}]
+
+        contracts = [f"COIN{i}USDC" for i in range(40)]
+        with tempfile.TemporaryDirectory() as tmp:
+            row = shadow.collect(state_dir=Path(tmp) / "state", now=1000.0,
+                                 baseline_module=Baseline, exa_search_fn=search,
+                                 universe_fn=lambda: contracts, clock_fn=lambda: 1100.0)
+        self.assertEqual(len(called), shadow.MAX_EXA_QUERIES_PER_SAMPLE)
+        self.assertGreaterEqual(row["universe_size"], len(contracts))
+        self.assertEqual(row["universe_queried"], shadow.MAX_EXA_QUERIES_PER_SAMPLE)
+        self.assertTrue(row["universe_complete"])
+        self.assertEqual(row["universe_coverage"],
+                         f"INCOMPLETE ({shadow.MAX_EXA_QUERIES_PER_SAMPLE}/{row['universe_size']} queried this sample)")
+        self.assertEqual(row["n_events"], 0)
+
+    def test_dynamic_ticker_alias_scoring_is_deterministic_and_identified(self):
+        scored = sentiment.score_items([("ZETA bullish", 1.0, 100.0), ("unrelated report", 1.0, 100.0)],
+                                       symbols={"ZETAUSDT": ("zeta",)})
+        self.assertEqual(scored["_n_ZETAUSDT"], 1)
+        self.assertNotEqual(scored["ZETAUSDT"], scored["_market"])
+        self.assertEqual(sentiment.SCORER_NAME, "sentibot-crypto-lexicon")
+        self.assertEqual(len(sentiment.SCORER_LEXICON_SHA256), 64)
+
+    def test_exchange_info_parser_selects_only_trading_usdc_perpetuals(self):
+        import io
+        payload = {"symbols": [
+            {"symbol": "BTCUSDC", "status": "TRADING", "contractType": "PERPETUAL", "quoteAsset": "USDC"},
+            {"symbol": "ETHUSDC", "status": "BREAK", "contractType": "PERPETUAL", "quoteAsset": "USDC"},
+            {"symbol": "SOLUSDC", "status": "TRADING", "contractType": "CURRENT_QUARTER", "quoteAsset": "USDC"},
+            {"symbol": "BNBUSDT", "status": "TRADING", "contractType": "PERPETUAL", "quoteAsset": "USDT"},
+        ]}
+        class Response(io.BytesIO):
+            def __enter__(self): return self
+            def __exit__(self, *_args): self.close()
+        with patch.object(adapter, "_safe_open", return_value=Response(json.dumps(payload).encode())):
+            self.assertEqual(adapter.binance_usdc_perpetuals(), ["BTCUSDC"])
 
     def test_state_path_cannot_be_vendored_source_directory(self):
         with self.assertRaisesRegex(ValueError, "outside"):

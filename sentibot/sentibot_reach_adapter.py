@@ -149,6 +149,23 @@ def _safe_open(req: urllib.request.Request, timeout: float):
     return opener.open(req, timeout=timeout)
 
 
+def binance_usdc_perpetuals(timeout: float = 8) -> list[str]:
+    """Load the public Binance USDC-margined perpetual universe (bounded request)."""
+    url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with _safe_open(req, timeout=timeout) as response:
+        raw = response.read(2 * 1024 * 1024 + 1)
+    if len(raw) > 2 * 1024 * 1024:
+        raise ValueError("exchangeInfo response too large")
+    data = json.loads(raw)
+    symbols = data.get("symbols", []) if isinstance(data, dict) else []
+    return sorted({row["symbol"] for row in symbols if isinstance(row, dict)
+                   and row.get("status") == "TRADING"
+                   and row.get("contractType") == "PERPETUAL"
+                   and row.get("quoteAsset") == "USDC"
+                   and isinstance(row.get("symbol"), str)})
+
+
 # ── prompt-injection hygiene (new, not in Agent Reach) ──
 _INJECT_RE = re.compile(
     r"(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above)\s+(instructions|prompts?)"
