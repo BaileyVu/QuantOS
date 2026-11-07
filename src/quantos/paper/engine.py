@@ -9,6 +9,7 @@ from .journal import Journal
 from .risk import portfolio_risk_caps, Account, Policy, evaluate, usable_quote, valid_quote, quantity_step
 from .types import D, Funding, Instrument, Quote, Signal, Trade, floor_step
 from .strategies.manifest import manifest_for
+from .stop_cost import price_stop
 
 TERMINAL = {"CLOSED", "CANCELED", "EXPIRED", "REJECTED"}
 
@@ -465,6 +466,49 @@ class PaperEngine:
                     return True
         return False
 
+    def check_realised_risk(self, order_id, now_ms, price, quantity, entry_fee=None):
+        """Real exchange fills must remain within 1.2x the approved risk budget.
+
+        Returns False after requesting a close. The mirror executes that close;
+        a closing/closed order is never reopened by a late fee correction.
+        """
+        with self.journal.transaction():
+            o = self.query_order(order_id)
+            if o["state"] in TERMINAL or o["state"] == "CLOSING":
+                return False
+            if not quantity.is_finite() or quantity <= 0:
+                raise ValueError("invalid real fill quantity")
+            approved = D(o["decision"]["requested_risk"])
+            if not approved.is_finite() or approved <= 0:
+                raise ValueError("missing approved risk")
+            fee_rate = self.policy.taker_fee
+            if entry_fee is not None:
+                if not entry_fee.is_finite() or entry_fee < 0:
+                    raise ValueError("invalid real entry fee")
+                fee_rate = max(fee_rate, entry_fee / (price * quantity))
+            q = self.quotes.get(o["signal"]["symbol"])
+            slip = 2 * price * self.policy.slippage
+            if q is not None and usable_quote(q, now_ms):
+                depth = q.bid_qty if o["signal"]["side"] == "LONG" else q.ask_qty
+                slip = max(slip, q.ask - q.bid,
+                           price * (self.policy.slippage + D(".01") * quantity / depth))
+            cost = price_stop(price, D(o["stop_price"]), o["signal"]["side"],
+                              slip, fee_rate, max(self.policy.taker_fee, fee_rate))
+            realised = quantity * cost.loss_per_unit
+            detail = {"id": order_id, "approved": str(approved), "realised": str(realised),
+                      "quantity": str(quantity), "entry_price": str(price),
+                      "limit": str(approved * D("1.2"))}
+            # Persist measured exposure for subsequent portfolio approvals.
+            o["decision"]["achievable_risk"] = str(max(D(o["decision"]["achievable_risk"]), realised))
+            if realised > approved * D("1.2"):
+                self._closing(o, now_ms, "REALISED_RISK_EXCEEDED")
+                self.journal.event(now_ms, "REALISED_RISK_EXCEEDED", detail)
+                self.journal.save(o)
+                return False
+            self.journal.event(now_ms, "REALISED_RISK_CHECKED", detail)
+            self.journal.save(o)
+            return True
+
     def book_real_fills(self, order_id, now_ms, entry=None, exit=None):
         """Replace simulated fill prices/fees with the exchange's. entry/exit = (price, fee or None);
         a None fee keeps the engine's rate at the real price. Cash and equity derive from fills, so they
@@ -501,6 +545,11 @@ class PaperEngine:
                            old_pnl=str(old_pnl), new_pnl=str(pnl))
                 changed = changed or (px, fee, pnl) != (old_px, old_fee, old_pnl)
             out["has_exit"] = x is not None
+            if entry is not None and x is None:
+                out["risk_safe"] = self.check_realised_risk(order_id, now_ms, avg, total, entry_fee)
+                # Risk may have moved this order to CLOSING. Preserve that state
+                # when the accounting correction saves the new average below.
+                o = self.query_order(order_id)
             if not changed:
                 return {**out, "changed": False}
             out["changed"] = True
