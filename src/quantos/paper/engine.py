@@ -449,6 +449,7 @@ class PaperEngine:
             row = self.journal.db.execute("SELECT payload FROM orders WHERE id=?", (order_id,)).fetchone()
             if row is None: return False
             o = json.loads(row[0])
+            if o["state"] == "CANCELED" and D(o["filled"]) == 0: return False
             self.journal.db.execute("DELETE FROM fills WHERE order_id=?", (order_id,))
             o.update(state="CANCELED", filled="0", remaining="0", stop_active=False, target_active=False)
             self.journal.save(o)
