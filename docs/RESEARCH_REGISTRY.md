@@ -1,8 +1,8 @@
 # Research registry
 
 `quantos.paper.research.registry` provides a local SQLite ledger for distinct
-experiment variants and their BUILD/HELD result observations. It does not run
-experiments or calculate a Sharpe ratio.
+experiment variants and their BUILD/HELD result observations. It computes DSR
+only from explicit return inputs and registry trial counts; it does not run experiments.
 
 ```python
 from quantos.paper.research.registry import ResearchRegistry
@@ -35,7 +35,9 @@ Bailey–López de Prado expected-maximum-Sharpe threshold and PSR non-normality
 adjustment. For one trial and zero trial mean, it reduces to PSR against zero.
 The single-trial case is handled directly instead of applying the extreme-value
 approximation outside its useful `N > 1` range. See the [authors' paper](https://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf),
-Equations 1–2.
+Equations 1–2. DSR uses the zero-Sharpe null in Equation 2:
+`trial_sharpe_mean` must be zero, not the observed search mean. Impossible
+skew/kurtosis combinations fail validation.
 
 Select N through the registry to keep family and all-search counts separate.
 Supply trial-Sharpe dispersion estimates that match the chosen scope:
@@ -44,14 +46,14 @@ Supply trial-Sharpe dispersion estimates that match the chosen scope:
 family_dsr = registry.deflated_sharpe(
     scope="family", family="crash_flush_e2",
     returns=periodic_returns,
-    trial_sharpe_mean=family_trial_mean,
+    trial_sharpe_mean=0,
     trial_sharpe_std=family_trial_std,
 )
 global_dsr = registry.deflated_sharpe(
     scope="global", sharpe_ratio=observed_sharpe,
     sample_size=n_periods, skewness=return_skew,
     kurtosis=pearson_kurtosis,
-    trial_sharpe_mean=all_trial_mean,
+    trial_sharpe_mean=0,
     trial_sharpe_std=all_trial_std,
 )
 ```
@@ -84,7 +86,7 @@ create_dataset_manifest(
     start="2020-01-01", end="2023-06-30",
     missing_ranges=[{"start": "2021-03-04", "end": "2021-03-04"}],
 )
-manifest = verify_dataset_manifest("research/manifests/bars.json")
+manifest = verify_dataset_manifest("research/manifests/bars.json", expected_hash=registered_hash)
 print(manifest["manifest_sha256"])
 ```
 
@@ -94,6 +96,10 @@ Existing manifests are not overwritten with different content. Keep generated
 manifest/database outputs in local research storage; do not add datasets or
 generated outputs to Git.
 
-The training `run_cell` output carries `data_manifest_hash` from the verified
-dataset index content hash. Pass that hash when registering locally generated
-variants so the variant identity remains bound to its data snapshot.
+The training `run_cell` output carries `data_manifest_hash`, binding the canonical
+base/overlay manifest metadata and selected universe, plus `data_content_hash`
+for verified partition bytes. Synthetic indexes without a manifest retain a null
+manifest hash; never register that as verified provenance. Pass the actual
+manifest hash when registering locally generated variants. Replay should pass
+the previously registered expected hash to detect metadata changes as well as
+changed dataset bytes.

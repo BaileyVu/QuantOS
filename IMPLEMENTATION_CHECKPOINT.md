@@ -1,4 +1,26 @@
-## Infrastructure v5 — PR5 implementation, 2026-11-07 (LATEST)
+## Infrastructure v5 — PR6 review, 2026-11-07 (LATEST)
+
+PR5 draft52 published: https://github.com/BaileyVu/QuantOS/pull/52 at a1942e8.
+Active branch codex/infra-registry-manifests; agent source integrated as8670366,
+8287a5f. Main reviewed entire registry/DSR and dataset provenance. Corrected
+DSR to require zero-Sharpe null per primary paper Eq2, reject impossible Pearson
+moments; manifest verifier accepts registered expected hash, detects metadata
+tamper. DatasetIndex now hashes full base/overlay metadata +selected universe;
+backtests/audits expose that hash separately from verified partition content hash.
+Integrated targeted registry/dataset/experiment suite23tests0.158s PASS; diffcheck
+PASS. Actual ledger import from prior checkpoint retained, NOT repeated. No real
+DSR result claimed without return moments/trial dispersion. No research/data/deploy
+or service operations. Existing full454suite fromPR5 remains valid for unchanged
+runtime; dataset/experiment checks cover PR6 diffs. Source rollback: revert main
+review commit then8287a5f then8670366 (none run).
+Next: publish draftPR6; integrate preparedPR7 replay with main review, PR8 after,
+then PR9 TimesFM2.5. PR7/8 agents requested safe checkpoint soon. At latestusage
+36%five-hour,75%weekly left;1banked reset. Active runtime processesNONE.
+All >=10min real-service soaks,24hshadow,3daySentibot acceptance remain UNVERIFIED.
+
+---
+
+## Infrastructure v5 — PR5 implementation, 2026-11-07 (historical)
 
 Active branch codex/infra-shadow-counterfactual. PR4 draft51 published, basePR3.
 PR5 captures every post-arbitration proposal once in shadow_<profile>.db with

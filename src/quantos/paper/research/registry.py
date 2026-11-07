@@ -120,7 +120,7 @@ def create_dataset_manifest(data_path: str | Path, manifest_path: str | Path, *,
     return {**manifest, "manifest_sha256": sha256_bytes(canonical_json(manifest).encode("utf-8"))}
 
 
-def verify_dataset_manifest(manifest_path: str | Path) -> dict:
+def verify_dataset_manifest(manifest_path: str | Path, *, expected_hash: str | None = None) -> dict:
     """Verify required fields and current dataset bytes; return verified manifest."""
     path = Path(manifest_path).resolve()
     manifest = json.loads(path.read_text(encoding="utf-8"))
@@ -153,7 +153,10 @@ def verify_dataset_manifest(manifest_path: str | Path) -> dict:
         gap_start, gap_end = date.fromisoformat(gap["start"]), date.fromisoformat(gap["end"])
         if gap_start > gap_end or gap_start < lo or gap_end > hi:
             raise ValueError("missing range is outside manifest range")
-    return {**manifest, "manifest_sha256": sha256_bytes(canonical_json(manifest).encode("utf-8"))}
+    digest = sha256_bytes(canonical_json(manifest).encode("utf-8"))
+    if expected_hash is not None and digest != _validate_sha256(expected_hash, "expected_hash"):
+        raise ValueError("manifest checksum mismatch")
+    return {**manifest, "manifest_sha256": digest}
 
 
 @dataclass(frozen=True)
@@ -209,6 +212,8 @@ def calculate_deflated_sharpe(*, n_trials: int, trial_sharpe_mean: float,
     if isinstance(n_trials, bool) or not isinstance(n_trials, int) or n_trials < 1:
         raise ValueError("n_trials must be a positive integer")
     trial_mean = _finite_number(trial_sharpe_mean, "trial_sharpe_mean")
+    if trial_mean != 0:
+        raise ValueError("DSR uses a zero-Sharpe null; trial_sharpe_mean must be zero")
     trial_std = _finite_number(trial_sharpe_std, "trial_sharpe_std")
     if trial_std < 0:
         raise ValueError("trial_sharpe_std must be nonnegative")
@@ -228,6 +233,8 @@ def calculate_deflated_sharpe(*, n_trials: int, trial_sharpe_mean: float,
         raise ValueError("sample_size must be an integer of at least two")
     if kurt < 1:
         raise ValueError("Pearson kurtosis must be at least one")
+    if kurt + 1e-12 < 1 + skew * skew:
+        raise ValueError("skewness and kurtosis violate the Pearson moment bound")
 
     if n_trials == 1:
         benchmark = trial_mean

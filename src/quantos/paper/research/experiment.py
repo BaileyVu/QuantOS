@@ -83,14 +83,15 @@ def run_cell(index, cache, filters: dict, cell: dict, *, start_ms=TRAIN_START,
                                signals, start_ms=start_ms, end_ms=end_ms)
     except IncompleteHistory as exc:
         return {"cell": cell, "status": "INVALID_DATA", "reason": str(exc),
-                "metrics": None, "kelly": None, "data_manifest_hash": index.content_hash}
+                "metrics": None, "kelly": None, "data_manifest_hash": index.manifest_hash,
+                "data_content_hash": index.content_hash}
     stats = summarize([(t, float(v)) for t, v in result.points], result.trades)
     # This stress path is not a synchronized observed MTM series.
     adverse = [float(v) for _, v in sorted(result.points + result.adverse_points)]
     stats["adverse_bar_stress_drawdown"] = max_drawdown(adverse)
     kelly = kelly_fraction([float(t["net_r"]) for t in result.trades])
     return _plain({"cell": cell, "status": "COMPLETE", "metrics": stats, "kelly": kelly,
-        "data_manifest_hash": index.content_hash,
+        "data_manifest_hash": index.manifest_hash, "data_content_hash": index.content_hash,
         "signal_count": sum(start_ms <= s.observed_ms < end_ms for s in signals),
         "rejections": dict(result.rejections), "approvals": dict(result.approvals),
         "paused_at_ms": result.paused_at_ms, "assumptions": result.assumptions,

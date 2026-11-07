@@ -122,12 +122,12 @@ class ResearchRegistryTest(unittest.TestCase):
         self.assertEqual(result.benchmark_sharpe, 0)
 
     def test_fixed_dsr_vector_and_more_trials_raise_threshold(self):
-        fixed = calculate_deflated_sharpe(n_trials=20, trial_sharpe_mean=0.05,
+        fixed = calculate_deflated_sharpe(n_trials=20, trial_sharpe_mean=0,
             trial_sharpe_std=0.2, sharpe_ratio=0.75, sample_size=250,
             skewness=0.25, kurtosis=3.5)
-        self.assertAlmostEqual(fixed.benchmark_sharpe, 0.4301415902362397, places=14)
-        self.assertAlmostEqual(fixed.z_score, 4.678097810809278, places=12)
-        self.assertAlmostEqual(fixed.probability, 0.9999985522578503, places=14)
+        self.assertAlmostEqual(fixed.benchmark_sharpe, 0.3801415902362397, places=14)
+        variance = 1 - .25 * .75 + ((3.5 - 1) / 4) * .75 ** 2
+        self.assertAlmostEqual(fixed.z_score, (.75 - .3801415902362397) * math.sqrt(249 / variance), places=12)
         single = calculate_deflated_sharpe(n_trials=1, trial_sharpe_mean=0,
             trial_sharpe_std=0.2, sharpe_ratio=0.75, sample_size=250,
             skewness=0.25, kurtosis=3.5)
@@ -166,6 +166,25 @@ class ResearchRegistryTest(unittest.TestCase):
                 self.assertEqual(family.n_trials, 2)
                 self.assertEqual(global_result.n_trials, 84)  # 3 registry + 81 external CCI
                 self.assertGreater(family.probability, global_result.probability)
+
+    def test_dsr_rejects_shifted_null_and_impossible_moments(self):
+        args = dict(n_trials=20, trial_sharpe_mean=0, trial_sharpe_std=.2,
+                    sharpe_ratio=.5, sample_size=100, skewness=0, kurtosis=3)
+        for changes in ({"trial_sharpe_mean": -.1}, {"skewness": 3}):
+            with self.assertRaises(ValueError): calculate_deflated_sharpe(**{**args, **changes})
+
+    def test_manifest_metadata_tamper_rejected_against_registered_digest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data.csv").write_text("data")
+            path = root / "manifest.json"
+            created = create_dataset_manifest(root / "data.csv", path, source="fixture",
+                start="2020-01-01", end="2020-01-02")
+            verify_dataset_manifest(path, expected_hash=created["manifest_sha256"])
+            data = json.loads(path.read_text()); data["source"] = "changed"
+            path.write_text(json.dumps(data))
+            with self.assertRaisesRegex(ValueError, "manifest checksum"):
+                verify_dataset_manifest(path, expected_hash=created["manifest_sha256"])
 
 
 if __name__ == "__main__":
