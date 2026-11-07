@@ -46,6 +46,16 @@ class Journal:
 
     @contextmanager
     def transaction(self):
+        if self.db.in_transaction:  # nested (e.g. the mirror runs inside the runtime's transaction): savepoint
+            self.db.execute("SAVEPOINT nested")
+            try:
+                yield
+                self.db.execute("RELEASE nested")
+            except BaseException:
+                self.db.execute("ROLLBACK TO nested")
+                self.db.execute("RELEASE nested")
+                raise
+            return
         self.db.execute("BEGIN IMMEDIATE")
         try:
             yield
