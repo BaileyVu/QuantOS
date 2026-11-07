@@ -156,3 +156,19 @@ class UserStreamTests(unittest.TestCase):
         self.assertEqual([e["e"] for e in u.drain()], ["ACCOUNT_UPDATE", "ORDER_TRADE_UPDATE"])
         self.assertEqual(u.drain(), [])
         self.assertFalse(u.up)
+
+
+class SeedTests(unittest.TestCase):
+    def test_quiet_book_seeded_from_rest_is_then_served_by_the_stream(self):
+        from quantos.paper.types import D, Quote
+        q = QuoteStream(lambda: {"NEARUSDC"}, clock_ms=lambda: 5_000)
+        q.subscribed = {"book": frozenset({"NEARUSDC"}), "mark": frozenset({"NEARUSDC"})}
+        q.up = {"book": True, "mark": True}
+        q.last = {"book": 5_000, "mark": 5_000}
+        q.handle(msg("markPriceUpdate", "NEARUSDC", **{"p": "4.105", "E": 4_900}))
+        self.assertIsNone(q.quotes(["NEARUSDC"], 5_000))           # no book pushed yet -> REST
+        q.seed_books({"NEARUSDC": Quote("NEARUSDC", 1_000, 5_000, D("4.10"), D("4.11"), D("10"), D("12"), D("4.105"))})
+        self.assertEqual(q.quotes(["NEARUSDC"], 5_000)["NEARUSDC"].bid, D("4.10"))
+        q.handle(msg("bookTicker", "NEARUSDC", **{**BOOK, "b": "4.20", "a": "4.21", "T": 4_950}))
+        q.seed_books({"NEARUSDC": Quote("NEARUSDC", 1_000, 5_000, D("4.10"), D("4.11"), D("10"), D("12"), D("4.105"))})
+        self.assertEqual(q.quotes(["NEARUSDC"], 5_000)["NEARUSDC"].bid, D("4.20"))   # a seed never overwrites

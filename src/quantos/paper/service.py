@@ -30,8 +30,8 @@ def build_plist(python: Path, state: Path, logdir: Path,
     # the base interpreter and lose the venv's installed package environment.
     python = Path(os.path.abspath(os.path.expanduser(os.fspath(python))))
     state, logdir = (Path(p).expanduser().resolve() for p in (state, logdir))
-    if not 0 < duration_hours <= 72:
-        raise ValueError("duration_hours must be between 1 and 72")
+    if not (duration_hours == 0 or 0 < duration_hours <= 72):
+        raise ValueError("duration_hours must be 0 (until stopped) or between 1 and 72")
     min_quote_volume = Decimal(min_quote_volume)
     if not min_quote_volume.is_finite() or min_quote_volume < 0:
         raise ValueError("invalid quote volume floor")

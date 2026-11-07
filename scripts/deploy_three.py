@@ -96,7 +96,7 @@ def restart_quantos():
         if label.endswith("paper") and len(only) > 1: time.sleep(90)
 
 
-def install_dashboard(runs=None):
+def install_dashboard(runs=None, exchange=None):
     """Local read-only dashboard on http://127.0.0.1:8787 (launchd com.quantos.dashboard)."""
     commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
                             capture_output=True, text=True, check=True).stdout.strip()
@@ -114,7 +114,8 @@ def install_dashboard(runs=None):
                                              "--run", f"paper $200={QOS / 'v4-live50'}#pM10",
                                              "--run", f"paper $200 m/5={QOS / 'v4-live50'}#pM5",
                                              "--run", f"demo 2%={QOS / 'v4-live50-demo'}#pL"]),
-                                  "--sentibot", str(SB / "app"), "--port", "8787"],
+                                  "--sentibot", str(SB / "app"), "--port", "8787",
+                                  *(["--exchange", exchange] if exchange else [])],
              "EnvironmentVariables": {"PYTHONPATH": str(app)}, "WorkingDirectory": str(QOS),
              "StandardOutPath": str(QOS / "dashboard-logs" / "out.log"),
              "StandardErrorPath": str(QOS / "dashboard-logs" / "err.log")}
@@ -135,9 +136,11 @@ def uninstall():
             print("stopped", label)
 
 
-def install_demo200(hours=72):
-    """Owner's combined $200 demo (2026-11-02): QuantOS pD on Binance Demo + alt-ML executor (shares the 3-position
-    cap via status.json) + sentibot (sentiment gate input) + reversed HL copy (paper). Fresh state folder; no mainnet."""
+def install_demo200(hours=0):
+    """Owner's combined $200 demo: QuantOS pD on Binance Demo + alt-ML executor (shares the 3-position cap via
+    status.json) + sentibot (sentiment gate input). hours=0 (default since 2026-11-07) runs until
+    `quantos stop`; `quantos pause` / `resume` hold new entries. Fresh state folder; no mainnet. HL copy was
+    dropped (2026-11-03) and is no longer started."""
     import time
     if not KEY.is_file() or KEY.stat().st_mode & 0o077:
         raise SystemExit("demo key copy missing or not mode 600")
@@ -168,7 +171,7 @@ def install_demo200(hours=72):
         "WorkingDirectory": str(ml / "app"),
         "EnvironmentVariables": {**env, "PYTHONPATH": str(app), "QOS_STATUS": str(state / "status.json"),
                                  "ML_VIRTUAL_BALANCE": "200", "ML_LEV": "5",
-                                 "ML_DEADLINE_MS": str(int(time.time() * 1000) + hours * 3600000)},
+                                 **({"ML_DEADLINE_MS": str(int(time.time() * 1000) + hours * 3600000)} if hours else {})},
         "StandardOutPath": str(ml / "logs" / "out.log"), "StandardErrorPath": str(ml / "logs" / "err.log")}
     busy = [label for label in plan if loaded(label)]
     if busy: raise SystemExit(f"already loaded: {busy}")
@@ -176,10 +179,7 @@ def install_demo200(hours=72):
         path = AGENTS / f"{label}.plist"
         with path.open("wb") as f: plistlib.dump(plist, f, sort_keys=True)
         subprocess.run(["launchctl", "bootstrap", DOMAIN, str(path)], check=True); print("started", label)
-    rev = AGENTS / "com.quantos.hlcopy.reverse.plist"
-    if rev.exists() and not loaded("com.quantos.hlcopy.reverse"):
-        subprocess.run(["launchctl", "bootstrap", DOMAIN, str(rev)], check=True); print("started com.quantos.hlcopy.reverse")
-    install_dashboard(runs=["--run", f"demo $200={state}#pD"])
+    install_dashboard(runs=["--run", f"demo $200={state}#pD"], exchange=f"demo={KEY}")
 
 
 if __name__ == "__main__":

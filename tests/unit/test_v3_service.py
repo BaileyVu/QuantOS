@@ -25,8 +25,10 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(Path(plist["WorkingDirectory"]).name, "state")
         self.assertIn("logs", plist["StandardOutPath"])
 
-    def test_duration_must_be_positive(self):
-        with self.assertRaises(ValueError): service.build_plist(Path("python"), Path("state"), Path("logs"), 0)
+    def test_duration_is_until_stopped_or_up_to_72h(self):
+        with self.assertRaises(ValueError): service.build_plist(Path("python"), Path("state"), Path("logs"), -1)
+        plist = service.build_plist(Path("python"), Path("state"), Path("logs"), 0)  # 0 = run until `stop`
+        self.assertIn("0", plist["ProgramArguments"])
         with self.assertRaises(ValueError): service.build_plist(Path("python"), Path("state"), Path("logs"), 73)
 
     def test_venv_symlink_path_is_preserved(self):

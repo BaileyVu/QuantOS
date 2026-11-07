@@ -396,3 +396,102 @@ class RealFillTests(unittest.TestCase):
             m.sync(eng, T + 2000)
         self.assertEqual(D(j.orders()[0]["average"]), D("100.07"))
         self.assertEqual(j.db.execute("SELECT COUNT(*) FROM events WHERE kind='BOOKS_CORRECTION'").fetchone()[0], 1)
+
+
+class FlakyExchange(FillsExchange):
+    """Entry reaches Binance but the reply is lost, and lookups fail until `down` clears."""
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.lose_reply, self.down, self.reject_leverage, self.drop_entry = True, True, False, False
+
+    def set_leverage(self, s, lev):
+        if self.reject_leverage: raise BinanceError(-4028, "Leverage is not valid", 400)
+
+    def new_order(self, p):
+        if self.drop_entry and not p.get("reduceOnly"):
+            from quantos.live.client import AmbiguousOrderState
+            raise AmbiguousOrderState("timeout")      # never reached Binance
+        o = super().new_order(p)
+        if self.lose_reply and not p.get("reduceOnly"):
+            from quantos.live.client import AmbiguousOrderState
+            raise AmbiguousOrderState("timeout")
+        return o
+
+    def get_order(self, s, cid):
+        if self.down: raise ConnectionError("network down")
+        if cid not in self.orders:
+            from quantos.live.client import UnknownOrder
+            raise UnknownOrder(-2013, "Order does not exist.", 400)
+        return self.orders[cid]
+
+
+class VoidingEngine(BookingEngine):
+    def __init__(self):
+        super().__init__()
+        self.voided = []
+    def void_entry(self, oid, now, reason): self.voided.append(oid); return True
+
+
+class EntrySafetyTests(unittest.TestCase):
+    setUp, tearDown, mirror = MirrorTests.setUp, MirrorTests.tearDown, MirrorTests.mirror
+
+    def test_lost_reply_entry_is_resolved_then_protected(self):
+        ex, e = FlakyExchange(), VoidingEngine()
+        m = self.mirror(ex)
+        e.orders = [order()]
+        m.sync(e, 1000)
+        self.assertEqual(m.book["a" * 32]["state"], "PENDING")
+        self.assertEqual((ex.pos["SOLUSDC"], ex.algo), (D("0.05"), {}))   # filled, not yet protected
+        ex.down = False
+        m.sync(e, 3000)
+        self.assertEqual(m.book["a" * 32]["state"], "OPEN")
+        self.assertEqual([o["triggerPrice"] for o in ex.algo.values()], ["75.00"])
+        self.assertFalse(m.kill.active)
+
+    def test_entry_that_never_reached_binance_is_voided(self):
+        ex, e = FlakyExchange(), VoidingEngine()
+        ex.drop_entry = True
+        m = self.mirror(ex)
+        e.orders = [order()]
+        m.sync(e, 1000)
+        ex.down = False
+        m.sync(e, 3000)
+        self.assertEqual((m.book["a" * 32]["state"], e.voided), ("FAILED", ["a" * 32]))
+        self.assertEqual(ex.pos.get("SOLUSDC", D(0)), D(0))
+
+    def test_unresolvable_entry_kills_after_the_limit(self):
+        ex, e = FlakyExchange(), VoidingEngine()
+        m = self.mirror(ex)
+        e.orders = [order()]
+        m.sync(e, 1000)
+        m.sync(e, 60_000)
+        self.assertFalse(m.kill.active)
+        m.sync(e, 95_000)
+        self.assertTrue(m.kill.active)
+
+    def test_rejected_leverage_never_enters(self):
+        ex, e = FlakyExchange(), VoidingEngine()
+        ex.reject_leverage = True
+        m = self.mirror(ex)
+        e.orders = [order()]
+        m.sync(e, 1000)
+        self.assertEqual((e.voided, ex.orders), (["a" * 32], {}))
+
+
+class SharedAccountTests(unittest.TestCase):
+    setUp, tearDown, mirror = MirrorTests.setUp, MirrorTests.tearDown, MirrorTests.mirror
+
+    def test_alt_ml_usdt_positions_neither_fail_reconcile_nor_get_flattened(self):
+        ex, e = FakeExchange(), Engine()
+        m = self.mirror(ex)
+        e.orders = [order()]
+        ex.pos["NEARUSDT"] = D("-10")                 # the alt-ML executor's short on the same account
+        ex.algo["mlalts-sl"] = {"clientAlgoId": "mlalts-sl", "symbol": "NEARUSDT", "orderType": "STOP_MARKET",
+                                "side": "BUY", "closePosition": False, "reduceOnly": True, "triggerPrice": "5"}
+        for t in (1000, 40_000, 80_000):
+            self.assertTrue(m.sync(e, t)["ok"])
+        m._halt("test")
+        self.assertEqual(ex.pos["SOLUSDC"], D(0))
+        self.assertEqual(ex.pos["NEARUSDT"], D("-10"))
+        self.assertIn("mlalts-sl", ex.algo)
+        self.assertTrue(m.flat_confirmed)

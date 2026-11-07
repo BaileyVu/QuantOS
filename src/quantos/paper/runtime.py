@@ -1,4 +1,5 @@
-"""Independent feed/scanner workers, single-owner execution, durable 72h deadline."""
+"""Independent feed/scanner workers, single-owner execution, durable deadline (or none: hours=0 runs until
+`quantos stop`; `quantos pause` / `resume` hold and allow new entries)."""
 from dataclasses import asdict, replace
 import math
 import fcntl
@@ -43,6 +44,7 @@ DEMO_PROFILE = os.environ.get("QUANTOS_DEMO_PROFILE", "pL")
 # validated on its own; at 5s, ordinary slow polls (p99 ~7s) marked it down ~55 times/hour (11-03).
 FEED_TIMEOUT_MS = 10_000
 # Dashboard status/heartbeat cadence. Was 10s; with the 5s page poll the display ran up to 15s behind.
+MARKET_KEEP_DAYS = 3  # raw market recordings kept per state dir (~1.2 GB/day on the Mac, 11-07)
 STATUS_EVERY_MS = 2_000
 # Messages waiting in the main queue. Each feed batch is ~2s, so 15 queued ~ 30s behind live (11-05: 31 min).
 QUEUE_LAG_WARN = 15
@@ -157,10 +159,11 @@ class Runtime:
                  min_quote_volume=D("20000000"), announcement_factory=BinanceAnnouncements,
                  portfolio="legacy", sentiment_path=None, notify=True, execution="paper", client_factory=None,
                  stream=True):
-        if not 0 < hours <= 72: raise ValueError("duration must be >0 and <=72 hours")
+        if not (hours == 0 or 0 < hours <= 72): raise ValueError("duration must be 0 (until stopped) or 0-72 hours")
         self.state, self.hours, self.market_factory = state, hours, market_factory
         self.shutdown = threading.Event()
         self.messages = queue.Queue(maxsize=1000)
+        self.dropped = {}  # kind -> messages dropped on a full queue
         if portfolio not in ("legacy", "live50"): raise ValueError("portfolio must be legacy or live50")
         self.portfolio = portfolio
         self.strategies = live_library() if portfolio == "live50" else library()
@@ -201,9 +204,11 @@ class Runtime:
             return set(self.watched_symbols).intersection(self.instruments)
 
     def emit(self, kind, payload):
-        try: self.messages.put((kind, payload), timeout=1)
+        """A full queue means the main loop is behind. Quote batches are dropped (the next one supersedes
+        them); other messages wait longer. Never flatten for it: that used to close every position."""
+        try: self.messages.put((kind, payload), timeout=1 if kind == "feed" else 30)
         except queue.Full:
-            self.stop_requested = True
+            self.dropped[kind] = self.dropped.get(kind, 0) + 1
             return False
         return True
 
@@ -211,6 +216,10 @@ class Runtime:
         folder = self.state / "market"
         folder.mkdir(exist_ok=True)
         day = time.strftime("%Y-%m-%d", time.gmtime(now/1000))
+        if day != getattr(self, "_record_day", day):  # a non-stop run must not fill the disk
+            for old in sorted(folder.glob("*.jsonl.gz"))[:-MARKET_KEEP_DAYS]:
+                old.unlink(missing_ok=True)
+        self._record_day = day
         with gzip.open(folder / f"{day}.jsonl.gz", "at") as f:
             f.write(dumps({"schema": 2, "received_ms": now, "kind": kind,
                            "payload": payload, "active_seconds": active_seconds}) + "\n")
@@ -358,7 +367,9 @@ class Runtime:
                 if self.portfolio == "live50":
                     batch = self.stream.quotes(symbols, now) if self.stream else None
                     streamed = batch is not None
-                    if not streamed: batch = market.quotes(symbols, skip_invalid=True)
+                    if not streamed:
+                        batch = market.quotes(symbols, skip_invalid=True)
+                        if self.stream: self.stream.seed_books(batch)
                     # One quiet thin book must not blank the whole batch (11-02 run: ~4.2k feed errors).
                     if not batch: raise ValueError("invalid or stale quote")
                     records[0:0] = [("quote", batch[s]) for s in symbols if s in batch]
@@ -386,7 +397,7 @@ class Runtime:
             now = milliseconds()
             run_file = self.state / "run.json"
             run = json.loads(run_file.read_text()) if run_file.exists() else {
-                "started_ms": now, "deadline_ms": now+int(self.hours*3600000),
+                "started_ms": now, "deadline_ms": now+int(self.hours*3600000) if self.hours else None,
                 "evidence": "natural", "status": "starting", "restarts": -1,
                 "hours": self.hours, "reported_days": [], "portfolio": self.portfolio,
                 **({"profiles": ["pL"]} if self.portfolio == "live50" else {})}
@@ -492,7 +503,7 @@ class Runtime:
                             e.journal.event(now, "SUSPENDED", {"active": len(e.active())})
                     return 0
                 self.stop_requested = self.stop_requested or (self.state / "stop.request").exists()
-                finishing = self.stop_requested or now >= run["deadline_ms"]
+                finishing = self.stop_requested or (run["deadline_ms"] is not None and now >= run["deadline_ms"])
                 if finishing:
                     finishing_since = finishing_since or now
                     run["status"] = "closing"
@@ -550,6 +561,8 @@ class Runtime:
                     for e in engines: e.kill(now)
                     alerter.alert("critical", "kill_switch", "KILL file present: entries paused, positions closing", now)
                 if now-last_status >= STATUS_EVERY_MS:
+                    paused = (self.state / "PAUSE").exists()
+                    for e in engines: e.manual_pause = paused
                     stale = {**dict(monitor.stale(now)), **dict(scan_monitor.stale(now))}
                     for name in ("feed", "scan"):
                         if name in stale:
@@ -560,13 +573,22 @@ class Runtime:
                         alerter.alert("warn", "user_stream", "account stream down >2min; mirror falls back to 30s REST checks", now)
                     elif user is not None and user.up:
                         alerter.clear("user_stream", now)
+                    if self.dropped:
+                        alerter.alert("critical", "queue_full", f"main loop fell behind; dropped {self.dropped}", now)
+                        self.dropped = {}
+                    if self.sentiment is not None and now - getattr(self, "_sentiment_checked", 0) >= 60_000:
+                        self._sentiment_checked = now
+                        feed = self.sentiment.read(now)
+                        if feed["available"]: alerter.clear("sentiment", now)
+                        else: alerter.alert("warn", "sentiment", "sentiment gate OFF (trend rules trade ungated): "
+                                                                  f"{feed['reason']}", now)
                     backlog = self.messages.qsize()
                     if backlog >= QUEUE_LAG_WARN:
                         alerter.alert("critical", "queue_lag", f"main loop {backlog} messages behind the feed", now)
                     else:
                         alerter.clear("queue_lag", now)
                     heartbeat.beat(now, {"status": run["status"], "feed_age_ms": now-last_feed if last_feed else None,
-                                         "queue": backlog,
+                                         "queue": backlog, "paused": paused,
                                          **({"stream": {"live": self.stream.healthy(now), "messages": self.stream.messages,
                                                         "reconnects": self.stream.reconnects}} if self.stream else {}),
                                          **({"user_stream": {"live": user.up, "messages": user.messages,
@@ -581,7 +603,7 @@ class Runtime:
                         write_status(self.state, status)
                     except Exception as error:
                         alerter.alert("warn", "dashboard", f"status write failed: {error}", now)
-                    atomic_json(self.state / "status.json", {"mode": "paper", "run": run, "updated_ms": now,
+                    atomic_json(self.state / "status.json", {"mode": "paper", "run": run, "updated_ms": now, "paused": paused,
                         "feed_age_ms": now-last_feed if last_feed else None,
                         "next_scan_ms": (now//30000+1)*30000,
                         "profiles": {e.journal.profile: {"cash": str(e.journal.cash()), "active": e.active(),

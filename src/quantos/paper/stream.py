@@ -132,6 +132,16 @@ class QuoteStream:
                 self.last["mark"] = self.clock_ms()
             self.messages += 1
 
+    def seed_books(self, quotes: dict):
+        """Books from a REST batch for symbols the stream has not seen since connecting. bookTicker only
+        pushes on change, so a quiet book never arrives and every batch fell back to REST (share fell to
+        57% on a quiet Saturday, 11-07). A book that later changes overwrites its seed."""
+        with self.lock:
+            for s, q in quotes.items():
+                if s in self.subscribed["book"] and s not in self.books:
+                    self.books[s] = {"symbol": s, "bidPrice": str(q.bid), "bidQty": str(q.bid_qty),
+                                     "askPrice": str(q.ask), "askQty": str(q.ask_qty), "time": q.time_ms}
+
     def healthy(self, now_ms: int) -> bool:
         """Both sockets up and each heard within its silence limit (marks tick every 1s; a quiet book may not)."""
         return all(self.up[c] and now_ms - self.last[c] <= limit for c, (_, _, limit) in self.CHANNELS.items())

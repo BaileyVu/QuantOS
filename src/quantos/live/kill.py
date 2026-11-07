@@ -31,12 +31,16 @@ class FlattenResult:
     errors: dict = field(default_factory=dict)
 
 
-def flatten(client, symbols=None, instruments: dict | None = None, tag: str = "kill") -> FlattenResult:
-    """Cancel all open orders, then reduce-only close every nonzero position. Per-symbol errors are collected."""
+def flatten(client, symbols=None, instruments: dict | None = None, tag: str = "kill", scope=None) -> FlattenResult:
+    """Cancel all open orders, then reduce-only close every nonzero position (only symbols `scope` accepts,
+    when given). Per-symbol errors are collected."""
     res = FlattenResult()
     positions = {p["symbol"]: D(str(p["positionAmt"])) for p in client.position_risk()}
     if symbols is None:
         symbols = sorted({s for s, q in positions.items() if q != 0} | {o["symbol"] for o in client.open_orders()})
+        if getattr(client, "conditional_api", "legacy") == "algo":
+            symbols = sorted(set(symbols) | {o["symbol"] for o in client.open_algo_orders()})
+        if scope is not None: symbols = [s for s in symbols if scope(s)]
     for sym in symbols:
         try:
             client.cancel_all(sym)

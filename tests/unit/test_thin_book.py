@@ -169,3 +169,20 @@ class RealFillBookingTests(EngineTests):
                     raise RuntimeError("inner failure")
         self.assertEqual(D(self.j.orders()[0]["average"]), D("100.20"))
         self.assertIsNone(self.j.get("probe"))
+
+
+class ManualPauseTests(EngineTests):
+    def test_pause_blocks_new_entries_only(self):
+        self.assertTrue(self.e.entry_allowed())
+        self.e.manual_pause = True
+        self.assertFalse(self.e.entry_allowed())
+        self.e.manual_pause = False
+        self.assertTrue(self.e.entry_allowed())
+
+    def test_void_entry_restores_cash(self):
+        self.held()
+        oid = self.j.orders()[0]["id"]
+        self.assertNotEqual(self.j.cash(), D(200))   # entry fee booked
+        self.assertTrue(self.e.void_entry(oid, T + 2000, "never filled on the exchange"))
+        self.assertEqual((self.j.cash(), self.j.orders()[0]["state"]), (D(200), "CANCELED"))
+        self.assertEqual(self.e.active(), [])

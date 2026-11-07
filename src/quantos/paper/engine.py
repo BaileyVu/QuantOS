@@ -65,7 +65,8 @@ class PaperEngine:
     def entry_allowed(self):
         # exchange_hold: the live mirror's soft pause while the exchange is unreachable (in memory only).
         return (self.connected and self.journal.get("reconciled", False)
-                and not self.journal.get("paused", False) and not getattr(self, "exchange_hold", False))
+                and not self.journal.get("paused", False) and not getattr(self, "exchange_hold", False)
+                and not getattr(self, "manual_pause", False))  # `quantos pause` (PAUSE file in the state dir)
 
     def query_order(self, order_id):
         row = self.journal.db.execute("SELECT payload FROM orders WHERE id=?", (order_id,)).fetchone()
@@ -440,6 +441,18 @@ class PaperEngine:
         sid = o["signal"]["strategy_id"]
         streaks[sid] = streaks.get(sid, 0) + 1 if pnl - fee < 0 else 0
         self.journal.set("loss_streaks", streaks)
+
+    def void_entry(self, order_id, now_ms, reason):
+        """The exchange never opened this position: drop its paper fills so cash and P&L match Binance."""
+        with self.journal.transaction():
+            row = self.journal.db.execute("SELECT payload FROM orders WHERE id=?", (order_id,)).fetchone()
+            if row is None: return False
+            o = json.loads(row[0])
+            self.journal.db.execute("DELETE FROM fills WHERE order_id=?", (order_id,))
+            o.update(state="CANCELED", filled="0", remaining="0", stop_active=False, target_active=False)
+            self.journal.save(o)
+            self.journal.event(now_ms, "VOIDED", {"id": order_id, "reason": reason})
+            return True
 
     def close_external(self, order_id, now_ms, reason="EXCHANGE_CLOSED"):
         """The exchange position is already gone (its stop filled first): close the paper side too, so the
