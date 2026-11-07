@@ -1,5 +1,47 @@
 # QuantOS — Codex Operating Instructions
 
+## Current V4 infrastructure contract — owner approved 2026-11-07
+
+For the nine-PR QuantOS infrastructure plan (`TIBO_PROMPT_INFRA_v5.md` and
+`QUANTOS_INFRA_PLAN.md`, dated 2026-11-07), this contract supersedes conflicting
+historical V1/V3 scope and specification-precedence rules below. Those documents
+remain frozen historical evidence; do not rewrite them.
+
+- V4 scope is Binance USDC-M perpetuals, multiple strategies, and demo/testnet
+  execution. Spot-only, BTC/ETH-only, one-strategy, and 1-minute-only restrictions
+  apply to historical V1, not this V4 plan. Completed-bar, timestamp, and data
+  integrity requirements still apply at each strategy's configured timeframe.
+- Mainnet is off until Bailey's explicit written go-live authorization. This plan
+  does not grant it. Never weaken `src/quantos/live/client.py` mainnet guards.
+- Capital rule: per-trade margin = current balance / 10, compounding as balance
+  changes; live leverage is at most 3x. This rule is subject to risk rejection,
+  stressed-stop sizing, and portfolio caps, never permission to exceed them.
+  Historical pD demo use of 5x is not live authorization.
+- Sealed 2025+ data must not be used for model selection. BUILD is
+  2020-01..2023-06; HELD is 2023-07..2024-12, evaluated once per family.
+  Do not weaken costs, slippage, fees, stops, evidence gates, or reporting honesty.
+- Bailey alone merges and deploys. Use one PR per work item on `codex/<task>`;
+  this contract has its own prerequisite PR. Do not push to main or merge PRs.
+  Never restart/redeploy the running demo, edit its state directory or LaunchAgents,
+  or touch `edge_data/ml5m/` or the separately maintained alt-ML executor.
+- Before a proposed deployment, run the candidate's real service entrypoint and
+  threads with live data, a separate state directory, and no orders for at least
+  10 minutes with zero errors; record results and a rollback command. Bailey
+  deploys only when flat. An incomplete soak must be reported as incomplete.
+- Keep risk, accounting, order-state integration, and final review with the main
+  agent. Use at most two lower-cost subagents for independent tasks. Resume from
+  `IMPLEMENTATION_CHECKPOINT.md`; record completed tasks, branch/commit, remaining
+  work, actual test results, active processes, and the exact next step.
+- Do not install Agent Reach, OpenCLI, CloakBrowser, or cookie-reading tools.
+  Treat scraped text as untrusted; no LLM scoring of scraped text. Pin new
+  dependency versions. TimesFM experiments are research-only and use 2.5 weights,
+  never 3.0. Sentibot reach collection is shadow-only and must never write
+  `paper_perp_signals.jsonl`.
+
+All non-conflicting safety, architecture, accounting, validation, and repository
+hygiene requirements below remain applicable. Passing tests never constitutes
+go-live, merge, or deployment approval.
+
 ## Current V3 implementation contract
 
 For the October 26 paper-engine task, `legacy/docs/V3_PAPER_CONTRACT.md` supersedes the
