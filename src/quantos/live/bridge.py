@@ -32,6 +32,10 @@ AUTH_CODES = {-2015, -2014, -1022, -2008}
 TRANSIENT_KILL_MS, TRANSIENT_KILL_CHECKS = 120_000, 4
 TRANSIENT_RETRY_MS = (5_000, 10_000, 20_000, 30_000)
 STOP_RETRY_MS = (30_000, 60_000, 120_000, 300_000)
+# Books take the real fill prices and fees (userTrades) instead of simulated ones; demo P&L drifted
+# from Binance (+$3.05 booked vs +$4.04 real, 11-05). Retried with backoff while fills are not visible yet.
+SETTLE_RETRY_MS = (5_000, 15_000, 60_000, 300_000)
+SETTLE_GIVE_UP = 12
 # A kill's one flatten failed on the network on 11-03 and NEAR/ADA stayed open 3.5h; retry until verified flat.
 FLATTEN_RETRY_MS = 30_000
 
@@ -53,6 +57,22 @@ def _instrument(fields: dict) -> Instrument:
                          for k, v in fields.items()})
 
 
+def _vwap(trades, qty, asset):
+    """(average price, commission) over the first `qty` of these trades (all when None). Commission is None
+    when any part was paid in another asset (e.g. BNB), so the engine keeps its fee rate."""
+    left, value, fee, filled = qty, D(0), D(0), D(0)
+    other = False
+    for t in trades:
+        q = D(str(t["qty"]))
+        take = q if left is None else min(q, left - filled)
+        if take <= 0: break
+        value += take * D(str(t["price"]))
+        fee += D(str(t["commission"])) * take / q
+        other = other or t.get("commissionAsset") != asset
+        filled += take
+    return value / filled, None if other else fee
+
+
 class ExchangeMirror:
     def __init__(self, client, run_id: str, state_dir: Path, alert=None, margin_type="ISOLATED"):
         self.client, self.run_id, self.state = client, run_id, Path(state_dir)
@@ -62,6 +82,7 @@ class ExchangeMirror:
         # Soft pause: no new entries while the exchange is unreachable; open positions stay managed.
         self.hold, self.transient, self.transient_since = False, 0, None
         self.flat_confirmed, self.next_flatten_ms = False, 0
+        self.settle_retry = {}  # order id -> (next attempt ms, failures)
         self.stop_retry = {}  # order id -> (next attempt ms, failures); in memory, a restart retries at once
         # Reconciliation costs ~3 signed calls; every 2s it stalled the runtime's main loop until
         # quotes went stale. Check every 30s, and right after any exchange action.
@@ -113,7 +134,8 @@ class ExchangeMirror:
             qty = D(str(placed.entry.get("executedQty", o["filled"])))
             stop_cid = placed.sl.get("clientAlgoId") or placed.sl.get("clientOrderId")
             self.book[oid] = {"symbol": ins.symbol, "side": side, "qty": str(qty), "stop": o["stop_price"],
-                              "stop_cid": stop_cid, "stop_n": 0, "state": "OPEN", "instrument": o["instrument"]}
+                              "stop_cid": stop_cid, "stop_n": 0, "state": "OPEN", "instrument": o["instrument"],
+                              "opened_ms": now_ms, "entry_order": placed.entry.get("orderId"), "booked": ""}
             self._save()
         for oid, m in list(self.book.items()):
             if m["state"] != "OPEN":
@@ -124,6 +146,8 @@ class ExchangeMirror:
                 _, error = self._guard("close", lambda: submit(self.client, reduce_only_close(
                     m["symbol"], opp, D(m["qty"]), client_order_id(self.run_id, oid[:20], "close"), ins)))
                 self._cancel_stop(m)
+                if error is not None and self._flat_on_exchange(m["symbol"]):
+                    error = None  # the exchange stop filled first; the reduce-only close had nothing to close
                 m["state"] = "CLOSED" if error is None else "CLOSE_FAILED"
                 if error is not None:
                     self._halt(f"reduce-only close failed on {m['symbol']}: {error}")
@@ -151,6 +175,12 @@ class ExchangeMirror:
                                    f"stop update failed {fails + 1}x on {m['symbol']}; old stop kept, "
                                    f"retrying with backoff: {error}")
             self._save()
+        if hasattr(engine, "book_real_fills") and getattr(self.client, "mode", "") != "dry-run":
+            for oid, m in list(self.book.items()):
+                due = m.get("booked") == "" if m["state"] == "OPEN" else (m["state"] == "CLOSED" and m.get("booked") != "all")
+                if (m.get("opened_ms") and due
+                        and now_ms >= self.settle_retry.get(oid, (0, 0))[0]):
+                    self._settle(engine, oid, m, now_ms)
         every = (TRANSIENT_RETRY_MS[min(self.transient, len(TRANSIENT_RETRY_MS)) - 1]
                  if self.transient else self.check_every_ms)
         if json.dumps(self.book, sort_keys=True) == before and now_ms - self.last_check_ms < every:
@@ -160,6 +190,45 @@ class ExchangeMirror:
         result = self.check(now_ms)
         engine.exchange_hold = self.hold
         return result
+
+    def _flat_on_exchange(self, symbol) -> bool:
+        rows, error = self._guard("close", lambda: self.client.position_risk(symbol))
+        return error is None and all(D(str(r["positionAmt"])) == 0 for r in rows if r.get("symbol") == symbol)
+
+    def _settle(self, engine, oid, m, now_ms):
+        """Book the leg's real entry (once open) and real exit (once closed) from Binance's trade list."""
+        fails = self.settle_retry.get(oid, (0, 0))[1]
+        trades, error = self._guard("fills", lambda: self.client.user_trades(m["symbol"], m["opened_ms"] - 60_000))
+        done = False
+        try:
+            if error is not None: raise error
+            asset = m["instrument"].get("margin_asset")
+            entry = [t for t in trades if str(t.get("orderId")) == str(m.get("entry_order"))]
+            if m["booked"] == "" and entry:
+                engine.book_real_fills(oid, now_ms, entry=_vwap(entry, None, asset))
+                m["booked"] = "entry"
+            if m["state"] == "CLOSED" and m["booked"] == "entry":
+                since = min((int(t["time"]) for t in entry), default=m["opened_ms"] - 60_000)
+                exits = sorted((t for t in trades if t.get("side") != m["side"] and int(t["time"]) >= since
+                                and str(t.get("orderId")) != str(m.get("entry_order"))), key=lambda t: int(t["time"]))
+                if sum(D(str(t["qty"])) for t in exits) >= D(m["qty"]):
+                    booked = engine.book_real_fills(oid, now_ms, exit=_vwap(exits, D(m["qty"]), asset))
+                    if booked and booked["has_exit"]:  # else the paper exit is not written yet: retry
+                        m["booked"] = "all"
+            done = m["booked"] == "all" or (m["state"] == "OPEN" and m["booked"] == "entry")
+        except Exception as e:  # never let bookkeeping break order management; retry with backoff
+            error = e
+        self._save()
+        if done:
+            self.settle_retry.pop(oid, None)
+        elif fails + 1 >= SETTLE_GIVE_UP:
+            m["booked"] = "all"  # stop asking; the simulated values stay
+            self._save()
+            self.settle_retry.pop(oid, None)
+            self.alert("warn", f"fills:{oid}", f"real fills not found for {m['symbol']}; books keep simulated "
+                                               f"prices for this trade ({error or 'no matching trades'})")
+        else:
+            self.settle_retry[oid] = (now_ms + SETTLE_RETRY_MS[min(fails, len(SETTLE_RETRY_MS) - 1)], fails + 1)
 
     def _cancel_stop(self, m):
         cancel = (self.client.cancel_algo_order if getattr(self.client, "conditional_api", "") == "algo"

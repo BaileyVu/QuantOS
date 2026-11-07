@@ -271,3 +271,87 @@ class KillFlattenTests(MirrorTests):
         fresh = self.mirror(ex)
         self.assertTrue(fresh.sync(e, 40_000)["ok"])
         self.assertFalse(fresh.kill.active)
+
+
+class FillsExchange(FakeExchange):
+    """Keeps a userTrades list; market orders fill at `price` with 0.05% commission in USDC."""
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.trades, self.price, self.trade_calls, self.next_id, self.hide = [], D("80.00"), 0, 100, False
+        self.reject_reduce = False
+
+    def new_order(self, p):
+        if p.get("reduceOnly") and self.reject_reduce:
+            raise BinanceError(-2022, "ReduceOnly Order is rejected.", 400)
+        o = super().new_order(p)
+        self.next_id += 1
+        o["orderId"] = self.next_id
+        self.fill(p["side"], D(p["quantity"]), self.next_id)
+        return o
+
+    def fill(self, side, qty, order_id):
+        self.trades.append({"orderId": order_id, "side": side, "price": str(self.price), "qty": str(qty),
+                            "commission": str(self.price * qty * D("0.0005")), "commissionAsset": "USDC",
+                            "time": 1000 + len(self.trades)})
+
+    def user_trades(self, symbol, start_time=None):
+        self.trade_calls += 1
+        if self.hide: return []
+        return [t for t in self.trades if start_time is None or t["time"] >= start_time]
+
+
+class BookingEngine(Engine):
+    def __init__(self):
+        super().__init__()
+        self.booked = []
+
+    def book_real_fills(self, oid, now_ms, entry=None, exit=None):
+        self.booked.append(("entry", entry) if entry else ("exit", exit))
+        return {"has_exit": exit is not None}
+
+
+class RealFillTests(unittest.TestCase):
+    setUp, tearDown, mirror = MirrorTests.setUp, MirrorTests.tearDown, MirrorTests.mirror
+
+    def test_entry_and_exit_booked_from_exchange_fills_once(self):
+        ex, e = FillsExchange(), BookingEngine()
+        m = self.mirror(ex)
+        e.orders = [order()]
+        m.sync(e, 1000)
+        self.assertEqual(e.booked, [("entry", (D("80.00"), D("0.0020")))])
+        for t in range(2000, 20_000, 2000):
+            m.sync(e, t)
+        self.assertEqual(ex.trade_calls, 1)  # no polling while the position is open
+        ex.price = D("82.50")
+        e.orders = []
+        m.sync(e, 30_000)
+        self.assertEqual(e.booked[-1], ("exit", (D("82.50"), D("0.0020625"))))
+        m.sync(e, 40_000)
+        self.assertEqual((ex.trade_calls, len(e.booked)), (2, 2))
+
+    def test_exchange_stop_filled_first_is_not_a_kill_and_books_the_stop_price(self):
+        ex, e = FillsExchange(), BookingEngine()
+        m = self.mirror(ex)
+        e.orders = [order()]
+        m.sync(e, 1000)
+        ex.price = D("75.10")                         # stop triggered on Binance
+        ex.fill("SELL", D("0.05"), 999)
+        ex.pos["SOLUSDC"], ex.algo, ex.reject_reduce = D(0), {}, True
+        e.orders = []
+        m.sync(e, 5000)
+        self.assertFalse(m.kill.active)
+        self.assertEqual(m.book["a" * 32]["state"], "CLOSED")
+        self.assertEqual(e.booked[-1][1][0], D("75.10"))
+
+    def test_fills_not_visible_yet_retry_with_backoff(self):
+        ex, e = FillsExchange(), BookingEngine()
+        m = self.mirror(ex)
+        ex.hide = True
+        e.orders = [order()]
+        m.sync(e, 1000)
+        for t in range(1000, 5000, 1000):
+            m.sync(e, 1000 + t)
+        self.assertEqual((ex.trade_calls, e.booked), (1, []))
+        ex.hide = False
+        m.sync(e, 6001)
+        self.assertEqual(len(e.booked), 1)
