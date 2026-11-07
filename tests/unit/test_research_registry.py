@@ -1,10 +1,12 @@
 import json
+import math
 from pathlib import Path
 import tempfile
 import unittest
 
 from quantos.paper.research.registry import (
     ResearchRegistry,
+    calculate_deflated_sharpe,
     create_dataset_manifest,
     hash_params,
     verify_dataset_manifest,
@@ -108,6 +110,62 @@ class ResearchRegistryTest(unittest.TestCase):
             data.write_bytes(data.read_bytes() + b"tampered")
             with self.assertRaisesRegex(ValueError, "checksum mismatch"):
                 verify_dataset_manifest(manifest_path)
+
+    def test_single_trial_reduces_to_probabilistic_sharpe(self):
+        result = calculate_deflated_sharpe(n_trials=1, trial_sharpe_mean=0,
+            trial_sharpe_std=0.4, sharpe_ratio=0.7, sample_size=100,
+            skewness=0.2, kurtosis=3.4)
+        variance = 1 - 0.2 * 0.7 + ((3.4 - 1) / 4) * 0.7 ** 2
+        expected = 0.5 * (1 + math.erf(
+            (0.7 * math.sqrt(99) / math.sqrt(variance)) / math.sqrt(2)))
+        self.assertAlmostEqual(result.probability, expected, places=14)
+        self.assertEqual(result.benchmark_sharpe, 0)
+
+    def test_fixed_dsr_vector_and_more_trials_raise_threshold(self):
+        fixed = calculate_deflated_sharpe(n_trials=20, trial_sharpe_mean=0.05,
+            trial_sharpe_std=0.2, sharpe_ratio=0.75, sample_size=250,
+            skewness=0.25, kurtosis=3.5)
+        self.assertAlmostEqual(fixed.benchmark_sharpe, 0.4301415902362397, places=14)
+        self.assertAlmostEqual(fixed.z_score, 4.678097810809278, places=12)
+        self.assertAlmostEqual(fixed.probability, 0.9999985522578503, places=14)
+        single = calculate_deflated_sharpe(n_trials=1, trial_sharpe_mean=0,
+            trial_sharpe_std=0.2, sharpe_ratio=0.75, sample_size=250,
+            skewness=0.25, kurtosis=3.5)
+        self.assertGreater(single.probability, fixed.probability)
+
+    def test_returns_input_and_invalid_or_insufficient_inputs(self):
+        result = calculate_deflated_sharpe(n_trials=1, trial_sharpe_mean=0,
+            trial_sharpe_std=0, returns=[-0.02, 0.01, 0.03, 0.02])
+        self.assertEqual(result.sample_size, 4)
+        with self.assertRaisesRegex(ValueError, "at least three returns"):
+            calculate_deflated_sharpe(n_trials=1, trial_sharpe_mean=0,
+                trial_sharpe_std=0, returns=[-0.01, 0.01])
+        with self.assertRaisesRegex(ValueError, "both"):
+            calculate_deflated_sharpe(n_trials=1, trial_sharpe_mean=0,
+                trial_sharpe_std=0, returns=[-0.01, 0.01, 0.02], sharpe_ratio=1)
+        with self.assertRaisesRegex(ValueError, "sample_size"):
+            calculate_deflated_sharpe(n_trials=1, trial_sharpe_mean=0,
+                trial_sharpe_std=0, sharpe_ratio=0.3, sample_size=1,
+                skewness=0, kurtosis=3)
+        with self.assertRaisesRegex(ValueError, "kurtosis"):
+            calculate_deflated_sharpe(n_trials=1, trial_sharpe_mean=0,
+                trial_sharpe_std=0, sharpe_ratio=0.3, sample_size=10,
+                skewness=0, kurtosis=0.5)
+
+    def test_registry_dsr_uses_family_or_global_n_explicitly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with ResearchRegistry(Path(tmp) / "registry.sqlite") as registry:
+                h = "a" * 64
+                registry.register_variant("f", "a", {"x": 1}, manifest_hash=h)
+                registry.register_variant("f", "b", {"x": 2}, manifest_hash=h)
+                registry.register_variant("other", "c", {"x": 3}, manifest_hash=h)
+                common = dict(trial_sharpe_mean=0, trial_sharpe_std=0.3,
+                    sharpe_ratio=0.6, sample_size=100, skewness=0, kurtosis=3)
+                family = registry.deflated_sharpe(scope="family", family="f", **common)
+                global_result = registry.deflated_sharpe(scope="global", **common)
+                self.assertEqual(family.n_trials, 2)
+                self.assertEqual(global_result.n_trials, 84)  # 3 registry + 81 external CCI
+                self.assertGreater(family.probability, global_result.probability)
 
 
 if __name__ == "__main__":

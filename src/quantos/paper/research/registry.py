@@ -14,6 +14,7 @@ import json
 import math
 from pathlib import Path
 import sqlite3
+from statistics import NormalDist
 from typing import Any
 
 REGISTRY_SCHEMA = 1
@@ -162,6 +163,86 @@ class ImportSummary:
     results_added: int
     duplicates_skipped: int
     source_sha256: str
+
+
+@dataclass(frozen=True)
+class DSRResult:
+    probability: float
+    z_score: float
+    observed_sharpe: float
+    benchmark_sharpe: float
+    sample_size: int
+    n_trials: int
+
+
+def _return_moments(returns) -> tuple[float, int, float, float]:
+    values = tuple(_finite_number(x, "return") for x in returns)
+    n = len(values)
+    if n < 3:
+        raise ValueError("at least three returns are required to estimate skew and kurtosis")
+    mean = sum(values) / n
+    centered = [x - mean for x in values]
+    m2 = sum(x * x for x in centered) / n
+    if m2 <= 0:
+        raise ValueError("return series must have nonzero variance")
+    # Sample standard deviation for Sharpe; population central moments for the
+    # standardized skew and Pearson (non-excess) kurtosis estimates.
+    sample_sd = math.sqrt(sum(x * x for x in centered) / (n - 1))
+    skewness = sum(x ** 3 for x in centered) / n / (m2 ** 1.5)
+    kurtosis = sum(x ** 4 for x in centered) / n / (m2 ** 2)
+    return mean / sample_sd, n, skewness, kurtosis
+
+
+def calculate_deflated_sharpe(*, n_trials: int, trial_sharpe_mean: float,
+                              trial_sharpe_std: float, returns=None,
+                              sharpe_ratio: float | None = None,
+                              sample_size: int | None = None,
+                              skewness: float | None = None,
+                              kurtosis: float | None = None) -> DSRResult:
+    """Compute DSR probability from explicit returns or explicit moments.
+
+    Sharpe and trial-distribution inputs must use the same *unannualized* return
+    period. ``kurtosis`` is Pearson kurtosis (normal distribution = 3).
+    ``trial_sharpe_std`` is the sample standard deviation of trial Sharpe ratios.
+    No moment or Sharpe input is inferred from the imported ledger's mean bp.
+    """
+    if isinstance(n_trials, bool) or not isinstance(n_trials, int) or n_trials < 1:
+        raise ValueError("n_trials must be a positive integer")
+    trial_mean = _finite_number(trial_sharpe_mean, "trial_sharpe_mean")
+    trial_std = _finite_number(trial_sharpe_std, "trial_sharpe_std")
+    if trial_std < 0:
+        raise ValueError("trial_sharpe_std must be nonnegative")
+    if returns is not None:
+        if any(value is not None for value in (sharpe_ratio, sample_size, skewness, kurtosis)):
+            raise ValueError("provide returns or explicit moments, not both")
+        try:
+            sharpe_ratio, sample_size, skewness, kurtosis = _return_moments(returns)
+        except TypeError:
+            raise ValueError("returns must be an iterable of finite numbers") from None
+    if sharpe_ratio is None or sample_size is None or skewness is None or kurtosis is None:
+        raise ValueError("provide returns or all of sharpe_ratio, sample_size, skewness, and kurtosis")
+    sr = _finite_number(sharpe_ratio, "sharpe_ratio")
+    skew = _finite_number(skewness, "skewness")
+    kurt = _finite_number(kurtosis, "kurtosis")
+    if isinstance(sample_size, bool) or not isinstance(sample_size, int) or sample_size < 2:
+        raise ValueError("sample_size must be an integer of at least two")
+    if kurt < 1:
+        raise ValueError("Pearson kurtosis must be at least one")
+
+    if n_trials == 1:
+        benchmark = trial_mean
+    else:
+        gamma = 0.5772156649015329
+        normal = NormalDist()
+        expected_max_z = ((1 - gamma) * normal.inv_cdf(1 - 1 / n_trials)
+                          + gamma * normal.inv_cdf(1 - 1 / (n_trials * math.e)))
+        benchmark = trial_mean + trial_std * expected_max_z
+    variance = 1 - skew * sr + ((kurt - 1) / 4) * (sr ** 2)
+    if not math.isfinite(variance) or variance <= 0:
+        raise ValueError("PSR variance adjustment must be positive")
+    z_score = (sr - benchmark) * math.sqrt(sample_size - 1) / math.sqrt(variance)
+    probability = NormalDist().cdf(z_score)
+    return DSRResult(probability, z_score, sr, benchmark, sample_size, n_trials)
 
 
 class ResearchRegistry:
@@ -369,6 +450,34 @@ class ResearchRegistry:
                 "registry_n": registry_n if family is None else None,
                 "legacy_cci_n": legacy,
                 "global_n_with_legacy": registry_n + legacy if family is None else None}
+
+    def deflated_sharpe(self, *, scope: str, family: str | None = None,
+                        trial_sharpe_mean: float, trial_sharpe_std: float,
+                        returns=None, sharpe_ratio: float | None = None,
+                        sample_size: int | None = None,
+                        skewness: float | None = None,
+                        kurtosis: float | None = None) -> DSRResult:
+        """Calculate DSR using this registry's family or global trial count.
+
+        Global N includes the separately documented 81 historical CCI trials;
+        those trials are not assigned to an invented family count. Supply a
+        dispersion estimate appropriate to the chosen scope.
+        """
+        if scope == "family":
+            if not family:
+                raise ValueError("family is required for family-scope DSR")
+            n_trials = self.trial_counts(family)["family_n"]
+        elif scope == "global":
+            if family is not None:
+                raise ValueError("family must be omitted for global-scope DSR")
+            n_trials = self.trial_counts()["global_n_with_legacy"]
+        else:
+            raise ValueError("scope must be 'family' or 'global'")
+        assert isinstance(n_trials, int)
+        return calculate_deflated_sharpe(n_trials=n_trials,
+            trial_sharpe_mean=trial_sharpe_mean, trial_sharpe_std=trial_sharpe_std,
+            returns=returns, sharpe_ratio=sharpe_ratio, sample_size=sample_size,
+            skewness=skewness, kurtosis=kurtosis)
 
     def result_rows(self, *, family: str | None = None, period_class: str | None = None) -> list[dict]:
         query = "SELECT v.family,v.params_hash,v.identity_method,v.manifest_hash,r.period,r.period_class,r.stats_json,r.result_hash FROM results r JOIN variants v USING(variant_key)"

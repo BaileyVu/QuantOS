@@ -26,9 +26,40 @@ The historical CCI study contributes 81 external trials per the Mac hunt
 summary. It is reported separately as `legacy_cci_n`, not assigned to a
 fabricated family or inserted as synthetic variant records. For overall
 multiple-testing context, use `global_n_with_legacy`; for family-level
-reporting, show `family_n` alongside the separate external count. There is no
-Sharpe return or DSR probability until a run supplies valid return series and a
-reviewed DSR implementation.
+reporting, show `family_n` alongside the separate external count. The imported
+ledger has no per-period Sharpe inputs, so the registry does not calculate DSR
+from its means or CIs. `calculate_deflated_sharpe()` accepts either a return
+series or explicit unannualized Sharpe/sample-size/skew/Pearson-kurtosis
+moments, plus the trial Sharpe mean and standard deviation. It applies the
+Bailey–López de Prado expected-maximum-Sharpe threshold and PSR non-normality
+adjustment. For one trial and zero trial mean, it reduces to PSR against zero.
+The single-trial case is handled directly instead of applying the extreme-value
+approximation outside its useful `N > 1` range. See the [authors' paper](https://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf),
+Equations 1–2.
+
+Select N through the registry to keep family and all-search counts separate.
+Supply trial-Sharpe dispersion estimates that match the chosen scope:
+
+```python
+family_dsr = registry.deflated_sharpe(
+    scope="family", family="crash_flush_e2",
+    returns=periodic_returns,
+    trial_sharpe_mean=family_trial_mean,
+    trial_sharpe_std=family_trial_std,
+)
+global_dsr = registry.deflated_sharpe(
+    scope="global", sharpe_ratio=observed_sharpe,
+    sample_size=n_periods, skewness=return_skew,
+    kurtosis=pearson_kurtosis,
+    trial_sharpe_mean=all_trial_mean,
+    trial_sharpe_std=all_trial_std,
+)
+```
+
+The Sharpe ratio and its trial distribution must use matching unannualized
+periodic return units. Input moments, return dependence, and the chosen
+effective trial count need research review; the count alone does not establish
+independent trials.
 
 The imported `edge_vault/search_ledger.jsonl` contains 4,309 lines, including
 14 rows without `params`. Line count is not DSR N. The importer derives trial N
