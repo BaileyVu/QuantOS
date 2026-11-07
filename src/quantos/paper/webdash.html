@@ -436,6 +436,7 @@ td { padding: 7px 10px; }
 <section class="g" id="mlPanel"></section>
 <section class="g" id="ml1hPanel"></section>
 <section class="g" id="funnel"></section>
+<section class="g" id="shadowPanel" style="padding: 16px 18px;"></section>
 </aside>
 </div>
 
@@ -861,6 +862,16 @@ ${h.top.slice(0, 8).map(bar).join('') || '<div class="mut">no scores yet</div>'}
 ${rows ? `<div style="overflow-x: auto;"><table class="m" style="width: 100%; border-collapse: collapse; font-size: 12px;"><thead><tr><th ${th}>Time UTC</th><th ${th}>Symbol</th><th ${th}>Side</th><th style="text-align: right; font-weight: 500; padding: 4px 6px; color: var(--az-text-muted);">Score</th><th ${th}>Crossed</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="mut" style="font-size: 12px;">No signals yet</div>'}`);
 }
 
+function renderShadow(M) {
+  const s = M.run.shadow || {}, rows = s.groups || [];
+  updateHTML($('shadowPanel'), `<h2 class="h">Shadow counterfactuals</h2>
+<p class="mut">${s.available ? 'Virtual trades · acceptance unverified' : 'No shadow evidence available'}</p>
+<p class="m mut">${Object.entries(s.counts || {}).map(([k,v]) => esc(k) + ': ' + v).join(' · ')}</p>
+<div style="overflow-x:auto"><table class="m" style="width:100%;font-size:12px;text-align:left"><thead><tr><th>Strategy / reason</th><th>n</th><th>Mean bp</th><th>CI90</th><th>Hit</th></tr></thead><tbody>
+${rows.map(r => `<tr><td>${esc(r.strategy)} / ${esc(r.reason)}</td><td>${r.n}</td><td>${r.mean_bp == null ? '—' : r.mean_bp.toFixed(1)}</td><td>${r.ci90_bp == null ? '—' : r.ci90_bp.map(v=>v.toFixed(1)).join(' to ')}</td><td>${r.hit_rate == null ? '—' : (100*r.hit_rate).toFixed(0)+'%'}</td></tr>`).join('')}
+</tbody></table></div>`);
+}
+
 function renderFunnel(M) {
   const c = M.run.counts || {}, rows = [['Signals', c.SIGNAL || 0, 'var(--az-tint-45)'], ['Risk rejected', c.REJECTED_RISK || 0, DN], ['Approved', c.APPROVED || 0, BLU], ['Filled', c.FILLED || 0, UP]];
   const mx = Math.max(1, ...rows.map(r => r[1]));
@@ -1058,7 +1069,7 @@ $('srcs').addEventListener('click', e => { const b = e.target.closest('[data-s]'
 function render() {
   if (!S) return;
   let M; try { M = model(); } catch (e) { console.error(e); return; }
-  const parts = [renderHeader, renderEquity, renderAcct, renderStrats, renderAlerts, renderMl, renderMl1h, renderFunnel, renderTrades, renderCharts, renderSenti, renderLogs];
+  const parts = [renderHeader, renderEquity, renderAcct, renderStrats, renderAlerts, renderMl, renderMl1h, renderFunnel, renderShadow, renderTrades, renderCharts, renderSenti, renderLogs];
   for (const f of parts) { try { f(M); } catch (e) { console.error(f.name, e); } }
 }
 async function getJSON(u) { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }

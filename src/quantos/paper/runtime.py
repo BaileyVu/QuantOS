@@ -73,6 +73,7 @@ def arbitrate(signals, adaptive=None):
 def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, sentiment=None,
              sentiment_fail_closed=False):
     """Identical state transitions for recorded input replay and natural runtime."""
+    for e in engines: shadow_call(e, "advance", now, kind, payload, now)
     if kind == "feed":
         quotes = [v for event, v in payload if event == "quote"]
         healthy = bool(quotes) and all(usable_quote(q, now) for q in quotes)
@@ -139,8 +140,16 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
                                 and proposal.strategy_id in getattr(e.policy, "sentiment_gate", ())):
                             e.journal.event(now, "REJECTED_RISK", {"signal_id": proposal.signal_id, "approved": False,
                                                                    "reason": "SENTIMENT_UNAVAILABLE" if unavailable else "SENTIMENT_BLOCK"})
+                            shadow_call(e, "propose", now, proposal, snapshot.instrument, q, now,
+                                        "SENTIMENT_UNAVAILABLE" if unavailable else "SENTIMENT_BLOCK")
                             continue
-                e.propose(proposal, snapshot.instrument, q, now)
+                oid = e.propose(proposal, snapshot.instrument, q, now)
+                reason = "TAKEN"
+                if oid is None:
+                    row = e.journal.db.execute("SELECT payload FROM events WHERE kind='REJECTED_RISK' "
+                        "AND json_extract(payload,'$.signal_id')=? ORDER BY id DESC LIMIT 1", (proposal.signal_id,)).fetchone()
+                    reason = json.loads(row[0])["reason"] if row else "DUPLICATE_OR_UNAVAILABLE"
+                shadow_call(e, "propose", now, proposal, snapshot.instrument, q, now, reason, oid)
     elif kind == "restart":
         for e in engines:
             e.connected = False
@@ -154,6 +163,21 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
     else:
         raise ValueError(f"unknown input kind: {kind}")
     return False
+
+
+def shadow_call(engine, method, now, *args):
+    book = getattr(engine, "shadow", None)
+    if book is None: return
+    try:
+        getattr(book, method)(*args)
+    except Exception as error:
+        # Evidence failures are visible, but cannot change execution or risk decisions.
+        with engine.journal.transaction():
+            engine.journal.event(now, "SHADOW_ERROR", {"method": method, "error": str(error)})
+        engine.shadow_error = str(error)
+        try: book.close()
+        except Exception: pass
+        engine.shadow = None
 
 
 class Runtime:
@@ -451,6 +475,12 @@ class Runtime:
                     self.instruments[ins.symbol] = ins
                 with j.transaction(): j.event(now, "START" if run["restarts"] == 0 else "RESTART", {"pid": os.getpid()})
             self.record("restart", {}, now)
+            from .shadow import ShadowBook
+            for e in engines:
+                try: e.shadow = ShadowBook(self.state / f"shadow_{e.journal.profile}.db", e, now)
+                except Exception as error:
+                    e.shadow_error = str(error)
+                    with e.journal.transaction(): e.journal.event(now, "SHADOW_ERROR", {"error": str(error)})
             self.watched_symbols.update(o["signal"]["symbol"] for e in engines for o in e.active())
             workers = [threading.Thread(target=self.scanner, daemon=True)] + [
                 threading.Thread(target=self.feed, args=(run["started_ms"], slot), daemon=True)
@@ -489,6 +519,8 @@ class Runtime:
                 with self.instrument_lock:
                     self.watched_symbols = {"BTCUSDC", "ETHUSDC"} | {
                         o["signal"]["symbol"] for e in engines for o in e.active()}
+                    for e in engines:
+                        if getattr(e, "shadow", None): self.watched_symbols.update(e.shadow.symbols())
                 gap = (now-last_wall)/1000
                 if gap > 5 or abs(gap-(mono-last_mono)) > 2:
                     detail = {"worker": "supervisor", "error": "SLEEP_OR_CLOCK_GAP"}
@@ -560,6 +592,8 @@ class Runtime:
                                 engines[0].journal.event(now, "EXCHANGE_RECONCILE_FAILED", result)
                     except Exception as error:
                         alerter.alert("critical", "mirror", f"exchange mirror error: {error}", now)
+                for e in engines:
+                    shadow_call(e, "advance", now, "tick", {"finish": finishing}, now)
                 if (self.state / "KILL").exists() and not killed:
                     killed = True
                     for e in engines: e.kill(now)
@@ -567,6 +601,9 @@ class Runtime:
                 if now-last_status >= STATUS_EVERY_MS:
                     paused = (self.state / "PAUSE").exists()
                     for e in engines: e.manual_pause = paused
+                    for e in engines:
+                        if getattr(e, "shadow_error", None):
+                            alerter.alert("critical", f"shadow:{e.journal.profile}", e.shadow_error, now)
                     stale = {**dict(monitor.stale(now)), **dict(scan_monitor.stale(now))}
                     for name in ("feed", "scan"):
                         if name in stale:
@@ -648,6 +685,8 @@ class Runtime:
                     return 0
         finally:
             self.shutdown.set()
+            for e in locals().get("engines", []):
+                if getattr(e, "shadow", None): e.shadow.close()
             if caffeine is not None:
                 caffeine.terminate()
                 try: caffeine.wait(timeout=2)

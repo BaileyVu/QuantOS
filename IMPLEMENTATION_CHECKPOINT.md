@@ -1,4 +1,25 @@
-## Infrastructure v5 — PR4 integration, 2026-11-07 (LATEST)
+## Infrastructure v5 — PR5 implementation, 2026-11-07 (LATEST)
+
+Active branch codex/infra-shadow-counterfactual. PR4 draft51 published, basePR3.
+PR5 captures every post-arbitration proposal once in shadow_<profile>.db with
+decision reason. Independent PaperEngine SQLite images reuse actual fill, exit,
+fee, funding and adaptive-evidence implementations; taken trades clone exact
+approved order sizing/latency. Portfolio competition is isolated; intrinsically
+invalid/unaffordable signals explicitly UNPRICEABLE (no fabricated returns).
+Shadow-only symbols watched; storage failure disables logger with SHADOW_ERROR
+and critical alert, no main-book/order changes. CLI report and dashboard card
+include n/meanbp/CI90/hit by strategy/reason; taken-book differences reported.
+Main reviewed runtime/accounting integration. Eight new focused tests PASS;
+full454tests12.968s OK(4existing skips), /tmp/quantos-infra-pr5-tests.log.
+No-data report CLI passes; diffcheckPASS. 24h demo acceptance, reconciled-real-fill
+comparison and live-data no-order soak remain UNVERIFIED. No deploy/orders started.
+Next: commit/publish draftPR5 then integrate registry3254755+97b9efc as PR6,
+review DSR/manifest semantics before targeted tests/publication. PR7/8 agents active.
+Last quota61%five-hour,79%weekly left;1banked reset. No owned runtime processes.
+
+---
+
+## Infrastructure v5 — PR4 integration, 2026-11-07 (historical)
 
 PR3 draft50 published: https://github.com/BaileyVu/QuantOS/pull/50,
 source0de3d30 +dae73e8. Final idempotent-void suite23tests0.135s PASS.
