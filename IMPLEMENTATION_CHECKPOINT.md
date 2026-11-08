@@ -1,3 +1,24 @@
+## FINAL quota handoff 2026-11-08 (LATEST)
+PR8 draft55 at788aa97; PR9 draft56 at55a1c23, currentbranch codex/infra-timesfm25-integration.
+510 tests13.767s PASS4skips, /tmp/quantos-infra-pr9-tests.log. ActualpinnedCPU
+syntheticforecast PASS2.573s, /tmp/quantos-timesfm25-synthetic-inference.log.
+Modelvenv QuantOS-infra-timesfm/.venv-timesfm25; cache .hf-home-timesfm25,
+925181104bytes SHA2f776efe6245e42b24bc4153ffdf61810140210e4bd3b01fb21f7aa779ab6ce8.
+Hubpin0.30.2 fixes actualAPIimport; no marketexperiment yet. Bothagentsstopped.
+Exactnext: sourceagent UNCOMMITTED acquire.py/dataset.py BUILDcutoff partialwork
+in QuantOS-infra-sentibot; NOTTESTED/NOTINTEGRATED. Reviewfinishboundary/hashlogic,
+addfocusedtests beforecommit/cherry. Then BUILDexport/preregisteredcomparison.
+NoHELDevaluation/depthfabrication; owneralone deploys24hdemo/72hSentibot.
+Soak4fe48e2-net finishedexit0,648.261seconds, start1794101012610 end1794101660871.
+Final eventcounts below. SQLite final read needs mode=ro&immutable=1 afterclosed
+(noWALfiles), ordinaryrofailed unableopen. Noownedprocessesremain.
+Quota handoff initially17%, now1%fivehour/38%weekly;1bankedunchanged.
+SAMEautomationupdateCONFIRMEDACTIVE13:22Vietnam today, after13:17:05reset.
+Do notrestartbefore reset. Noimplementationafterthreshold; onlysave/soakmonitor.
+[('ALT_DIP_CALIBRATION', 1), ('CONNECTED', 1), ('NO_SIGNAL', 2002), ('OBSERVATION', 607), ('RECONCILED', 1), ('SCAN', 2002), ('SELF_CHECK', 1), ('SKIPPED_STALE_RELEASE', 24), ('START', 1)]
+
+---
+
 ## Infrastructure v5 — PR8 published, PR9 active, 2026-11-08 (LATEST)
 
 PR8 draft55 OPEN https://github.com/BaileyVu/QuantOS/pull/55 at788aa97, stacked
