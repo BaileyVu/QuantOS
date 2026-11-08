@@ -1,3 +1,68 @@
+## STOP AT QUOTA — exact unfinished driver state (LATEST)
+Main sourcecf200a0 pluscheckpointcommitfollows. ModelagentSTOPPED21%fivehour/
+74%weekly,banked0. Noactiveprocesses,NOdriftinference/actualmodelfit.
+Modelagentworktree QuantOS-infra-timesfm branchcodex/infra-ml1h-drift-runner
+base4632c7c plusfithelperbb35f78 (samef1d507b/main72c5c5b). UNCOMMITTED NEW
+src/quantos/paper/research/ml1h_drift_runner.py exists; NOtestfile, NOtestsrun.
+Do NOT run thisdraft. Latestresult-cache/finalizationrefactorunfinished.
+Exactnextafterreset: finish_read_result/_write_result use,cachedfoldsfinalize
+WITHOUTmodelreload; validatefoldrecordschema/coverage, decideinternaltest
+injectionisolation; addfakeendtoendregistration-before-inference/resume/deadline
+checks; mainreview thencommit/integrate/freeze beforeONEactualA/B. Draftalready
+includes49htrailing-originexclusion andwatchdogscaffold butNOTvalidated.
+Sourcearchiveagentfinalstatusfollowswhenavailable. Mainpassivecapturehooks
+fceb531/cf200a0 safelycommittedtested, notruntimewired, preservewhenPR9closes.
+Nextfivehourreset1794192745=Nov9 09:52:25Vietnam; samecontinuation09:58.
+
+---
+
+## Runner and passive capture work — 2026-11-09 morning (LATEST)
+Resume quota verified98%five-hour/86%weekly,banked0. Mainbranch
+codex/infra-timesfm25-integration sourcecf200a0. Widthpilot/exportunchanged.
+Reviewed/integratedf1d507b as72c5c5b frozenfoldscorer;4focusedtests PASS.
+
+Maincapture work (source only, not release-integrated, NOservice changes):
+- fceb531 passive SignedClient observer receives allowedendpoint unsignedparams
+  +decodedresponses beforeerrorhandling, neverheaders/signatures/listenkeys.
+  Deepcopyisolatescallbacks; exceptions preserveoriginalorderoutcomes andmark
+  observation_error. Sentimentactualconsumedline andml1hactualbytes callbacks,
+  UserStream observedbeforebufferloss, alsoisolated.17focusedobserver/clienttests
+  passedbeforeadditionalenginecapturetest.
+- cf200a0 PaperEngine optionalfill_observer emitsoriginalmodelprice+actualquote
+  andabsmodelslippageBEFORE book_real_fills overwritesfills/events.7observer
+  testsPASS includespostcorrectionoriginalpricepreserved. Runtime MUSTbuffer
+  theseobservationsandflushonlycommittedfills; observerisnotwiredyet.
+- AgentInputArchive5df3e54 prepared oncodex/infra-input-audit in
+  QuantOS-infra-sentibot, NOTintegrated. Mainfoundthreadrace storingbloboutside
+  lock; agentfixing withclosed-no-write/rootpreservation/nan rejection tests.
+  Archivecontentmustpersist exactbytes, hash-onlyisinsufficient.
+- Recorderlifecycle/runtimeCLI/initial+finaljournalsnapshot/windowfirst20fills
+  or3days/seededreplay/pertradecomparison NOTimplemented. Noacceptanceclaim.
+  Preservefceb531+cf200a0 as separatecommits forPR7/release: theycurrentlylive
+  ontopPR9stack; MUST move/retain inacceptedinfraPR before anyPR9closure.
+
+Modelagent implementing ml1h_drift_runner.py inQuantOS-infra-timesfm,
+newcodexbranch (inspectlatestagentstatus), NOTintegrated/run. Mainreviewed
+initialsourceandrequested: pinnedlightgbm4.6.0 not4.7; exclude last49origins
+withoutBUILDlabels; no globalmodulemutationfortestinjection; strictfoldcoverage
++cachedreporthashvalidation; completedfoldsfinalizewithoutmodelreload; independent
+harddeadlinewatchdogsinceSIGALRMmaywaitonCcode. Agenttests/commitpending.
+Existing16x15311export andpinnedoverlay/weights ready; NOdriftinference/actualfit.
+Atlatestusage28%fivehour/75%weekly,reset1794192745 (Nov9 09:52:25Vietnam).
+Stopnewworknear20%; checkpointagentfinalstatus, updateSAMEcontinuation09:58.
+Noactiveownedprocesses. Do not reexport/redownload/repeatpassingtests.
+
+---
+
+## Final quota verification (LATEST)
+Saved/pushed head4632c7c to existingPR56. Finalallowance13%fivehour/86%weekly,
+ZERO bankedresets. No implementation resumed after22%checkpoint; wrapup committed
+safe work andupdatedPR. ResetNov9 04:49:36Vietnam; samecontinuationconfirmed04:55.
+Next: reviewf1d507b, IMPLEMENT missingrunner (no draftexists), freeze/test/mainreview
+beforeONEactualdriftA/B. Bothagentsidle/noownedprocess. No export/inference repeats.
+
+---
+
 ## Final runner status clarification (LATEST)
 Validationagent stopped before starting orchestration: NO ml1h_drift_runner.py
 exists, no draft or commit. Ownbranchcodex/infra-timesfm-drift remainsf1fc61d,
