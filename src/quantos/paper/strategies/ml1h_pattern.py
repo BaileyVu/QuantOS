@@ -18,8 +18,9 @@ class Ml1hPatternStrategy:
     strategy_id = "ml1h_pattern"
     version = "0.1.0"
 
-    def __init__(self, path: str = PATH):
+    def __init__(self, path: str = PATH, input_observer=None):
         self.path, self._mtime, self._data = path, None, {}
+        self.input_observer, self.observation_error = input_observer, None
 
     def _signals(self):
         try:
@@ -28,7 +29,13 @@ class Ml1hPatternStrategy:
             return {}
         if m != self._mtime:
             try:
-                self._data, self._mtime = json.load(open(self.path)), m
+                # Preserve the exact bytes consumed; an independent polling
+                # read could observe a different producer version.
+                with open(self.path, "rb") as source: raw = source.read()
+                if self.input_observer is not None:
+                    try: self.input_observer("ml1h", raw, None)
+                    except Exception as exc: self.observation_error = type(exc).__name__
+                self._data, self._mtime = json.loads(raw), m
             except (OSError, ValueError):
                 return {}
         return self._data

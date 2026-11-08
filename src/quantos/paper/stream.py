@@ -212,12 +212,14 @@ class UserStream:
     KEEPALIVE_MS = 30 * 60_000
 
     def __init__(self, client, host: str | None = None, connect: Callable = WebSocket,
-                 clock_ms: Callable[[], int] = lambda: int(time.time() * 1000), on_event: Callable = None):
+                 clock_ms: Callable[[], int] = lambda: int(time.time() * 1000), on_event: Callable = None,
+                 input_observer=None):
         self.client, self.host, self.connect, self.clock_ms = client, host or client.ws_host, connect, clock_ms
         self.on_event = on_event or (lambda kind, detail: None)
         self.lock = threading.Lock()
         self.events, self.up, self.down_since = [], False, None
         self.messages = self.reconnects = 0
+        self.input_observer, self.observation_error = input_observer, None
 
     def drain(self) -> list:
         with self.lock:
@@ -230,6 +232,9 @@ class UserStream:
         if msg.get("e") == "listenKeyExpired":
             raise ConnectionError("listenKey expired")
         if msg.get("e") in ("ORDER_TRADE_UPDATE", "ACCOUNT_UPDATE"):
+            if self.input_observer is not None:
+                try: self.input_observer(json.loads(json.dumps(msg)), self.clock_ms())
+                except Exception as exc: self.observation_error = type(exc).__name__
             with self.lock:
                 self.events.append(msg)
                 del self.events[:-1000]  # bounded if nobody drains

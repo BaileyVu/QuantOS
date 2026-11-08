@@ -29,14 +29,19 @@ def _last_line(path: Path) -> str | None:
 
 
 class SentimentShadow:
-    def __init__(self, path: Path | None):
+    def __init__(self, path: Path | None, input_observer=None):
         self.path = Path(path).expanduser() if path else None
+        self.input_observer, self.observation_error = input_observer, None
 
     def read(self, now_ms: int) -> dict:
         if self.path is None:
             return {"available": False, "reason": "NOT_CONFIGURED"}
         try:
-            row = json.loads(_last_line(self.path) or "null")
+            text = _last_line(self.path)
+            if self.input_observer is not None:
+                try: self.input_observer("sentiment", (text or "").encode(), now_ms)
+                except Exception as exc: self.observation_error = type(exc).__name__
+            row = json.loads(text or "null")
             if not isinstance(row, dict): raise ValueError("invalid sentiment record")
             parsed = datetime.fromisoformat(row["time"])
             if parsed.tzinfo is None: raise ValueError("sentiment time needs an explicit timezone")
