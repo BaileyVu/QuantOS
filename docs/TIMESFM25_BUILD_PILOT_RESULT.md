@@ -40,6 +40,12 @@ execution/depth evidence, no transaction-cost or profitability conclusion, and
 unverified overlap between the foundation-model training corpus and these
 historical targets. The result does not pass L2 or L3.
 
+The archive index includes 2021-12-31 so the candle closing at 2022-01-01
+00:00 UTC is available. The exported model input itself contains only the
+exact declared 2022 close timestamps. An independent read-only audit verified
+all 1,029 origins, target boundaries and the progress hash chain. The local
+registry contains nine preregistered variants and three width-result records.
+
 ## Reproducibility
 
 - Source commit: `06f5b4f36ae59879a4676cf284eb925f6d89f0ee`.

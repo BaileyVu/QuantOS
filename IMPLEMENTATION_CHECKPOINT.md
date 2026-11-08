@@ -1,3 +1,18 @@
+## Pilot audit and pending owner decisions (LATEST)
+Completedactualpilot independentlyauditedread-only:1029validhashchainedorigins,
+0missing/duplicate/unknown/targetboundarymismatch;9registeredvariants/3results.
+CPUmodel/dependencies/data/source bindings verified. No replay/inference rerun.
+SourceindexincludesDec31 2021only toprovideJan1close; actualinput8760hours2022.
+Acceptance matrix docs/INFRA_V5_ACCEPTANCE.md recordsremainingwork honestly.
+Ownerquestionspending: (1)newforwarddemowithtrades replaceoriginalpD missingcontext
+acceptance? (2)applyTimesFMkillrule now orcontinueuntestedml1h/filterarms? Noanswer
+assumed. Do not mark taskcomplete. Bothagentsidle,noownedprocesses.
+Next independentstep: preparefinalowner-selectedsnapshot/soak/rollback bundle;
+owneralone merges/deploys. Actual24h/72hacceptancecannotbeclaimedfromtests oronecycle.
+Lastusage80%fivehour/4%weekly,banked1; checkweeklybeforefurtherwork, resetonlyat0.
+
+---
+
 ## ACTUAL TIMESFM PILOT COMPLETE — 2026-11-08 (LATEST)
 run-v1 completedexit0,137.686s,PID23064/execsession72239 finished. Noownedprocess.
 3symbols×343origins=1029 forecasts saved; do NOT rerunforecasts/bootstrap/export.
