@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 import math
+import numbers
 from typing import Sequence
 
 SOURCE_RUN_SHA256 = "5a6470bfb28848ea31e21e7a821a7b69db410f63acf332262b2e7245253f6577"
@@ -63,7 +64,7 @@ def extract_features(timestamp_ms: Sequence[int], opens: Sequence[float],
     n = len(timestamp_ms)
     if any(len(column) != n for column in columns):
         raise ValueError("hourly timestamp/OHLCV columns must have equal lengths")
-    if any(isinstance(t, bool) or not isinstance(t, int) or t < 0 for t in timestamp_ms):
+    if any(isinstance(t, bool) or not isinstance(t, numbers.Integral) or t < 0 for t in timestamp_ms):
         raise ValueError("timestamps must be nonnegative integer milliseconds")
     if any(right <= left for left, right in zip(timestamp_ms, timestamp_ms[1:])):
         raise ValueError("timestamps must be strictly increasing")

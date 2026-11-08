@@ -31,3 +31,29 @@ module. Do not use the historical loader or its outcomes as the new augmentation
 runner; it accesses protected raw paths and calculates labels before period
 selection. Main must preregister and implement the BUILD-only walk-forward and
 unchanged L2 cost evaluation separately.
+
+## Fixed-fold score helper
+
+`ml1h_walkforward.walk_forward_scores` accepts aligned `baseline` and
+`augmented` feature matrices, LONG/SHORT binary targets, target `label_end_ms`,
+an explicit `dataset_start_ms`, and a strict `build_end_exclusive_ms`. It creates
+one LONG and one SHORT classifier per feature arm. The first test quarter follows
+four elapsed calendar quarters from the explicit dataset start (the final prior
+quarter is reserved for calibration); model-fit labels must end strictly before
+calibration starts, and calibration labels strictly before test starts. Fit and
+calibration exclude NaN labels. Both classes must exist or the fold fails closed.
+Thresholds are the linear-interpolated 98th percentile of preceding-quarter
+calibration probabilities; calibration labels do not determine the threshold.
+
+Rows with any nonfinite feature in either arm are removed from both arms so
+baseline and augmented results remain paired, including origins where TimesFM
+context/forecast features are unavailable. Test targets are not read for scoring.
+Pass `quarters={"2022Q4"}` to process one completed fold per call and persist its
+`FoldScores` via `fold_callback`; this lets an external runner resume by skipping
+already completed quarter calls. Scores align with `result.fold.test_indices`.
+The helper does not turn scores into positions or apply fees/slippage; main-owned
+label-end filters and L2 accounting remain downstream responsibilities.
+
+The lazy LightGBM factory freezes 200 trees, 31 leaves, learning rate 0.05,
+minimum child samples 500, subsample 0.7/frequency 1, column sample 0.8, two
+threads, and seed 17. No model has been fit by this feature/helper implementation.
