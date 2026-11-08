@@ -1,3 +1,33 @@
+## Infrastructure v5 — PR8 collector review, 2026-11-08 (LATEST)
+
+Resumed after recorded reset; initial usage88%five-hour/52%weekly, one banked
+reset remains. Reused both existing lower-cost agents (no nested agents).
+Active branch codex/infra-sentibot-integration. Integrated44055cf as8fb3736;
+main collector review committed immediately before this checkpoint. Fixed normal
+CLI Jina now=None discard; availability measured after scoring; reject nonfinite/
+naive/future publication dates; correct RFC timezone; exact dynamically enumerated
+USDC margin/quote perpetual universe with explicit fallback; POSIX hard600s
+collection deadline includes DNS/slow reads and escapes broad source catches.
+Cadence900s includes collection duration. Focused30tests0.067s PASS afterfix;
+prior failure was stale fake name expectation exposed by exact universe, fixed
+lookup retains known aliases. git diff --check PASS.
+
+NEXT: integrate sourceagent snapshot/plist preparation commit, review/update README,
+publish PR8 draft; run updated immutable no-order >=10min soak with READ-ONLY
+QUANTOS_ML1H_SIGNALS=/Users/bailey12/Library/Application Support/ml1h/app/signals.json
+(confirmed existing/fresh metadata; prior soak missing env causedcriticalalert).
+Never deploy/restartexistingservices. PR8 three-day owner-deployed acceptance pending.
+PR9 agent preparing variance/alignment/model identity corrections atopfa9febc and
+separate pinned CPUvenv; no data selection authorized on2025+. Main finishintegrate
+and actualmanifestedBUILD experiment planning. Existing historicalpD replay remains
+incomplete; turtle/volsqueezeL2,24hdemo and3dayacceptance NOTPASSED.
+Active owned runtime processes NONE; agents working independent helper/research.
+Latest observedusage79%fivehour/51%weekly; reset1794118625, banked1. Automation
+still08:18Vietnam daily; update SAME at20%threshold afternewreset. No passing
+fullsuite/research/ledgerimport repeats. Prior evidence below retained.
+
+---
+
 ## Infrastructure v5 — PR8 review checkpoint, 2026-11-08 (LATEST)
 
 PR7 draft54 published https://github.com/BaileyVu/QuantOS/pull/54 at965168b.
