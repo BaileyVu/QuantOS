@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 from quantos.paper.research.timesfm_drift import (
     CONTEXT, HOUR_MS, MAX_TIMEOUT_SECONDS, drift_features, generate,
-    plan_document, read_progress, validate_bars,
+    output_lock, plan_document, read_progress, validate_bars,
 )
 from quantos.paper.research.timesfm_experiment import BUILD_START_MS, Forecast
 
@@ -62,6 +62,8 @@ class TimesfmDriftTest(unittest.TestCase):
         self.assertNotEqual(first["audit_sha256"], second["audit_sha256"])
         with self.assertRaises(ValueError):
             plan_document(**{**kwargs, "timeout_seconds": MAX_TIMEOUT_SECONDS + 1}, source={}, created_at=0)
+        with self.assertRaisesRegex(ValueError, "deadline"):
+            plan_document(**kwargs, source={}, created_at=100, deadline_epoch=86_501)
 
     def test_generate_resumes_without_repeating_completed_origins(self):
         data = bars(514)
@@ -76,7 +78,7 @@ class TimesfmDriftTest(unittest.TestCase):
             second = generate(data, never, output_dir=output, symbol="BTCUSDT",
                               manifest_sha256="b" * 64, source={"commit": "b", "source_sha256": "src"},
                               dependencies={"torch": "synthetic"}, timeout_seconds=100,
-                              clock=Mock(side_effect=[102.0, 102.1, 102.1]))
+                              clock=Mock(side_effect=[201.0]))
             never.assert_not_called()
             self.assertEqual(first, second)
             plan = json.loads((output / "drift_plan.json").read_text())
@@ -85,6 +87,14 @@ class TimesfmDriftTest(unittest.TestCase):
                                                    expected={r["origin_ms"] for r in first})
             self.assertEqual(len(completed), 3)
             self.assertGreater(elapsed, 0)
+
+    def test_writer_lock_is_exclusive_and_nonblocking(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "run"
+            with output_lock(output):
+                with self.assertRaisesRegex(RuntimeError, "another drift writer"):
+                    with output_lock(output):
+                        pass
 
     def test_changed_identity_tamper_and_duplicate_origin_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

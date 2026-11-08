@@ -10,9 +10,11 @@ import hashlib
 import json
 import math
 import os
+import fcntl
 from pathlib import Path
 import time
 from typing import Callable, Sequence
+from contextlib import contextmanager
 
 from .registry import canonical_json, sha256_bytes
 from .timesfm_experiment import BUILD_END_MS, BUILD_START_MS, HOUR_MS
@@ -75,7 +77,8 @@ def drift_features(prefix: Sequence[tuple[int, float]], predictor: Callable) -> 
 
 def plan_document(*, symbol: str, manifest_sha256: str, source: dict,
                   dependencies: dict, timeout_seconds: int = MAX_TIMEOUT_SECONDS,
-                  created_at: float | None = None) -> tuple[dict, str]:
+                  created_at: float | None = None,
+                  deadline_epoch: float | None = None) -> tuple[dict, str]:
     """Build immutable provenance identity and a persisted absolute deadline."""
     if not symbol or not isinstance(symbol, str):
         raise ValueError("symbol is required")
@@ -84,6 +87,9 @@ def plan_document(*, symbol: str, manifest_sha256: str, source: dict,
     if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int) or not 1 <= timeout_seconds <= MAX_TIMEOUT_SECONDS:
         raise ValueError("timeout_seconds must be in [1, 86400]")
     created = time.time() if created_at is None else _finite(created_at, "created_at")
+    deadline = created + timeout_seconds if deadline_epoch is None else _finite(deadline_epoch, "deadline_epoch")
+    if not created < deadline <= created + min(timeout_seconds, MAX_TIMEOUT_SECONDS):
+        raise ValueError("deadline must be after start and within 86400 seconds")
     plan = {
         "protocol": "timesfm25_ml1h_drift_v1", "symbol": symbol,
         "manifest_sha256": manifest_sha256,
@@ -94,7 +100,7 @@ def plan_document(*, symbol: str, manifest_sha256: str, source: dict,
                   "weights_sha256": WEIGHTS_SHA256, "device": "cpu"},
         "source": source, "dependencies": dependencies,
         "timeout_seconds": timeout_seconds, "created_at_epoch": created,
-        "deadline_epoch": created + timeout_seconds,
+        "deadline_epoch": deadline,
     }
     identity = json.loads(canonical_json(plan))
     # HEAD is audit metadata; identical relevant source bytes remain resumable.
@@ -121,14 +127,33 @@ def persist_plan(output: Path, document: dict) -> dict:
         expected, _ = plan_document(
             symbol=saved.get("symbol"), manifest_sha256=saved.get("manifest_sha256"),
             source=saved.get("source"), dependencies=saved.get("dependencies"),
-            timeout_seconds=saved.get("timeout_seconds"), created_at=saved.get("created_at_epoch"))
+            timeout_seconds=saved.get("timeout_seconds"), created_at=saved.get("created_at_epoch"),
+            deadline_epoch=saved.get("deadline_epoch"))
         if (expected != existing or existing["plan_sha256"] != document["plan_sha256"]):
             raise ValueError("output directory belongs to a different or tampered frozen plan")
         return existing
-    if any(output.iterdir()):
+    if any(item.name != ".drift.lock" for item in output.iterdir()):
         raise ValueError("refusing nonempty output without a matching drift plan")
     target.write_text(json.dumps(document, sort_keys=True, allow_nan=False, indent=2) + "\n", encoding="utf-8")
     return document
+
+
+@contextmanager
+def output_lock(output: Path):
+    """Acquire a nonblocking exclusive lock on one output directory."""
+    output = Path(output)
+    if output.exists() and not output.is_dir():
+        raise ValueError("output-dir must be a directory")
+    output.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(output / ".drift.lock", os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError("another drift writer holds the output lock") from None
+        yield
+    finally:
+        os.close(descriptor)
 
 
 def _record(payload: dict, previous: str) -> dict:
@@ -176,43 +201,53 @@ def generate(bars: Sequence[tuple[int, float]], predictor: Callable, *,
              output_dir: str | Path, symbol: str, manifest_sha256: str,
              source: dict, dependencies: dict,
              timeout_seconds: int = MAX_TIMEOUT_SECONDS,
+             created_at_epoch: float | None = None,
+             deadline_epoch: float | None = None,
              clock: Callable[[], float] = time.time) -> list[dict]:
     """Generate causal features; resumes exact completed origins only.
 
     Deadline is absolute in the frozen plan and elapsed time is persisted with
-    every row. A predictor call already in progress cannot be interrupted.
+    every row. Supply one shared created_at_epoch/deadline_epoch pair when
+    coordinating multiple symbol outputs. A predictor call already in progress
+    cannot be interrupted.
     """
     rows = validate_bars(bars)
     if len(rows) < CONTEXT:
         return []
     origins = {rows[i][0] for i in range(CONTEXT - 1, len(rows))}
-    doc, plan_hash = plan_document(symbol=symbol, manifest_sha256=manifest_sha256,
-                                   source=source, dependencies=dependencies,
-                                   timeout_seconds=timeout_seconds, created_at=clock())
     output = Path(output_dir)
-    saved = persist_plan(output, doc)
-    # A resume uses the original deadline and elapsed clock accounting.
-    plan = saved["plan"]
-    progress = output / "drift_progress.jsonl"
-    completed, tail, elapsed_before = read_progress(progress, plan_hash=plan_hash, expected=origins)
-    started = clock()
-    if clock() >= plan["deadline_epoch"]:
-        raise TimeoutError("persisted drift experiment deadline has expired")
-    output_rows = []
-    for index in range(CONTEXT - 1, len(rows)):
-        ts = rows[index][0]
-        cached = completed.get(ts)
-        if cached is None:
-            if clock() >= plan["deadline_epoch"]:
-                raise TimeoutError("drift experiment deadline reached")
-            feature = drift_features(rows[index - CONTEXT + 1:index + 1], predictor)
-            elapsed = elapsed_before + max(0.0, clock() - started)
-            entry = _record({"plan_sha256": plan_hash, "origin_ms": ts,
-                             "features": feature, "elapsed_seconds": elapsed}, tail)
-            with progress.open("ab") as handle:
-                handle.write((canonical_json(entry) + "\n").encode())
-                handle.flush(); os.fsync(handle.fileno())
-            tail = entry["record_sha256"]
-            completed[ts] = {"features": feature, "elapsed_seconds": elapsed}
-        output_rows.append(completed[ts]["features"])
-    return output_rows
+    with output_lock(output):
+        plan_start = clock() if created_at_epoch is None else created_at_epoch
+        doc, plan_hash = plan_document(
+            symbol=symbol, manifest_sha256=manifest_sha256, source=source,
+            dependencies=dependencies, timeout_seconds=timeout_seconds,
+            created_at=plan_start, deadline_epoch=deadline_epoch)
+        saved = persist_plan(output, doc)
+        plan = saved["plan"]
+        progress = output / "drift_progress.jsonl"
+        completed, tail, elapsed_before = read_progress(progress, plan_hash=plan_hash, expected=origins)
+        # A complete cache is valid output even after its generation deadline.
+        if set(completed) == origins:
+            return [completed[rows[i][0]]["features"] for i in range(CONTEXT - 1, len(rows))]
+        if clock() >= plan["deadline_epoch"]:
+            raise TimeoutError("drift experiment deadline has expired")
+        started = clock()
+        output_rows = []
+        for index in range(CONTEXT - 1, len(rows)):
+            ts = rows[index][0]
+            cached = completed.get(ts)
+            if cached is None:
+                if clock() >= plan["deadline_epoch"]:
+                    raise TimeoutError("drift experiment deadline reached")
+                feature = drift_features(rows[index - CONTEXT + 1:index + 1], predictor)
+                elapsed = elapsed_before + max(0.0, clock() - started)
+                entry = _record({"plan_sha256": plan_hash, "origin_ms": ts,
+                                 "features": feature, "elapsed_seconds": elapsed}, tail)
+                with progress.open("ab") as handle:
+                    handle.write((canonical_json(entry) + "\n").encode())
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                tail = entry["record_sha256"]
+                completed[ts] = {"features": feature, "elapsed_seconds": elapsed}
+            output_rows.append(completed[ts]["features"])
+        return output_rows
