@@ -8,6 +8,11 @@ from quantos.paper.sentiment import SentimentShadow
 from quantos.paper.strategies.ml1h_pattern import Ml1hPatternStrategy
 from quantos.paper.stream import UserStream
 from tests.unit.live_fakes import Fake, KEYS
+from quantos.paper.engine import PaperEngine
+from quantos.paper.journal import Journal
+from quantos.paper.risk import Policy
+from quantos.paper.types import D, Trade
+from tests.unit.test_thin_book import T, INS, signal, quote
 
 
 class ObserverTests(unittest.TestCase):
@@ -67,6 +72,23 @@ class ObserverTests(unittest.TestCase):
         stream = UserStream(Client(), input_observer=observe)
         stream.handle(json.dumps({'e':'ORDER_TRADE_UPDATE', 'o':{'t': 19}}))
         self.assertEqual(stream.drain()[0]['o']['t'], 19)
+
+    def test_model_fill_is_preserved_before_real_book_correction(self):
+        with tempfile.TemporaryDirectory() as folder:
+            journal = Journal(Path(folder)/'journal.db', 'p1')
+            observed = []
+            try:
+                engine = PaperEngine(journal, Policy(), fill_observer=observed.append)
+                engine.recover(T); engine.connection(True, T)
+                oid = engine.propose(signal(), INS, quote(), T)
+                engine.trade(Trade('AAVEUSDC', 1, T+1000, D('99.99'), D(1000), True), T+1000)
+                self.assertEqual(len(observed), 1)
+                original = observed[0]['model_price']
+                engine.book_real_fills(oid, T+2000, entry=(D('100.07'), None))
+                self.assertEqual(observed[0]['model_price'], original)
+                self.assertNotEqual(original, '100.07')
+                self.assertIsNone(engine.observation_error)
+            finally: journal.close()
 
 
 if __name__ == '__main__': unittest.main()

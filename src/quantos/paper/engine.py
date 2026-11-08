@@ -7,7 +7,7 @@ from decimal import InvalidOperation
 
 from .journal import Journal
 from .risk import portfolio_risk_caps, Account, Policy, evaluate, usable_quote, valid_quote, quantity_step
-from .types import D, Funding, Instrument, Quote, Signal, Trade, floor_step
+from .types import D, Funding, Instrument, Quote, Signal, Trade, floor_step, dumps
 from .strategies.manifest import manifest_for
 from .stop_cost import price_stop
 
@@ -42,7 +42,8 @@ class PaperEngine:
     latency_ms = 500
     participation = D(".01")
 
-    def __init__(self, journal: Journal, policy: Policy, faults: Faults | None = None, adaptive=None):
+    def __init__(self, journal: Journal, policy: Policy, faults: Faults | None = None, adaptive=None,
+                 fill_observer=None):
         if faults is not None and journal.get("identity")["evidence"] != "synthetic":
             raise ValueError("fault injection is synthetic-only")
         self.journal, self.policy = journal, policy
@@ -50,6 +51,7 @@ class PaperEngine:
         self.faults = faults or Faults()
         self.quotes: dict[str, Quote] = {}
         self.connected = False
+        self.fill_observer, self.observation_error = fill_observer, None
         if (journal.profile == "pR") != policy.candidates_enabled:
             raise ValueError("research policy requires a separate pR journal")
         if policy.candidates_enabled:
@@ -62,6 +64,18 @@ class PaperEngine:
 
     def active(self):
         return [o for o in self.journal.orders() if o["state"] not in TERMINAL]
+
+    def _observe_model_fill(self, o, fill_id, kind, quantity, price, now_ms, reference, quote=None):
+        if self.fill_observer is None:
+            return
+        try:
+            self.fill_observer({"profile": self.journal.profile, "order_id": o["id"],
+                "fill_id": fill_id, "kind": kind, "symbol": o["signal"]["symbol"],
+                "time_ms": now_ms, "quantity": str(quantity), "model_price": str(price),
+                "reference_price": str(reference), "modeled_slippage_abs": str(abs(price-reference)),
+                "quote": json.loads(dumps(asdict(quote))) if quote is not None else None})
+        except Exception as exc:
+            self.observation_error = type(exc).__name__
 
     def entry_allowed(self):
         # exchange_hold: the live mirror's soft pause while the exchange is unreachable (in memory only).
@@ -368,6 +382,10 @@ class PaperEngine:
             self._protect(o, now_ms)
         self.journal.save(o)
 
+        q = self.quotes.get(o["signal"]["symbol"])
+        reference = price if maker or q is None else (q.ask if D(o["direction"]) > 0 else q.bid)
+        self._observe_model_fill(o, fill_id, "ENTRY", quantity, price, now_ms, reference, q)
+
     def trade(self, trade: Trade, now_ms):
         if (not self.entry_allowed() or not 0 <= now_ms - trade.time_ms <= 5000
                 or not trade.price.is_finite() or trade.price <= 0):
@@ -442,6 +460,8 @@ class PaperEngine:
         sid = o["signal"]["strategy_id"]
         streaks[sid] = streaks.get(sid, 0) + 1 if pnl - fee < 0 else 0
         self.journal.set("loss_streaks", streaks)
+        self._observe_model_fill(o, o["id"]+":EXIT", "EXIT", quantity, price, now_ms,
+                                 q.bid if side > 0 else q.ask, q)
 
     def void_entry(self, order_id, now_ms, reason):
         """The exchange never opened this position: drop its paper fills so cash and P&L match Binance."""
