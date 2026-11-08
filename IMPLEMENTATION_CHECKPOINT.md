@@ -1,3 +1,19 @@
+## Agent final status clarification (LATEST)
+Modelagent replacement timesfm_volatility.py IS PRESENT (earlierdeletedstatus was
+midwrite), modifiedUNCOMMITTED/UNTESTED in QuantOS-infra-timesfm on
+codex/infra-timesfm-protocol. registry.py modifiedonly optionalseries metadata
+argument tocreate_dataset_manifest. No alternate/temp source. Bothagentsstopped;
+noownedprocessesstartedbyagent. No modelinference/realcomparison yet.
+Exactnext: reviewrunner; fix resumeidentity currentlyincludesgitHEAD (mustaccept
+checkpoint-onlycommits whenrelevantsourcehashesunchanged); completedresume currently
+synthesizesdifferentmodelmetadata causing reportmismatch. Addfocused strictseries/
+fullcoverage/logwidth/cachehashchain/duplicate-unknownorigin/planmismatch/resume-
+skip/bootstrapdeterminism n<14 tests. Then affectedtests, commit/integrate/mainreview.
+Do not runthisunfinishedrunner. Savedexport andpinnedmodelcache remainvalid.
+SAMEcontinuationconfirmed18:32Vietnam after18:26:52reset; owneralone merges/deploys.
+
+---
+
 ## Quota handoff 2026-11-08 afternoon (LATEST)
 Current mainHEAD ea39660, codex/infra-timesfm25-integration; PR56 sourceupdates
 ready to push. Allcompletedsource safelycommitted. At21%fivehour/26%weekly,
