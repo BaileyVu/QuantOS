@@ -1,3 +1,51 @@
+## Infrastructure v5 — PR8 published, PR9 active, 2026-11-08 (LATEST)
+
+PR8 draft55 OPEN https://github.com/BaileyVu/QuantOS/pull/55 at788aa97, stacked
+onPR54. Sourcecollector4fe48e2, helper14b2e56+review788aa97: lexicalvenvPython,
+refuseLaunchAgents/symlinks, newstate/plist only, fullSHA clean snapshot. Tests
+30collector/report/input/resolverPASS +4helperPASS. No existingserviceschanged.
+
+Active branch codex/infra-timesfm25-integration; PR9 bf5a695+835f32b integrated,
+main6757574 adds manifest-bound BUILD-only 24h volatilitycomparison runner.
+Plan is registered beforeinference, noHELDevaluation. Synthetic12testsPASS,
+final3runner testsPASS, help/diffcheckPASS. Runnerexpects pendingagent loader
+(timesfm_model.load_model), notyet runnable with realweights. PR9 notpublished.
+Sourceagent adding safeBUILD-cutoff to existingdatasetreader (beforearchiveopen);
+modelagent installing separatepinnedCPUvenv/cache +explicit2.5loader. Main owns
+review. No actualBUILD modelcomparison/ml1hwalkforward/L2/L3 result yet.
+
+Currentownedprocess: isolatedreal-entrypoint live-data NOORDER soak immutable
+4fe48e2 in QuantOS-infra-soak-4fe48e2, state/tmp/quantos-infra-soak-4fe48e2-net,
+log samepath+.log, PID76929, execsession38513. Started1794101012610;
+deadline1794101660610 (648s). Correctreadonly QUANTOS_ML1H_SIGNALS path supplied,
+baselinesentimentfile readonly. First224observations/819scans, startupselfcheck
+allOK, zeroERROR/SHADOW_ERROR/ALERT; NOTfinalpassyet. Earlier sandbox-onlyattempt
+/tmp/quantos-infra-soak-4fe48e2 failedpublicAPI (3ERROR), stoppedourPID76519,
+exit0session14751closed. Nevererasefailedrecordorclaimpass.
+Sentibot isolatedonecycle immutable4fe48e2 COMPLETEDexit0session50311closed:
+/tmp/quantos-sentibot-4fe48e2/reach_shadow.jsonl, log sameparent+.log. Duration
+66.169s,10events,38eligibleUSDCcontracts,12queried (explicitpartialcoverage),
+Reddit160posts, Jina0/8fulltext success UNVERIFIED. No72hrun/deployment.
+
+Metadata-only dataaudit: existing QuantOS/data/portfolio/manifests/train_2021-10-01_to_2024-12-31.json
+SHAe3464f95f66e438c42c78c30187dd639da74014d25fce6b22c60bfe2ac551810;
+daily_repairs_2021-10-01_to_2024-12-31.json SHA8fbb13eadcfa148c6479d444b7a2a3edf14811a35f3a53fb5afaa2e3c85cee9f.
+29survivorUSDTproxy symbols, hourlyklines/marks/funding, BUILD21months609partitions
+perdataset; completeoverlay fixes1200klinehours/1608markhours. NOdeptharchive or
+historicalUSDCavailability/provenance. SupportsTimesFMcandlecomparison oncecutoff
+reviewed, NOT fullUSDCexecutionL2 acceptance. Do not rerunmetadatascan. Indexdefault
+readsHELD2023H2–2024; agent adds explicitBUILDonly option before anynewindexrun.
+ActualhistoricalpDparity remainsincompletecapture; noinventeddepth/prelistingdata.
+
+NEXT: follow currentsoak tocompletion; integrate/review modelagentloader andBUILD
+cutoff separately, runaffectedtests, publishPR9draft, then actualBUILDexport and
+preregisteredcomparison. Owner-alone deployments remainneededfor24hdemo and72h
+Sentibotacceptance. Latestusage39%five-hour/44%weekly,1banked; reset1794118625.
+At20%save/checkpoint and updateSAMEcontinuation afterverifiedreset; currentlydaily
+08:18Vietnam. No additionalresetused. Prior evidence retainedbelow.
+
+---
+
 ## Infrastructure v5 — PR8 collector review, 2026-11-08 (LATEST)
 
 Resumed after recorded reset; initial usage88%five-hour/52%weekly, one banked
