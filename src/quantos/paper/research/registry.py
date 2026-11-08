@@ -439,6 +439,29 @@ class ResearchRegistry:
             self.db.execute("INSERT OR IGNORE INTO variant_aliases VALUES(?,?)", (key, variant_id.strip()))
         return key
 
+    def record_observation(self, variant_key: str, *, period: str,
+                           stats: dict, source_path: str | Path) -> bool:
+        """Record a manifested variant's non-trade research result idempotently.
+
+        Forecast errors remain forecast errors; callers need not invent a trade
+        count or Sharpe ratio to use the same experiment registry.
+        """
+        if not isinstance(period, str) or not period.strip():
+            raise ValueError("period must be a nonempty string")
+        if not isinstance(stats, dict) or not stats:
+            raise ValueError("stats must be a nonempty object")
+        if self.db.execute("SELECT 1 FROM variants WHERE variant_key=?", (variant_key,)).fetchone() is None:
+            raise ValueError("observation requires a registered variant")
+        stats_json = canonical_json(stats)
+        result_hash = sha256_bytes(canonical_json({"period": period.strip(), "stats": stats}).encode())
+        source_hash = sha256_file(source_path)
+        with self.db:
+            cur = self.db.execute("""INSERT OR IGNORE INTO results
+                (variant_key,period,period_class,stats_json,result_hash,source_sha256,source_line)
+                VALUES(?,?,?,?,?,?,?)""", (variant_key, period.strip(), _period_class(period),
+                                         stats_json, result_hash, source_hash, 0))
+        return cur.rowcount == 1
+
     def trial_counts(self, family: str | None = None) -> dict[str, int | str | None]:
         """Return family/global registry N and the separate historical CCI count.
 
