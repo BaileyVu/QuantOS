@@ -17,7 +17,7 @@ START_MS = 1_640_995_200_000  # 2022-01-01 00:00 UTC, completed close boundary
 END_MS = 1_672_531_200_000    # 2023-01-01 00:00 UTC, exclusive
 HOUR_MS = 3_600_000
 BASE_SHA = "e3464f95f66e438c42c78c30187dd639da74014d25fce6b22c60bfe2ac551810"
-OVERLAY_SHA = "8fbb13eadcfa148c6479d444b7a2a3edf14811a35f3a53fb5afaa2e3c85cee9f"
+OVERLAY_SHA = "8fbb13eadcfa148c6479d444b7a2a3edf14811a35f3a53fb5afaa3e2c85cee9f"
 
 
 def export_index(index, output_dir, provenance):

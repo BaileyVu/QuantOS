@@ -1,3 +1,15 @@
+## BUILD export preflight correction (LATEST)
+Source metadata preflight failed before anyrawarchive access. Verified exactfile
+SHA: overlay8fbb13eadcfa148c6479d444b7a2a3edf14811a35f3a53fb5afaa3e2c85cee9f.
+Earlier agent report/checkpoint transposed aa3e2 asaa2e3; sourcefile unchanged
+sinceOct29. BaseSHAmatches. Corrected exporterpin, no dataoutcomesinspected.
+Maincutoff integratedeff2be5 via5c4f342+9c62423; conflictresolution firstfailed
+import, correctedfullmodule+retainedtests:9focusedPASS. Exporteraa72049 tests2PASS.
+Exactnext rerun preflight/export (priorrunneveropenedrawdata), integrateagent
+protocolfixes then actualfixed2022 BTC/ETH/SOL forecastcomparison. Noactiveprocess.
+
+---
+
 ## Resume 2026-11-08 13:26 Vietnam (LATEST)
 Reset verified;97%five-hour/38%weekly,banked1. CurrentHEAD e466a1a on
 codex/infra-timesfm25-integration, PR56 source55a1c23. Existing510tests and
