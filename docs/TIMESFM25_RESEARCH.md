@@ -23,9 +23,20 @@ No weights were downloaded during harness implementation.
 TimesFM upstream's signed `v2.0.2` release exposes the 2.5 PyTorch API; its
 package declares Python >=3.10, NumPy >=1.26.4, Hugging Face Hub >=0.23.0,
 Safetensors >=0.5.3, and optional torch >=2.0.0. The requirement file pins those
-runtime choices. PyTorch 2.7.1 has an official macOS wheel. All experiment
+runtime choices. Hub is pinned at 0.30.2 because the tagged TimesFM class
+declares `paper_url`, which older Hub versions (including 0.28.1) reject at
+import time. PyTorch 2.7.1 has an official macOS wheel. All experiment
 outputs must record exact dependency versions, model revision, device, source
 commit, and data manifest hash.
+
+`timesfm_model.load_model(cache_dir=...)` is the explicit loader used by offline
+research runners. It requires a caller-supplied cache directory, sets
+`HF_HUB_DISABLE_TELEMETRY=1` before importing Hub/model packages, disables CUDA,
+uses `token=False`, bounds torch to two CPU threads, checks the pinned weights
+SHA-256 before constructing the model, compiles the documented context/horizon
+configuration, and returns `(model, metadata)`. Loading the artifact is a
+separate explicit action; importing the module and running synthetic tests do
+not load weights or perform model inference.
 
 Primary source references:
 
@@ -33,6 +44,7 @@ Primary source references:
 - [TimesFM v2.0.2 package metadata](https://raw.githubusercontent.com/google-research/timesfm/v2.0.2/pyproject.toml)
 - [TimesFM v2.0.2 2.5 PyTorch implementation](https://github.com/google-research/timesfm/blob/v2.0.2/src/timesfm/timesfm_2p5/timesfm_2p5_torch.py)
 - [TimesFM v2.0.2 forecast API and quantile order](https://github.com/google-research/timesfm/blob/v2.0.2/src/timesfm/timesfm_2p5/timesfm_2p5_base.py)
+- [Hugging Face Hub 0.30.2 `paper_url` mixin API](https://github.com/huggingface/huggingface_hub/blob/v0.30.2/src/huggingface_hub/hub_mixin.py)
 - [Official TimesFM 2.5 model card and license](https://huggingface.co/google/timesfm-2.5-200m-pytorch)
 - [Official PyTorch previous versions, including macOS 2.7.1](https://pytorch.org/get-started/previous-versions/)
 
