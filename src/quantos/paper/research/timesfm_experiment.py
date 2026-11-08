@@ -28,10 +28,26 @@ class Forecast:
     q90: Mapping[int, float]
 
 
+@dataclass(frozen=True)
+class VolatilityForecast:
+    """Causal volatility prediction aligned to future return indices."""
+    origin_index: int
+    target_start_index: int
+    target_end_exclusive: int
+    volatility: float
+
+
 def _positive(value: float, field: str) -> float:
     value = float(value)
     if not math.isfinite(value) or value <= 0:
         raise ValueError(f"{field} must be finite and positive")
+    return value
+
+
+def _nonnegative(value: float, field: str) -> float:
+    value = float(value)
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(f"{field} must be finite and nonnegative")
     return value
 
 
@@ -57,8 +73,9 @@ def features_at(forecast: Forecast, *, completed_close_ms: int,
     if 24 not in forecast.q10 or 24 not in forecast.q90:
         raise ValueError("missing 24h quantile bounds")
     lower, upper = _positive(forecast.q10[24], "q10"), _positive(forecast.q90[24], "q90")
-    if lower > upper:
-        raise ValueError("q10 must not exceed q90")
+    median_24 = _positive(forecast.median[24], "median")
+    if not lower <= median_24 <= upper:
+        raise ValueError("forecast quantiles must satisfy q10 <= median <= q90")
     out["width_24h"] = (upper - lower) / price
     if prior_forecast is None:
         out["surprise"] = None
@@ -88,26 +105,49 @@ def assert_period(timestamp_ms: int, period: str) -> None:
         raise ValueError(f"timestamp is outside the permitted {period} window")
 
 
-def persistence_volatility(realized_vol: Sequence[float]) -> list[float]:
-    """Persistence forecast: prior completed-window volatility."""
-    values = [_positive(x, "realized_vol") for x in realized_vol]
-    return values[:-1]
+def persistence_volatility(realized_vol: Sequence[float], *,
+                           horizon: int = 1) -> list[VolatilityForecast]:
+    """Persistence forecasts for future blocks of ``horizon`` returns.
+
+    Input values are per-bar volatility estimates known at each completed bar.
+    Forecast at index i applies to target indices [i+1, i+horizon+1).
+    """
+    if horizon < 1:
+        raise ValueError("horizon must be positive")
+    values = [_nonnegative(x, "realized_vol") for x in realized_vol]
+    return [VolatilityForecast(i, i + 1, i + horizon + 1, values[i])
+            for i in range(max(0, len(values) - horizon))]
 
 
-def ewma_volatility(returns: Sequence[float], *, alpha: float = 0.06) -> list[float]:
-    """Causal EWMA absolute-return proxy, emitting state before each return."""
+def ewma_volatility(returns: Sequence[float], *, alpha: float = 0.06,
+                    horizon: int = 1) -> list[VolatilityForecast]:
+    """Forecast future RMS volatility from causal EWMA return variance.
+
+    The state at origin i uses returns through i only. Forecast rows target the
+    next ``horizon`` returns, indices [i+1, i+horizon+1). One-step variance is
+    initialized with the first observed squared return; later observations use
+    ``alpha*r^2 + (1-alpha)*variance``. For a multi-bar target, the per-bar
+    volatility remains sqrt(variance), suitable for comparison to future RMS.
+    """
     if not 0 < alpha <= 1:
         raise ValueError("alpha must be in (0, 1]")
-    state = None
-    result = []
+    if horizon < 1:
+        raise ValueError("horizon must be positive")
+    values = []
     for value in returns:
         x = float(value)
         if not math.isfinite(x):
             raise ValueError("returns must be finite")
-        if state is not None:
-            result.append(state)
-        magnitude = abs(x)
-        state = magnitude if state is None else alpha * magnitude + (1 - alpha) * state
+        values.append(x)
+    if len(values) <= horizon:
+        return []
+    state = values[0] ** 2
+    result = []
+    for origin in range(len(values) - horizon):
+        if origin:
+            state = alpha * values[origin] ** 2 + (1 - alpha) * state
+        result.append(VolatilityForecast(origin, origin + 1, origin + horizon + 1,
+                                         math.sqrt(state)))
     return result
 
 
@@ -119,14 +159,25 @@ def atr_percent(bars: Sequence[tuple[float, float, float]], *, window: int = 14)
     previous = None
     for high, low, close in bars:
         high, low, close = (_positive(high, "high"), _positive(low, "low"), _positive(close, "close"))
-        if low > high:
-            raise ValueError("low must not exceed high")
+        if low > close or close > high:
+            raise ValueError("OHLC must satisfy low <= close <= high")
         tr = high - low if previous is None else max(high - low, abs(high - previous), abs(low - previous))
         trs.append(tr)
         previous = close
         if len(trs) >= window:
             result.append(sum(trs[-window:]) / window / close)
     return result
+
+
+def align_volatility_forecasts(values: Sequence[float], *, horizon: int = 1,
+                               first_index: int = 0) -> list[VolatilityForecast]:
+    """Align causal per-bar estimates (for example ATR/close) to future blocks."""
+    if horizon < 1 or first_index < 0:
+        raise ValueError("horizon must be positive and first_index nonnegative")
+    estimates = [_nonnegative(value, "volatility") for value in values]
+    return [VolatilityForecast(first_index + i, first_index + i + 1,
+                               first_index + i + horizon + 1, estimates[i])
+            for i in range(max(0, len(estimates) - horizon))]
 
 
 def mean_absolute_error(predicted: Sequence[float], realized: Sequence[float]) -> float:
@@ -142,7 +193,13 @@ def mean_absolute_error(predicted: Sequence[float], realized: Sequence[float]) -
 def register_variants(registry: ResearchRegistry, *, manifest_hash: str,
                       config: Mapping | None = None) -> dict[str, str]:
     """Register every preregistered experiment family against a data manifest."""
-    common = {"model": "google/timesfm-2.5-200m-pytorch", **dict(config or {})}
+    common = dict(config or {})
+    # Model choice is frozen for this experiment; reject conflicting metadata.
+    requested_model = common.pop("model", None)
+    pinned_model = "google/timesfm-2.5-200m-pytorch"
+    if requested_model is not None and requested_model != pinned_model:
+        raise ValueError("TimesFM experiment model is pinned to google/timesfm-2.5-200m-pytorch")
+    common["model"] = pinned_model
     variants = {
         "timesfm_ml1h": {
             **common,

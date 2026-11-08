@@ -4,7 +4,7 @@ from pathlib import Path
 
 from quantos.paper.research.timesfm_experiment import (
     BUILD_START_MS, BUILD_END_MS, HELD_END_MS, HOUR_MS, Forecast,
-    assert_period, atr_percent, ewma_volatility, features_at,
+    align_volatility_forecasts, assert_period, atr_percent, ewma_volatility, features_at,
     mean_absolute_error, persistence_volatility, register_variants, walk_forward_features,
     timesfm25_predictor,
 )
@@ -14,7 +14,7 @@ from quantos.paper.research.registry import ResearchRegistry
 def forecast(ts, price, *, median=None):
     median = median or {1: price * 1.01, 4: price * 1.04, 12: price * 1.12, 24: price * 1.24}
     return Forecast(ts, price, median,
-                    {24: price * 0.9}, {24: price * 1.1})
+                    {24: price * 0.9}, {24: price * 1.3})
 
 
 class TimesfmExperimentTest(unittest.TestCase):
@@ -27,7 +27,7 @@ class TimesfmExperimentTest(unittest.TestCase):
         self.assertAlmostEqual(result["drift_4h"], .04)
         self.assertAlmostEqual(result["drift_12h"], .12)
         self.assertAlmostEqual(result["drift_24h"], .24)
-        self.assertAlmostEqual(result["width_24h"], .2)
+        self.assertAlmostEqual(result["width_24h"], .4)
         self.assertAlmostEqual(result["surprise"], 3 / 105)
 
     def test_missing_prior_forecast_is_explicit(self):
@@ -106,26 +106,50 @@ class TimesfmExperimentTest(unittest.TestCase):
         self.assertEqual(adapted.q90, {24: 113})
 
     def test_causal_baselines(self):
-        self.assertEqual(persistence_volatility([1, 2, 3]), [1.0, 2.0])
-        ewma = ewma_volatility([.1, -.2, .3], alpha=.5)
-        self.assertEqual(len(ewma), 2)
-        self.assertAlmostEqual(ewma[0], .1)
-        self.assertAlmostEqual(ewma[1], .15)
+        persisted = persistence_volatility([.1, .2, .3], horizon=1)
+        self.assertEqual([(x.origin_index, x.target_start_index, x.target_end_exclusive)
+                          for x in persisted], [(0, 1, 2), (1, 2, 3)])
+        self.assertEqual([x.volatility for x in persisted], [.1, .2])
+        self.assertEqual(persistence_volatility([0, .2])[0].volatility, 0)
+        ewma = ewma_volatility([.1, -.2, .3, .4], alpha=.5, horizon=1)
+        self.assertEqual([(x.origin_index, x.target_start_index, x.target_end_exclusive)
+                          for x in ewma], [(0, 1, 2), (1, 2, 3), (2, 3, 4)])
+        self.assertAlmostEqual(ewma[0].volatility, .1)
+        self.assertAlmostEqual(ewma[1].volatility, (.025) ** .5)
+        self.assertAlmostEqual(ewma[2].volatility, (.0575) ** .5)
+        multi = ewma_volatility([.1, -.2, .3, .4], alpha=.5, horizon=2)
+        self.assertEqual([(x.target_start_index, x.target_end_exclusive)
+                          for x in multi], [(1, 3), (2, 4)])
+        self.assertAlmostEqual(multi[0].volatility, .1)
         atr = atr_percent([(11, 9, 10), (12, 10, 11)], window=1)
         self.assertAlmostEqual(atr[0], .2)
         self.assertAlmostEqual(atr[1], 2 / 11)
+        atr_forecasts = align_volatility_forecasts(atr, horizon=1, first_index=0)
+        self.assertEqual([(x.target_start_index, x.target_end_exclusive)
+                          for x in atr_forecasts], [(1, 2)])
+        self.assertEqual(align_volatility_forecasts([0, 1])[0].volatility, 0)
+        with self.assertRaisesRegex(ValueError, "low <= close <= high"):
+            atr_percent([(11, 9, 12)], window=1)
         self.assertAlmostEqual(mean_absolute_error([1, 2], [1.5, 3]), .75)
 
     def test_all_experiment_variants_register_against_manifest(self):
         with TemporaryDirectory() as tmp:
             manifest_hash = "a" * 64
             with ResearchRegistry(Path(tmp) / "registry.sqlite") as registry:
-                keys = register_variants(registry, manifest_hash=manifest_hash)
+                keys = register_variants(registry, manifest_hash=manifest_hash,
+                                         config={"model": "google/timesfm-2.5-200m-pytorch", "fold": 3})
                 self.assertEqual(set(keys), {
                     "timesfm_ml1h", "timesfm_width_volatility", "timesfm_crash_dip_shadow"
                 })
                 self.assertEqual(registry.trial_counts("timesfm25")["family_n"], 3)
                 self.assertEqual(registry.result_rows(family="timesfm25"), [])
+                stored = [row[0] for row in registry.db.execute(
+                    "SELECT params_json FROM variants WHERE family='timesfm25'")]
+                self.assertTrue(all('"model":"google/timesfm-2.5-200m-pytorch"' in row
+                                    for row in stored))
+                with self.assertRaisesRegex(ValueError, "pinned"):
+                    register_variants(registry, manifest_hash=manifest_hash,
+                                      config={"model": "wrong-model"})
 
 
 if __name__ == "__main__":

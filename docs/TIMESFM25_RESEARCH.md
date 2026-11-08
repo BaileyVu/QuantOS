@@ -65,14 +65,23 @@ task. Do not pass sealed 2025+ bars into `walk_forward_features`.
    gates. Keep per-fold fitting and transforms limited to each training prefix.
 2. Compare the forecast width as a volatility forecast against persistence,
    EWMA, and ATR using matched realized-volatility targets and identical periods.
+   The baseline helpers emit `VolatilityForecast` records with origin index and
+   future target interval `[start, end)`. EWMA uses the square root of a causal
+   EWMA return variance, initialized from the first squared return; its state at
+   origin `i` uses observations only through `i`. For an `h`-bar target, score
+   against realized RMS return over exactly `[i+1, i+h+1)`. ATR estimates can be
+   aligned with `align_volatility_forecasts`; pass the correct first source
+   index after its warmup. Compare only identical target intervals.
 3. Evaluate crash/dip filters only with the existing L3 shadow protocol. Do not
    infer acceptance from the small number of episodes or alter strategy/risk
-   code here.
+   code here; no filter thresholds are fit on HELD.
 
 The kill criterion is no material improvement over persistence/EWMA under the
 existing costs and validation gates. Register every feature/model/filter
 variant in `ResearchRegistry` with a verified dataset manifest hash before
 outcomes are inspected. `register_variants` registers the three planned families.
+The TimesFM model id is fixed to the pinned 2.5 checkpoint; a conflicting
+`model` in supplied configuration is rejected.
 
 ## Evidence needed before a model run
 
