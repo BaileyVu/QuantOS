@@ -1,3 +1,29 @@
+## Fixed BUILD export complete (LATEST)
+Activebranch codex/infra-timesfm25-integration sourcee5f8b1a, clean beforecheckpoint.
+PR56 remainsdraft; nothingmerged/deployed. BUILDcutoff reviewed/integrated,
+9datasettestsPASS. Registryforecastresult methodab43c97,13registrytestsPASS.
+Exporter aa72049+checksumcorrectione5f8b1a,2exporttestsPASS.
+ActualEXPORT COMPLETE exit0: QuantOS-infra-timesfm/.research-timesfm25-build2022.
+BTC/ETH/SOL each8760 completed-hour2022bars, noHELDrawarchivesopened. Full
+base/overlaymetadata hashes checked; rangeDec31 2021 through2022, strictclose
+cutoff2023-01-01. Selectedexport timestamps2022-01-01T00 throughDec31T23 UTC.
+Manifesthashes:
+BTC f08a106f3bfd2c09fbadbe49d098445f82c44a8095ab729d0465029a3437b387
+ETH c325a92070a3488912f128f766dd2d7e5a300cbde430f291bbc5e72045f04942
+SOL b36c03d841e93421aaed215eccb24678f4c35fef87a295a1e7398c05867c3b4d
+Indexmanifest f3b5e5c039c733c375706f8fa9c5c53c4a5aa626056175fd21995e1ee0466441.
+Log/tmp/quantos-timesfm25-build-export.log; sourceaudit/export.json inexportdir.
+Do notrepeat export or fullmetadata scans. No actualforecastoutcomesyet.
+NEXT: integrate modelagent codex/infra-timesfm-protocol runnerfixes (log-width,
+strictseries/fullcoverage, preregcode/model/deps, resumableorigin cache, paired
+7dayblockCI); mainreview/affectedtests thenrunfixed3assetpilot usingexistingCPUvenv
+andweights. Sourceagentread-only ml1htraining-code prerequisiteaudit. Noactiveowned
+runtime/researchprocess currently. Latestusage39%five-hour/29%weekly,banked1;
+reset1794137213. SAMEautomationcurrently13:22Vietnam; update at20%threshold.
+AllactualUSDC L2,pDoriginalparity,24hdemo,72hSentibot acceptance stillpending.
+
+---
+
 ## BUILD export preflight correction (LATEST)
 Source metadata preflight failed before anyrawarchive access. Verified exactfile
 SHA: overlay8fbb13eadcfa148c6479d444b7a2a3edf14811a35f3a53fb5afaa3e2c85cee9f.
