@@ -97,3 +97,27 @@ The TimesFM model id is fixed to the pinned 2.5 checkpoint; a conflicting
 
 No data manifest was supplied in this PR, so there are no experiments or
 performance claims. The research harness is not a candidate for deployment.
+
+## Executable BUILD volatility comparison
+
+`python -m quantos.paper.research.timesfm_volatility --manifest MANIFEST
+--manifest-hash SHA256 --registry REGISTRY --cache-dir MODEL_CACHE
+--output-dir NEW_OUTPUT` consumes checksummed JSONL with completed UTC hourly
+`time_ms`, `high`, `low`, `close` fields. It checks the manifest's BUILD range
+before opening data, rejects gaps, registers the plan before inference, then
+uses fixed 512-hour contexts and non-overlapping 24-hour targets. HELD and
+2025+ are deliberately unavailable in this runner.
+
+The target is the square root of summed next-24h squared log returns. The
+predeclared comparison maps the model's 80% price interval to a volatility
+proxy by dividing relative width by 2.563103131; persistence uses prior-24h
+quadratic variation, EWMA uses alpha 0.06, and 14-hour ATR is divided by
+sqrt(8/pi) then scaled by sqrt(24). These Gaussian/range assumptions are explicit,
+with no outcome-fitted rescaling. MAE is descriptive forecast error, not P&L.
+A favorable result alone cannot pass L2 or L3. The foundation model's training
+corpus overlap with historical crypto targets is unverified; historical tests
+must not be described as proof of unseen-data generalization.
+
+The runner writes its plan before loading weights and a result containing
+individual origins, targets, forecasts and model provenance. An interrupted run
+leaves the plan, not a fabricated report. No real comparison has passed yet.
