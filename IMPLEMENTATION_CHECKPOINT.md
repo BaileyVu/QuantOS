@@ -1,3 +1,37 @@
+## Resume and new replay evidence — 2026-11-08 evening (LATEST)
+Resetverified98%fivehour/22%weekly,banked1. Mainbranch codex/infra-timesfm25-integration
+source6f4447b. Reusedexistingtwo lowercostagents: modelagent finishingprotocol/tests;
+sourceagent source-onlyml1haudit then referencevendoring. No rawdata/export/download
+or passingtest repeated. Mainreadprotocol andflaggedstructuredmodelmetadata collision
+with register_variants pinnedstring; agentfixing andtestingwholemockedprotocol.
+
+NEW ACTUAL EVENTREPLAY: completedimmutable4fe48e2-net soak recording replayed ONCE,
+exit0, /tmp/quantos-infra-replay-4fe48e2-complete (log same+.log). Input985events,
+22scanbatches;4,006decisionrows EXACTmatch,0mismatch; sentiment/external/exchange
+contextcomplete. No trades, so nofillparityclaim. InputdecompressedSHA
+7c16b979328e08a2cdb27bc39434b542508bc8c4f33088123d71ba4bc67cbf63.
+Expectedclosedjournal copiedto/tmp/quantos-infra-soak-4fe48e2-expected.db; original
+soak/demo state untouched. OriginalhistoricalpD period stillincompletecapture.
+Askedownerasync whethernewforwarddemo withtrades mayreplaceoriginalpDacceptance;
+ANSWERPENDING. Continueindependentresearch, don't inferapproval.
+
+Source-onlyml1haudit: edge_data/patml_v1/run.py SHA
+5a6470bfb28848ea31e21e7a821a7b69db410f63acf332262b2e7245253f6577;
+PREREG.txt SHAcf9601a9ac2ff3c96d3bd7f85e0c8c089f7a5b536dd58c470e1f5c441514f843.
+Selfcontainedscript, top-levelimports execute data/training, NEVERimport/run as-is.
+32causalfeatures, ATR14,1.5ATR TP/SL48h; labelsomitentryfee andhaveoldcosts;
+train-tail scorecalibrationbiasedbycoinconcatenation, labelsbuiltbeforequarterfilter,
+48h boundarymayreadHELD labels. OriginalHELD exploratoryalreadydone perprereg;
+no outcomesread. Loaderreadsprotectedml5m paths (notaccessed). FutureBUILD refactor
+mustuseverifiedhourlyinput, actualcurrentcosts/conservativecollision semantics and
+trainonlycalibration, strictlabelendcutoff. CannotclaimUSDC/depthtruth fromUSDTproxy.
+
+Exactnext: integrateagentprotocol oncefocusedtestsPASS, mainreview, runSAVEDfixed
+3×8760hour2022dataset comparison with existingvenv/cache. Noactiveownedprocesses.
+Latestusage70%fivehour/18%weekly; onebanked onlyatconfirmedweeklyexhaustion.
+
+---
+
 Final allowance verification:6%five-hour/23%weekly remaining, banked1. Main
 source+checkpoint pushed through1cff558; thisquota-onlynote islocal. No implementation
 resumed afterthreshold. Continuationconfirmed18:32Vietnam after18:26:52reset.
