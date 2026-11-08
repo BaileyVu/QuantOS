@@ -1,3 +1,7 @@
+Final allowance verification:6%five-hour/23%weekly remaining, banked1. Main
+source+checkpoint pushed through1cff558; thisquota-onlynote islocal. No implementation
+resumed afterthreshold. Continuationconfirmed18:32Vietnam after18:26:52reset.
+
 ## Agent final status clarification (LATEST)
 Modelagent replacement timesfm_volatility.py IS PRESENT (earlierdeletedstatus was
 midwrite), modifiedUNCOMMITTED/UNTESTED in QuantOS-infra-timesfm on
