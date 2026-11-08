@@ -1,3 +1,27 @@
+## ACTUAL TIMESFM PILOT COMPLETE — 2026-11-08 (LATEST)
+run-v1 completedexit0,137.686s,PID23064/execsession72239 finished. Noownedprocess.
+3symbols×343origins=1029 forecasts saved; do NOT rerunforecasts/bootstrap/export.
+Artifacts QuantOS-infra-timesfm/.research-timesfm25-build2022/run-v1/report.json,
+preregistered_plan.json,progress.jsonl; registry.sqlite adjacent. Log
+/tmp/quantos-timesfm25-pilot.log. Source06f5b4f, protocol765e9ae. Resultsummary
+in docs/TIMESFM25_BUILD_PILOT_RESULT.md. CPUcachedweights,offline/no redownload.
+PooledMAE TimesFM.014120145321321035, persistence.015004494768331196,
+EWMA.013914850460051175,ATR.013215945755212089. Allpaired95%CIsincludezero.
+TESTEDWIDTHFEATURE FAILS baselinegate; rejectpromotion/sizing/signaluse.
+This doesNOTtest ml1hfeatureaugmentation or crash/dipL3 filter; stillNOTRUN.
+No modelselection onHELD or2025+. Low-costmodelagent auditingcompletedartifact
+metadata/counts read-only (no repeats), mainownsfinalinterpretation.
+
+NEXT: saveaudit/result, updatePR56; remaining acceptance needsownerexclusive
+merge/deploy and pendingdecisionwhethernewforwarddemo canreplaceoriginalpDperiod
+missingcontext. 4006decisionno-tradereplaypassed, nottradefillparity. Stillno24h
+reconciledshadowdemo,72hSentibot,actualUSDC L2,ml1h+featuresL2/crashdipL3 evidence.
+Atresumeusage95%fivehour/6%weekly; afterrun80%fivehour/4%weekly,banked1. Do NOTuse
+bankeduntilweeklyconfirmed0. No redemptiontool; owner redeemedfirst manually.
+SAMEautomation currently23:40Vietnam; next5hreset1794173906; updatewhenrequired.
+
+---
+
 ## READY FOR ACTUAL TIMESFM PILOT — quota handoff (LATEST)
 Currentbranch codex/infra-timesfm25-integration, source765e9ae. Protocolagent
 3d909a0 INTEGRATED andMAINREVIEWED;25focusedprotocol/volatility/registry/export
