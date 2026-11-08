@@ -72,7 +72,8 @@ def _validate_sha256(value: str, field: str) -> str:
 
 def create_dataset_manifest(data_path: str | Path, manifest_path: str | Path, *,
                             source: str, start: str, end: str,
-                            missing_ranges: list[dict[str, str]] | None = None) -> dict:
+                            missing_ranges: list[dict[str, str]] | None = None,
+                            series: dict[str, str] | None = None) -> dict:
     """Write a manifest for an existing dataset file and return its SHA-256.
 
     Range endpoints and missing-range endpoints are ISO dates, inclusive. The
@@ -90,6 +91,12 @@ def create_dataset_manifest(data_path: str | Path, manifest_path: str | Path, *,
     start_date, end_date = date.fromisoformat(start), date.fromisoformat(end)
     if start_date > end_date:
         raise ValueError("start must be on or before end")
+    if series is not None:
+        expected_series_fields = {"symbol", "market", "timeframe", "timestamp_semantics"}
+        if (not isinstance(series, dict) or set(series) != expected_series_fields
+                or any(not isinstance(value, str) or not value.strip()
+                       for value in series.values())):
+            raise ValueError("series must contain symbol, market, timeframe, and timestamp_semantics")
     gaps = missing_ranges or []
     for gap in gaps:
         if not isinstance(gap, dict) or set(gap) != {"start", "end"}:
@@ -110,6 +117,8 @@ def create_dataset_manifest(data_path: str | Path, manifest_path: str | Path, *,
         "missing_ranges": sorted(gaps, key=lambda item: (item["start"], item["end"])),
         "dataset": {"path": data_ref, "sha256": sha256_file(data)},
     }
+    if series is not None:
+        manifest["series"] = dict(series)
     target.parent.mkdir(parents=True, exist_ok=True)
     content = json.dumps(manifest, sort_keys=True, indent=2) + "\n"
     if target.exists():

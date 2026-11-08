@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from quantos.paper.research.registry import create_dataset_manifest
 from quantos.paper.research.timesfm_experiment import BUILD_START_MS, HOUR_MS, Forecast
+from quantos.paper.research import timesfm_volatility as protocol
 from quantos.paper.research.timesfm_volatility import compare, load_build_bars
 
 
@@ -26,7 +27,9 @@ class TimesfmVolatilityTest(unittest.TestCase):
             self.assertAlmostEqual(row['realized'], math.sqrt(24) * .001)
             self.assertAlmostEqual(row['predicted']['persistence'], row['realized'])
             self.assertAlmostEqual(row['predicted']['ewma'], row['realized'])
-        self.assertFalse(result['beats_persistence_and_ewma'])
+            self.assertEqual(row['target_start_ms'], row['origin_ms'] + HOUR_MS)
+            self.assertEqual(row['target_end_ms'], row['origin_ms'] + 24 * HOUR_MS)
+        self.assertGreater(result['mae']['timesfm'], result['mae']['persistence'])
         # Modifying an unseen target never changes forecasts at prior origins.
         changed = list(rows)
         ts, hi, lo, close = changed[-1]
@@ -40,22 +43,28 @@ class TimesfmVolatilityTest(unittest.TestCase):
             manifest = Path(tmp) / 'manifest.json'
             manifest.write_text(json.dumps({'range': {'start': '2023-07-01', 'end': '2024-12-31'}}))
             with patch('quantos.paper.research.timesfm_volatility.verify_dataset_manifest') as verify:
-                with self.assertRaisesRegex(ValueError, 'BUILD-only'):
+                with self.assertRaisesRegex(ValueError, 'full 2022'):
                     load_build_bars(manifest, 'a' * 64)
                 verify.assert_not_called()
 
     def test_completed_hour_gap_and_manifest_binding(self):
         with tempfile.TemporaryDirectory() as tmp:
             data, manifest = Path(tmp) / 'bars.jsonl', Path(tmp) / 'manifest.json'
-            rows = [{'time_ms': BUILD_START_MS + i * HOUR_MS, 'high': 101, 'low': 99, 'close': 100}
-                    for i in range(536)]
+            start = protocol._utc_ms(protocol.START_DATE)
+            rows = [{'time_ms': start + i * HOUR_MS, 'symbol': 'BTCUSDT',
+                     'high': 101, 'low': 99, 'close': 100}
+                    for i in range(8760)]
             data.write_text(''.join(json.dumps(row) + '\n' for row in rows))
-            created = create_dataset_manifest(data, manifest, source='synthetic fixture', start='2020-01-01', end='2020-01-23')
-            loaded, verified = load_build_bars(manifest, created['manifest_sha256'])
-            self.assertEqual(len(loaded), 536)
+            created = create_dataset_manifest(
+                data, manifest, source='synthetic fixture', start='2022-01-01', end='2022-12-31',
+                series={'symbol': 'BTCUSDT', 'market': protocol.MARKET,
+                        'timeframe': '1h', 'timestamp_semantics': protocol.TIMESTAMP_SEMANTICS})
+            symbol, loaded, verified = load_build_bars(manifest, created['manifest_sha256'])
+            self.assertEqual(symbol, 'BTCUSDT')
+            self.assertEqual(len(loaded), 8760)
             self.assertEqual(verified['manifest_sha256'], created['manifest_sha256'])
             with self.assertRaisesRegex(ValueError, 'manifest checksum'):
                 load_build_bars(manifest, '0' * 64)
-            data.write_text(data.read_text().replace(str(BUILD_START_MS), str(BUILD_START_MS + 1), 1))
+            data.write_text(data.read_text().replace(str(start), str(start + 1), 1))
             with self.assertRaisesRegex(ValueError, 'dataset checksum'):
                 load_build_bars(manifest, created['manifest_sha256'])

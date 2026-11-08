@@ -18,7 +18,8 @@ rejects a non-CPU device. The approved model id is
 `google/timesfm-2.5-200m-pytorch`; do not substitute TimesFM 3.0. Pin the model
 repository revision in any run manifest. The inspected 2.5 checkpoint revision
 is `2d1b32066b7f3950c45913d4a3849f3c75cb0312` (model card license Apache-2.0).
-No weights were downloaded during harness implementation.
+The repository does not store model weights; the explicit loader uses a caller
+provided local cache and verifies the pinned weight digest before model load.
 
 TimesFM upstream's signed `v2.0.2` release exposes the 2.5 PyTorch API; its
 package declares Python >=3.10, NumPy >=1.26.4, Hugging Face Hub >=0.23.0,
@@ -67,9 +68,10 @@ median column 5 and q10/q90 columns 1/9.
 
 BUILD is `[2020-01-01, 2023-07-01)` UTC. HELD is `[2023-07-01, 2025-01-01)` UTC.
 The data adapter must not read or use 2025+ observations for any feature,
-threshold, normalization, feature selection, or model selection. A future live
-shadow evaluation requires separate explicit authorization and is outside this
-task. Do not pass sealed 2025+ bars into `walk_forward_features`.
+threshold, normalization, feature selection, or model selection. PR9 explicitly
+authorizes evaluating crash/dip filters only through the existing L3 shadow
+protocol; no filter threshold is fitted on HELD. Do not pass sealed 2025+ bars
+into `walk_forward_features`.
 
 ## Planned comparisons (not run here)
 
@@ -107,29 +109,34 @@ The TimesFM model id is fixed to the pinned 2.5 checkpoint; a conflicting
 - For L3, the preexisting shadow logging path and enough episodes to report
   uncertainty honestly. No thresholds may be fitted on HELD.
 
-No data manifest was supplied in this PR, so there are no experiments or
-performance claims. The research harness is not a candidate for deployment.
+No performance claims or deployment approval follow from this research harness.
 
 ## Executable BUILD volatility comparison
 
-`python -m quantos.paper.research.timesfm_volatility --manifest MANIFEST
---manifest-hash SHA256 --registry REGISTRY --cache-dir MODEL_CACHE
+`python -m quantos.paper.research.timesfm_volatility --manifest BTC_MANIFEST
+--manifest ETH_MANIFEST --manifest SOL_MANIFEST --manifest-hash BTC_SHA256
+--manifest-hash ETH_SHA256 --manifest-hash SOL_SHA256 --registry REGISTRY --cache-dir MODEL_CACHE
 --output-dir NEW_OUTPUT` consumes checksummed JSONL with completed UTC hourly
-`time_ms`, `high`, `low`, `close` fields. It checks the manifest's BUILD range
-before opening data, rejects gaps, registers the plan before inference, then
-uses fixed 512-hour contexts and non-overlapping 24-hour targets. HELD and
-2025+ are deliberately unavailable in this runner.
+`time_ms`, `symbol`, `high`, `low`, `close` fields. Each series manifest must
+pin its symbol, `Binance USD-M USDT proxy`, `1h` timeframe, and
+`completed_close_exclusive_ms` semantics, with complete 2022 coverage. It
+rejects missing hours, registers the complete source/data/model/dependency plan
+before inference, then uses 512-hour contexts and non-overlapping 24-hour
+targets. Resume requires the same plan and hash-valid per-origin progress. HELD
+and 2025+ are unavailable in this runner.
 
 The target is the square root of summed next-24h squared log returns. The
-predeclared comparison maps the model's 80% price interval to a volatility
-proxy by dividing relative width by 2.563103131; persistence uses prior-24h
-quadratic variation, EWMA uses alpha 0.06, and 14-hour ATR is divided by
-sqrt(8/pi) then scaled by sqrt(24). These Gaussian/range assumptions are explicit,
-with no outcome-fitted rescaling. MAE is descriptive forecast error, not P&L.
+predeclared comparison maps the model's 80% interval to log-return volatility
+using `log(q90/spot)-log(q10/spot)`, divided by 2.563103131; persistence uses
+prior-24h quadratic variation, EWMA uses alpha 0.06, and 14-hour ATR is divided
+by sqrt(8/pi) then scaled by sqrt(24). These Gaussian/range assumptions are
+explicit, with no outcome-fitted rescaling. MAE is descriptive forecast error,
+not P&L. Paired MAE deltas use fixed 7-day circular blocks, 2,000 resamples,
+seed 0; fewer than 14 observations per series is insufficient for bootstrap.
 A favorable result alone cannot pass L2 or L3. The foundation model's training
 corpus overlap with historical crypto targets is unverified; historical tests
 must not be described as proof of unseen-data generalization.
 
-The runner writes its plan before loading weights and a result containing
-individual origins, targets, forecasts and model provenance. An interrupted run
-leaves the plan, not a fabricated report. No real comparison has passed yet.
+The runner writes its plan before loading weights and hash-chained progress for
+each origin. Its report contains individual target intervals and model
+provenance. No real comparison has passed yet.
