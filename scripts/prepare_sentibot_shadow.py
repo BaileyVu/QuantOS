@@ -59,8 +59,15 @@ def prepare(repo: str | Path, snapshots: str | Path, state_dir: str | Path,
     repo = Path(repo).expanduser().resolve()
     snapshots = Path(snapshots).expanduser().resolve()
     state = Path(state_dir).expanduser().resolve()
-    plist_file = Path(plist_path).expanduser().resolve()
-    python = Path(python_path).expanduser().resolve()
+    plist_input = Path(plist_path).expanduser()
+    if plist_input.is_symlink():
+        raise ValueError("plist output must not be a symlink")
+    plist_file = plist_input.resolve()
+    # Resolving a virtualenv executable loses its environment and dependencies.
+    python = Path(os.path.abspath(os.path.expanduser(os.fspath(python_path))))
+    launchagents = Path.home() / "Library" / "LaunchAgents"
+    if _overlaps(launchagents.resolve(), plist_file):
+        raise ValueError("preparation must not write LaunchAgents")
     if every < 60 or cycle_timeout < 1 or cycle_timeout >= every:
         raise ValueError("require every >= 60 and 1 <= cycle_timeout < every")
     if not python.is_file() or not os.access(python, os.X_OK):

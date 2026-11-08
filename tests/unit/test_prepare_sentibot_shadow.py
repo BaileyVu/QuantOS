@@ -1,5 +1,7 @@
 from pathlib import Path
 import plistlib
+import os
+from unittest.mock import patch
 import subprocess
 import sys
 import tempfile
@@ -33,11 +35,26 @@ class PrepareSentibotShadowTests(unittest.TestCase):
                 plist = plistlib.load(handle)
             self.assertEqual(plist["Label"], "com.quantos.sentibot.reach-shadow")
             self.assertEqual(plist["ProgramArguments"], [
-                str(Path(sys.executable).resolve()), "-m", "sentibot.sentibot_reach_shadow",
+                os.path.abspath(sys.executable), "-m", "sentibot.sentibot_reach_shadow",
                 "--state-dir", str(state.resolve()), "--every", "900", "--cycle-timeout", "600"])
             self.assertEqual(plist["WorkingDirectory"], result["snapshot"])
             self.assertEqual(plist["EnvironmentVariables"]["PYTHONPATH"], result["snapshot"])
             self.assertTrue(Path(plist["StandardOutPath"]).is_relative_to(state.resolve()))
+
+    def test_preserves_virtualenv_executable_and_refuses_launchagents(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo = self.make_repo(root)
+            python = root / "venv" / "bin" / "python"
+            python.parent.mkdir(parents=True)
+            python.symlink_to(sys.executable)
+            with patch("scripts.prepare_sentibot_shadow.Path.home", return_value=root):
+                with self.assertRaisesRegex(ValueError, "LaunchAgents"):
+                    prepare(repo, root / "snapshots", root / "state",
+                            root / "Library/LaunchAgents/shadow.plist", python)
+            result = prepare(repo, root / "snapshots", root / "state", root / "shadow.plist", python)
+            with Path(result["plist"]).open("rb") as handle:
+                self.assertEqual(plistlib.load(handle)["ProgramArguments"][0], str(python))
 
     def test_rejects_dirty_source_and_does_not_create_outputs(self):
         with tempfile.TemporaryDirectory() as temporary:
