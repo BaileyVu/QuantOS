@@ -1,3 +1,34 @@
+## READY FOR ACTUAL TIMESFM PILOT — quota handoff (LATEST)
+Currentbranch codex/infra-timesfm25-integration, source765e9ae. Protocolagent
+3d909a0 INTEGRATED andMAINREVIEWED;25focusedprotocol/volatility/registry/export
+integrationtests PASS1.983s. No unfinishedrunner. Bothagentsidle,noownedprocesses.
+Do not repeat passingtests. source-onlyml1h reference d71fda1 integrated; do not
+execute historicalrun.py (top-levelprotectedml5maccess/cost/calibrationissues).
+Newforward no-trade replay4006decisionsexact, documentedpriorsection. Owner
+question replacingoriginalpDacceptance pending; noimplicitapproval. Noactualmodel
+marketcomparisonyet. 24hdemo/72hSentibot/USDC L2/ml1hL2/crash-dipL3 stillpending.
+
+EXACTNEXT afterreset: execute savedfixed3seriespilot. MainSOURCE=QuantOS-infra-v5/src;
+PYTHON=QuantOS-infra-timesfm/.venv-timesfm25/bin/python; HF_HUB_DISABLE_TELEMETRY=1,
+CUDA_VISIBLE_DEVICES=''. Import run_protocol fromquantos.paper.research.timesfm_volatility.
+Read QuantOS-infra-timesfm/.research-timesfm25-build2022/export.json datasets;
+inputs=[(entry['manifest'],entry['manifest_hash']) forentry in datasets.values()].
+run_protocol(inputs, registry_path=exportdir/'registry.sqlite',
+ cache_dir=QuantOS-infra-timesfm/.hf-home-timesfm25, output_dir=exportdir/'run-v1').
+Registry/output new; allmodelweights/dataALREADYSAVED. No reexport/redownload.
+Record actualprocessID/session/log iflongrunning. Frozenper-originprogressresumes;
+neverrepeat completedforecasts. Inspectreportifalreadycompletebeforeinvoke. Registry
+hereis isolatedTimesFMtrialregistry, NOTglobalsearchN; noSharpe/DSRfromforecastMAE.
+Priorlegacyimport4309/4227 proofretained; DBartifactnotfoundinpriorregistryworktree
+or/tmpglob, don'trepeatimport. Source/dependency/model hashesfrozenbeforeinference.
+
+Quota verified7%five-hour/8%weekly,banked1. Stoppednewimplementationnear20%,
+onlysavedcompletedagentwork/integrationchecks afterthreshold. SAMEcontinuation
+updateCONFIRMED ACTIVE23:40Vietnam today after23:35:25reset1794155725. Onebanked
+resetONLYafterweeklyexhaustion; no redemptiontool, ownerusedfirstmanually.
+
+---
+
 ## Resume and new replay evidence — 2026-11-08 evening (LATEST)
 Resetverified98%fivehour/22%weekly,banked1. Mainbranch codex/infra-timesfm25-integration
 source6f4447b. Reusedexistingtwo lowercostagents: modelagent finishingprotocol/tests;
