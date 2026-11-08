@@ -72,7 +72,8 @@ def _validate_sha256(value: str, field: str) -> str:
 
 def create_dataset_manifest(data_path: str | Path, manifest_path: str | Path, *,
                             source: str, start: str, end: str,
-                            missing_ranges: list[dict[str, str]] | None = None) -> dict:
+                            missing_ranges: list[dict[str, str]] | None = None,
+                            series: dict[str, str] | None = None) -> dict:
     """Write a manifest for an existing dataset file and return its SHA-256.
 
     Range endpoints and missing-range endpoints are ISO dates, inclusive. The
@@ -90,6 +91,12 @@ def create_dataset_manifest(data_path: str | Path, manifest_path: str | Path, *,
     start_date, end_date = date.fromisoformat(start), date.fromisoformat(end)
     if start_date > end_date:
         raise ValueError("start must be on or before end")
+    if series is not None:
+        expected_series_fields = {"symbol", "market", "timeframe", "timestamp_semantics"}
+        if (not isinstance(series, dict) or set(series) != expected_series_fields
+                or any(not isinstance(value, str) or not value.strip()
+                       for value in series.values())):
+            raise ValueError("series must contain symbol, market, timeframe, and timestamp_semantics")
     gaps = missing_ranges or []
     for gap in gaps:
         if not isinstance(gap, dict) or set(gap) != {"start", "end"}:
@@ -110,6 +117,8 @@ def create_dataset_manifest(data_path: str | Path, manifest_path: str | Path, *,
         "missing_ranges": sorted(gaps, key=lambda item: (item["start"], item["end"])),
         "dataset": {"path": data_ref, "sha256": sha256_file(data)},
     }
+    if series is not None:
+        manifest["series"] = dict(series)
     target.parent.mkdir(parents=True, exist_ok=True)
     content = json.dumps(manifest, sort_keys=True, indent=2) + "\n"
     if target.exists():
@@ -438,6 +447,29 @@ class ResearchRegistry:
                 (key, family.strip(), params_hash, params_json, manifest_hash, variant_id.strip()))
             self.db.execute("INSERT OR IGNORE INTO variant_aliases VALUES(?,?)", (key, variant_id.strip()))
         return key
+
+    def record_observation(self, variant_key: str, *, period: str,
+                           stats: dict, source_path: str | Path) -> bool:
+        """Record a manifested variant's non-trade research result idempotently.
+
+        Forecast errors remain forecast errors; callers need not invent a trade
+        count or Sharpe ratio to use the same experiment registry.
+        """
+        if not isinstance(period, str) or not period.strip():
+            raise ValueError("period must be a nonempty string")
+        if not isinstance(stats, dict) or not stats:
+            raise ValueError("stats must be a nonempty object")
+        if self.db.execute("SELECT 1 FROM variants WHERE variant_key=?", (variant_key,)).fetchone() is None:
+            raise ValueError("observation requires a registered variant")
+        stats_json = canonical_json(stats)
+        result_hash = sha256_bytes(canonical_json({"period": period.strip(), "stats": stats}).encode())
+        source_hash = sha256_file(source_path)
+        with self.db:
+            cur = self.db.execute("""INSERT OR IGNORE INTO results
+                (variant_key,period,period_class,stats_json,result_hash,source_sha256,source_line)
+                VALUES(?,?,?,?,?,?,?)""", (variant_key, period.strip(), _period_class(period),
+                                         stats_json, result_hash, source_hash, 0))
+        return cur.rowcount == 1
 
     def trial_counts(self, family: str | None = None) -> dict[str, int | str | None]:
         """Return family/global registry N and the separate historical CCI count.

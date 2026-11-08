@@ -1,0 +1,16 @@
+patml_v1 PRE-REGISTRATION (2026-11-03, before any fit). Candle-pattern ML across timeframes + distilled 1-setup rule.
+TFs: 1m (Binance USDT 1m 2022-01..2024-12, 11 coins: BTC + 10 USDC-perp alts), 5m/15m/1h/4h (5m archive resampled,
+  2020-01..2024-12, 21 coins). No 2025+. Decisions: 1m every 5th bar, 5m every 3rd, others every bar.
+Features (~40, bars <= t): last-3-candle body/upper wick/lower wick/range (in ATR14), close location, engulfing flag,
+  close vs prior high/low (ATR), up-closes in last 5, log returns 3/12/48, dist to daily VWAP / daily open / EMA20/50/200
+  (ATR), volume z and range z (48), hour sin/cos, weekday.
+Label per side: maker limit at close (fill if next bar trades through); TP +1.5 ATR maker (from bar t+2); stop -1.5 ATR
+  taker 4bp + slip (5bp BTC/ETH, 10bp alts); else exit at close of bar t+48 taker. y = TP hit.
+Model: LightGBM (200 trees, 31 leaves, lr .05, min_data 500), quarterly expanding walk-forward, BUILD eval from
+  first quarter with >=12 months history (1m: 2023Q1..2023Q2 only - short; 5m+: 2021Q1..2023Q2).
+Variants per TF (6): side x top {1%,2%} of training scores (4) + distilled rule per side (2):
+  Rule = best leaf of a depth-3 regression tree (min leaf 0.5% of rows) fit on BUILD first half to net pnl, chosen by
+  mean pnl on BUILD second half; reported as plain "if A and B and C" conditions.
+Gates loose (family N = 30): BUILD n>=150, mean>0, CI90 lo>0 (day cluster), > random p90, quarters+ >=50%,
+  family DSR>0. HELD 2023-07..2024-12 once per passing variant: mean>0 and > random p90.
+AMENDMENT 2026-11-03 03:34 UTC: owner asked to explore 15m/1h potential. HELD run for ALL 15m and 1h variants as EXPLORATORY (BUILD gates not passed); any use is paper-only and must be confirmed on new live data.

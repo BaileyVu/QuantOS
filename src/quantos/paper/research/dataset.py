@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 from typing import TypeVar
 
-from .acquire import iter_cached_archives
+from .acquire import iter_cached_archives, period_overlaps_selection
 from .data import Bar, FundingRate, OpenInterestMetric, parse_funding, parse_klines, parse_metrics
 
 TRAIN_START = date(2021, 10, 1)
@@ -50,6 +50,7 @@ class DatasetIndex:
     overlay_manifest: str | None = None
     overlay_hash: str | None = None
     overlay_rows: int = 0
+    selection_bounds: tuple[str | None, str | None] = (None, None)
     manifest_hash: str | None = None
 
 
@@ -88,13 +89,21 @@ def manifest_content_hash(manifest: dict, symbols: set[str] | None = None) -> st
 
 def build_index(manifest_path: str | Path, *, symbols: tuple[str, ...] | None = None,
                 training_only: bool = True,
-                overlay_manifest: str | Path | None = None) -> DatasetIndex:
+                overlay_manifest: str | Path | None = None,
+                start_date: str | None = None,
+                end_exclusive: str | None = None) -> DatasetIndex:
     """Parse each cached archive once, verify it through the manifest iterator,
     then sort and audit raw timestamps. Gaps/duplicates remain visible.
     """
     manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     if training_only and (manifest.get("window") != {"start": TRAIN_START.isoformat(), "end": TRAIN_END.isoformat()}):
         raise ValueError("manifest is outside the approved training window")
+    start_ms = (int(datetime.combine(date.fromisoformat(start_date), datetime.min.time(), timezone.utc).timestamp() * 1000)
+                if start_date else None)
+    end_ms = (int(datetime.combine(date.fromisoformat(end_exclusive), datetime.min.time(), timezone.utc).timestamp() * 1000)
+              if end_exclusive else None)
+    if start_ms is not None and end_ms is not None and start_ms >= end_ms:
+        raise ValueError("selection start_date must precede end_exclusive")
     window = manifest.get("window", {})
     if not window.get("start") or not window.get("end"):
         raise ValueError("manifest window is required")
@@ -109,12 +118,16 @@ def build_index(manifest_path: str | Path, *, symbols: tuple[str, ...] | None = 
     for item in sorted(manifest.get("tasks", []), key=lambda x: x.get("id", "")):
         if item.get("symbol") not in wanted:
             continue
+        if not period_overlaps_selection(item.get("period", ""), start_date, end_exclusive):
+            continue
         if item.get("status") in {"missing", "error", "unverified", "available"}:
             unavailable.append({key: item.get(key) for key in
                                 ("id", "dataset", "symbol", "period", "status", "availability_class", "error")})
     for dataset in grouped:
         for row in iter_cached_archives(manifest_path, dataset=dataset,
-                                        interval="1h" if dataset in {"klines", "markPriceKlines"} else None):
+                                        interval="1h" if dataset in {"klines", "markPriceKlines"} else None,
+                                        symbols=wanted, start_date=start_date,
+                                        end_exclusive=end_exclusive):
             symbol = row["symbol"]
             if symbol not in wanted:
                 continue
@@ -131,11 +144,19 @@ def build_index(manifest_path: str | Path, *, symbols: tuple[str, ...] | None = 
             outside = sum(not (bounds[0] <= timestamp(x) < bounds[1]) for x in parsed)
             if outside:
                 raise ValueError(f"archive rows outside declared manifest window: {symbol} {dataset} ({outside})")
+            if dataset in {"klines", "markPriceKlines"}:
+                # Exclude a candle whose close boundary is exactly the BUILD cutoff.
+                parsed = [x for x in parsed if (start_ms is None or x.open_ms >= start_ms)
+                          and (end_ms is None or x.close_exclusive_ms < end_ms)]
+            else:
+                parsed = [x for x in parsed if (start_ms is None or timestamp(x) >= start_ms)
+                          and (end_ms is None or timestamp(x) < end_ms)]
             grouped[dataset][symbol].extend(parsed)
 
     overlay_path: str | None = None
     overlay_hash: str | None = None
     overlay_rows = 0
+    repair = None
     if overlay_manifest is not None:
         overlay_path = str(Path(overlay_manifest).resolve())
         repair = json.loads(Path(overlay_manifest).read_text(encoding="utf-8"))
@@ -153,6 +174,16 @@ def build_index(manifest_path: str | Path, *, symbols: tuple[str, ...] | None = 
             symbol, dataset = task.get("symbol"), task.get("dataset")
             if symbol not in wanted or dataset not in {"klines", "markPriceKlines"}:
                 continue
+            if not period_overlaps_selection(task.get("period", ""), start_date, end_exclusive):
+                continue
+            all_expected = set(task.get("missing_open_ms", []))
+            if not all_expected:
+                raise ValueError(f"repair task has no exact missing timestamps: {task.get('id')}")
+            expected = {x for x in all_expected
+                        if (start_ms is None or x >= start_ms)
+                        and (end_ms is None or x + BAR_MS < end_ms)}
+            if not expected:
+                continue
             if task.get("status") != "downloaded":
                 raise ValueError(f"repair task is not downloaded: {task.get('id')}")
             cached = Path(task["cached_path"])
@@ -162,15 +193,15 @@ def build_index(manifest_path: str | Path, *, symbols: tuple[str, ...] | None = 
             if digest != task.get("sha256"):
                 raise ValueError(f"repair archive checksum mismatch: {cached}")
             bars = parse_klines(cached, symbol, "1h")
-            expected = set(task.get("missing_open_ms", []))
-            if not expected:
-                raise ValueError(f"repair task has no exact missing timestamps: {task.get('id')}")
             current = {bar.open_ms: bar for bar in grouped[dataset].get(symbol, [])}
             additions: list[Bar] = []
             observed_expected: set[int] = set()
             for bar in bars:
                 if not (bounds[0] <= bar.open_ms < bounds[1]):
                     raise ValueError(f"repair row outside declared manifest window: {symbol} {bar.open_ms}")
+                if ((start_ms is not None and bar.open_ms < start_ms) or
+                        (end_ms is not None and bar.close_exclusive_ms >= end_ms)):
+                    continue
                 if bar.open_ms in expected:
                     if bar.open_ms in current:
                         raise ValueError(f"repair timestamp already exists in base series: {symbol} {bar.open_ms}")
@@ -200,6 +231,13 @@ def build_index(manifest_path: str | Path, *, symbols: tuple[str, ...] | None = 
             if dataset in {"klines", "markPriceKlines"}:
                 if len({ts(row) for row in rows}) != len(rows):
                     raise ValueError(f"duplicate timestamps prevent exact lookup: {symbol} {dataset}")
+    selection = (start_date, end_exclusive)
+    manifest_material = {"base": manifest, "overlay": repair,
+                         "selected_symbols": sorted(wanted)}
+    if start_date is not None or end_exclusive is not None:
+        manifest_material["selection_bounds"] = selection
+    manifest_hash = hashlib.sha256(json.dumps(manifest_material, sort_keys=True,
+        separators=(",", ":"), allow_nan=False).encode()).hexdigest()
     return DatasetIndex(
         bars={k: tuple(v) for k, v in grouped["klines"].items()},
         marks={k: tuple(v) for k, v in grouped["markPriceKlines"].items()},
@@ -214,10 +252,8 @@ def build_index(manifest_path: str | Path, *, symbols: tuple[str, ...] | None = 
         overlay_manifest=overlay_path,
         overlay_hash=overlay_hash,
         overlay_rows=overlay_rows,
-        manifest_hash=hashlib.sha256(json.dumps({"base": manifest,
-            "overlay": repair if overlay_manifest is not None else None,
-            "selected_symbols": sorted(wanted)}, sort_keys=True, separators=(",", ":"),
-            allow_nan=False).encode()).hexdigest(),
+        selection_bounds=selection,
+        manifest_hash=manifest_hash,
     )
 
 
@@ -225,8 +261,8 @@ def persist_audit(index: DatasetIndex, path: str | Path) -> None:
     """Persist row-level audit evidence (caller chooses ignored output path)."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"window": list(index.window), "content_hash": index.content_hash,
-               "manifest_hash": index.manifest_hash,
+    payload = {"window": list(index.window), "selection_bounds": list(index.selection_bounds),
+               "manifest_hash": index.manifest_hash, "content_hash": index.content_hash,
                "overlay_manifest": index.overlay_manifest,
                "overlay_hash": index.overlay_hash, "overlay_rows": index.overlay_rows,
                "series": [{"symbol": x.symbol, "dataset": x.dataset, "rows": x.rows,
@@ -242,14 +278,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", default="data/portfolio/manifests/train_2021-10-01_to_2024-12-31.json")
     parser.add_argument("--audit", default="data/portfolio/audits/train_2021-10-01_to_2024-12-31.json")
     parser.add_argument("--overlay-manifest")
+    parser.add_argument("--start-date", help="optional UTC inclusive date; filters partitions before checksum and read")
+    parser.add_argument("--end-exclusive", help="optional UTC date boundary; bars must close strictly before it")
     args = parser.parse_args(argv)
-    index = build_index(args.manifest, overlay_manifest=args.overlay_manifest)
+    index = build_index(args.manifest, overlay_manifest=args.overlay_manifest,
+                        start_date=args.start_date, end_exclusive=args.end_exclusive)
     persist_audit(index, args.audit)
     print(json.dumps({"symbols": len(index.bars), "bars": sum(map(len, index.bars.values())),
                       "marks": sum(map(len, index.marks.values())),
                       "funding": sum(map(len, index.funding.values())),
                       "metrics": sum(map(len, index.metrics.values())),
                       "window": index.window, "content_hash": index.content_hash,
+                      "selection_bounds": index.selection_bounds, "manifest_hash": index.manifest_hash,
                       "audit_file": args.audit}, sort_keys=True))
     return 0
 

@@ -1,3 +1,473 @@
+## STOP AT QUOTA — exact unfinished driver state (LATEST)
+Main sourcecf200a0 pluscheckpointcommitfollows. ModelagentSTOPPED21%fivehour/
+74%weekly,banked0. Noactiveprocesses,NOdriftinference/actualmodelfit.
+Modelagentworktree QuantOS-infra-timesfm branchcodex/infra-ml1h-drift-runner
+base4632c7c plusfithelperbb35f78 (samef1d507b/main72c5c5b). UNCOMMITTED NEW
+src/quantos/paper/research/ml1h_drift_runner.py exists; NOtestfile, NOtestsrun.
+Do NOT run thisdraft. Latestresult-cache/finalizationrefactorunfinished.
+Exactnextafterreset: finish_read_result/_write_result use,cachedfoldsfinalize
+WITHOUTmodelreload; validatefoldrecordschema/coverage, decideinternaltest
+injectionisolation; addfakeendtoendregistration-before-inference/resume/deadline
+checks; mainreview thencommit/integrate/freeze beforeONEactualA/B. Draftalready
+includes49htrailing-originexclusion andwatchdogscaffold butNOTvalidated.
+Sourcearchiveagentfinalstatusfollowswhenavailable. Mainpassivecapturehooks
+fceb531/cf200a0 safelycommittedtested, notruntimewired, preservewhenPR9closes.
+Nextfivehourreset1794192745=Nov9 09:52:25Vietnam; samecontinuation09:58.
+
+---
+
+## Runner and passive capture work — 2026-11-09 morning (LATEST)
+Resume quota verified98%five-hour/86%weekly,banked0. Mainbranch
+codex/infra-timesfm25-integration sourcecf200a0. Widthpilot/exportunchanged.
+Reviewed/integratedf1d507b as72c5c5b frozenfoldscorer;4focusedtests PASS.
+
+Maincapture work (source only, not release-integrated, NOservice changes):
+- fceb531 passive SignedClient observer receives allowedendpoint unsignedparams
+  +decodedresponses beforeerrorhandling, neverheaders/signatures/listenkeys.
+  Deepcopyisolatescallbacks; exceptions preserveoriginalorderoutcomes andmark
+  observation_error. Sentimentactualconsumedline andml1hactualbytes callbacks,
+  UserStream observedbeforebufferloss, alsoisolated.17focusedobserver/clienttests
+  passedbeforeadditionalenginecapturetest.
+- cf200a0 PaperEngine optionalfill_observer emitsoriginalmodelprice+actualquote
+  andabsmodelslippageBEFORE book_real_fills overwritesfills/events.7observer
+  testsPASS includespostcorrectionoriginalpricepreserved. Runtime MUSTbuffer
+  theseobservationsandflushonlycommittedfills; observerisnotwiredyet.
+- AgentInputArchive5df3e54 prepared oncodex/infra-input-audit in
+  QuantOS-infra-sentibot, NOTintegrated. Mainfoundthreadrace storingbloboutside
+  lock; agentfixing withclosed-no-write/rootpreservation/nan rejection tests.
+  Archivecontentmustpersist exactbytes, hash-onlyisinsufficient.
+- Recorderlifecycle/runtimeCLI/initial+finaljournalsnapshot/windowfirst20fills
+  or3days/seededreplay/pertradecomparison NOTimplemented. Noacceptanceclaim.
+  Preservefceb531+cf200a0 as separatecommits forPR7/release: theycurrentlylive
+  ontopPR9stack; MUST move/retain inacceptedinfraPR before anyPR9closure.
+
+Modelagent implementing ml1h_drift_runner.py inQuantOS-infra-timesfm,
+newcodexbranch (inspectlatestagentstatus), NOTintegrated/run. Mainreviewed
+initialsourceandrequested: pinnedlightgbm4.6.0 not4.7; exclude last49origins
+withoutBUILDlabels; no globalmodulemutationfortestinjection; strictfoldcoverage
++cachedreporthashvalidation; completedfoldsfinalizewithoutmodelreload; independent
+harddeadlinewatchdogsinceSIGALRMmaywaitonCcode. Agenttests/commitpending.
+Existing16x15311export andpinnedoverlay/weights ready; NOdriftinference/actualfit.
+Atlatestusage28%fivehour/75%weekly,reset1794192745 (Nov9 09:52:25Vietnam).
+Stopnewworknear20%; checkpointagentfinalstatus, updateSAMEcontinuation09:58.
+Noactiveownedprocesses. Do not reexport/redownload/repeatpassingtests.
+
+---
+
+## Final quota verification (LATEST)
+Saved/pushed head4632c7c to existingPR56. Finalallowance13%fivehour/86%weekly,
+ZERO bankedresets. No implementation resumed after22%checkpoint; wrapup committed
+safe work andupdatedPR. ResetNov9 04:49:36Vietnam; samecontinuationconfirmed04:55.
+Next: reviewf1d507b, IMPLEMENT missingrunner (no draftexists), freeze/test/mainreview
+beforeONEactualdriftA/B. Bothagentsidle/noownedprocess. No export/inference repeats.
+
+---
+
+## Final runner status clarification (LATEST)
+Validationagent stopped before starting orchestration: NO ml1h_drift_runner.py
+exists, no draft or commit. Ownbranchcodex/infra-timesfm-drift remainsf1fc61d,
+alreadyintegrated98d4fae. Bothagentsidle,noactiveprocesses. Nextwindow mainreview
+fithelperf1d507b then IMPLEMENT runner fromsavedprereg/interfaces; do not search
+for a nonexistentdraft. Main source/accounting/test/docs safely9338754 before
+thisclarification. SAMEcontinuationconfirmedACTIVE Nov9 04:55Vietnam after
+04:49:36reset. Allownerrequirements inprecedingcheckpoint remaininforce.
+
+---
+
+## FIXED-COST A/B preparation saved — 2026-11-09 quota handoff (LATEST)
+Currentbranch codex/infra-timesfm25-integration, sourceb059e17; checkpoint/test
+commit follows. STOPPED new implementation at22%five-hour,88%weekly remaining,
+ZERO banked resets. Reset1794174576 = Nov9 04:49:36 Vietnam; continuation04:55.
+No actual drift inference or market model fitting begun; no one-day deadline
+has started. Widthpilotcompleteunchanged; do not repeat it or its audits.
+
+Completed this window:
+- Integrated/reviewed causal32features8003bdd (agent18e661a), driftcache57c5f5f
+  (5816614), BUILDexport684aae3 (6f5055a), lock/shareddeadline98d4fae(f1fc61d).
+- Main fixed-cost labels/gates and ex-ante specification b059e17,
+  research/ML1H_DRIFT_PREREGISTRATION.md. Delayed49hlabelboundary; sidechosen
+  BEFORE fillobservation; no hindsight switch tootherdirection. Policy remains
+  originalmaker-label fixedcost4bp+10bp owneramendment, not productioncosts.
+- Integrated23focusedfeature/export/drift/accountingtests PASS0.868s. Addednew
+  completeA/B accounting test:8fixedcost tests PASS0.068s (supersedes7subset).
+  No older passing tests or outcomes repeated. evaluate_records callable main
+  finalreport API in ml1h_gates.py, no actualresultyet.
+- Supplementary EXACTpinned packages installed isolated
+  QuantOS-infra-timesfm/.ml1h-drift-deps: pandas2.2.3,lightgbm4.6.0,
+  scikit-learn1.6.1,scipy1.15.3,python-dateutil2.9.0.post0,pytz2025.2,
+  tzdata2025.2,six1.17.0,joblib1.4.2,threadpoolctl3.6.0. OriginalCPUvenv
+  unchanged; importsmokeactualPASS (initiallyslow,process25292/session19313
+  complete). Firstpipcommandfailed becausevenvhasnopip; uvtargetinstallpassed.
+
+ACTUAL NEW EXPORT COMPLETE exit0(session86799 closed):
+QuantOS-infra-timesfm/.research-ml1h-drift-build/export.json holds16manifests+
+hashes; all16exact15311hours,2021Oct01 01UTC..2023Jun30 23UTC completedcloses.
+indexmanifestSHA f579489471f668f1184e3eb6e567af7dfb13da73fb7d74a0bf3c2cc3afa6e4f8.
+Do NOT rerunexport. Earlierattempt frominfra-v5cwdfailed beforearchiveopen due
+relativecachepath; correctedcanonicalQuantOScwd succeeded. Logs
+/tmp/quantos-ml1h-drift-export.log(failure) and
+/tmp/quantos-ml1h-drift-export-cwd-fixed.log(success). Export usesmainPYTHONPATH
+and existing .venv-timesfm25; noHELD/2025+ partitions. Savedwidth2022exportintact.
+
+EXACT NEXT afterreset:
+1. Mainreview/integrate sourceagent f1d507b inQuantOS-infra-sentibot branch
+   codex/infra-ml1h-features: pure frozenwalkforwardhelper. Agent8synthetictests
+   passed; mainhasnotreviewedfinalcallback/quarters changes orintegratedit.
+2. Review validationagent DRAFT runner inQuantOS-infra-timesfm branch
+   codex/infra-timesfm-drift (statusbelow). Mainownsaccounting/gates/finalreview.
+   Runner mustuse common16x15311manifestdata, originalopen_ms for32features,
+   completedclose forfolds, drift4/12/24only, oneglobal24hdeadline acrossall
+   symbols/fits/resumes, immutablefoldpredictioncache, registry2armsBEFORE
+   inference. Freeze source/model/fullresolveddeps/data+protocolhashes. Avoid
+   treating missingDSRmoments/globalregistry as inventedstatistics.
+3. OncefocusedrunnerintegrationPASS and mainreviewcomplete, runactualONE A/B
+   with existingcache+venv, PYTHONPATH overlay:first and main/src. SavePID/log,
+   checkpoint. No newdownloads/export. Preserveforecastcache/resumeexactorigins.
+   Passfixed-costgates1xAND2x andbeatbaseline=>L3shadowONLY; measuredfailure=>
+   closePR56 and shortrejectionwithnumbers. Infra/timefailureisNOTmeasuredfail.
+4. Remainingreleasework includes recorder forowner-startednonstopdemo (NOdemo
+   currentlyrunning). Source/start_demo_nonstop.sh + statev4-demo200/service
+   com.quantos.v4.demo200 ownerlaunchonly. Capturemarket+sentiment/ml1hfileversions
+   +exchangeorder/fillresponses, initialstate; first20actualfills OR3days,
+   exactdecisionparity and each independentmodeledfill withinmodeledslippage.
+   DoNOT validate fillaccuracy by copyingactualfill into simulatedprice.
+   4006decisionno-orderproofretained. RecorderNOTimplementedyet. No serviceedits.
+5. Actual24hdemo/72hSentibot/fullUSDC L2 remainpending; crash/dipCANCELLED.
+Noactiveownedruntime/export/importprocess. Sourceagentidle; modelagentstopping.
+
+---
+
+## Owner clarified data and demo prerequisites (LATEST)
+No demo is running; owner holds it until release work is ready. Do NOT start or
+change services. Build recorder into release; owner later launches
+start_demo_nonstop.sh with state ~/Library/Application Support/QuantOS/v4-demo200
+and service com.quantos.v4.demo200. Forward acceptance begins with that launch:
+first >=20 actual fills OR three days, exact decisions and per-fill modeled
+slippage bound. Capture raw sentiment/ml1h files and order/fill responses.
+
+No historical depth/USDC dataset exists. Owner explicitly authorizes USDT
+FIXED-COST L2 ml1h drift A/B: original maker-label scenario, taker4bp+slip10bp,
+2x/3x fixed-cost stress. Pass requires augmented arm beat baseline AND gates at
+1x and2x; earns L3 shadow on real quotes ONLY, no promotion. Do not call this
+full L2. This supersedes the preceding missing-dataset blocker. No crash/dip.
+Main preparing one frozen protocol; actual inference/training has NOT begun.
+Fixed data choice before outcomes: original C21 intersect saved corpus,16symbols;
+2021Oct01..strict2023Jul01, three testquarters2022Q4,2023Q1/Q2, top2% matching
+runtime ml1h, train-only lastquarter calibration, purged48h labels. Saved2022width
+export insufficient OHLCV/warmup, separate narrowly scoped export necessary.
+Main added fixed-cost labels and gates;5focused tests passed before delayaddition.
+Agent18e661a features,5816614 drift cache await mainintegration; followupsactive.
+New exact pinned dependencies installed in isolated .ml1h-drift-deps overlay;
+original .venv-timesfm25 and weights unchanged. No owned long-running process.
+Latestusage77%fivehour/96%weekly,banked0. Automation sameID update confirmed04:55
+Vietnam after04:49:36reset; prompt must be updated again for newest directions.
+
+---
+
+## Owner directions after second reset — 2026-11-08 (LATEST)
+Owner confirmed second banked reset used; tool verifies ZERO resets remain.
+At resume: 99% five-hour and 100% weekly remaining. Five-hour reset1794174576;
+weekly1794761376. Never attempt further banked resets. Current source435ff1d on
+codex/infra-timesfm25-integration, clean at resume. Completed volatility pilot and
+its independent audit remain final; do not repeat inference/export/tests.
+
+New explicit decisions supersede prior pending questions:
+1. Cancel crash/dip shadow test: its quantile-width input failed the volatility gate.
+2. Run ml1h augmentation ONCE, preregistered DRIFT FEATURES ONLY, one walk-forward,
+   unchanged costs and L2 gates, at most one day compute. Log in registry. Pass
+   all gates => candidate only; fail => close PR56/PR9 and write short TimesFM
+   rejected note with actual numbers. Do not call missing evidence a numerical fail.
+3. Replace original pD replay with forward recording of existing non-stop demo,
+   read-only, no service changes. Capture sentiment, ml1h signals.json, exchange
+   order/fill responses along with market inputs. Window >=20 real fills OR
+   3 days, whichever first. Exact decision match and EACH simulated fill error
+   within modeled slippage versus Binance fill; report per trade. Retain prior
+   4,006-exact-decision no-order soak as decision-layer evidence.
+
+Two existing lower-cost agents reused: sourceagent pure causal ml1h features;
+validationagent resumable TimesFM median drift4/12/24h cache. Source-only tests;
+no actual training/inference yet. Main owns labels/costs/protocol/L2, recorder,
+accounting, integration and final review. No owned active runtime process.
+Exact next: main preregister bounded safe BUILD experiment; inspect running demo
+recording capabilities read-only to design complete capture without service edits.
+Historical hourly USDT archive lacks depth/USDC provenance, so genuine L2 cannot
+be claimed by silently substituting fixed costs. Existing width export lacks open
+and volume required for ml1h; any new narrowly scoped export must document reason.
+Owner alone merges/deploys; running demo/state/LaunchAgents and alt-ML untouched.
+
+---
+
+## Pilot audit and pending owner decisions (LATEST)
+Completedactualpilot independentlyauditedread-only:1029validhashchainedorigins,
+0missing/duplicate/unknown/targetboundarymismatch;9registeredvariants/3results.
+CPUmodel/dependencies/data/source bindings verified. No replay/inference rerun.
+SourceindexincludesDec31 2021only toprovideJan1close; actualinput8760hours2022.
+Acceptance matrix docs/INFRA_V5_ACCEPTANCE.md recordsremainingwork honestly.
+Ownerquestionspending: (1)newforwarddemowithtrades replaceoriginalpD missingcontext
+acceptance? (2)applyTimesFMkillrule now orcontinueuntestedml1h/filterarms? Noanswer
+assumed. Do not mark taskcomplete. Bothagentsidle,noownedprocesses.
+Next independentstep: preparefinalowner-selectedsnapshot/soak/rollback bundle;
+owneralone merges/deploys. Actual24h/72hacceptancecannotbeclaimedfromtests oronecycle.
+Lastusage80%fivehour/4%weekly,banked1; checkweeklybeforefurtherwork, resetonlyat0.
+
+---
+
+## ACTUAL TIMESFM PILOT COMPLETE — 2026-11-08 (LATEST)
+run-v1 completedexit0,137.686s,PID23064/execsession72239 finished. Noownedprocess.
+3symbols×343origins=1029 forecasts saved; do NOT rerunforecasts/bootstrap/export.
+Artifacts QuantOS-infra-timesfm/.research-timesfm25-build2022/run-v1/report.json,
+preregistered_plan.json,progress.jsonl; registry.sqlite adjacent. Log
+/tmp/quantos-timesfm25-pilot.log. Source06f5b4f, protocol765e9ae. Resultsummary
+in docs/TIMESFM25_BUILD_PILOT_RESULT.md. CPUcachedweights,offline/no redownload.
+PooledMAE TimesFM.014120145321321035, persistence.015004494768331196,
+EWMA.013914850460051175,ATR.013215945755212089. Allpaired95%CIsincludezero.
+TESTEDWIDTHFEATURE FAILS baselinegate; rejectpromotion/sizing/signaluse.
+This doesNOTtest ml1hfeatureaugmentation or crash/dipL3 filter; stillNOTRUN.
+No modelselection onHELD or2025+. Low-costmodelagent auditingcompletedartifact
+metadata/counts read-only (no repeats), mainownsfinalinterpretation.
+
+NEXT: saveaudit/result, updatePR56; remaining acceptance needsownerexclusive
+merge/deploy and pendingdecisionwhethernewforwarddemo canreplaceoriginalpDperiod
+missingcontext. 4006decisionno-tradereplaypassed, nottradefillparity. Stillno24h
+reconciledshadowdemo,72hSentibot,actualUSDC L2,ml1h+featuresL2/crashdipL3 evidence.
+Atresumeusage95%fivehour/6%weekly; afterrun80%fivehour/4%weekly,banked1. Do NOTuse
+bankeduntilweeklyconfirmed0. No redemptiontool; owner redeemedfirst manually.
+SAMEautomation currently23:40Vietnam; next5hreset1794173906; updatewhenrequired.
+
+---
+
+## READY FOR ACTUAL TIMESFM PILOT — quota handoff (LATEST)
+Currentbranch codex/infra-timesfm25-integration, source765e9ae. Protocolagent
+3d909a0 INTEGRATED andMAINREVIEWED;25focusedprotocol/volatility/registry/export
+integrationtests PASS1.983s. No unfinishedrunner. Bothagentsidle,noownedprocesses.
+Do not repeat passingtests. source-onlyml1h reference d71fda1 integrated; do not
+execute historicalrun.py (top-levelprotectedml5maccess/cost/calibrationissues).
+Newforward no-trade replay4006decisionsexact, documentedpriorsection. Owner
+question replacingoriginalpDacceptance pending; noimplicitapproval. Noactualmodel
+marketcomparisonyet. 24hdemo/72hSentibot/USDC L2/ml1hL2/crash-dipL3 stillpending.
+
+EXACTNEXT afterreset: execute savedfixed3seriespilot. MainSOURCE=QuantOS-infra-v5/src;
+PYTHON=QuantOS-infra-timesfm/.venv-timesfm25/bin/python; HF_HUB_DISABLE_TELEMETRY=1,
+CUDA_VISIBLE_DEVICES=''. Import run_protocol fromquantos.paper.research.timesfm_volatility.
+Read QuantOS-infra-timesfm/.research-timesfm25-build2022/export.json datasets;
+inputs=[(entry['manifest'],entry['manifest_hash']) forentry in datasets.values()].
+run_protocol(inputs, registry_path=exportdir/'registry.sqlite',
+ cache_dir=QuantOS-infra-timesfm/.hf-home-timesfm25, output_dir=exportdir/'run-v1').
+Registry/output new; allmodelweights/dataALREADYSAVED. No reexport/redownload.
+Record actualprocessID/session/log iflongrunning. Frozenper-originprogressresumes;
+neverrepeat completedforecasts. Inspectreportifalreadycompletebeforeinvoke. Registry
+hereis isolatedTimesFMtrialregistry, NOTglobalsearchN; noSharpe/DSRfromforecastMAE.
+Priorlegacyimport4309/4227 proofretained; DBartifactnotfoundinpriorregistryworktree
+or/tmpglob, don'trepeatimport. Source/dependency/model hashesfrozenbeforeinference.
+
+Quota verified7%five-hour/8%weekly,banked1. Stoppednewimplementationnear20%,
+onlysavedcompletedagentwork/integrationchecks afterthreshold. SAMEcontinuation
+updateCONFIRMED ACTIVE23:40Vietnam today after23:35:25reset1794155725. Onebanked
+resetONLYafterweeklyexhaustion; no redemptiontool, ownerusedfirstmanually.
+
+---
+
+## Resume and new replay evidence — 2026-11-08 evening (LATEST)
+Resetverified98%fivehour/22%weekly,banked1. Mainbranch codex/infra-timesfm25-integration
+source6f4447b. Reusedexistingtwo lowercostagents: modelagent finishingprotocol/tests;
+sourceagent source-onlyml1haudit then referencevendoring. No rawdata/export/download
+or passingtest repeated. Mainreadprotocol andflaggedstructuredmodelmetadata collision
+with register_variants pinnedstring; agentfixing andtestingwholemockedprotocol.
+
+NEW ACTUAL EVENTREPLAY: completedimmutable4fe48e2-net soak recording replayed ONCE,
+exit0, /tmp/quantos-infra-replay-4fe48e2-complete (log same+.log). Input985events,
+22scanbatches;4,006decisionrows EXACTmatch,0mismatch; sentiment/external/exchange
+contextcomplete. No trades, so nofillparityclaim. InputdecompressedSHA
+7c16b979328e08a2cdb27bc39434b542508bc8c4f33088123d71ba4bc67cbf63.
+Expectedclosedjournal copiedto/tmp/quantos-infra-soak-4fe48e2-expected.db; original
+soak/demo state untouched. OriginalhistoricalpD period stillincompletecapture.
+Askedownerasync whethernewforwarddemo withtrades mayreplaceoriginalpDacceptance;
+ANSWERPENDING. Continueindependentresearch, don't inferapproval.
+
+Source-onlyml1haudit: edge_data/patml_v1/run.py SHA
+5a6470bfb28848ea31e21e7a821a7b69db410f63acf332262b2e7245253f6577;
+PREREG.txt SHAcf9601a9ac2ff3c96d3bd7f85e0c8c089f7a5b536dd58c470e1f5c441514f843.
+Selfcontainedscript, top-levelimports execute data/training, NEVERimport/run as-is.
+32causalfeatures, ATR14,1.5ATR TP/SL48h; labelsomitentryfee andhaveoldcosts;
+train-tail scorecalibrationbiasedbycoinconcatenation, labelsbuiltbeforequarterfilter,
+48h boundarymayreadHELD labels. OriginalHELD exploratoryalreadydone perprereg;
+no outcomesread. Loaderreadsprotectedml5m paths (notaccessed). FutureBUILD refactor
+mustuseverifiedhourlyinput, actualcurrentcosts/conservativecollision semantics and
+trainonlycalibration, strictlabelendcutoff. CannotclaimUSDC/depthtruth fromUSDTproxy.
+
+Exactnext: integrateagentprotocol oncefocusedtestsPASS, mainreview, runSAVEDfixed
+3×8760hour2022dataset comparison with existingvenv/cache. Noactiveownedprocesses.
+Latestusage70%fivehour/18%weekly; onebanked onlyatconfirmedweeklyexhaustion.
+
+---
+
+Final allowance verification:6%five-hour/23%weekly remaining, banked1. Main
+source+checkpoint pushed through1cff558; thisquota-onlynote islocal. No implementation
+resumed afterthreshold. Continuationconfirmed18:32Vietnam after18:26:52reset.
+
+## Agent final status clarification (LATEST)
+Modelagent replacement timesfm_volatility.py IS PRESENT (earlierdeletedstatus was
+midwrite), modifiedUNCOMMITTED/UNTESTED in QuantOS-infra-timesfm on
+codex/infra-timesfm-protocol. registry.py modifiedonly optionalseries metadata
+argument tocreate_dataset_manifest. No alternate/temp source. Bothagentsstopped;
+noownedprocessesstartedbyagent. No modelinference/realcomparison yet.
+Exactnext: reviewrunner; fix resumeidentity currentlyincludesgitHEAD (mustaccept
+checkpoint-onlycommits whenrelevantsourcehashesunchanged); completedresume currently
+synthesizesdifferentmodelmetadata causing reportmismatch. Addfocused strictseries/
+fullcoverage/logwidth/cachehashchain/duplicate-unknownorigin/planmismatch/resume-
+skip/bootstrapdeterminism n<14 tests. Then affectedtests, commit/integrate/mainreview.
+Do not runthisunfinishedrunner. Savedexport andpinnedmodelcache remainvalid.
+SAMEcontinuationconfirmed18:32Vietnam after18:26:52reset; owneralone merges/deploys.
+
+---
+
+## Quota handoff 2026-11-08 afternoon (LATEST)
+Current mainHEAD ea39660, codex/infra-timesfm25-integration; PR56 sourceupdates
+ready to push. Allcompletedsource safelycommitted. At21%fivehour/26%weekly,
+implementation stopped; onebankedreset unchanged. Reset1794137212=Nov8 18:26:52
+Vietnam. SAMEcontinuation updateCONFIRMED ACTIVE18:32Vietnam daily,thischat.
+Noownedruntime/researchprocessactive. Sourceagent finishedreadonly audit, modelagent
+interrupted atthreshold and requestedSTATUSONLY. No furtherimplementationthiswindow.
+
+EXACT NEXT: modelagent worktree QuantOS-infra-timesfm branchcodex/infra-timesfm-protocol
+baseab43c97 currentlyUNCOMMITTED registry.py modified and timesfm_volatility.py
+DELETED midrewrite. NOT integrated/tested; do not run it. Inspectagentstatusnote
+below ifavailable, recover/finish coherent protocol source, tests, then mainreview.
+Desired protocol: exact2022 completedclosebars BTC/ETH/SOL, log(q90/q10)/2.563,
+strictmanifestseries+fullcoverage, pinnedrevision/weights/deps/sourcebytes prereg,
+resumableper-origin cache withidentitychecks,7daypairedblockbootstrapseed0/2000.
+OriginalEWMA recurrence already correct (firstactualreturn² thenrecurrence); no
+unnecessaryformula change. Main registry.record_observation added/tested13PASS;
+retainit, don'tduplicate. Dataexport ALREADYCOMPLETE: use manifesthashes inprior
+section; neverreexport orinspectHELD. Actualcomparison stillNOTRUN.
+
+LaterPR9ml1h prerequisite: edge_vault/patml_v1 containsREADME only, names training
+source edge_data/patml_v1/run.py and PREREG.txt. AgentdidNOTreadthoseyet. Nextaudit
+mustonlyreadthese sourcefiles/directimports; don'treconstructfeaturesfromprose,
+no outputs/models/HELD/2025+. Existingconsumer requiresbar_close_ms plus
+signals(symbol,side,atr,score), fresh<=10min; remainscandidate. No changes to
+alt-ML or edge_data/ml5m. Mainacceptedruntimecostoassumptionsunchanged.
+
+---
+
+## Fixed BUILD export complete (LATEST)
+Activebranch codex/infra-timesfm25-integration sourcee5f8b1a, clean beforecheckpoint.
+PR56 remainsdraft; nothingmerged/deployed. BUILDcutoff reviewed/integrated,
+9datasettestsPASS. Registryforecastresult methodab43c97,13registrytestsPASS.
+Exporter aa72049+checksumcorrectione5f8b1a,2exporttestsPASS.
+ActualEXPORT COMPLETE exit0: QuantOS-infra-timesfm/.research-timesfm25-build2022.
+BTC/ETH/SOL each8760 completed-hour2022bars, noHELDrawarchivesopened. Full
+base/overlaymetadata hashes checked; rangeDec31 2021 through2022, strictclose
+cutoff2023-01-01. Selectedexport timestamps2022-01-01T00 throughDec31T23 UTC.
+Manifesthashes:
+BTC f08a106f3bfd2c09fbadbe49d098445f82c44a8095ab729d0465029a3437b387
+ETH c325a92070a3488912f128f766dd2d7e5a300cbde430f291bbc5e72045f04942
+SOL b36c03d841e93421aaed215eccb24678f4c35fef87a295a1e7398c05867c3b4d
+Indexmanifest f3b5e5c039c733c375706f8fa9c5c53c4a5aa626056175fd21995e1ee0466441.
+Log/tmp/quantos-timesfm25-build-export.log; sourceaudit/export.json inexportdir.
+Do notrepeat export or fullmetadata scans. No actualforecastoutcomesyet.
+NEXT: integrate modelagent codex/infra-timesfm-protocol runnerfixes (log-width,
+strictseries/fullcoverage, preregcode/model/deps, resumableorigin cache, paired
+7dayblockCI); mainreview/affectedtests thenrunfixed3assetpilot usingexistingCPUvenv
+andweights. Sourceagentread-only ml1htraining-code prerequisiteaudit. Noactiveowned
+runtime/researchprocess currently. Latestusage39%five-hour/29%weekly,banked1;
+reset1794137213. SAMEautomationcurrently13:22Vietnam; update at20%threshold.
+AllactualUSDC L2,pDoriginalparity,24hdemo,72hSentibot acceptance stillpending.
+
+---
+
+## BUILD export preflight correction (LATEST)
+Source metadata preflight failed before anyrawarchive access. Verified exactfile
+SHA: overlay8fbb13eadcfa148c6479d444b7a2a3edf14811a35f3a53fb5afaa3e2c85cee9f.
+Earlier agent report/checkpoint transposed aa3e2 asaa2e3; sourcefile unchanged
+sinceOct29. BaseSHAmatches. Corrected exporterpin, no dataoutcomesinspected.
+Maincutoff integratedeff2be5 via5c4f342+9c62423; conflictresolution firstfailed
+import, correctedfullmodule+retainedtests:9focusedPASS. Exporteraa72049 tests2PASS.
+Exactnext rerun preflight/export (priorrunneveropenedrawdata), integrateagent
+protocolfixes then actualfixed2022 BTC/ETH/SOL forecastcomparison. Noactiveprocess.
+
+---
+
+## Resume 2026-11-08 13:26 Vietnam (LATEST)
+Reset verified;97%five-hour/38%weekly,banked1. CurrentHEAD e466a1a on
+codex/infra-timesfm25-integration, PR56 source55a1c23. Existing510tests and
+syntheticCPUforecast retained; no reruns. Sourceagent resumes partialBUILDcutoff
+with boundary/hash regressiontests; modelagent independently reviewsPR9runner.
+Main reviews finalintegration/protocol. Noownedruntimeprocesses. Workspace is now
+read-only; scoped authorized edits require reviewed escalation. Exactnext:
+finish/test/integratecutoff, freeze source/model/data plan beforerealBUILDcomparison.
+
+---
+
+## FINAL quota handoff 2026-11-08 (LATEST)
+PR8 draft55 at788aa97; PR9 draft56 at55a1c23, currentbranch codex/infra-timesfm25-integration.
+510 tests13.767s PASS4skips, /tmp/quantos-infra-pr9-tests.log. ActualpinnedCPU
+syntheticforecast PASS2.573s, /tmp/quantos-timesfm25-synthetic-inference.log.
+Modelvenv QuantOS-infra-timesfm/.venv-timesfm25; cache .hf-home-timesfm25,
+925181104bytes SHA2f776efe6245e42b24bc4153ffdf61810140210e4bd3b01fb21f7aa779ab6ce8.
+Hubpin0.30.2 fixes actualAPIimport; no marketexperiment yet. Bothagentsstopped.
+Exactnext: sourceagent UNCOMMITTED acquire.py/dataset.py BUILDcutoff partialwork
+in QuantOS-infra-sentibot; NOTTESTED/NOTINTEGRATED. Reviewfinishboundary/hashlogic,
+addfocusedtests beforecommit/cherry. Then BUILDexport/preregisteredcomparison.
+NoHELDevaluation/depthfabrication; owneralone deploys24hdemo/72hSentibot.
+Soak4fe48e2-net finishedexit0,648.261seconds, start1794101012610 end1794101660871.
+Final eventcounts below. SQLite final read needs mode=ro&immutable=1 afterclosed
+(noWALfiles), ordinaryrofailed unableopen. Noownedprocessesremain.
+Quota handoff initially17%, now1%fivehour/38%weekly;1bankedunchanged.
+SAMEautomationupdateCONFIRMEDACTIVE13:22Vietnam today, after13:17:05reset.
+Do notrestartbefore reset. Noimplementationafterthreshold; onlysave/soakmonitor.
+[('ALT_DIP_CALIBRATION', 1), ('CONNECTED', 1), ('NO_SIGNAL', 2002), ('OBSERVATION', 607), ('RECONCILED', 1), ('SCAN', 2002), ('SELF_CHECK', 1), ('SKIPPED_STALE_RELEASE', 24), ('START', 1)]
+
+---
+
+## Infrastructure v5 — PR8 published, PR9 active, 2026-11-08 (LATEST)
+
+PR8 draft55 OPEN https://github.com/BaileyVu/QuantOS/pull/55 at788aa97, stacked
+onPR54. Sourcecollector4fe48e2, helper14b2e56+review788aa97: lexicalvenvPython,
+refuseLaunchAgents/symlinks, newstate/plist only, fullSHA clean snapshot. Tests
+30collector/report/input/resolverPASS +4helperPASS. No existingserviceschanged.
+
+Active branch codex/infra-timesfm25-integration; PR9 bf5a695+835f32b integrated,
+main6757574 adds manifest-bound BUILD-only 24h volatilitycomparison runner.
+Plan is registered beforeinference, noHELDevaluation. Synthetic12testsPASS,
+final3runner testsPASS, help/diffcheckPASS. Runnerexpects pendingagent loader
+(timesfm_model.load_model), notyet runnable with realweights. PR9 notpublished.
+Sourceagent adding safeBUILD-cutoff to existingdatasetreader (beforearchiveopen);
+modelagent installing separatepinnedCPUvenv/cache +explicit2.5loader. Main owns
+review. No actualBUILD modelcomparison/ml1hwalkforward/L2/L3 result yet.
+
+Currentownedprocess: isolatedreal-entrypoint live-data NOORDER soak immutable
+4fe48e2 in QuantOS-infra-soak-4fe48e2, state/tmp/quantos-infra-soak-4fe48e2-net,
+log samepath+.log, PID76929, execsession38513. Started1794101012610;
+deadline1794101660610 (648s). Correctreadonly QUANTOS_ML1H_SIGNALS path supplied,
+baselinesentimentfile readonly. First224observations/819scans, startupselfcheck
+allOK, zeroERROR/SHADOW_ERROR/ALERT; NOTfinalpassyet. Earlier sandbox-onlyattempt
+/tmp/quantos-infra-soak-4fe48e2 failedpublicAPI (3ERROR), stoppedourPID76519,
+exit0session14751closed. Nevererasefailedrecordorclaimpass.
+Sentibot isolatedonecycle immutable4fe48e2 COMPLETEDexit0session50311closed:
+/tmp/quantos-sentibot-4fe48e2/reach_shadow.jsonl, log sameparent+.log. Duration
+66.169s,10events,38eligibleUSDCcontracts,12queried (explicitpartialcoverage),
+Reddit160posts, Jina0/8fulltext success UNVERIFIED. No72hrun/deployment.
+
+Metadata-only dataaudit: existing QuantOS/data/portfolio/manifests/train_2021-10-01_to_2024-12-31.json
+SHAe3464f95f66e438c42c78c30187dd639da74014d25fce6b22c60bfe2ac551810;
+daily_repairs_2021-10-01_to_2024-12-31.json SHA8fbb13eadcfa148c6479d444b7a2a3edf14811a35f3a53fb5afaa2e3c85cee9f.
+29survivorUSDTproxy symbols, hourlyklines/marks/funding, BUILD21months609partitions
+perdataset; completeoverlay fixes1200klinehours/1608markhours. NOdeptharchive or
+historicalUSDCavailability/provenance. SupportsTimesFMcandlecomparison oncecutoff
+reviewed, NOT fullUSDCexecutionL2 acceptance. Do not rerunmetadatascan. Indexdefault
+readsHELD2023H2–2024; agent adds explicitBUILDonly option before anynewindexrun.
+ActualhistoricalpDparity remainsincompletecapture; noinventeddepth/prelistingdata.
+
+NEXT: follow currentsoak tocompletion; integrate/review modelagentloader andBUILD
+cutoff separately, runaffectedtests, publishPR9draft, then actualBUILDexport and
+preregisteredcomparison. Owner-alone deployments remainneededfor24hdemo and72h
+Sentibotacceptance. Latestusage39%five-hour/44%weekly,1banked; reset1794118625.
+At20%save/checkpoint and updateSAMEcontinuation afterverifiedreset; currentlydaily
+08:18Vietnam. No additionalresetused. Prior evidence retainedbelow.
+
+---
+
 ## Infrastructure v5 — PR8 collector review, 2026-11-08 (LATEST)
 
 Resumed after recorded reset; initial usage88%five-hour/52%weekly, one banked

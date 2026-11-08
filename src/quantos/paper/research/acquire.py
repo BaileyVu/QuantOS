@@ -311,17 +311,41 @@ def download_batch(manifest_path: str | Path, *, limit: int = 32,
     return manifest
 
 
+def period_overlaps_selection(period: str, start_date: str | None,
+                              end_exclusive: str | None) -> bool:
+    """Check YYYY-MM or YYYY-MM-DD task partitions before touching cached bytes."""
+    if start_date is None and end_exclusive is None:
+        return True
+    if len(period) == 7:
+        year, month = map(int, period.split("-"))
+        lo = date(year, month, 1)
+        hi = date(year + (month == 12), 1 if month == 12 else month + 1, 1)
+    else:
+        lo = date.fromisoformat(period)
+        hi = lo.fromordinal(lo.toordinal() + 1)
+    start = date.fromisoformat(start_date) if start_date else None
+    end = date.fromisoformat(end_exclusive) if end_exclusive else None
+    return not ((end is not None and lo >= end) or (start is not None and hi <= start))
+
+
 def iter_cached_archives(manifest_path: str | Path, *, dataset: str,
                          symbol: str | None = None,
-                         interval: str | None = None):
+                         interval: str | None = None,
+                         symbols: set[str] | tuple[str, ...] | None = None,
+                         start_date: str | None = None,
+                         end_exclusive: str | None = None):
     """Yield verified downloaded manifest rows for downstream preprocessing."""
     manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     for task in manifest.get("tasks", []):
         if task.get("status") != "downloaded" or task.get("dataset") != dataset:
             continue
+        if symbols is not None and task.get("symbol") not in symbols:
+            continue
         if symbol is not None and task.get("symbol") != symbol:
             continue
         if interval is not None and task.get("interval") != interval:
+            continue
+        if not period_overlaps_selection(task.get("period", ""), start_date, end_exclusive):
             continue
         cached = Path(task["cached_path"])
         if not cached.is_file():

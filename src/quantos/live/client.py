@@ -98,7 +98,7 @@ def check_mainnet(allow_mainnet: bool, confirm_file) -> None:
 class SignedClient:
     def __init__(self, mode, keys, transport: Callable | None = None, clock_ms: Callable[[], int] | None = None,
                  recv_window: int = 5000, *, allow_mainnet: bool = False, confirm_file=None, log_path=None,
-                 conditional_api: str = "algo"):
+                 conditional_api: str = "algo", observer=None):
         if conditional_api not in ("algo", "legacy"): raise ModeError("conditional_api must be algo or legacy")
         self.conditional_api = conditional_api
         if mode not in ("dry-run", "testnet", "mainnet"):
@@ -115,6 +115,31 @@ class SignedClient:
         self._log_path = Path(log_path) if log_path else None
         self._dry_orders: dict[tuple, dict] = {}
         self.dry_log: list[dict] = []
+        self.observer, self.observation_error = observer, None
+
+    def _observe(self, method, path, params, *, status=None, response=None, error=None):
+        """Passive capture of exchange observations, never signed wire requests.
+
+        Capture failure cannot turn an accepted mutation into an apparent
+        transport failure. Listen keys, credentials and request headers are
+        deliberately outside the observation interface.
+        """
+        paths = {"/fapi/v1/order", "/fapi/v1/algoOrder", "/fapi/v1/openOrders",
+                 "/fapi/v1/openAlgoOrders", "/fapi/v1/allOpenOrders", "/fapi/v1/algoOpenOrders",
+                 "/fapi/v1/userTrades", "/fapi/v2/positionRisk", "/fapi/v1/leverage", "/fapi/v1/marginType"}
+        if self.observer is None or path not in paths:
+            return
+        fields = {"symbol", "side", "type", "quantity", "price", "stopPrice", "triggerPrice",
+                  "reduceOnly", "closePosition", "positionSide", "timeInForce", "workingType",
+                  "newClientOrderId", "origClientOrderId", "clientAlgoId", "orderId", "fromId",
+                  "startTime", "endTime", "limit", "leverage", "marginType", "algoType"}
+        try:
+            self.observer({"mode": self.mode, "host": self.base, "method": method, "path": path,
+                           "params": {k: v for k, v in params.items() if k in fields},
+                           "status": status, "response": json.loads(json.dumps(response)), "error": error,
+                           "received_ms": self._clock_ms()})
+        except Exception as exc:
+            self.observation_error = type(exc).__name__
 
     @staticmethod
     def _urlopen(request, timeout):
@@ -134,7 +159,10 @@ class SignedClient:
     def request(self, method: str, path: str, params: dict | None = None):
         if (method, path) not in ALLOWED: raise ModeError("endpoint not allowlisted")
         p = {k: _fmt(v) for k, v in (params or {}).items() if v is not None}
-        if self.mode == "dry-run": return self._dry(method, path, p)
+        if self.mode == "dry-run":
+            result = self._dry(method, path, p)
+            self._observe(method, path, p, status=200, response=result)
+            return result
         return self._send(method, path, p, signed=path not in UNSIGNED and path not in KEY_ONLY)
 
     def _send(self, method, path, p, signed):
@@ -150,6 +178,7 @@ class SignedClient:
         try:
             status, body, headers = self._transport(req, 5)
         except Exception as e:
+            self._observe(method, path, p, error=type(e).__name__)
             why = f"transport failure {type(e).__name__}: {getattr(e, 'reason', e)!r}"
             if mutating: raise AmbiguousOrderState(f"{method} {path}: {why}") from None
             raise ConnectionError(f"{method} {path}: {why}") from None
@@ -157,6 +186,8 @@ class SignedClient:
             data = json.loads(body)
         except (ValueError, TypeError):
             data = None
+        self._observe(method, path, p, status=status, response=data,
+                      error="UNPARSEABLE_RESPONSE" if data is None else None)
         if status in (418, 429):
             try: ra = float((headers or {}).get("Retry-After", 60))
             except (TypeError, ValueError): ra = 60.0

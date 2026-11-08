@@ -28,6 +28,26 @@ def ledger_row(**overrides):
 
 
 class ResearchRegistryTest(unittest.TestCase):
+    def test_forecast_result_records_without_fabricated_trade_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = root / "forecast.json"
+            report.write_text('{"n_forecasts":12,"mae":0.03}')
+            with ResearchRegistry(root / "registry.sqlite") as registry:
+                key = registry.register_variant("forecast", "fixed", {"horizon": 24}, manifest_hash="a" * 64)
+                stats = {"n_forecasts": 12, "mae": .03}
+                self.assertTrue(registry.record_observation(key, period="BUILD", stats=stats, source_path=report))
+                self.assertFalse(registry.record_observation(key, period="BUILD", stats=stats, source_path=report))
+                self.assertEqual(registry.trial_counts("forecast")["family_n"], 1)
+                rows = registry.result_rows(family="forecast")
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0]["stats"], stats)
+                self.assertNotIn("trades", rows[0]["stats"])
+                with self.assertRaises(ValueError):
+                    registry.record_observation(key, period="BUILD", stats={"mae": float("nan")}, source_path=report)
+                with self.assertRaises(ValueError):
+                    registry.record_observation("unregistered", period="BUILD", stats=stats, source_path=report)
+
     def test_import_is_idempotent_and_n_counts_variants_not_period_rows(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
