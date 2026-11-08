@@ -1,3 +1,32 @@
+## Quota handoff 2026-11-08 afternoon (LATEST)
+Current mainHEAD ea39660, codex/infra-timesfm25-integration; PR56 sourceupdates
+ready to push. Allcompletedsource safelycommitted. At21%fivehour/26%weekly,
+implementation stopped; onebankedreset unchanged. Reset1794137212=Nov8 18:26:52
+Vietnam. SAMEcontinuation updateCONFIRMED ACTIVE18:32Vietnam daily,thischat.
+Noownedruntime/researchprocessactive. Sourceagent finishedreadonly audit, modelagent
+interrupted atthreshold and requestedSTATUSONLY. No furtherimplementationthiswindow.
+
+EXACT NEXT: modelagent worktree QuantOS-infra-timesfm branchcodex/infra-timesfm-protocol
+baseab43c97 currentlyUNCOMMITTED registry.py modified and timesfm_volatility.py
+DELETED midrewrite. NOT integrated/tested; do not run it. Inspectagentstatusnote
+below ifavailable, recover/finish coherent protocol source, tests, then mainreview.
+Desired protocol: exact2022 completedclosebars BTC/ETH/SOL, log(q90/q10)/2.563,
+strictmanifestseries+fullcoverage, pinnedrevision/weights/deps/sourcebytes prereg,
+resumableper-origin cache withidentitychecks,7daypairedblockbootstrapseed0/2000.
+OriginalEWMA recurrence already correct (firstactualreturn² thenrecurrence); no
+unnecessaryformula change. Main registry.record_observation added/tested13PASS;
+retainit, don'tduplicate. Dataexport ALREADYCOMPLETE: use manifesthashes inprior
+section; neverreexport orinspectHELD. Actualcomparison stillNOTRUN.
+
+LaterPR9ml1h prerequisite: edge_vault/patml_v1 containsREADME only, names training
+source edge_data/patml_v1/run.py and PREREG.txt. AgentdidNOTreadthoseyet. Nextaudit
+mustonlyreadthese sourcefiles/directimports; don'treconstructfeaturesfromprose,
+no outputs/models/HELD/2025+. Existingconsumer requiresbar_close_ms plus
+signals(symbol,side,atr,score), fresh<=10min; remainscandidate. No changes to
+alt-ML or edge_data/ml5m. Mainacceptedruntimecostoassumptionsunchanged.
+
+---
+
 ## Fixed BUILD export complete (LATEST)
 Activebranch codex/infra-timesfm25-integration sourcee5f8b1a, clean beforecheckpoint.
 PR56 remainsdraft; nothingmerged/deployed. BUILDcutoff reviewed/integrated,
