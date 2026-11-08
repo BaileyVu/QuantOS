@@ -156,9 +156,9 @@ class ShadowCollectorTest(unittest.TestCase):
     def test_exchange_info_parser_selects_only_trading_usdc_perpetuals(self):
         import io
         payload = {"symbols": [
-            {"symbol": "BTCUSDC", "status": "TRADING", "contractType": "PERPETUAL", "quoteAsset": "USDC"},
-            {"symbol": "ETHUSDC", "status": "BREAK", "contractType": "PERPETUAL", "quoteAsset": "USDC"},
-            {"symbol": "SOLUSDC", "status": "TRADING", "contractType": "CURRENT_QUARTER", "quoteAsset": "USDC"},
+            {"symbol": "BTCUSDC", "status": "TRADING", "contractType": "PERPETUAL", "quoteAsset": "USDC", "marginAsset": "USDC"},
+            {"symbol": "ETHUSDC", "status": "BREAK", "contractType": "PERPETUAL", "quoteAsset": "USDC", "marginAsset": "USDC"},
+            {"symbol": "SOLUSDC", "status": "TRADING", "contractType": "CURRENT_QUARTER", "quoteAsset": "USDC", "marginAsset": "USDC"},
             {"symbol": "BNBUSDT", "status": "TRADING", "contractType": "PERPETUAL", "quoteAsset": "USDT"},
         ]}
         class Response(io.BytesIO):
@@ -166,6 +166,47 @@ class ShadowCollectorTest(unittest.TestCase):
             def __exit__(self, *_args): self.close()
         with patch.object(adapter, "_safe_open", return_value=Response(json.dumps(payload).encode())):
             self.assertEqual(adapter.binance_usdc_perpetuals(), ["BTCUSDC"])
+
+    def test_normal_clock_path_preserves_jina_and_rejects_invalid_times(self):
+        class Baseline:
+            LAST_LINKS = {"BTC rally": "https://example.com/btc"}
+            STATUS = {}
+            COIN_ALIASES = {}
+            news_items = staticmethod(lambda _now: [("BTC rally", 1.0, 900.0)])
+            reddit_items = staticmethod(lambda _now: [])
+            score_items = staticmethod(lambda items, **kw: {"_n": len(items)})
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(adapter.socket, "getaddrinfo", side_effect=public_dns), \
+             patch.object(shadow.time, "time", side_effect=[1000.0, 1100.0]):
+            row = shadow.collect(state_dir=tmp, baseline_module=Baseline,
+                                 universe_fn=lambda: ["BTCUSDC"],
+                                 exa_search_fn=lambda *_: [],
+                                 jina_read_fn=lambda _: {"text": "BTC bullish"})
+        self.assertEqual(row["n_events"], 1)
+        self.assertEqual(row["events"][0]["first_seen"], 1100.0)
+        self.assertEqual(row["universe_size"], 1)
+        self.assertEqual(row["universe_coverage"], "complete")
+        with patch.object(adapter.socket, "getaddrinfo", side_effect=public_dns):
+            for published in (float("nan"), float("inf"), "2026-01-01T00:00:00"):
+                self.assertIsNone(shadow._safe_event(
+                    {"title": "bad", "url": "https://example.com", "published": published}, 1000))
+        self.assertEqual(shadow._published("Thu, 01 Jan 1970 01:00:00 +0100", 1000), 0)
+
+    def test_cycle_timeout_interrupts_source_catch_and_restores_handler(self):
+        import signal
+        import time
+        previous = signal.getsignal(signal.SIGALRM)
+        started = time.monotonic()
+        with self.assertRaises(shadow.CollectionDeadline):
+            with shadow.cycle_deadline(0.02):
+                try:
+                    time.sleep(2)
+                except Exception:
+                    self.fail("deadline must escape broad source exception handlers")
+        self.assertLess(time.monotonic() - started, 1)
+        self.assertEqual(signal.getsignal(signal.SIGALRM), previous)
+        self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0.0, 0.0))
 
     def test_state_path_cannot_be_vendored_source_directory(self):
         with self.assertRaisesRegex(ValueError, "outside"):

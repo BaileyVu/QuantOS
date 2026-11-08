@@ -163,6 +163,7 @@ def binance_usdc_perpetuals(timeout: float = 8) -> list[str]:
                    and row.get("status") == "TRADING"
                    and row.get("contractType") == "PERPETUAL"
                    and row.get("quoteAsset") == "USDC"
+                   and row.get("marginAsset") == "USDC"
                    and isinstance(row.get("symbol"), str)})
 
 

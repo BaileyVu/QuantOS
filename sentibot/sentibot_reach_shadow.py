@@ -10,6 +10,9 @@ import hashlib
 import json
 import math
 import os
+import signal
+import sys
+from contextlib import contextmanager
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -51,18 +54,21 @@ def _key(title: str) -> str:
 def _published(value, now: float) -> float:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         result = float(value)
-        return result if math.isfinite(result) else now
+        return result
     if not isinstance(value, str) or not value.strip():
         return now
     try:
         parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
+            return float("nan")
         return parsed.timestamp()
     except ValueError:
         for fmt in ("%a, %d %b %Y %H:%M:%S %z", "%Y-%m-%d"):
             try:
-                return datetime.strptime(value[:40], fmt).replace(tzinfo=timezone.utc).timestamp()
+                parsed = datetime.strptime(value[:40], fmt)
+                if parsed.tzinfo is None:
+                    return float("nan")
+                return parsed.timestamp()
             except ValueError:
                 continue
     return now
@@ -129,7 +135,7 @@ def collect(*, state_dir: str | Path, now: float | None = None,
     read = jina_read_fn or jina_read
     status: dict[str, str] = {}
     events = []
-    universe = dict(ASSETS)
+    universe = {}
     universe_complete = False
     try:
         contracts = (universe_fn or binance_usdc_perpetuals)()
@@ -138,9 +144,12 @@ def collect(*, state_dir: str | Path, now: float | None = None,
             if isinstance(contract, str) and contract.endswith("USDC"):
                 asset = contract[:-4] + "USDT"
                 known = aliases.get(asset)
-                universe.setdefault(asset, known[0] if known else contract[:-4].lower())
+                universe.setdefault(asset, known[0] if known else ASSETS.get(asset, contract[:-4].lower()))
+        if not universe:
+            raise ValueError("empty USDC perpetual universe")
         universe_complete = True
     except Exception as exc:
+        universe = dict(ASSETS)
         status["universe"] = f"INCOMPLETE ({type(exc).__name__}; {len(ASSETS)} fallback assets)"
     symbols = list(universe.items())
     try:
@@ -178,7 +187,7 @@ def collect(*, state_dir: str | Path, now: float | None = None,
         try:
             article = read(url)
             event = _safe_event({"src": "jina", "title": title, "url": url,
-                                 "published": published, "text": article.get("text", "")}, now)
+                                 "published": published, "text": article.get("text", "")}, started_at)
             if event:
                 events.append(event)
                 jina_ok += 1
@@ -188,13 +197,10 @@ def collect(*, state_dir: str | Path, now: float | None = None,
 
     reddit_items = base.reddit_items(started_at) if hasattr(base, "reddit_items") else []
     status.update(getattr(base, "STATUS", {}))
-    available_at = float(clock())
-    if not math.isfinite(available_at) or available_at < started_at:
-        raise ValueError("completion clock must be finite and not precede collection start")
     rss_items = [item for item in rss_items if len(item) >= 3 and
-                 isinstance(item[2], (int, float)) and math.isfinite(item[2]) and item[2] <= available_at]
+                 isinstance(item[2], (int, float)) and math.isfinite(item[2]) and item[2] <= started_at]
     reddit_items = [item for item in reddit_items if len(item) >= 3 and
-                    isinstance(item[2], (int, float)) and math.isfinite(item[2]) and item[2] <= available_at]
+                    isinstance(item[2], (int, float)) and math.isfinite(item[2]) and item[2] <= started_at]
     unique: dict[str, dict] = {}
     for event in events:
         if not event:
@@ -203,11 +209,6 @@ def collect(*, state_dir: str | Path, now: float | None = None,
         current = unique.get(key)
         if current is None or len(event["text"]) > len(current["text"]):
             unique[key] = event
-    for key, event in unique.items():
-        first_seen = seen.get(key)
-        event["first_seen"] = available_at if first_seen is None else first_seen
-        event["novel"] = first_seen is None
-
     reach_items = [(event["title"] + ". " + event["text"], 1.0, event["published"])
                    for event in unique.values()]
     baseline_items = list(rss_items) + list(reddit_items)
@@ -219,6 +220,13 @@ def collect(*, state_dir: str | Path, now: float | None = None,
     except TypeError:
         # Keep injected legacy test scorers usable; production sentiment supports symbols.
         reach_score, baseline_score = base.score_items(reach_items), base.score_items(baseline_items)
+    available_at = float(clock())
+    if not math.isfinite(available_at) or available_at < started_at:
+        raise ValueError("completion clock must be finite and not precede collection start")
+    for key, event in unique.items():
+        first_seen = seen.get(key)
+        event["first_seen"] = available_at if first_seen is None else first_seen
+        event["novel"] = first_seen is None
     row = {
         "started_at": started_at,
         "available_at": available_at,
@@ -248,22 +256,55 @@ def collect(*, state_dir: str | Path, now: float | None = None,
     return row
 
 
+class CollectionDeadline(BaseException):
+    """Escape source-level exception handlers without publishing a partial sample."""
+
+
+@contextmanager
+def cycle_deadline(seconds):
+    """Hard wall-clock bound including DNS/redirects/slow reads (POSIX main thread)."""
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise ValueError("collection deadline must be positive and finite")
+    def expired(*_args):
+        raise CollectionDeadline("collection cycle deadline exceeded; no sample published")
+    previous = signal.signal(signal.SIGALRM, expired)
+    old_timer = signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, *old_timer)
+        signal.signal(signal.SIGALRM, previous)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state-dir", required=True,
                         help="dedicated state path outside sentibot source; only reach_shadow.jsonl is written")
     parser.add_argument("--once", action="store_true", help="collect one sample and exit")
     parser.add_argument("--every", type=int, default=900, help="seconds between samples")
+    parser.add_argument("--cycle-timeout", type=int, default=600,
+                        help="hard per-cycle deadline in seconds; timed-out samples are not published")
     args = parser.parse_args(argv)
     if args.every < 60:
         parser.error("--every must be at least 60 seconds")
+    if args.cycle_timeout < 1 or args.cycle_timeout > args.every:
+        parser.error("--cycle-timeout must be positive and no greater than --every")
     while True:
-        row = collect(state_dir=args.state_dir)
+        started = time.monotonic()
+        try:
+            with cycle_deadline(args.cycle_timeout):
+                row = collect(state_dir=args.state_dir)
+        except CollectionDeadline as exc:
+            print(str(exc), file=sys.stderr, flush=True)
+            if args.once:
+                return 1
+            time.sleep(max(0, args.every - (time.monotonic() - started)))
+            continue
         print(time.strftime("%H:%M:%S"), "events", row["n_events"], "novel", row["n_novel"],
               "reach", row["reach"], flush=True)
         if args.once:
             return 0
-        time.sleep(args.every)
+        time.sleep(max(0, args.every - (time.monotonic() - started)))
 
 
 if __name__ == "__main__":
