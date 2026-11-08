@@ -1,3 +1,126 @@
+## FIXED-COST A/B preparation saved — 2026-11-09 quota handoff (LATEST)
+Currentbranch codex/infra-timesfm25-integration, sourceb059e17; checkpoint/test
+commit follows. STOPPED new implementation at22%five-hour,88%weekly remaining,
+ZERO banked resets. Reset1794174576 = Nov9 04:49:36 Vietnam; continuation04:55.
+No actual drift inference or market model fitting begun; no one-day deadline
+has started. Widthpilotcompleteunchanged; do not repeat it or its audits.
+
+Completed this window:
+- Integrated/reviewed causal32features8003bdd (agent18e661a), driftcache57c5f5f
+  (5816614), BUILDexport684aae3 (6f5055a), lock/shareddeadline98d4fae(f1fc61d).
+- Main fixed-cost labels/gates and ex-ante specification b059e17,
+  research/ML1H_DRIFT_PREREGISTRATION.md. Delayed49hlabelboundary; sidechosen
+  BEFORE fillobservation; no hindsight switch tootherdirection. Policy remains
+  originalmaker-label fixedcost4bp+10bp owneramendment, not productioncosts.
+- Integrated23focusedfeature/export/drift/accountingtests PASS0.868s. Addednew
+  completeA/B accounting test:8fixedcost tests PASS0.068s (supersedes7subset).
+  No older passing tests or outcomes repeated. evaluate_records callable main
+  finalreport API in ml1h_gates.py, no actualresultyet.
+- Supplementary EXACTpinned packages installed isolated
+  QuantOS-infra-timesfm/.ml1h-drift-deps: pandas2.2.3,lightgbm4.6.0,
+  scikit-learn1.6.1,scipy1.15.3,python-dateutil2.9.0.post0,pytz2025.2,
+  tzdata2025.2,six1.17.0,joblib1.4.2,threadpoolctl3.6.0. OriginalCPUvenv
+  unchanged; importsmokeactualPASS (initiallyslow,process25292/session19313
+  complete). Firstpipcommandfailed becausevenvhasnopip; uvtargetinstallpassed.
+
+ACTUAL NEW EXPORT COMPLETE exit0(session86799 closed):
+QuantOS-infra-timesfm/.research-ml1h-drift-build/export.json holds16manifests+
+hashes; all16exact15311hours,2021Oct01 01UTC..2023Jun30 23UTC completedcloses.
+indexmanifestSHA f579489471f668f1184e3eb6e567af7dfb13da73fb7d74a0bf3c2cc3afa6e4f8.
+Do NOT rerunexport. Earlierattempt frominfra-v5cwdfailed beforearchiveopen due
+relativecachepath; correctedcanonicalQuantOScwd succeeded. Logs
+/tmp/quantos-ml1h-drift-export.log(failure) and
+/tmp/quantos-ml1h-drift-export-cwd-fixed.log(success). Export usesmainPYTHONPATH
+and existing .venv-timesfm25; noHELD/2025+ partitions. Savedwidth2022exportintact.
+
+EXACT NEXT afterreset:
+1. Mainreview/integrate sourceagent f1d507b inQuantOS-infra-sentibot branch
+   codex/infra-ml1h-features: pure frozenwalkforwardhelper. Agent8synthetictests
+   passed; mainhasnotreviewedfinalcallback/quarters changes orintegratedit.
+2. Review validationagent DRAFT runner inQuantOS-infra-timesfm branch
+   codex/infra-timesfm-drift (statusbelow). Mainownsaccounting/gates/finalreview.
+   Runner mustuse common16x15311manifestdata, originalopen_ms for32features,
+   completedclose forfolds, drift4/12/24only, oneglobal24hdeadline acrossall
+   symbols/fits/resumes, immutablefoldpredictioncache, registry2armsBEFORE
+   inference. Freeze source/model/fullresolveddeps/data+protocolhashes. Avoid
+   treating missingDSRmoments/globalregistry as inventedstatistics.
+3. OncefocusedrunnerintegrationPASS and mainreviewcomplete, runactualONE A/B
+   with existingcache+venv, PYTHONPATH overlay:first and main/src. SavePID/log,
+   checkpoint. No newdownloads/export. Preserveforecastcache/resumeexactorigins.
+   Passfixed-costgates1xAND2x andbeatbaseline=>L3shadowONLY; measuredfailure=>
+   closePR56 and shortrejectionwithnumbers. Infra/timefailureisNOTmeasuredfail.
+4. Remainingreleasework includes recorder forowner-startednonstopdemo (NOdemo
+   currentlyrunning). Source/start_demo_nonstop.sh + statev4-demo200/service
+   com.quantos.v4.demo200 ownerlaunchonly. Capturemarket+sentiment/ml1hfileversions
+   +exchangeorder/fillresponses, initialstate; first20actualfills OR3days,
+   exactdecisionparity and each independentmodeledfill withinmodeledslippage.
+   DoNOT validate fillaccuracy by copyingactualfill into simulatedprice.
+   4006decisionno-orderproofretained. RecorderNOTimplementedyet. No serviceedits.
+5. Actual24hdemo/72hSentibot/fullUSDC L2 remainpending; crash/dipCANCELLED.
+Noactiveownedruntime/export/importprocess. Sourceagentidle; modelagentstopping.
+
+---
+
+## Owner clarified data and demo prerequisites (LATEST)
+No demo is running; owner holds it until release work is ready. Do NOT start or
+change services. Build recorder into release; owner later launches
+start_demo_nonstop.sh with state ~/Library/Application Support/QuantOS/v4-demo200
+and service com.quantos.v4.demo200. Forward acceptance begins with that launch:
+first >=20 actual fills OR three days, exact decisions and per-fill modeled
+slippage bound. Capture raw sentiment/ml1h files and order/fill responses.
+
+No historical depth/USDC dataset exists. Owner explicitly authorizes USDT
+FIXED-COST L2 ml1h drift A/B: original maker-label scenario, taker4bp+slip10bp,
+2x/3x fixed-cost stress. Pass requires augmented arm beat baseline AND gates at
+1x and2x; earns L3 shadow on real quotes ONLY, no promotion. Do not call this
+full L2. This supersedes the preceding missing-dataset blocker. No crash/dip.
+Main preparing one frozen protocol; actual inference/training has NOT begun.
+Fixed data choice before outcomes: original C21 intersect saved corpus,16symbols;
+2021Oct01..strict2023Jul01, three testquarters2022Q4,2023Q1/Q2, top2% matching
+runtime ml1h, train-only lastquarter calibration, purged48h labels. Saved2022width
+export insufficient OHLCV/warmup, separate narrowly scoped export necessary.
+Main added fixed-cost labels and gates;5focused tests passed before delayaddition.
+Agent18e661a features,5816614 drift cache await mainintegration; followupsactive.
+New exact pinned dependencies installed in isolated .ml1h-drift-deps overlay;
+original .venv-timesfm25 and weights unchanged. No owned long-running process.
+Latestusage77%fivehour/96%weekly,banked0. Automation sameID update confirmed04:55
+Vietnam after04:49:36reset; prompt must be updated again for newest directions.
+
+---
+
+## Owner directions after second reset — 2026-11-08 (LATEST)
+Owner confirmed second banked reset used; tool verifies ZERO resets remain.
+At resume: 99% five-hour and 100% weekly remaining. Five-hour reset1794174576;
+weekly1794761376. Never attempt further banked resets. Current source435ff1d on
+codex/infra-timesfm25-integration, clean at resume. Completed volatility pilot and
+its independent audit remain final; do not repeat inference/export/tests.
+
+New explicit decisions supersede prior pending questions:
+1. Cancel crash/dip shadow test: its quantile-width input failed the volatility gate.
+2. Run ml1h augmentation ONCE, preregistered DRIFT FEATURES ONLY, one walk-forward,
+   unchanged costs and L2 gates, at most one day compute. Log in registry. Pass
+   all gates => candidate only; fail => close PR56/PR9 and write short TimesFM
+   rejected note with actual numbers. Do not call missing evidence a numerical fail.
+3. Replace original pD replay with forward recording of existing non-stop demo,
+   read-only, no service changes. Capture sentiment, ml1h signals.json, exchange
+   order/fill responses along with market inputs. Window >=20 real fills OR
+   3 days, whichever first. Exact decision match and EACH simulated fill error
+   within modeled slippage versus Binance fill; report per trade. Retain prior
+   4,006-exact-decision no-order soak as decision-layer evidence.
+
+Two existing lower-cost agents reused: sourceagent pure causal ml1h features;
+validationagent resumable TimesFM median drift4/12/24h cache. Source-only tests;
+no actual training/inference yet. Main owns labels/costs/protocol/L2, recorder,
+accounting, integration and final review. No owned active runtime process.
+Exact next: main preregister bounded safe BUILD experiment; inspect running demo
+recording capabilities read-only to design complete capture without service edits.
+Historical hourly USDT archive lacks depth/USDC provenance, so genuine L2 cannot
+be claimed by silently substituting fixed costs. Existing width export lacks open
+and volume required for ml1h; any new narrowly scoped export must document reason.
+Owner alone merges/deploys; running demo/state/LaunchAgents and alt-ML untouched.
+
+---
+
 ## Pilot audit and pending owner decisions (LATEST)
 Completedactualpilot independentlyauditedread-only:1029validhashchainedorigins,
 0missing/duplicate/unknown/targetboundarymismatch;9registeredvariants/3results.

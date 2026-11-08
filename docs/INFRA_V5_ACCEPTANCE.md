@@ -12,9 +12,9 @@ Passing source checks is not operational acceptance or mainnet authorization.
 | PR4 clean snapshots | Full-SHA clean worktree and dirty-source rejection tests | Owner review/deployment/rollback on the final intended snapshot |
 | PR5 counterfactual shadow | Isolated engine/cost reuse, reporting and dashboard tests | Actual 24-hour demo run; taken shadow trades reconciled with real books |
 | PR6 registry/manifests | Manifest integrity, DSR formula checks, historical import proof (4,227 distinct variants) | Canonical persistent registry location must be established before global-N reporting; TimesFM registry is isolated |
-| PR7 replay | New no-trade forward soak: 4,006 decision rows exactly matched | Original pD context is missing; owner replacement decision pending. No trade-fill parity or turtle/vol-squeeze USDC L2 result |
+| PR7 replay | New no-trade forward soak: 4,006 decision rows exactly matched | Owner replaced original pD requirement with future demo recording: first20fills or3days, exact decisions and per-trade modeled-slippage bounds. No trade-fill parity or turtle/vol-squeeze USDC L2 result |
 | PR8 Sentibot | Shadow-only collector, guarded URLs, availability-aware reports, snapshot/plist preparation | Actual 72-hour collection and forward/gate report; one isolated cycle is insufficient and Jina full-text coverage was 0/8 |
-| PR9 TimesFM2.5 | Pinned CPU model and fixed 1,029-forecast BUILD volatility comparison | Tested width feature fails baseline gate. ml1h augmentation and crash/dip L3 were not run; owner kill-rule scope decision pending |
+| PR9 TimesFM2.5 | Pinned CPU model and fixed 1,029-forecast BUILD volatility comparison | Width failed; owner cancelled crash/dip. One drift-only USDT fixed-cost L2 A/B is being prepared; passing1x/2x earns L3 shadow only. Actual A/B not run |
 
 ## Completed operational evidence
 

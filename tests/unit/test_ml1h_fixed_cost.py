@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from quantos.paper.research.ml1h_fixed_cost import labels, net_returns, select_positions, HOUR_MS
-from quantos.paper.research.ml1h_gates import block_means, decide
+from quantos.paper.research.ml1h_gates import block_means, decide, evaluate_records
 
 
 class FixedCostTests(unittest.TestCase):
@@ -66,6 +66,21 @@ class FixedCostTests(unittest.TestCase):
         base = {str(x): {'pass': True, 'mean': .01} for x in (1, 2)}
         self.assertEqual(decide(base, base, {'1': [0, 0], '2': [0, 0]},
                                 delay_mean_1x=.01, delay_mean_2x=.01)['decision'], 'REJECTED')
+
+    def test_complete_ab_accounting_rejects_identical_arm_and_scales_costs(self):
+        rows = []
+        for arm in ('baseline', 'augmented'):
+            for day in range(0, 270, 2):
+                for symbol in ('BTCUSDT', 'ETHUSDT'):
+                    rows.append(dict(arm=arm, time_ms=1664582400000+day*86400000,
+                        symbol=symbol, side=1, score=.9, threshold=.8, gross=.02,
+                        taker_exit=True, delayed_gross=.02, delayed_taker_exit=True))
+        result = evaluate_records(rows)
+        self.assertEqual(result['decision'], 'REJECTED')
+        self.assertEqual(result['counts']['augmented']['selected'], 270)
+        self.assertEqual(result['paired_improvement_ci90']['1'], [0., 0.])
+        for multiple in (1, 2, 3):
+            self.assertAlmostEqual(result['arms']['augmented'][str(multiple)]['mean'], .02-.0014*multiple)
 
 
 if __name__ == '__main__': unittest.main()
