@@ -1,14 +1,15 @@
-# Demo release handoff template
+# QuantOS v6 owner release handoff
 
-Owner-only runbook draft for a release cut from PR55 (`788aa97`) plus the two
-capture-hook commits. No commands here were run. Replace every `<...>` value
-from the owner-reviewed release record before deploying.
+Owner-only runbook for PR57, based on PR55 (`788aa97`) and the two capture hooks.
+Preparation ran successfully; no service was installed, started, stopped or changed.
+Launch is blocked until the zero-error/zero-alert soak and exact replay pass.
+Merge PR47 through PR55 in order, then PR57. PR56 remains parked as a draft.
 
 ## Release identity and snapshot
 
-- Release checkout: `<ABSOLUTE_PATH_TO_CLEAN_RELEASE_CHECKOUT>`
-- Release full SHA: `<RELEASE_FULL_SHA>`
-- Expected immutable app snapshot: `~/Library/Application Support/QuantOS/app-v4/<RELEASE_FULL_SHA>/source`
+- Release checkout: `/Users/bailey12/Library/Application Support/QuantOS/app-v4/72c8cd71d19ed8f64944f4c7b61874d9a6896491/source`
+- Release full SHA: `72c8cd71d19ed8f64944f4c7b61874d9a6896491`
+- Expected immutable app snapshot: `~/Library/Application Support/QuantOS/app-v4/72c8cd71d19ed8f64944f4c7b61874d9a6896491/source`
 - Verified previous full SHA: `5d8342d4e90613783a93a08a58bbc662906236b4`
 - Previous installed `PYTHONPATH`: `/Users/bailey12/Library/Application Support/QuantOS/app-v4/5d8342d/src`
 
@@ -19,19 +20,20 @@ environment are used as templates; the key file itself is not read.
 Verify before an owner deployment:
 
 ```sh
-REPO="<ABSOLUTE_PATH_TO_CLEAN_RELEASE_CHECKOUT>"
-RELEASE_SHA="<RELEASE_FULL_SHA>"
+REPO="/Users/bailey12/Library/Application Support/QuantOS/app-v4/72c8cd71d19ed8f64944f4c7b61874d9a6896491/source"
+RELEASE_SHA="72c8cd71d19ed8f64944f4c7b61874d9a6896491"
 test "$(git -C "$REPO" rev-parse HEAD)" = "$RELEASE_SHA"
 test -z "$(git -C "$REPO" status --porcelain=v1 --untracked-files=all --ignore-submodules=none)"
+cd "$REPO"
 ```
 
 `scripts/deploy_three.py::clean_snapshot` derives the full SHA from the clean
 checkout and makes a detached worktree under `~/Library/Application Support/QuantOS/app-v4/<SHA>/source`.
 The narrow `scripts/start_demo_nonstop.sh` wrapper is prepare-only by default.
-From the clean release checkout, prepare candidate plists and a redacted plan:
+The following preparation was already completed from the clean workspace; do not repeat it into the existing plan directory:
 
 ```sh
-scripts/start_demo_nonstop.sh --plan-dir "$HOME/Library/Application Support/QuantOS/release-plans/<RELEASE_FULL_SHA>"
+scripts/start_demo_nonstop.sh --plan-dir "$HOME/Library/Application Support/QuantOS/release-plans/demo-nonstop-72c8cd71d19ed8f64944f4c7b61874d9a6896491"
 ```
 
 It verifies a clean exact-SHA snapshot, copies the current demo/watchdog plist
@@ -42,7 +44,7 @@ plists are written outside LaunchAgents and outside demo state. Review those
 plists and the plan before the owner invokes:
 
 ```sh
-scripts/start_demo_nonstop.sh --plan-dir "$HOME/Library/Application Support/QuantOS/release-plans/<RELEASE_FULL_SHA>" --execute --confirmed-flat
+scripts/start_demo_nonstop.sh --plan-dir "$HOME/Library/Application Support/QuantOS/release-plans/demo-nonstop-72c8cd71d19ed8f64944f4c7b61874d9a6896491" --execute --confirmed-flat
 ```
 
 `--confirmed-flat` is an owner attestation that Binance Demo has no positions or
@@ -65,23 +67,22 @@ separate from Sentibot's producer state. The existing Sentibot producer still
 writes `paper_perp_signals.jsonl`; the shadow collector must not write or
 replace that file.
 
-Owner preparation template (all paths must be new and outside the source tree
-and snapshot root):
+Preparation below was already completed. Do not rerun it into these existing output paths. The source workspace was clean at the tested SHA:
 
 ```sh
-REPO="<ABSOLUTE_PATH_TO_CLEAN_RELEASE_CHECKOUT>"
+REPO="/Users/bailey12/Desktop/PythonProject/QuantOS-infra-v5"
 QOS="$HOME/Library/Application Support/QuantOS"
-SNAPSHOTS="$QOS/sentibot-shadow-snapshots"
-SHADOW_STATE="$QOS/sentibot-reach-shadow"
-PLIST_OUT="$QOS/release-artifacts/com.quantos.sentibot.reach-shadow.plist"
-PINNED_PYTHON="<ABSOLUTE_EXECUTABLE_PYTHON_PATH>"
+SNAPSHOTS="$QOS/app-v4"
+SHADOW_STATE="$QOS/sentibot-reach-shadow-72c8cd7"
+PLIST_OUT="$QOS/release-plans/demo-nonstop-72c8cd71d19ed8f64944f4c7b61874d9a6896491/com.quantos.sentibot.reach-shadow.plist"
+PINNED_PYTHON="/Users/bailey12/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12"
 cd "$REPO"
 ../QuantOS/.venv/bin/python scripts/prepare_sentibot_shadow.py \
   --repo "$REPO" --snapshots "$SNAPSHOTS" --state-dir "$SHADOW_STATE" \
   --plist "$PLIST_OUT" --python "$PINNED_PYTHON" --every 900 --cycle-timeout 600
 ```
 
-Review the emitted plist and snapshot SHA before owner installation. Only then
+For installation, set `PLIST_OUT` to the prepared path above. Review the emitted plist and snapshot SHA before owner installation. Only then
 may the owner install and start it:
 
 ```sh
@@ -104,7 +105,7 @@ the new run still resumable, the owner can restore the exact previous source
 path and those plists without archiving the current state:
 
 ```sh
-scripts/start_demo_nonstop.sh --rollback --plan-dir "$HOME/Library/Application Support/QuantOS/release-plans/<RELEASE_FULL_SHA>" --execute --confirmed-flat
+scripts/start_demo_nonstop.sh --rollback --plan-dir "$HOME/Library/Application Support/QuantOS/release-plans/demo-nonstop-72c8cd71d19ed8f64944f4c7b61874d9a6896491" --execute --confirmed-flat
 ```
 
 The previous runtime cannot resume a nonstop `deadline_ms: null` state: it

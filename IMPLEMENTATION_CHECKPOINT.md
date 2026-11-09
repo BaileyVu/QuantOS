@@ -1,11 +1,22 @@
-# QuantOS finish v6 — checkpoint 2026-11-09
-Budget: weekly70% start,57% left,13 points spent, max50 total; wrap22%, floor20%. Zero resets. Five-hour reset verified Nov9 14:54:31 Vietnam,99% left. MAX ONE helper. Owner alone merges/deploys/services. v6 prompt /Users/bailey12/Desktop/TIBO_PROMPT_FINISH_v6.md supersedes research-first history; do not reread archived checkpoint.
+# QuantOS finish v6 — 2026-11-09
+Budget70% weekly start;53% left(17points spent), max50 total,wrap22/floor20. Zero resets. Five-hour75% left; reset verified, next Nov9 19:54:40Vietnam. MAX ONE helper(idle). Owner alone merges/deploys/services. v6 prompt Desktop/TIBO_PROMPT_FINISH_v6.md. Do not read archived history or repeat passing checks.
 
-Main codex/infra-release source37a4cb4 from PR55 788aa97. PR47 contract + drafts48..55 remain unmerged. Release PR not yet created/pushed.
-Done: checkpoint diet/archive629551e; capture hooks ab6fbc3+c436033; minimal gzip writer/runtime f97776c; isolated no-order accountstream flag37a4cb4. Captures consumed sentiment/ml1h bytes, unsigned exchange responses, user events, original modeled fills buffered until commit, start/stop journal backups, mirror links and runtime replay inputs. Capture errors in status; capture not market-pruned. No InputArchive. No service/state changes.
-PR56 PARKED draft; unfinished runner saved772217c in QuantOS-infra-timesfm/codex/infra-ml1h-drift-runner. DO NOT RUN/finish/test before launch. Saved data/env/weights untouched; width failed, drift unrun. Resume research only after launch if weekly>35%.
+PR branches (codex/ prefix):
+47 v4-infra-contract 2c52b60
+48 infra-stressed-stop 63caef7
+49 infra-resolver-gaps 9282e07
+50 infra-exchange-protection dae73e8
+51 infra-clean-deploys 4bf6102
+52 infra-shadow-counterfactual a1942e8
+53 infra-registry-manifests a003409(local),989770c(remote)
+54 infra-replay-integration 965168b
+55 infra-sentibot-integration 788aa97
+56 infra-timesfm25-integration eca49f9 PARKED draft; runner772217c WIP DO NOT RUN in QuantOS-infra-timesfm. No research/exports/downloads until after launch and only weekly>35%. Width failed; drift unrun.
+57 infra-release source72c8cd71d19ed8f64944f4c7b61874d9a6896491, pushed draft https://github.com/BaileyVu/QuantOS/pull/57. No merges.
 
-Tests: hooks23PASS; touched capture/runtime52PASS. FULL SUITE ONCE508PASS4skips13.689s (/tmp/quantos-infra-release-tests.log). Do not repeat. After stream flag, separate-client focused test1PASS; broader focused result was truncated/unconfirmed, use focused checks only if needed. Full suite predates stream flag/launcher; changed focused tests now pass.
-Launcher integrated407c6a1; main fixed src-root contract/rollback CLI72h, stop both before start, local flat guards. Changed launcher6PASS, runtime16PASS. NEXT freeze snapshot and prepare plan; no broad install-demo200 or old Desktop launcher. Old snapshot5d8342d4e90613783a93a08a58bbc662906236b4 verified73files unchanged; old runtime rejects hours0/deadlineNone: rollback needs backed-up finite72h run metadata, untouched journals/capture.
-Then focused changed tests, freeze fullSHA clean_snapshot, ONE648s live-data no-order realCLI soak: paper start --execution dry-run --observe-testnet-stream --portfolio live50 --hours0.18 --min-quote-volume5000000, new tempstate, existing ml1h/sentiment/testnet key paths. Auth client only UserStream; ordermirror stays dry-run. Require zeroerrors/alerts/captureerrors, stream connected, capturewritten, exactexisting decisionreplay. Prior4006decision proof retained, not substitute. No owned processes; helper idle.
-Then release PR; one owner handoff merge47..55 thenrelease,56parked; exactsnapshot/launch/Sentibotshadow/quote/rollback. AFTER ownerlaunch: fill_report, first20fills OR3days;24hshadow72hSentibot. No prelaunch replay/report CLI. Preserve altML/ml5m,sealed2025+,mainnetguards,costs.
+Done: gzip passive capture/runtime, consumed sentiment/ml1h bytes, sanitized exchange/user events, original committed model fills, start/stop journal snapshots; capture errors/status, no pruning. No InputArchive/no postlaunch reportingCLI. Launcher407c6a1 reviewed/fixed72c8cd7: clean_snapshot returns src; rollback CLI72h; stop pair beforestart; reject local unresolved orders. No service or existingstate changes.
+Tests: full suite ONCE508PASS4skip before finalstream/launcherchanges. Then runtime16PASS,newstreamclient1PASS,changedlauncher6PASS. Prior4006decision proof retained.
+Snapshot QOS/app-v4/<fullSHA>/source; QOS=~/Library/Application Support/QuantOS. Review plan QOS/release-plans/demo-nonstop-<fullSHA>; Sentibotshadow plist there, isolated state QOS/sentibot-reach-shadow-72c8cd7. Neither service installed/started. Previous snapshot5d8342d4e90613783a93a08a58bbc662906236b4 verified; rollback finite72h metadata required.
+First attempt /private/tmp/quantos-v6-soak-72c8cd7 completed650.89s,exit0,0journalerrors,0fills,1703capture events,0captureerrors. FAILED clean acceptance: stale Sentibot warning then natural recovery08:01UTC. No source/service/input changes.
+ACTIVE: same snapshot fresh-state retry /private/tmp/quantos-v6-soak-72c8cd7-fresh, session84848,pid73846. Retry only because firstfailed; neverrepeatpassingtests. NEXT finish648s, inspect errors/alerts/capture/streams; extract runtime_input payloads and use existing event_replay with final journal snapshot for exactdecisions. Must pass zeroerrors/alerts/captureerrors before launch-ready. Then owner handoff PR47..55then57, exactpreparedsnapshot/launch/Sentibotshadow/quote/rollback. Docs handoff updated with actual paths; no agent services.
+AFTERownerlaunch: fill_report first20fillsOR3days,24hshadow72hSentibot; actualevidence pending. PreservealtML/ml5m,sealed2025+,mainnetguards,costs.
