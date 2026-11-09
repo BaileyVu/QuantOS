@@ -553,6 +553,30 @@ let S = null, X = null, NEWS = null, FNG = null, KL = {}, EX = null;
 // Live marks: the venue's own markPrice@1s stream, straight into the page. /api/exchange (2s) stays the source of truth for
 // positions, entry and wallet, and the fallback while the socket is down.
 const LIVE = { ws: null, key: '', marks: {}, up: false, backoff: 1000, retryAt: 0, last: 0, pending: false };
+// Live candles: the venue's own 15m kline stream (/public), the feed Binance's chart draws. Keeps KL's forming candle current.
+const CANDLES = { ws: null, key: '', up: false, backoff: 1000, retryAt: 0 };
+function candleSync() {
+  const host = EX && EX.ws_host, syms = EX && EX.positions ? EX.positions.map(r => r.symbol).sort() : [];
+  const key = host && syms.length ? host + '|' + syms.join(',') : '';
+  if (key === CANDLES.key && (CANDLES.ws || !key)) return;
+  if (Date.now() < CANDLES.retryAt && key === CANDLES.key) return;
+  if (CANDLES.ws) { CANDLES.ws.onclose = null; CANDLES.ws.close(); CANDLES.ws = null; CANDLES.up = false; }
+  CANDLES.key = key;
+  if (!key) return;
+  const ws = new WebSocket(`wss://${host}/public/stream?streams=` + syms.map(s => s.toLowerCase() + '@kline_15m').join('/'));
+  ws.onopen = () => { CANDLES.up = true; CANDLES.backoff = 1000; };
+  ws.onmessage = ev => { try {
+    const d = JSON.parse(ev.data).data, k = d && d.k, rows = k && KL[d.s];
+    if (!k || !rows || !rows.length) return;
+    const row = [k.t, k.o, k.h, k.l, k.c, k.v, k.T];
+    if (rows[rows.length - 1][0] === k.t) rows[rows.length - 1] = row;
+    else if (k.t > rows[rows.length - 1][0]) { rows.push(row); if (rows.length > 96) rows.shift(); }
+    liveRender();
+  } catch (e) {} };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+  ws.onclose = () => { CANDLES.up = false; CANDLES.ws = null; CANDLES.retryAt = Date.now() + CANDLES.backoff; CANDLES.backoff = Math.min(30000, CANDLES.backoff * 2); setTimeout(candleSync, CANDLES.retryAt - Date.now()); };
+  CANDLES.ws = ws;
+}
 function liveSync() {
   const host = EX && EX.ws_host, syms = EX && EX.positions ? EX.positions.map(r => r.symbol).sort() : [];
   const key = host && syms.length ? host + '|' + syms.join(',') : '';
@@ -919,7 +943,7 @@ ${rows.map(([n, v, col]) => `<div style="display: grid; grid-template-columns: 9
 // ---------- trades tab ----------
 function chartHtml(p) {
   let k = KL[p.sym];
-  if (k && k.length && p.m != null) {  // the forming candle follows the live mark between 15s candle reloads
+  if (k && k.length && p.m != null && !CANDLES.up) {  // no candle stream: let the forming candle follow the live mark
     const last = k[k.length - 1].slice(); last[4] = String(p.m);
     last[2] = String(Math.max(+last[2], p.m)); last[3] = String(Math.min(+last[3], p.m)); k = k.slice(0, -1).concat([last]);
   }
@@ -963,8 +987,8 @@ ${p.e != null ? `<span style="position: absolute; left: 0; top: ${pct(p.e)}; col
 <span class="m pill" style="color: ${sideCol}; background: ${sideBg};">${esc(p.side)} ${p.q != null ? p.q.toFixed(1) : ''}</span>
 <span class="m" style="font-size: 20px;">${px(mark)}</span>
 <span class="m" style="color: ${pc(vs)};">${vs != null ? sgn(vs) + '% vs entry' : ''}</span>
-<span class="m mut" style="font-size: 12px;">15m · last 24h · Binance · ${esc(p.book)}</span>
-<span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px;" class="m"><span class="live" style="width: 6px; height: 6px; border-radius: 50%; background: ${LIVE.up ? 'var(--az-positive)' : 'var(--az-text-secondary)'};"></span><span style="color: ${LIVE.up ? 'var(--az-positive)' : 'var(--az-text-secondary)'};">${LIVE.up ? 'LIVE' : 'POLL'}</span><span class="mut">${LIVE.up ? 'mark every 1s' : 'mark every 2s'} · candles 15s</span></span>
+<span class="m mut" style="font-size: 12px;">15m · last 24h · Binance Demo futures · ${esc(p.book)}</span>
+<span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px;" class="m"><span class="live" style="width: 6px; height: 6px; border-radius: 50%; background: ${LIVE.up ? 'var(--az-positive)' : 'var(--az-text-secondary)'};"></span><span style="color: ${LIVE.up ? 'var(--az-positive)' : 'var(--az-text-secondary)'};">${LIVE.up ? 'LIVE' : 'POLL'}</span><span class="mut">${LIVE.up ? 'mark every 1s' : 'mark every 2s'} · ${CANDLES.up ? 'candles live' : 'candles 15s'}</span></span>
 </div>
 ${body}${foot}</section>`;
 }
@@ -1113,7 +1137,7 @@ async function loadState() {
   try { S = await getJSON('/api/state'); render(); }
   catch (e) { updateHTML($('hdr'), `<span class="status-pill" aria-live="polite" style="display: flex; align-items: center; gap: 6px; color: ${DN};">${dot(DN)}dashboard API unreachable · retrying</span>`); }
 }
-async function loadExchange() { try { const x = await getJSON('/api/exchange'); EX = x && x.enabled && x.positions ? x : null; liveSync(); if (S) render(); } catch (e) { EX = null; } }
+async function loadExchange() { try { const x = await getJSON('/api/exchange'); EX = x && x.enabled && x.positions ? x : null; liveSync(); candleSync(); if (S) render(); } catch (e) { EX = null; } }
 async function loadExtra() { try { X = await getJSON('/api/strategies'); render(); } catch (e) { } }
 async function loadNews() { try { NEWS = await getJSON('/api/news'); newsPolledAt = Date.now(); renderNews(); } catch (e) { $('newsLive').textContent = 'UNAVAILABLE'; $('newsMeta').textContent = 'news unavailable · retrying'; $('newsDot').style.background = DN; $('newsLive').style.color = DN; } }
 async function loadFng() { try { FNG = await getJSON('/api/fng'); } catch (e) { if (!FNG) FNG = false; } renderFng(); }
