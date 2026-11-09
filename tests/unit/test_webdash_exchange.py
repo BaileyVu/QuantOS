@@ -48,6 +48,7 @@ class ExchangeViewTests(unittest.TestCase):
         self.assertEqual(v["assets"]["USDT"], {"wallet": 4999.85, "upnl": 0.21879})  # alt-ML trades USDT
         self.assertNotIn("BNB", v["assets"])
         self.assertEqual(v["total_upnl"], 2.852)
+        self.assertIsNone(v["ws_host"])  # the fake has no stream host; the page then stays on the 2s poll
 
 
 if __name__ == "__main__":

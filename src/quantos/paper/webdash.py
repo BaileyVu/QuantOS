@@ -304,6 +304,8 @@ def exchange_view():
                                       "upnl": float(acct.get("totalUnrealizedProfit") or 0)}
         return {"enabled": True, "mode": _EXCHANGE["mode"], "time_ms": int(time.time() * 1000), "positions": positions,
                 "wallet": main["wallet"], "upnl": main["upnl"], "assets": assets,
+                # The page streams marks from here (e.g. demo-fstream.binance.com), the venue's own mark feed.
+                "ws_host": getattr(client, "ws_host", None),
                 "total_upnl": round(sum(p["upnl"] for p in positions), 8)}
     with _LOCK:
         hit = _CACHE.get("exchange")
