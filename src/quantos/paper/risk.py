@@ -160,7 +160,7 @@ class Cap200M5Policy(Cap200M10Policy):
 @dataclass(frozen=True)
 class Demo200Policy(Cap200M10Policy):
     """Owner's combined demo run (2026-11-02): $200, margin = realized balance / 10 (~$20, so 3 trades <= ~$60),
-    leverage <= 5x, at most 3 positions shared with the external alt-ML executor (it reads status.json),
+    leverage <= 5x, at most 3 positions across all strategies,
     all rules enabled, looser breakers, full top-of-book depth, and the sentiment gate on trend rules."""
     leverage: Decimal = D("5")
     daily_loss: Decimal = D(".15")
@@ -175,6 +175,7 @@ class Demo200Policy(Cap200M10Policy):
     # Owner 2026-11-03: the unproven 1h ML rule stops opening trades after 5 losing closes in a row
     # (same sizing and caps as every other rule). Delete journal key loss_streaks to resume.
     loss_streak_pause = (("ml1h_pattern", 5),)
+    enabled_strategies = Cap200M10Policy.enabled_strategies | {"ml5m_alts"}
 
 
 def portfolio_risk_caps(policy: Policy) -> tuple[Decimal, Decimal]:
@@ -294,8 +295,10 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     manifest = manifest_for(signal.strategy_id, signal.strategy_version)
     if manifest and manifest.status == "candidate" and not policy.candidates_enabled:
         return reject("CANDIDATE_RESEARCH_ONLY")
+    if manifest and manifest.status == "demo" and not isinstance(policy, Demo200Policy):
+        return reject("DEMO_STRATEGY_ONLY")
     hold_ceiling = 259200 if manifest and manifest.timeframe == "4h" else 14400
-    if manifest and (manifest.status == "promoted" or manifest.status == "candidate" and policy.candidates_enabled):
+    if manifest and (manifest.status in {"promoted", "demo"} or manifest.status == "candidate" and policy.candidates_enabled):
         hold_ceiling = min(259200, manifest.maximum_hold_seconds)
     no_target = bool(manifest and manifest.exit_model in {"trailing", "channel", "time"})
     if not 1 <= signal.maximum_hold_seconds <= hold_ceiling:
@@ -343,7 +346,8 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
     costs = unit_loss - distance
     if no_target and costs > D(".25") * distance:
         return reject("COSTS_TOO_HIGH_FOR_STOP")
-    if not no_target and (abs(target - entry) - costs) / unit_loss < policy.min_net_rr:
+    min_net_rr = D(manifest.min_net_rr) if manifest and manifest.min_net_rr is not None else policy.min_net_rr
+    if not no_target and (abs(target - entry) - costs) / unit_loss < min_net_rr:
         return reject("NET_REWARD_RISK")
     budget = account.equity * policy.risk_fraction
     shared = policy.candidates_enabled or policy.max_positions > 1

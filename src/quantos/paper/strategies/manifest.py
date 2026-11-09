@@ -16,6 +16,7 @@ class Manifest:
     evidence_status: str
     aliases: tuple[str, ...] = ()
     status: str = "library"
+    min_net_rr: str | None = None
 
     @property
     def manifest_id(self):
@@ -36,6 +37,11 @@ MANIFESTS = (
              '1h', 'MARKET', 'fixed', 172800,
              (('target_atr','1.5'),('stop_atr','1.5'),('hold_bars','48'),('threshold','train top 2%'),
               ('signals','external scorer signals.json')), 'EXPLORATORY_HELDOUT', status='candidate'),
+    Manifest('ml5m_alts', '0.1.0', 'ml', 'edge_vault/ml5m_alts_v1 via external USDT scorer',
+             '5m', 'MARKET', 'fixed', 86400,
+             (('target_fraction','0.02'),('stop_fraction','0.04'),('soft_stop_fraction','0.02'),
+              ('threshold','rolling p99 of previous 30 UTC days'),('margin_asset','USDC')),
+             'DEMO_UNVERIFIED', status='demo', min_net_rr='0.35'),
     Manifest('tsmom_4h', '1.0.0', 'trend',
              'Moskowitz, Ooi & Pedersen 2012; task-specific 30-day/4h adaptation',
              '4h', 'MARKET', 'trailing', 259200,

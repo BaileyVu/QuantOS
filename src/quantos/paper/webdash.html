@@ -166,7 +166,7 @@ a:hover { color: var(--az-primary); }
 #views > [data-tab="Trades"] > div:nth-child(2) { display: grid; grid-template-columns: minmax(0,2fr) minmax(280px,1fr); gap: 16px; align-items: start; }
 #views > [data-tab="Sentiment"] { display: grid; grid-template-columns: minmax(0,2fr) minmax(280px,1fr); gap: 16px; align-items: start; }
 #views > [data-tab="Logs"] { display: flex; flex-direction: column; gap: 16px; }
-#eqPanel, #acct, #alerts, #mlPanel, #ml1hPanel, #funnel, #senti { padding: 16px 18px; }
+#eqPanel, #acct, #alerts, #ml1hPanel, #funnel, #senti { padding: 16px 18px; }
 #health { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 16px; }
 #charts { display: flex; flex-direction: column; gap: 16px; }
 #views .g table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -433,7 +433,6 @@ td { padding: 7px 10px; }
 </div>
 </section>
 <aside>
-<section class="g" id="mlPanel"></section>
 <section class="g" id="ml1hPanel"></section>
 <section class="g" id="funnel"></section>
 <section class="g" id="shadowPanel" style="padding: 16px 18px;"></section>
@@ -521,8 +520,8 @@ const NAV = [
 const TABS = NAV.map(n => n.label);
 const SITE = { 'CoinDesk': ['https://www.coindesk.com/', 'CD', 'var(--az-tint-33)', 'var(--az-warning)'], 'Cointelegraph': ['https://cointelegraph.com/', 'CT', 'var(--az-tint-43)', 'var(--az-text-secondary)'], 'Watcher Guru': ['https://t.me/s/WatcherGuru', 'WG', 'var(--az-tint-7)', 'var(--az-info)'] };
 // Backtest edge per strategy (research notes, not live data).
-const EDGE = { alt_dip_reversal: '+2.5% / trade', crash_flush_e2: '+2.9% / trade', tsmom_4h: 'near miss', 'alt-ML 5m': '~+20bp / trade', ml1h_pattern: '1h LightGBM' };
-const SLOT = { crash_flush_e2: 'crash', alt_dip_reversal: 'event', delist_short_e17: 'event', tsmom_4h: 'trend', turtle_55: 'trend', vol_squeeze_breakout: 'trend' };
+const EDGE = { alt_dip_reversal: '+2.5% / trade', crash_flush_e2: '+2.9% / trade', tsmom_4h: 'near miss', ml5m_alts: '5m GBM', ml1h_pattern: '1h LightGBM' };
+const SLOT = { crash_flush_e2: 'crash', alt_dip_reversal: 'event', delist_short_e17: 'event', tsmom_4h: 'trend', turtle_55: 'trend', vol_squeeze_breakout: 'trend', ml5m_alts: 'trend' };
 const STOP_CMD = 'cd ~/Desktop/PythonProject/QuantOS-mainnet-ready && ../QuantOS/.venv/bin/python scripts/deploy_three.py uninstall';
 
 const $ = id => document.getElementById(id);
@@ -729,18 +728,7 @@ function model() {
     const xf = ((X && X[run.name] && X[run.name].fills) || run.fills || []).filter(f => f.order_id === oid && f.kind === 'ENTRY').pop();
     return { book: run.profile || 'pD', sym: p.symbol, strat: p.strategy_id, side: p.side, q, e, m, up, upPct: up != null && e ? up / (e * q) * 100 : null, stop: num(p.stop_price || p.stop_loss), tp: num(p.take_profit), state: p.state, opened: xf ? xf.time_ms : null, cid: oid && run.mirror[oid].stop_cid };
   });
-  const ml = S.mlalts || null;
-  (ml && ml.open || []).forEach(p => {
-    // Live mark/uPnL from /api/exchange (2s); 15m candle close only if Binance doesn't list the leg.
-    const xp = exPos(p.sym);
-    const k = KL[p.sym], m = xp ? xp.mark : k && k.length ? +k[k.length - 1][4] : null, q = num(p.qty), e = num(p.entry);
-    const up = xp ? xp.upnl : q && e != null && m != null ? (m - e) * q : null;
-    const xo = (EX && EX.orders || []).filter(o => o.symbol === p.sym);  // alt-ML's own stop and TP on Binance
-    const so = xo.find(o => /STOP/.test(o.type || '')), to = xo.find(o => /LIMIT|TAKE_PROFIT/.test(o.type || ''));
-    positions.push({ book: 'alt-ML', sym: p.sym, strat: 'alt-ML 5m', side: 'LONG', q, e, m, up, upPct: up != null && e ? (m / e - 1) * 100 : null, stop: so ? so.price : null, tp: to ? to.price : null, state: String(p.st || 'open').toUpperCase(), opened: p.t || null, cid: p.sid });
-  });
-  const unreal = positions.filter(p => p.book !== 'alt-ML').reduce((a, p) => a + (p.up || 0), 0);
-  const mlUnreal = positions.filter(p => p.book === 'alt-ML').reduce((a, p) => a + (p.up || 0), 0);
+  const unreal = positions.reduce((a, p) => a + (p.up || 0), 0);
   const hist = (run.equity_history || []).slice();
   // Re-mark equity with live exchange prices: engine equity minus its own unrealised, plus the live one.
   const equity = num(eng.equity) != null ? num(eng.equity) - engUnreal + unreal : null;
@@ -749,21 +737,11 @@ function model() {
   const per = (X && X[run.name] && X[run.name].strategies) || {};
   const checks = (run.self_check && run.self_check.checks) || {};
   const strats = [...new Set([...Object.keys(checks), ...Object.keys(per)])].map(id => {
-    const c = checks[id] || {}, inPos = positions.some(p => p.strat === id && p.book !== 'alt-ML'), a = per[id] || {};
-    const pnl = (a.pnl || 0) + positions.filter(p => p.strat === id && p.book !== 'alt-ML').reduce((s, p) => s + (p.up || 0), 0);
+    const c = checks[id] || {}, inPos = positions.some(p => p.strat === id), a = per[id] || {};
+    const pnl = (a.pnl || 0) + positions.filter(p => p.strat === id).reduce((s, p) => s + (p.up || 0), 0);
     const stt = inPos ? 'In position' : c.ok === false ? 'Check failed' : eng.paused ? 'Paused' : 'Scanning';
     return { n: id, b: run.profile || 'pD', slot: SLOT[id] || '–', st: stt, stc: inPos ? BLU : stt === 'Scanning' ? UP : stt === 'Check failed' ? DN : DIM, t: a.entries || 0, p: pnl, d: c.detail || '', edge: EDGE[id] || '–' };
   });
-  let mlTop = null;
-  if (ml) {
-    const sc = (ml.scores && ml.scores.scores) || {}, thr = ml.scores && ml.scores.thr;
-    const top = Object.entries(sc).sort((a, b) => b[1] - a[1]);
-    mlTop = { thr, top, ts: ml.scores && ml.scores.ts_ms };
-    const open = (ml.open || []).length, best = top[0];
-    const stt = open ? 'In position' : best && thr != null && best[1] >= thr ? 'Signal' : 'Below threshold';
-    const mlUp = positions.filter(p => p.book === 'alt-ML').reduce((s, p) => s + (p.up || 0), 0);
-    strats.push({ n: 'alt-ML 5m', b: 'executor', slot: 'shared', st: stt, stc: open ? BLU : stt === 'Signal' ? UP : DIM, t: (ml.closed || 0) + open, p: (ml.realized_usd || 0) + mlUp, d: best ? `Top ${short(best[0])} ${best[1].toFixed(2)} vs ${thr != null ? thr.toFixed(3) : '?'} needed` : 'no scores yet', edge: EDGE['alt-ML 5m'] });
-  }
   let h1 = null;
   if (S.ml1h) {
     const o = S.ml1h, thr = o.thr || {}, sigs = (o.signals || []).slice().sort((a, b) => (b.generated_ms || 0) - (a.generated_ms || 0)).slice(0, 10);
@@ -771,7 +749,7 @@ function model() {
     const age = o.ts_ms ? (now - o.ts_ms) / 60000 : null;
     h1 = { ts: o.ts_ms, thr, top, sigs, stale: age == null || age > 75, fresh: sigs.filter(x => x.generated_ms && now - x.generated_ms < 3600000) };
   }
-  return { run, st, eng, now, positions, unreal, mlUnreal, hist, equity, start, strats, ml, mlTop, h1 };
+  return { run, st, eng, now, positions, unreal, hist, equity, start, strats, h1 };
 }
 
 // ---------- header ----------
@@ -812,11 +790,9 @@ function renderEquity(M) {
   }
   updateHTML($('eqPanel'), `<div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 40px;">
 <div>
-<div class="k">Equity · ${esc(M.run.profile || '')} book <span class="mut" style="font-size: 11px; text-transform: none; letter-spacing: 0;">· live uPnL: ${esc(M.run.profile || 'pD')} ${sgn(M.unreal)} · alt-ML ${sgn(M.mlUnreal)} · Binance total ${sgn(M.unreal + M.mlUnreal)} ${LIVE.up ? '● LIVE' : '○ POLL'}</span></div>
+<div class="k">Equity · ${esc(M.run.profile || '')} book <span class="mut" style="font-size: 11px; text-transform: none; letter-spacing: 0;">· live uPnL: ${esc(M.run.profile || 'pD')} ${sgn(M.unreal)} ${LIVE.up ? '● LIVE' : '○ POLL'}</span></div>
 <div style="display: flex; align-items: baseline; gap: 12px; margin-top: 6px;"><span class="m" style="font-size: 40px; font-weight: 500; letter-spacing: -0.02em;">${f2(eq)}</span><span class="m mut" style="font-size: 13px;">USD</span></div>
 <div class="m" style="margin-top: 4px; font-size: 12.5px;"><span style="color: ${pc(ch)};">${sgn(ch)} (${ch != null && M.start ? sgn(ch / M.start * 100) : '–'}%)</span><span class="mut"> vs ${f2(M.start)} start · HWM ${f2(hwm)}</span></div>
-${M.ml ? (() => { const mlEq = num(M.ml.budget) != null ? num(M.ml.budget) + (M.ml.realized_usd || 0) + (M.mlUnreal || 0) : null, tot = eq != null && mlEq != null ? eq + mlEq : null;
-  return `<div class="m" style="margin-top: 6px; font-size: 12.5px;"><span class="mut">Total (pD + alt-ML):</span> <span style="font-weight: 500;">${f2(tot)}</span> <span class="mut">= pD ${f2(eq)} + alt-ML ${f2(mlEq)} (two separate virtual books)</span></div>`; })() : ''}
 </div>
 <dl style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 28px; margin: 6px 0 0 auto;">
 ${kpis.map(k => `<div><dt class="k">${k.l}</dt><dd class="m" style="margin: 4px 0 0; font-size: 15px; color: ${k.c};">${k.v}</dd></div>`).join('')}
@@ -831,7 +807,7 @@ ${kpis.map(k => `<div><dt class="k">${k.l}</dt><dd class="m" style="margin: 4px 
 
 function renderAcct(M) {
   const eq = M.equity, sl = M.run.slots || {};
-  const acct = [{ l: 'Cash', v: f2(M.eng.cash), c: 'inherit' }, { l: 'Unrealised (QuantOS)', v: sgn(M.unreal), c: pc(M.unreal) }, { l: 'Unrealised (alt-ML)', v: sgn(M.mlUnreal), c: pc(M.mlUnreal) }, { l: 'Unrealised (all, Binance)', v: sgn(M.unreal + M.mlUnreal), c: pc(M.unreal + M.mlUnreal) }, { l: 'Realised', v: sgn(M.run.realized && M.run.realized.pnl), c: pc(M.run.realized && M.run.realized.pnl) }, { l: 'High-water mark', v: f2(M.eng.high_water), c: 'inherit' }, { l: 'Next margin (bal / 10)', v: eq != null ? (eq / 10).toFixed(2) : '–', c: 'inherit' }, { l: 'Restarts', v: String((M.run.run && M.run.run.restarts) || 0), c: 'inherit' }];
+  const acct = [{ l: 'Cash', v: f2(M.eng.cash), c: 'inherit' }, { l: 'Unrealised (Binance)', v: sgn(M.unreal), c: pc(M.unreal) }, { l: 'Realised', v: sgn(M.run.realized && M.run.realized.pnl), c: pc(M.run.realized && M.run.realized.pnl) }, { l: 'High-water mark', v: f2(M.eng.high_water), c: 'inherit' }, { l: 'Next margin (bal / 10)', v: eq != null ? (eq / 10).toFixed(2) : '–', c: 'inherit' }, { l: 'Restarts', v: String((M.run.run && M.run.run.restarts) || 0), c: 'inherit' }];
   updateHTML($('acct'), `<h2 class="h">Account · ${esc(M.run.profile || '')} <span class="mut" style="font-size: 11px;" title="LIVE: marks streamed from Binance each second; POLL: refreshed every 2s">${LIVE.up ? '● LIVE' : '○ POLL'}</span></h2>
 <dl class="m" style="margin: 12px 0 0; display: grid; grid-template-columns: 1fr auto; gap: 9px 12px; font-size: 12.5px;">
 ${acct.map(a => `<dt style="color: var(--az-text-secondary); font-family: var(--az-font-ui);">${a.l}</dt><dd style="margin: 0; color: ${a.c};">${a.v}</dd>`).join('')}
@@ -846,7 +822,7 @@ const stratRow = (s, full) => `<tr><td style="font-weight: 500;">${esc(s.n)}</td
 
 function renderStrats(M) {
   const nPd = M.strats.filter(s => s.b !== 'executor').length;
-  $('ovStSub').textContent = `${nPd} ${M.run.profile || ''}${M.ml ? ' · alt-ML' : ''}`;
+  $('ovStSub').textContent = `${nPd} ${M.run.profile || ''}`;
   updateHTML($('ovStrats'), M.strats.slice().sort((a, b) => b.t - a.t || Math.abs(b.p) - Math.abs(a.p)).slice(0, 5).map(s => stratRow(s, false)).join(''));
   const running = M.strats.filter(s => s.st !== 'Check failed' && s.st !== 'Paused').length;
   $('stSub').textContent = `${running} running · ${Object.keys(M.run.slots || {}).length} slots shared · margin = balance / 10`;
@@ -870,7 +846,6 @@ function renderAlerts(M) {
   if (sh.last) info(`Sentiment gate would block ${sh.last.symbol || ''} ${String(sh.last.side || '').toLowerCase()}`, `shadow mode · ${sh.block.length} times in 30 min (of last 40 events)`);
   const rr = Object.entries(M.run.reject_reasons || {});
   if (rr.length) info(`${rr[0][1]} signals rejected as ${rr[0][0].toLowerCase().replace(/_/g, ' ')}`, rr.slice(1).map(([k, v]) => `${v} ${k.toLowerCase().replace(/_/g, ' ')}`).join(' · ') || 'only reason so far');
-  if (M.ml && !(M.ml.closed || (M.ml.open || []).length) && M.mlTop && M.mlTop.top.length) info('alt-ML has not traded yet', `best score ${M.mlTop.top[0][1].toFixed(2)}, threshold ${M.mlTop.thr != null ? M.mlTop.thr.toFixed(3) : '?'}`);
   if (M.h1 && M.h1.stale) warn('1h-ML scores stale', M.h1.ts ? 'last scored ' + md(M.h1.ts) + ' ' + hm(M.h1.ts) + 'Z' : 'no scores yet');
   if (M.h1 && M.h1.fresh.length) info(`1h-ML: ${M.h1.fresh.length} signal${M.h1.fresh.length > 1 ? 's' : ''} in the last hour`, M.h1.fresh.slice(0, 4).map(x => `${short(x.symbol)} ${String(x.side || '').toLowerCase()} ${(+x.score).toFixed(3)}`).join(' · '));
   const sb = S.sentibot && S.sentibot.perp;
@@ -896,16 +871,6 @@ function renderAlerts(M) {
 }
 
 // ---------- strategies tab ----------
-function renderMl(M) {
-  if (!M.mlTop) { updateHTML($('mlPanel'), '<h2 class="h">alt-ML candidates</h2><div class="mut" style="margin-top: 12px;">alt-ML executor not found</div>'); return; }
-  const thr = num(M.mlTop.thr), scale = 1;
-  updateHTML($('mlPanel'), `<div style="display: flex; align-items: center; justify-content: space-between;"><h2 class="h">alt-ML candidates</h2><span class="m mut" style="font-size: 12px;">${M.mlTop.ts ? 'scored ' + hm(M.mlTop.ts) + 'Z' : ''}</span></div>
-<div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
-${M.mlTop.top.slice(0, 8).map(([s, v]) => `<div style="display: grid; grid-template-columns: 74px 1fr 44px; align-items: center; gap: 10px; font-size: 12px;"><span class="m">${esc(short(s))}</span><span style="position: relative; height: 6px; border-radius: 3px; background: var(--az-tint-42);"><span style="position: absolute; left: 0; top: 0; height: 6px; border-radius: 3px; width: ${Math.max(0, Math.min(100, v / scale * 100)).toFixed(1)}%; background: ${thr != null && v >= thr ? UP : BLU}; opacity: 0.7;"></span><span style="position: absolute; left: ${thr == null ? 0 : Math.max(0, Math.min(1, thr)) * 100}%; display: ${thr == null ? 'none' : 'block'}; top: -3px; width: 1px; height: 12px; background: var(--az-warning);"></span></span><span class="m" style="text-align: right;">${v.toFixed(3)}</span></div>`).join('')}
-</div>
-<div class="m mut" style="font-size: 12px; margin-top: 10px;">amber tick = entry threshold ${thr == null ? 'unavailable' : thr.toFixed(3)}</div>`);
-}
-
 function renderMl1h(M) {
   const h = M.h1;
   if (!h) { updateHTML($('ml1hPanel'), '<h2 class="h">1h-ML pattern</h2><div class="mut" style="margin-top: 12px;">1h-ML scorer not found</div>'); return; }
@@ -1013,8 +978,7 @@ function renderTrades(M) {
   else updateHTML($('orders'), orders.map(p => `<tr><td style="font-family: var(--az-font-ui); font-weight: 500;">${esc(p.sym)}</td><td>Stop</td><td style="color: ${p.side === 'SHORT' ? UP : DN};">${p.side === 'SHORT' ? 'Buy' : 'Sell'}</td><td style="text-align: right;">${p.q != null ? p.q.toFixed(1) : '–'}</td><td style="text-align: right;">${px(p.stop)}</td><td style="text-align: right;" class="mut">${p.m ? sgn((p.stop / p.m - 1) * 100, 1) + '%' : '–'}</td><td class="mut">${p.cid ? esc(String(p.cid)) : '–'}</td></tr>`).join('') || empty(7, 'No open orders'));
   const run = M.run, ex = X && X[run.name], fills = (ex && ex.fills) || run.fills || [];
   updateHTML($('fills'), fills.map(f => { const entry = f.kind === 'ENTRY', q = num(f.quantity); return `<tr><td class="mut">${md(f.time_ms)} ${hms(f.time_ms)}</td><td style="font-family: var(--az-font-ui); font-weight: 500;">${esc(f.symbol || '–')}</td><td style="color: ${DIM};">${entry ? 'Entry' : esc(String(f.kind || '').charAt(0) + String(f.kind || '').slice(1).toLowerCase())} ${q != null ? q.toFixed(1) : ''}</td><td style="text-align: right;">${px(f.price)}</td><td style="text-align: right;" class="mut">${num(f.fee) != null ? num(f.fee).toFixed(4) : '–'}</td></tr>`; }).join('') || empty(5, 'No fills yet'));
-  const crossed = M.ml && (M.ml.closed || (M.ml.open || []).length);
-  $('fillNote').textContent = `${fills.length} fill${fills.length === 1 ? '' : 's'} since start.${M.ml ? crossed ? ` alt-ML: ${M.ml.closed || 0} closed, ${(M.ml.open || []).length} open.` : ' alt-ML has not crossed its threshold yet.' : ''}`;
+  $('fillNote').textContent = `${fills.length} fill${fills.length === 1 ? '' : 's'} since start.`;
 }
 
 // ---------- sentiment ----------
@@ -1080,7 +1044,6 @@ function renderLogs(M) {
   ];
   updateHTML($('health'), H.map(h => `<section class="g" style="padding: 14px 16px;"><div class="k">${h.l}</div><div class="m" style="font-size: 22px; margin-top: 6px; color: ${h.c};">${h.v}</div><div class="mut" style="font-size: 12px; margin-top: 2px;">${esc(h.d)}</div></section>`).join(''));
   const ev = (M.run.feed || []).map(f => ({ t: f.time_ms, k: f.kind, s: f.strategy, y: f.symbol, side: f.side, r: [f.reason, f.detail].filter(Boolean).join(' · ') }));
-  ((M.ml && M.ml.events) || []).forEach(e => ev.push({ t: Date.parse(e.ts), k: 'ML_' + String(e.ev || '').toUpperCase(), s: 'alt-ML 5m', y: e.sym, side: e.ev === 'signal' ? 'LONG' : '', r: [e.why, e.score != null ? 'score ' + e.score : '', e.px != null ? '@ ' + e.px : '', e.pnl_usd != null ? 'pnl ' + e.pnl_usd : '', e.err].filter(Boolean).join(' · ') }));
   ev.sort((a, b) => b.t - a.t);
   const rows = [];
   for (const e of ev) { const p = rows[rows.length - 1]; if (p && p.k === e.k && p.s === e.s && p.y === e.y && p.side === e.side && p.r === e.r) { p.n++; p.t0 = e.t; } else rows.push({ ...e, n: 1, t0: e.t }); }
@@ -1137,7 +1100,7 @@ $('srcs').addEventListener('click', e => { const b = e.target.closest('[data-s]'
 function render() {
   if (!S) return;
   let M; try { M = model(); } catch (e) { console.error(e); return; }
-  const parts = [renderHeader, renderEquity, renderAcct, renderStrats, renderAlerts, renderMl, renderMl1h, renderFunnel, renderShadow, renderTrades, renderCharts, renderSenti, renderLogs];
+  const parts = [renderHeader, renderEquity, renderAcct, renderStrats, renderAlerts, renderMl1h, renderFunnel, renderShadow, renderTrades, renderCharts, renderSenti, renderLogs];
   for (const f of parts) { try { f(M); } catch (e) { console.error(f.name, e); } }
 }
 async function getJSON(u) { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }
