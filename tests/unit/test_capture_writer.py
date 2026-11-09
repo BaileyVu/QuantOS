@@ -24,6 +24,19 @@ def records(state):
 
 
 class CaptureTests(unittest.TestCase):
+    def test_readonly_stream_mode_keeps_separate_order_client(self):
+        with tempfile.TemporaryDirectory() as folder:
+            calls=[]
+            def factory(mode): calls.append(mode); return mode
+            runtime=Runtime(Path(folder),portfolio='live50',execution='dry-run',
+                            observe_testnet_stream=True,client_factory=factory,stream=False)
+            self.assertEqual(runtime._client(),'dry-run')
+            self.assertEqual(runtime._client('testnet'),'testnet')
+            self.assertEqual(runtime.execution,'dry-run')
+            self.assertEqual(calls,['dry-run','testnet'])
+            with self.assertRaises(ValueError):
+                Runtime(Path(folder),portfolio='live50',execution='testnet',observe_testnet_stream=True)
+
     def test_exact_bytes_and_concurrent_append(self):
         with tempfile.TemporaryDirectory() as folder:
             state = Path(folder); writer = CaptureWriter(state)

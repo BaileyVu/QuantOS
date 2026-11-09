@@ -197,7 +197,7 @@ class Runtime:
     def __init__(self, state: Path, hours=72, market_factory=PublicMarket,
                  min_quote_volume=D("20000000"), announcement_factory=BinanceAnnouncements,
                  portfolio="legacy", sentiment_path=None, notify=True, execution="paper", client_factory=None,
-                 stream=True, sentiment_fail_closed=False):
+                 stream=True, sentiment_fail_closed=False, observe_testnet_stream=False):
         if not (hours == 0 or 0 < hours <= 72): raise ValueError("duration must be 0 (until stopped) or 0-72 hours")
         self.state, self.hours, self.market_factory = state, hours, market_factory
         from .capture import CaptureWriter
@@ -224,6 +224,9 @@ class Runtime:
         if execution != "paper" and portfolio != "live50":
             raise ValueError("exchange execution requires --portfolio live50")
         self.execution, self.client_factory = execution, client_factory
+        if observe_testnet_stream and execution != "dry-run":
+            raise ValueError("observe-testnet-stream is only for a no-order dry-run soak")
+        self.observe_testnet_stream = observe_testnet_stream
         self.min_quote_volume = D(min_quote_volume)
         if not self.min_quote_volume.is_finite() or self.min_quote_volume < 0:
             raise ValueError("invalid quote volume floor")
@@ -235,16 +238,17 @@ class Runtime:
         self.suspend_requested = False  # live50: SIGTERM/SIGINT leaves protected positions for the restart
         self.last_final_attempt = 0
 
-    def _client(self):
+    def _client(self, execution=None):
+        execution = self.execution if execution is None else execution
         if self.client_factory is not None:
-            return self.client_factory(self.execution)
+            return self.client_factory(execution)
         from ..live.client import SignedClient
-        if self.execution == "dry-run":
+        if execution == "dry-run":
             return SignedClient("dry-run", None, log_path=self.state / "dry_run_orders.jsonl")
         from ..live.keys import load_keys
         path = os.environ.get("QUANTOS_KEY_FILE")
         if not path: raise ValueError("QUANTOS_KEY_FILE must name the testnet key file")
-        return SignedClient(self.execution, load_keys(path))
+        return SignedClient(execution, load_keys(path))
 
     def _capture_input(self, source, raw, now_ms):
         self.capture.input_bytes(source, raw, milliseconds() if now_ms is None else now_ms)
@@ -541,8 +545,13 @@ class Runtime:
                     else: alerter.alert(level, key, message, milliseconds())
                 mirror = ExchangeMirror(self._client(), f"q{run['started_ms'] // 1000}", self.state, mirror_alert)
                 mirror.client.observer = lambda row: self.capture.record("exchange_response", row, row["received_ms"])
-                if getattr(mirror.client, "ws_host", None) and mirror.client.mode != "dry-run":
-                    user = UserStream(mirror.client, input_observer=lambda row, at: self.capture.record("user_stream", row, at))
+                # An optional testnet user-data connection makes the dry-run
+                # soak exercise the service's account-stream thread. Only
+                # UserStream receives this client; the order mirror retains
+                # its entirely local dry-run client.
+                user_client = self._client("testnet") if self.observe_testnet_stream else mirror.client
+                if getattr(user_client, "ws_host", None) and user_client.mode != "dry-run":
+                    user = UserStream(user_client, input_observer=lambda row, at: self.capture.record("user_stream", row, at))
                     threading.Thread(target=user.run, args=(self.shutdown,), daemon=True).start()
             last_wall, last_mono = milliseconds(), time.monotonic()
             last_feed, last_status, last_report = 0, 0, 0
