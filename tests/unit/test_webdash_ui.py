@@ -49,7 +49,7 @@ class WebdashUITests(unittest.TestCase):
     def test_key_live_panels_remain_addressable(self) -> None:
         for element_id in (
             "stopAll", "eqPanel", "acct", "ovStrats", "alerts", "stStrats",
-            "mlPanel", "ml1hPanel", "funnel", "positions", "orders", "fills",
+            "ml1hPanel", "funnel", "positions", "orders", "fills",
             "senti", "health", "log", "newsPanel",
         ):
             with self.subTest(element_id=element_id):

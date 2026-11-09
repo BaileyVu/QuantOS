@@ -9,6 +9,7 @@ from .journal import Journal
 from .risk import portfolio_risk_caps, Account, Policy, evaluate, usable_quote, valid_quote, quantity_step
 from .types import D, Funding, Instrument, Quote, Signal, Trade, floor_step, dumps
 from .strategies.manifest import manifest_for
+from .strategies.ml5m_alts import SOFT_STOP_FRACTION
 from .stop_cost import price_stop
 
 TERMINAL = {"CLOSED", "CANCELED", "EXPIRED", "REJECTED"}
@@ -318,6 +319,24 @@ class PaperEngine:
                 self._tighten_stop(o, price, now_ms, "CHANNEL", bars[-1].close_ms)
                 o["channel_bar_ms"] = bars[-1].close_ms
                 self.journal.save(o)
+
+    def bar_close_stops(self, snapshot, now_ms):
+        """Exit alt-ML longs after a completed 5m candle closes at or below -2%."""
+        if snapshot.at_ms > now_ms or not self.journal.get("reconciled", False):
+            return
+        from .strategies.indicators import closed_bars
+
+        with self.journal.transaction():
+            for order in self.active():
+                signal = order["signal"]
+                if (signal["strategy_id"] != "ml5m_alts" or signal["symbol"] != snapshot.instrument.symbol
+                        or order["state"] == "CLOSING" or D(order["filled"]) <= 0):
+                    continue
+                bars = closed_bars(snapshot, "5m", 1)
+                stop = D(order["average"]) * (1 - SOFT_STOP_FRACTION)
+                if bars and any(bar.close_ms > order["first_fill_ms"] and bar.close <= stop for bar in bars):
+                    self._closing(order, now_ms, "SOFT_STOP_5M")
+                    self.journal.save(order)
 
     def _trailing_stop(self, o, q, now_ms):
         s = o["signal"]

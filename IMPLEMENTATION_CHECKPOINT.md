@@ -21,3 +21,11 @@ First attempt /private/tmp/quantos-v6-soak-72c8cd7 completed650.89s,exit0,0journ
 Fresh retry PASS650.56s,exit0,0errors/alerts/captureerrors,1344records,both streamsconnected,0fills. Replay719inputs/22scans/allcontextcomplete:6414/6414decisions EXACT. Prior4006proof retained. Durable evidence ../QuantOS-release-evidence/<fullSHA>/quantos-v6-soak-72c8cd7-fresh; failedattempt beside it. No activeprocesses/helperidle. Code/scripts/tests unchanged from tested72c8cd7; laterdocs only.
 NEXT ownerlaunch: merge47..55then57;56parked. Exact commands docs/DEMO_RELEASE_HANDOFF.md. Preparedplan above. Owneraloneexecutes; never change service/state. No repeats whilewaiting.
 AFTERownerlaunch: fill_report first20fillsOR3days,24hshadow72hSentibot; actualevidence pending. PreservealtML/ml5m,sealed2025+,mainnetguards,costs.
+
+## 5m alt-ML demo integration — 2026-11-09
+
+- Branch `codex/ml5m-alts` starts from verified main `d97cc6f`. The scorer still uses the full 19-contract USDT universe and 30-day p99. Eleven Demo USDC twins are tradable through pD. ATOM, BAT, DASH, ETC, IOST, IOTA, TRX and XLM have no Demo twin.
+- pD uses MARKET entry and its standard size, three-position cap, trend slot, kill switch and stressed hard-stop cost. The approved 0.35 net reward-to-risk floor applies only to the versioned demo manifest. The protection prices use the entry quote and exchange ticks. The completed 5m close soft stop uses the booked entry average.
+- Local validation covered 88 targeted tests, the synthetic CLI and a real scorer warm-up. The first 520-test discovery had three failures on touched paths, which passed on targeted rerun. Two days of legacy history replay matched 3,648/3,648 scores in the legacy runtime. The single logged signal matched 0.5758 at threshold 0.5602.
+- Isolated dry-run finished in 921.49 seconds with both streams live, 630 ml5m scans, zero orders/fills/alerts/errors and 1,473 capture records. Offline runtime replay matched 10,082/10,082 journal decisions. Both candidate processes exited. The installed services and trading state were left alone.
+- Next step is owner-only `scripts/ml5m_cutover.py deploy --plan-dir <prepared-plan>` once Binance Demo and the local books are flat. Use the same script with `rollback` and the same plan for the previous snapshot. The read-only guard already refused the currently nonflat Demo account.

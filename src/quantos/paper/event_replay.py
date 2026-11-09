@@ -14,6 +14,7 @@ from .report import atomic_json, write_reports
 from .risk import Demo200Policy, LivePolicy, Policy
 from .runtime import dispatch
 from .strategies import library, live_library
+from .strategies.ml5m_alts import Ml5mAltsStrategy
 from .types import D, Funding, Quote, Trade, Signal
 from .replay import decode, snapshot
 
@@ -30,9 +31,9 @@ PROFILE_DECISIONS = {
 
 
 class RecordedExternalStrategy:
-    strategy_id, version = "ml1h_pattern", "0.1.0"
-
-    def __init__(self, proposals): self.proposals = proposals
+    def __init__(self, proposals, strategy_id="ml1h_pattern", version="0.1.0"):
+        self.strategy_id, self.version = strategy_id, version
+        self.proposals = proposals
 
     def evaluate(self, snapshot):
         if self.proposals is None: return None  # incomplete old capture; never read today's file
@@ -45,7 +46,7 @@ class RecordedExternalStrategy:
             if row[key] is not None: row[key] = D(row[key])
         row["features"] = tuple((k, D(v)) for k, v in row.get("features", ()))
         proposal = Signal(**row)
-        if proposal.symbol != snapshot.instrument.symbol or proposal.strategy_id != self.strategy_id:
+        if proposal.symbol != snapshot.instrument.symbol or proposal.strategy_id != self.strategy_id or proposal.strategy_version != self.version:
             raise ValueError("external proposal identity mismatch")
         return proposal
 
@@ -167,6 +168,8 @@ def event_replay(paths, state: Path, *, profile="pD", strategy="all", expected_j
     if not sources: raise ValueError("at least one runtime recording is required")
     state.mkdir(parents=True)
     profiles, journals, engines, strategies = _profile(profile, state)
+    if profile == "pD":
+        strategies += (Ml5mAltsStrategy(""),)
     selected = tuple(s for s in strategies if strategy == "all" or s.strategy_id == strategy)
     if not selected:
         for j in journals: j.close()
@@ -210,12 +213,18 @@ def event_replay(paths, state: Path, *, profile="pD", strategy="all", expected_j
                     sentiment_fail_closed = context["sentiment_fail_closed"]
                 if isinstance(context, dict) and context.get("sentiment_enabled") is True:
                     sentiment = RecordedSentiment(context.get("sentiment_verdicts"))
-                if any(s.strategy_id == "ml1h_pattern" for s in selected):
-                    external = context.get("external_proposals", {}) if isinstance(context, dict) else {}
-                    proposals = external.get("ml1h_pattern")
-                    if proposals is None: complete_external = False
-                    scan_strategies = tuple(RecordedExternalStrategy(proposals) if s.strategy_id == "ml1h_pattern" else s
-                                            for s in selected)
+                external = context.get("external_proposals", {}) if isinstance(context, dict) else {}
+                scan_strategies = []
+                for candidate in selected:
+                    sid = candidate.strategy_id
+                    if sid == "ml5m_alts" and sid not in external and strategy == "all":
+                        continue  # Historical or unconfigured pD run.
+                    if sid in {"ml1h_pattern", "ml5m_alts"}:
+                        proposals = external.get(sid)
+                        if proposals is None:
+                            complete_external = False
+                        candidate = RecordedExternalStrategy(proposals, sid, candidate.version)
+                    scan_strategies.append(candidate)
             dispatch(engines, kind, payload, now, strategies=scan_strategies,
                      active_seconds=row.get("active_seconds", 0), sentiment=sentiment,
                      sentiment_fail_closed=sentiment_fail_closed)

@@ -191,6 +191,7 @@ class ScannerTests(unittest.TestCase):
                     self.maintained, self.proposed = [], []
                 def channel_stops(self, snapshot, _now):
                     self.maintained.append(snapshot.instrument.symbol)
+                def bar_close_stops(self, snapshot, _now): pass
                 def propose(self, proposal, *_args): self.proposed.append(proposal)
 
             class SignalOnHeld:

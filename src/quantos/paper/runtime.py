@@ -34,6 +34,7 @@ from .stream import QuoteStream, UserStream
 from .report import atomic_json, write_reports
 from .risk import Cap200M5Policy, Cap200M10Policy, Demo200Policy, LivePolicy, LiveR5Policy, Policy, usable_quote
 from .strategies import library
+from .strategies.ml5m_alts import Ml5mAltsStrategy
 from .announcements import BinanceAnnouncements
 from .types import D, Instrument, Snapshot, dumps
 
@@ -100,17 +101,22 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
     elif kind == "scan":
         from .regime import regime_tags
         signals, lookup = [], {}
+        if external_trace is not None:
+            for strategy in strategies:
+                if strategy.strategy_id in {"ml1h_pattern", "ml5m_alts"}:
+                    external_trace[strategy.strategy_id] = {}
         for snapshot in payload:
             lookup[snapshot.instrument.symbol] = snapshot
             for e in engines:
                 e.channel_stops(snapshot, now)
+                e.bar_close_stops(snapshot, now)
             tags = regime_tags(snapshot)
             if not snapshot.entry_eligible:
                 continue  # Exit maintenance above remains active outside the entry universe.
             for strategy in strategies:
                 proposal = strategy.evaluate(snapshot)
                 if proposal: proposal = replace(proposal, **tags)
-                if external_trace is not None and strategy.strategy_id == "ml1h_pattern":
+                if external_trace is not None and strategy.strategy_id in {"ml1h_pattern", "ml5m_alts"}:
                     external_trace.setdefault(strategy.strategy_id, {})[snapshot.instrument.symbol] = (
                         asdict(proposal) if proposal else None)
                 if proposal: signals.append(proposal)
@@ -224,6 +230,11 @@ class Runtime:
         if execution != "paper" and portfolio != "live50":
             raise ValueError("exchange execution requires --portfolio live50")
         self.execution, self.client_factory = execution, client_factory
+        ml5m_signals = os.environ.get("QUANTOS_ML5M_SIGNALS")
+        if ml5m_signals and portfolio == "live50" and DEMO_PROFILE == "pD" and (
+            execution == "dry-run" or execution == "testnet" and os.environ.get("QUANTOS_TESTNET_HOST") == "demo"
+        ):
+            self.strategies += (Ml5mAltsStrategy(ml5m_signals, self._capture_input),)
         if observe_testnet_stream and execution != "dry-run":
             raise ValueError("observe-testnet-stream is only for a no-order dry-run soak")
         self.observe_testnet_stream = observe_testnet_stream

@@ -145,10 +145,9 @@ def sentibot_view(path: Path | None, now_ms: int) -> dict | None:
 # Combined $200 demo run (2026-11-02); the earlier paper/demo/hl-copy services are retired.
 SERVICES = (("demo", "com.quantos.v4.demo200"), ("sentibot spot", "com.sentibot.spot"),
             ("sentibot perp", "com.sentibot.perp"), ("dashboard", "com.quantos.dashboard"),
-            ("alt-ML", "com.quantos.mlalts"), ("1h-ML", "com.quantos.ml1h"))  # HL copy dropped 2026-11-03 (no edge: short beta only)
+            ("5m scorer", "com.quantos.ml5m.scorer"), ("1h-ML", "com.quantos.ml1h"))  # HL copy dropped 2026-11-03 (no edge: short beta only)
 HLCOPY = Path.home() / "Library/Application Support/hl_copy/state"
 HLREVERSE = Path.home() / "Library/Application Support/hl_copy_reverse/state"
-MLALTS = Path.home() / "Library/Application Support/mlalts/app"
 ML1H = Path.home() / "Library/Application Support/ml1h/app"
 
 
@@ -189,20 +188,6 @@ def hlcopy_view(now_ms: int, HLCOPY: Path = HLCOPY) -> dict | None:
             "start_ts": _json(HLCOPY / "summary.json", {}).get("start_ts")}
 
 
-def mlalts_view(now_ms: int) -> dict | None:
-    """Alt-ML demo executor (edge_data/ml5m/shadow/demo_exec.py): open positions and recent events."""
-    log = MLALTS / "exec_log_testnet.jsonl"
-    if not log.exists():
-        return None
-    rows = _tail(log, 400)
-    exits = [r for r in rows if r.get("ev") == "exit"]
-    keep = [{k: r.get(k) for k in ("ts", "ev", "sym", "why", "score", "px", "qty", "pnl_usd", "err")}
-            for r in rows if r.get("ev") in ("signal", "exit", "nofill", "order_error", "error", "start")][-25:]
-    return {"open": _json(MLALTS / "exec_state_testnet.json", []), "events": keep, "closed": len(exits),
-            "realized_usd": sum(float(r.get("pnl_usd") or 0) for r in exits),
-            "heartbeat_ms": _json(MLALTS / "heartbeat.json", {}).get("ts_ms"), "scores": _json(MLALTS / "last_scores.json", {})}
-
-
 def ml1h_view(now_ms: int) -> dict | None:
     """1h pattern-ML scorer: latest scores and recent signals (orders go through QuantOS pD as ml1h_pattern)."""
     s = _json(ML1H / "last_scores.json", None)
@@ -219,7 +204,7 @@ def snapshot(runs, sentibot) -> dict:
         "perp": sentibot_view(sentibot / "paper_perp_signals.jsonl", now),
         "spot": sentibot_view(sentibot / "paper_signals.jsonl", now)}
     return {"time_ms": now, "services": services_view(), "runs": [run_view(n, s, now, *p) for n, s, *p in runs],
-            "hlcopy": None, "hlreverse": None, "mlalts": mlalts_view(now), "ml1h": ml1h_view(now),
+            "hlcopy": None, "hlreverse": None, "ml1h": ml1h_view(now),
             "sentibot": bots}
 
 
