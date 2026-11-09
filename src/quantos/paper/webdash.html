@@ -379,6 +379,166 @@ td { padding: 7px 10px; }
 .alert-icon { color: #080c1b; background: var(--alert-color); border-color: color-mix(in srgb,var(--alert-color) 75%,white); box-shadow: 0 0 10px color-mix(in srgb,var(--alert-color) 36%,transparent); }
 .alert-warn { border: 1px solid rgba(244,176,91,.4); background: linear-gradient(180deg,rgba(244,176,91,.22),rgba(244,176,91,.08)); box-shadow: inset 0 1px 4px rgba(244,176,91,.14); }
 
+/* Aura Zenith reference finish. */
+.app-shell {
+  --neon-icon-core: #fff3fc;
+  --neon-icon-edge: #ff9ce8;
+  --neon-icon-halo: #f414bf;
+  --neon-icon-glow: drop-shadow(0 0 1.5px var(--neon-icon-edge))
+                    drop-shadow(0 0 4.5px var(--neon-icon-halo))
+                    drop-shadow(0 0 9px var(--neon-icon-halo));
+  --az-rim-core: #f1a9f6;
+  --az-rim-crest: #faafff;
+  --az-rim-warm-crest: #ffb5ec;
+  --az-rim-violet: #ad4ef3;
+  --az-rim-pink: #ee6fde;
+}
+body::before { filter: brightness(1.85) saturate(1.28); }
+#views { --az-card-radius: 18px; }
+#views .g {
+  border: 2px solid transparent;
+  background:
+    radial-gradient(ellipse 94px 37px at 0 0, #df1cbc96, transparent) padding-box,
+    radial-gradient(ellipse 74px 38px at 100% 0, #ba1aff9c, transparent) padding-box,
+    radial-gradient(ellipse 76px 32px at 100% 100%, #9025ffb7, transparent) padding-box,
+    radial-gradient(ellipse 70px 28px at 0 100%, #da2ed879, transparent) padding-box,
+    linear-gradient(#030516fa,#040618fa) padding-box,
+    radial-gradient(ellipse 80px 32px at 0 0, var(--az-rim-warm-crest), transparent) border-box,
+    radial-gradient(ellipse 63px 35px at 100% 0, var(--az-rim-crest), transparent) border-box,
+    radial-gradient(ellipse 84px 33px at 100% 100%, var(--az-rim-crest), transparent) border-box,
+    radial-gradient(ellipse 62px 30px at 0 100%, var(--az-rim-crest), transparent) border-box,
+    linear-gradient(152deg,var(--az-rim-pink),var(--az-rim-violet) 46%,var(--az-rim-core)) border-box;
+  box-shadow: inset 0 1px 9px #d245f279, inset 0 -2px 9px #ac3effa1,
+              0 0 4px #e043ff7b, 0 0 11px #ad1be559;
+}
+#views .g::before, #views .g::after { content: none; }
+#views :is(#eqPanel,#newsPanel,#acct) {
+  box-shadow: inset 0 2px 11px #c83afb8a, inset 0 -3px 10px #b043ffae,
+              0 0 5px #e647ff99, 0 0 13px #c32bff62;
+}
+#views .g:focus-within { --az-rim-core: #ffc1fe; }
+.neon-icon { filter: var(--neon-icon-glow); }
+#views .g h2.h::before {
+  width: 23px; height: 23px; margin: 0 11px 1px 0;
+  background: linear-gradient(158deg,var(--neon-icon-core) 22%,var(--neon-icon-edge) 82%);
+}
+#views .g h2.h::after {
+  left: -7px; width: 37px; height: 35px; border-radius: 50%;
+  background: radial-gradient(ellipse,var(--neon-icon-edge) 0%,var(--neon-icon-halo) 35%,transparent 76%);
+  filter: blur(4px);
+}
+#views #acct h2.h::before { mask-image: url('/static/aura-zenith/wallet.svg'); }
+#views #newsPanel h2.h::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.85' stroke-linecap='round'%3E%3Crect x='3' y='2.5' width='18' height='19' rx='3'/%3E%3Cpath d='M7 7.5h10M7 11.5h10M7 15.5h6'/%3E%3C/svg%3E");
+}
+#acct h2.h, #alerts h2.h {
+  --neon-icon-core: #fff4ed;
+  --neon-icon-edge: #ff9fbc;
+  --neon-icon-halo: #ff244f;
+}
+#views #alerts h2.h::before {
+  background: linear-gradient(155deg,#fff7e8 26%,#ffabc2 78%);
+}
+#views #alerts h2.h::after {
+  background: radial-gradient(ellipse,#ffaabf 0%,#ff2458 35%,transparent 76%);
+}
+.fng-card h2::before {
+  content: ""; width: 20px; height: 20px; margin-right: 14px;
+  vertical-align: middle; border-radius: 50%; border: 1.5px solid var(--neon-icon-core);
+  background: radial-gradient(circle, var(--neon-icon-core) 0 2px, #f241d6 2px 3px, #27092b 4px);
+  box-shadow: 0 0 6px #ff9deb, 0 0 16.5px #eb2de9, inset 0 0 6px #f548dc;
+}
+.nav-item { color: #e2dced; font-weight: 500; border-radius: 14px; }
+.nav-item .neon-icon {
+  display: inline-block; flex: 0 0 23px; width: 23px; height: 23px;
+  --neon-icon-glow: drop-shadow(0 0 2px #ef56d1b7) drop-shadow(0 0 4px #ca27d879);
+}
+.nav-item .neon-icon::before {
+  content: ""; display: block; width: 100%; height: 100%;
+  mask: var(--nav-icon) center / contain no-repeat; background: #eee4f1;
+}
+.nav-item[aria-current="page"] {
+  background: radial-gradient(ellipse at 98% 100%,#f321dc95,transparent 44%),
+              linear-gradient(105deg,#6c153c,#140822 47%,#390953);
+  border-color: #ff9be9;
+  box-shadow: inset 2px 0 7px #ff846acc, inset -2px -2px 8px #ff45f5,
+              0 0 4px #ff65ce, 0 0 15px #f82ed884;
+}
+.nav-item[aria-current="page"]::before {
+  content: ""; position: absolute; pointer-events: none; right: -1px; bottom: 2px;
+  width: 28px; height: 12px; border-radius: 0 0 13px 0;
+  border: solid #fff0ff; border-width: 0 2px 2px 0;
+  filter: drop-shadow(0 0 2px #ffaaff) drop-shadow(0 0 5px #ff2bf4);
+}
+.nav-item[aria-current="page"] .neon-icon {
+  --neon-icon-glow: drop-shadow(0 0 3px #ff7a7c) drop-shadow(0 0 6px #ff337f)
+                    drop-shadow(0 0 9px #ff337f);
+}
+.nav-item[aria-current="page"] .neon-icon::before {
+  background: linear-gradient(145deg,#fff5ec 20%,#ffc1dc 70%,#ff74de);
+}
+.brand-name .os { background-image: linear-gradient(115deg,#ff9f91,#ff379e 72%,#ed40d9); }
+.brand-subtitle { color: #f3eafa; }
+#runPill { color: #fff8fc; border-color: #8e53ba; background: linear-gradient(#161027,#060819); }
+#hdr { color: #ded5ec; border-color: #a353b35c; background: linear-gradient(#10091d,#030514f2); box-shadow: inset 0 0 9px #9f24bb24; }
+#stopAll {
+  min-height: 38px; border-radius: 999px; padding-inline: 17px;
+  border-color: #ff9abc; background: linear-gradient(180deg,#5c092e,#240415);
+  box-shadow: inset 0 0 9px #ff2666ba, 0 0 4px #ff5b8f, 0 0 12px #ff235775;
+}
+#stopAll:hover { background: linear-gradient(180deg,#70203c,#390c22); }
+#stopAll:focus-visible { outline: 2px solid #ffd3e3; outline-offset: 3px; }
+.equity-plot { background: linear-gradient(180deg,#030416,#06041b); border-bottom: 1px solid #74648c70; }
+.equity-trace { filter: drop-shadow(0 0 3px #ff35b870); }
+.equity-axis { color: #d6cde6; font-variant-numeric: tabular-nums; }
+.account-slots { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 3px; }
+.slot-label { margin-top: 8px; color: #eae3f2; }
+.slot-segment {
+  min-width: 0; padding: 7px 2px 0; text-align: center;
+  border-top: 1px solid #d063e2;
+  background: linear-gradient(180deg,#9a2cbb29,transparent 12px);
+  box-shadow: inset 0 3px 5px -4px #f05dff;
+  color: #f1e8fa; font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.slot-segment[data-used="true"] { border-color: #f486ed; box-shadow: inset 0 4px 6px -5px #f058f0; }
+.slot-segment[data-full="true"] { border-color: #ffc88e; }
+#srcs .chip, #overviewMain .btn { border-color: #a667c279; background: linear-gradient(#1a102d,#08091c); }
+#srcs .chip[aria-pressed="true"] {
+  color: #fff; border-color: #f54f9c;
+  background: linear-gradient(#580c31,#240a20); box-shadow: inset 0 0 7px #ff448857, 0 0 7px #f9338654;
+}
+.news-row { border-color: #77649624; }
+.news-meta { color: #c1b6d4; }
+#alerts .panel-heading .pill { border-radius: 999px; }
+#alerts .panel-heading .pill.mut { color: #9ce2ff; border: 1px solid #526fc47d; background: #172343; }
+#overviewMain :is(td,th) { padding-block: 4px; }
+#acct :is(dt,dd) { padding-bottom: 1px; }
+#acct dl { row-gap: 3px !important; }
+@media (min-width: 1440px) {
+  .app-shell { --az-sidebar-width: 262px; }
+  #sidebar { padding: 22px 7px 18px 18px; }
+  .brand-mark { width: 88px; height: 66px; }
+  .brand-lockup { gap: 10px; padding-bottom: 43px; }
+  .brand-subtitle { max-width: 113px; }
+  .nav-item { min-height: 54px; padding-inline: 18px; gap: 16px; margin-bottom: 0; }
+  #views > .overview-grid { grid-template-columns: minmax(0,2.2fr) minmax(0,1fr); gap: 20px; }
+  #views > .overview-grid > :is(#overviewMain,#overviewSide) { gap: 12px; }
+  #eqPanel { padding: 14px 24px 16px; }
+  #eqPanel > div:first-child { display: grid !important; grid-template-columns: minmax(0,1.18fr) minmax(0,1fr); }
+  #eqPanel dl { width: 100%; margin-top: 0 !important; }
+  #eqPanel > div:first-child > div { overflow-wrap: anywhere; }
+  #eqPanel > div:first-child > div > div:nth-child(2) { line-height: 1.08; }
+  #eqPanel > div:nth-child(2) { margin-top: 8px !important; }
+  #eqPanel > div:nth-child(2) svg { height: 158px !important; }
+  #overviewMain :is(td,th) { padding-block: 3px; }
+  #newsPanel { padding: 12px 22px 8px; }
+  #overviewMain .g:has(#ovStrats) > div:first-child { padding-left: 17px; }
+  #overviewMain .news-row { padding-block: 5px; }
+  #overviewMain #news { max-height: 151px; }
+}
+@media (max-width: 600px) {
+  #stopAll { padding-inline: 12px; min-height: 34px; }
+}
 </style>
 </head>
 <body>
@@ -625,10 +785,11 @@ function renderTabs() {
       const a = document.createElement('a');
       a.className = 'nav-item'; a.href = n.route; a.dataset.t = n.label;
       a.title = n.label; a.setAttribute('aria-label', n.label);
-      const img = document.createElement('img');
-      img.src = '/static/aura-zenith/' + n.icon + '.svg'; img.alt = ''; img.width = 20; img.height = 20;
+      const icon = document.createElement('span');
+      icon.className = 'neon-icon'; icon.setAttribute('aria-hidden', 'true');
+      icon.style.setProperty('--nav-icon', 'url("/static/aura-zenith/' + n.icon + '.svg")');
       const label = document.createElement('span'); label.textContent = n.label;
-      a.append(img, label); $('tabs').append(a);
+      a.append(icon, label); $('tabs').append(a);
     });
   }
   $('tabs').querySelectorAll('[data-t]').forEach(a => {
@@ -769,7 +930,6 @@ function renderHeader(M) {
 function renderEquity(M) {
   const eq = M.equity, ch = eq != null ? eq - M.start : null, hwm = num(M.eng.high_water), dd = num(M.eng.drawdown);
   const kpis = [{ l: 'Day PnL', v: sgn(M.eng.day_pnl), c: pc(M.eng.day_pnl) }, { l: 'Drawdown', v: dd != null && hwm ? (dd > 0 ? '-' : '') + (dd / hwm * 100).toFixed(2) + '%' : '–', c: dd > 0 ? DN : 'inherit' }, { l: 'Fills', v: String((M.run.counts && M.run.counts.FILLED) || 0), c: 'inherit' }, { l: 'Fees', v: f2(M.run.realized && M.run.realized.fees), c: 'inherit' }];
-  const curve = ch == null ? ACC : ch < 0 ? DN : UP, curveEnd = ch < 0 ? 'var(--az-rose)' : 'var(--az-positive)';
   const pts = M.hist, H = 240, pad = 8;
   let svg = '', yl = '', xl = '';
   if (pts.length > 1) {
@@ -780,10 +940,14 @@ function renderEquity(M) {
     const Y = v => pad + (H - 2 * pad) * (1 - (v - lo) / (hi - lo)), Xp = t => (t1 > t0 ? (t - t0) / (t1 - t0) : 0) * 1000;
     const line = pts.map((p, i) => (i ? 'L' : 'M') + Xp(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join(' ');
     const ticks = nt.ticks.slice().reverse();
-    svg = `<defs><linearGradient id="equityLine"><stop stop-color="${curve}"></stop><stop offset="1" stop-color="${curveEnd}"></stop></linearGradient><linearGradient id="ef" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${curve}" stop-opacity="0.14"></stop><stop offset="1" stop-color="${curve}" stop-opacity="0"></stop></linearGradient></defs>`
+    svg = `<defs>
+      <linearGradient id="equityLine" gradientUnits="userSpaceOnUse" x1="0" x2="1000"><stop stop-color="#ff516e"/><stop offset=".48" stop-color="#ff487e"/><stop offset=".64" stop-color="#ff36ec"/></linearGradient>
+      <linearGradient id="ef" x2="0%" y2="100%"><stop stop-color="#ff345e" stop-opacity=".58"/><stop offset=".53" stop-color="#da2194" stop-opacity=".25"/><stop offset="1" stop-color="#8115a8" stop-opacity=".06"/></linearGradient>
+      </defs>`
+      + [200, 500, 750].map(x => `<line x1="${x}" x2="${x}" y2="${H}" stroke="#a382cc20" stroke-dasharray="2 4"/>`).join('')
       + ticks.map(v => `<line x1="0" x2="1000" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--az-tint-38)" stroke-dasharray="2 4"></line>`).join('')
       + `<line x1="0" x2="1000" y1="${Y(M.start).toFixed(1)}" y2="${Y(M.start).toFixed(1)}" stroke="var(--az-tint-40)" stroke-dasharray="4 4"></line>`
-      + `<path d="${line} L1000 ${H} L0 ${H} Z" fill="url(#ef)"></path><path d="${line}" fill="none" stroke="url(#equityLine)" stroke-width="2.2" vector-effect="non-scaling-stroke"></path>`;
+      + `<path d="${line} L1000 ${H} L0 ${H} Z" fill="url(#ef)"></path><path class="equity-trace" d="${line}" fill="none" stroke="url(#equityLine)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>`;
     yl = ticks.map(v => `<span style="position: absolute; left: 0; top: ${(Y(v) / H * 100 - 2.5).toFixed(1)}%;">${tickTxt(v, nt.step)}</span>`).join('');
     const tm = (t0 + t1) / 2;
     xl = `<span style="position: absolute; left: 0;">${md(t0)} ${hm(t0)}</span><span style="position: absolute; left: 50%;">${hm(tm)}</span><span style="position: absolute; right: 0;">${md(t1)} ${hm(t1)}</span>`;
@@ -799,10 +963,10 @@ ${kpis.map(k => `<div><dt class="k">${k.l}</dt><dd class="m" style="margin: 4px 
 </dl>
 </div>
 <div style="display: flex; gap: 8px; margin-top: 18px;">
-<svg viewBox="0 0 1000 240" preserveAspectRatio="none" style="flex: 1; min-width: 0; height: 240px; display: block;" role="img" aria-label="Equity since start, ${f2(M.start)} to ${f2(eq)} USD">${svg}</svg>
-<div class="m mut" style="position: relative; width: 40px; font-size: 12px;">${yl}</div>
+<svg class="equity-plot" viewBox="0 0 1000 240" preserveAspectRatio="none" style="flex: 1; min-width: 0; height: 240px; display: block;" role="img" aria-label="Equity since start, ${f2(M.start)} to ${f2(eq)} USD">${svg}</svg>
+<div class="m equity-axis" style="position: relative; width: 40px; font-size: 12px;">${yl}</div>
 </div>
-<div class="m mut chart-time-axis" style="position: relative; height: 14px; font-size: 12px; margin: 6px 48px 0 0;">${xl}</div>`);
+<div class="m equity-axis chart-time-axis" style="position: relative; height: 14px; font-size: 12px; margin: 6px 48px 0 0;">${xl}</div>`);
 }
 
 function renderAcct(M) {
@@ -812,9 +976,9 @@ function renderAcct(M) {
 <dl class="m" style="margin: 12px 0 0; display: grid; grid-template-columns: 1fr auto; gap: 9px 12px; font-size: 12.5px;">
 ${acct.map(a => `<dt style="color: var(--az-text-secondary); font-family: var(--az-font-ui);">${a.l}</dt><dd style="margin: 0; color: ${a.c};">${a.v}</dd>`).join('')}
 </dl>
-<div class="k" style="margin-top: 16px;">Slots</div>
-<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px;">
-${Object.entries(sl).map(([n, s]) => `<div><span style="display: block; height: 4px; border-radius: 2px; background: ${s.used >= s.max ? ACC : s.used ? 'var(--az-tint-4)' : 'var(--az-tint-44)'};"></span><div class="m" style="font-size: 12px; margin-top: 6px; color: var(--az-text-secondary);">${esc(n)} ${s.used}/${s.max}</div></div>`).join('')}
+<div class="k slot-label">Slots</div>
+<div class="account-slots">
+${Object.entries(sl).map(([n, s]) => `<div class="m slot-segment" data-used="${s.used > 0}" data-full="${s.used >= s.max}">${esc(n)} ${s.used}/${s.max}</div>`).join('')}
 </div>`);
 }
 
