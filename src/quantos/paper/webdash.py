@@ -302,13 +302,23 @@ def exchange_view():
                       "mark": float(r["markPrice"]), "upnl": float(r["unRealizedProfit"])}
                      for r in client.position_risk() if float(r.get("positionAmt") or 0) != 0]
         acct = client.account()
+        # Open orders as Binance holds them (limit TPs and conditional stops), for every bot on the account.
+        # Best effort: a failure here leaves orders out (null) instead of hiding positions and wallet.
+        try:
+            orders = [{"symbol": o["symbol"], "side": o.get("side"), "type": o.get("type"), "price": float(o.get("price") or 0),
+                       "qty": float(o.get("origQty") or 0), "id": o.get("clientOrderId")} for o in client.open_orders()]
+            orders += [{"symbol": o.get("symbol"), "side": o.get("side"), "type": o.get("orderType"),
+                        "price": float(o.get("triggerPrice") or 0), "qty": float(o.get("quantity") or 0),
+                        "id": o.get("clientAlgoId")} for o in client.open_algo_orders()]
+        except Exception:
+            orders = None
         # QuantOS trades USDC margin, alt-ML trades USDT perps: report both, plus the sum of every position's uPnL.
         assets = {x["asset"]: {"wallet": float(x["walletBalance"]), "upnl": float(x.get("unrealizedProfit") or 0)}
                   for x in acct.get("assets", []) if x.get("asset") in ("USDC", "USDT")}
         main = assets.get("USDC") or {"wallet": float(acct.get("totalWalletBalance") or 0),
                                       "upnl": float(acct.get("totalUnrealizedProfit") or 0)}
         return {"enabled": True, "mode": _EXCHANGE["mode"], "time_ms": int(time.time() * 1000), "positions": positions,
-                "wallet": main["wallet"], "upnl": main["upnl"], "assets": assets,
+                "wallet": main["wallet"], "upnl": main["upnl"], "assets": assets, "orders": orders,
                 # The page streams marks from here (e.g. demo-fstream.binance.com), the venue's own mark feed.
                 "ws_host": getattr(client, "ws_host", None),
                 "total_upnl": round(sum(p["upnl"] for p in positions), 8)}
