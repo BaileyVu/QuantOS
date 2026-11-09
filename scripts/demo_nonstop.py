@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import plistlib
 import re
+import sqlite3
 import subprocess
 import sys
 import time
@@ -138,7 +139,8 @@ def prepare(repo: str | Path, *, plan_dir: str | Path, snapshots: str | Path,
     if clean_snapshot_fn is None:
         sys.path.insert(0, str(repo / "scripts"))
         from deploy_three import clean_snapshot as clean_snapshot_fn
-    source = Path(clean_snapshot_fn(repo, snapshots)).resolve()
+    # PR51 returns the src directory, not the worktree root.
+    source = Path(clean_snapshot_fn(repo, snapshots)).resolve().parent
     if not (source / "src").is_dir() or _git(source, "rev-parse", "HEAD") != sha:
         raise ValueError("candidate snapshot does not match the clean release SHA")
 
@@ -196,10 +198,13 @@ def apply_two_plists(plists: dict[str, dict], launch_agents: str | Path, *,
             raise OSError(f"refusing symlink LaunchAgent plist: {path}")
         if loaded_fn(label):
             bootout_fn(label)
+    for label in (DEMO, WATCHDOG):
+        path = launch_agents / f"{label}.plist"
         temp = path.with_name(f".{path.name}.new")
-        temp.unlink(missing_ok=True)
         _write_new(temp, plistlib.dumps(plists[label], fmt=plistlib.FMT_XML, sort_keys=True))
         os.replace(temp, path)
+    for label in (DEMO, WATCHDOG):
+        path = launch_agents / f"{label}.plist"
         bootstrap_fn(label, path)
 
 
@@ -258,6 +263,9 @@ def execute_start(plan_dir: str | Path, *, confirmed_flat: bool,
         if loaded_fn(label):
             bootout_fn(label)
     _require_unlocked_state(state)
+    if _state_status(state) != "completed":
+        raise ValueError("demo status changed during shutdown; review state before proceeding")
+    _require_local_flat(state)
     os.rename(state, archived)
     state.mkdir(mode=0o700)
     (state / "logs").mkdir(mode=0o700)
@@ -289,7 +297,7 @@ def execute_rollback(plan_dir: str | Path, *, confirmed_flat: bool,
         raise FileNotFoundError(f"previous source is missing: {old_source}")
     demo = _load(plan_dir / "previous-demo.plist")
     watchdog = _load(plan_dir / "previous-watchdog.plist")
-    demo["ProgramArguments"] = _set_arg(demo["ProgramArguments"], "--hours", "0")
+    demo["ProgramArguments"] = _set_arg(demo["ProgramArguments"], "--hours", "72")
     demo["EnvironmentVariables"] = {**demo.get("EnvironmentVariables", {}),
                                     "PYTHONPATH": str(old_source),
                                     "QUANTOS_ML1H_SIGNALS": str(signals)}
@@ -305,6 +313,7 @@ def execute_rollback(plan_dir: str | Path, *, confirmed_flat: bool,
         if loaded_fn(label):
             bootout_fn(label)
     _require_unlocked_state(state)
+    _require_local_flat(state)
     run_path = state / "run.json"
     original = run_path.read_bytes()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -316,6 +325,29 @@ def execute_rollback(plan_dir: str | Path, *, confirmed_flat: bool,
     _atomic_replace_json(run_path, run)
     apply_two_plists({DEMO: demo, WATCHDOG: watchdog}, launch_agents,
                      loaded_fn=lambda _label: False, bootout_fn=bootout_fn, bootstrap_fn=bootstrap_fn)
+
+
+def _require_local_flat(state: Path) -> None:
+    """Owner attests exchange flatness; also reject unresolved local orders."""
+    journals = list(state.glob("journal_*.db"))
+    if not journals:
+        raise ValueError("no local journal available to verify flat state")
+    for path in journals:
+        if path.is_symlink():
+            raise ValueError("unsafe journal path")
+        with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as db:
+            for (payload,) in db.execute("SELECT payload FROM orders"):
+                order = json.loads(payload)
+                if order.get("state") not in {"CLOSED", "CANCELED", "EXPIRED", "REJECTED"}:
+                    raise ValueError("local journal has unresolved orders; reconcile before deployment")
+    mirror_path = state / "mirror.json"
+    if mirror_path.exists():
+        book = json.loads(mirror_path.read_text())
+        if not isinstance(book, dict) or any(
+            not isinstance(row, dict) or row.get("state") not in {"CLOSED", "VOID"}
+            for row in book.values()
+        ):
+            raise ValueError("local exchange mirror is not flat; reconcile before deployment")
 
 
 def _require_unlocked_state(state: Path) -> None:

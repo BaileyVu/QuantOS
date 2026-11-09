@@ -51,7 +51,7 @@ requires the existing `run.json` status to be `completed`, unloads/reloads only
 `com.quantos.v4.demo200` and `com.quantos.v4.demo200.watchdog`, archives the
 completed `v4-demo200` directory under a unique UTC timestamp, and creates the
 new nonstop state. It refuses a non-completed state or a state already owned by
-an engine lock. Do not use `deploy_three.py install-demo200` here: that broad
+an engine lock. Both start and rollback also reject unresolved local journal or mirror orders. Do not use `deploy_three.py install-demo200` here: that broad
 installer also starts alt-ML, both Sentibot producers, and the dashboard.
 
 ## Sentibot reach shadow
@@ -110,7 +110,7 @@ scripts/start_demo_nonstop.sh --rollback --plan-dir "$HOME/Library/Application S
 The previous runtime cannot resume a nonstop `deadline_ms: null` state: it
 expects a finite deadline. Rollback therefore saves the current `run.json` in
 the plan directory, changes only `hours` to 72 and `deadline_ms` to 72 hours
-from rollback time, then starts the old snapshot. Journal and capture files
+from rollback time, and restores the CLI duration to `--hours 72`, then starts the old snapshot. Journal and capture files
 remain in the same state directory. The helper requires the owner flat
 attestation and an unlocked engine state before this metadata adjustment.
 

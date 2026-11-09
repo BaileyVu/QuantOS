@@ -1,11 +1,20 @@
 import json
 import tempfile
 import unittest
+import sqlite3
+import plistlib
+from unittest.mock import patch
 from pathlib import Path
 
 from scripts.demo_nonstop import (
-    DEMO, LABELS, WATCHDOG, _validate_template, apply_two_plists, execute_rollback, execute_start,
+    DEMO, LABELS, WATCHDOG, STATE, _validate_template, _require_local_flat,
+    apply_two_plists, execute_rollback, execute_start, prepare,
 )
+
+def journal(state, order=None):
+    with sqlite3.connect(state / 'journal_pD.db') as db:
+        db.execute('CREATE TABLE orders(payload TEXT)')
+        if order: db.execute('INSERT INTO orders VALUES(?)', (json.dumps(order),))
 
 
 def _plist(label, state, python, pythonpath, *, demo=False):
@@ -23,6 +32,32 @@ def _plist(label, state, python, pythonpath, *, demo=False):
 
 
 class DemoNonstopTests(unittest.TestCase):
+    def test_prepare_uses_src_returned_by_clean_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); agents=root/'agents'; agents.mkdir()
+            source=root/'snapshots'/'source'; (source/'src').mkdir(parents=True)
+            signals=root/'signals.json'; signals.write_text('{}')
+            for label in LABELS:
+                value=_plist(label, STATE, '/usr/bin/python3', str(root/'5d8342d'/'src'), demo=label==DEMO)
+                (agents/f'{label}.plist').write_bytes(plistlib.dumps(value))
+            sha='a'*40
+            def git(repo,*args):
+                if args[0]=='status': return ''
+                return '5d8342d'+'b'*33 if '--verify' in args else sha
+            with patch('scripts.demo_nonstop._git', side_effect=git):
+                result=prepare(root, plan_dir=root/'plan', snapshots=root/'snapshots',
+                    launch_agents=agents, ml1h_signals=signals,
+                    clean_snapshot_fn=lambda *_: source/'src')
+            self.assertEqual(result['release_source'], str(source.resolve()))
+            candidate=plistlib.loads((root/'plan'/'candidate-demo.plist').read_bytes())
+            self.assertEqual(candidate['EnvironmentVariables']['PYTHONPATH'], str(source.resolve()/'src'))
+
+    def test_local_unresolved_order_blocks_start_and_rollback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state=Path(tmp); journal(state, {'state':'PROTECTED'})
+            with self.assertRaisesRegex(ValueError, 'unresolved orders'):
+                _require_local_flat(state)
+
     def test_candidate_changes_only_snapshot_hours_and_ml1h_input(self):
         with tempfile.TemporaryDirectory() as tmp:
             python = "/usr/bin/python3"
@@ -52,14 +87,16 @@ class DemoNonstopTests(unittest.TestCase):
             python = "/usr/bin/python3"
             plists = {DEMO: _plist(DEMO, state, python, "/new/src", demo=True),
                       WATCHDOG: _plist(WATCHDOG, state, python, "/new/src")}
-            loaded, booted, started = [], [], []
+            loaded, booted, started, events = [], [], [], []
 
             def loaded_fn(label):
                 loaded.append(label)
                 return True
 
             apply_two_plists(plists, root / "LaunchAgents", loaded_fn=loaded_fn,
-                             bootout_fn=booted.append, bootstrap_fn=lambda label, path: started.append((label, path)))
+                             bootout_fn=lambda label: (booted.append(label), events.append(('stop',label))),
+                             bootstrap_fn=lambda label, path: (started.append((label, path)),events.append(('start',label))))
+            self.assertEqual(events, [('stop',WATCHDOG),('stop',DEMO),('start',DEMO),('start',WATCHDOG)])
             self.assertEqual(set(loaded), set(LABELS))
             self.assertEqual(set(booted), set(LABELS))
             self.assertEqual({label for label, _ in started}, set(LABELS))
@@ -73,10 +110,10 @@ class DemoNonstopTests(unittest.TestCase):
             state.mkdir()
             run = {"status": "running", "hours": 0, "deadline_ms": None, "portfolio": "live50"}
             (state / "run.json").write_text(json.dumps(run))
-            (state / "journal.sqlite").write_bytes(b"journal-fixture")
+            journal(state)
             (state / "capture").mkdir()
             (state / "capture" / "day.jsonl.gz").write_bytes(b"capture-fixture")
-            original_journal = (state / "journal.sqlite").read_bytes()
+            original_journal = (state / "journal_pD.db").read_bytes()
             original_capture = (state / "capture" / "day.jsonl.gz").read_bytes()
 
             plan = root / "plan"
@@ -101,7 +138,9 @@ class DemoNonstopTests(unittest.TestCase):
             after = json.loads((state / "run.json").read_text())
             self.assertEqual(after["hours"], 72)
             self.assertGreater(after["deadline_ms"], 0)
-            self.assertEqual((state / "journal.sqlite").read_bytes(), original_journal)
+            self.assertEqual((state / "journal_pD.db").read_bytes(), original_journal)
+            restored=plistlib.loads((root/'LaunchAgents'/f'{DEMO}.plist').read_bytes())['ProgramArguments']
+            self.assertEqual(restored[restored.index('--hours')+1], '72')
             self.assertEqual((state / "capture" / "day.jsonl.gz").read_bytes(), original_capture)
             self.assertEqual(set(started), set(LABELS))
             self.assertEqual(len(list(plan.glob("rollback-run-before-*.json"))), 1)
@@ -114,6 +153,7 @@ class DemoNonstopTests(unittest.TestCase):
             plan.mkdir()
             (state / "run.json").write_text(json.dumps({"status": "completed", "hours": 72}))
             (state / "journal.db").write_bytes(b"complete-journal")
+            journal(state)
             signals = root / "signals.json"
             signals.write_text("fixture")
             (plan / "plan.json").write_text(json.dumps({"ml1h_signals": str(signals)}))
