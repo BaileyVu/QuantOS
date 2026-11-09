@@ -60,6 +60,13 @@ def parser():
     selection = cmd.add_mutually_exclusive_group()
     selection.add_argument("--strategy", default="all")
     selection.add_argument("--config", type=Path)
+    cmd = sub.add_parser("event-replay", help="replay schema-2 runtime recordings offline")
+    cmd.add_argument("--input", nargs="+", required=True, type=Path)
+    cmd.add_argument("--state", required=True, type=Path)
+    cmd.add_argument("--profile", choices=("legacy", "pD", "pL"), default="pD")
+    cmd.add_argument("--strategy", default="all")
+    cmd.add_argument("--expected-journal", type=Path,
+                     help="read-only natural journal to compare decision events against")
     return p
 
 
@@ -204,6 +211,10 @@ def main(argv=None):
             selected_strategy = _strategy_from_config(args.config) if args.config else args.strategy
             result = replay(args.input, args.state, selected_strategy,
                             **({"research": True} if args.research else {}))
+        elif args.command == "event-replay":
+            from .event_replay import event_replay
+            result = event_replay(args.input, args.state, profile=args.profile, strategy=args.strategy,
+                                  expected_journal=args.expected_journal)
         elif args.command == "start": return Runtime(
             args.state, args.hours, min_quote_volume=args.min_quote_volume,
             portfolio=args.portfolio, sentiment_path=args.sentiment_file, execution=args.execution,

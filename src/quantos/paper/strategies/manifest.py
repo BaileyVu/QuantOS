@@ -17,6 +17,10 @@ class Manifest:
     aliases: tuple[str, ...] = ()
     status: str = "library"
 
+    @property
+    def manifest_id(self):
+        return f"{self.strategy_id}@{self.version}"
+
 
 MANIFESTS = (
     Manifest('ema_atr_ref', '1.0.0', 'reference', 'QuantOS V3 EMA/ATR reference',
@@ -31,7 +35,7 @@ MANIFESTS = (
              'edge_vault/patml_v1: LightGBM on ~40 candle/trend-location features, 1h, top 2% of training scores',
              '1h', 'MARKET', 'fixed', 172800,
              (('target_atr','1.5'),('stop_atr','1.5'),('hold_bars','48'),('threshold','train top 2%'),
-              ('signals','external scorer signals.json')), 'EXPLORATORY_HELDOUT', status='promoted'),
+              ('signals','external scorer signals.json')), 'EXPLORATORY_HELDOUT', status='candidate'),
     Manifest('tsmom_4h', '1.0.0', 'trend',
              'Moskowitz, Ooi & Pedersen 2012; task-specific 30-day/4h adaptation',
              '4h', 'MARKET', 'trailing', 259200,
@@ -98,6 +102,19 @@ MANIFESTS = (
 )
 
 
+if len({m.manifest_id for m in MANIFESTS}) != len(MANIFESTS):
+    raise ValueError("duplicate versioned strategy manifest identity")
+
+
 def manifest_for(strategy_id: str, version: str | None = None) -> Manifest | None:
-    return next((m for m in MANIFESTS if strategy_id in (m.strategy_id, *m.aliases)
-                 and (version is None or version == m.version)), None)
+    matches = [m for m in MANIFESTS if strategy_id in (m.strategy_id, *m.aliases)
+               and (version is None or version == m.version)]
+    if version is not None and len(matches) > 1:
+        raise ValueError("ambiguous exact strategy manifest identity")
+    if version is not None or len(matches) <= 1:
+        return matches[0] if matches else None
+    # Research and USDC-mapped production variants intentionally share a family ID.
+    # An unversioned caller gets the uniquely promoted runtime variant; versioned
+    # signal/config lookups continue to resolve the exact registered contract.
+    promoted = [m for m in matches if m.status == "promoted"]
+    return promoted[0] if len(promoted) == 1 else None
