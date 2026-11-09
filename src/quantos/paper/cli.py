@@ -32,6 +32,9 @@ def parser():
         if name in {"start", "install-service"}:
             cmd.add_argument("--min-quote-volume", type=_quote_volume, default=D("20000000"))
         if name == "start": cmd.add_argument("--mode", choices=["paper"], default="paper")
+        if name == "start":
+            cmd.add_argument("--observe-testnet-stream", action="store_true",
+                             help="dry-run soak: listen to testnet user data while orders remain local")
         if name in {"start", "install-service"}:
             cmd.add_argument("--execution", choices=["paper", "dry-run", "testnet"], default="paper",
                              help="mirror paper positions to Binance; testnet reads QUANTOS_KEY_FILE")
@@ -218,7 +221,8 @@ def main(argv=None):
         elif args.command == "start": return Runtime(
             args.state, args.hours, min_quote_volume=args.min_quote_volume,
             portfolio=args.portfolio, sentiment_path=args.sentiment_file, execution=args.execution,
-            sentiment_fail_closed=args.sentiment_fail_closed).run()
+            sentiment_fail_closed=args.sentiment_fail_closed,
+            observe_testnet_stream=args.observe_testnet_stream).run()
         elif args.command == "install-service":
             from .service import install_service, install_watchdog
             extra = (["--portfolio", args.portfolio, "--execution", args.execution]
