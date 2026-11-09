@@ -813,6 +813,8 @@ function renderEquity(M) {
 <div class="k">Equity · ${esc(M.run.profile || '')} book <span class="mut" style="font-size: 11px; text-transform: none; letter-spacing: 0;">· live uPnL: ${esc(M.run.profile || 'pD')} ${sgn(M.unreal)} · alt-ML ${sgn(M.mlUnreal)} · Binance total ${sgn(M.unreal + M.mlUnreal)} ${LIVE.up ? '● LIVE' : '○ POLL'}</span></div>
 <div style="display: flex; align-items: baseline; gap: 12px; margin-top: 6px;"><span class="m" style="font-size: 40px; font-weight: 500; letter-spacing: -0.02em;">${f2(eq)}</span><span class="m mut" style="font-size: 13px;">USD</span></div>
 <div class="m" style="margin-top: 4px; font-size: 12.5px;"><span style="color: ${pc(ch)};">${sgn(ch)} (${ch != null && M.start ? sgn(ch / M.start * 100) : '–'}%)</span><span class="mut"> vs ${f2(M.start)} start · HWM ${f2(hwm)}</span></div>
+${M.ml ? (() => { const mlEq = num(M.ml.budget) != null ? num(M.ml.budget) + (M.ml.realized_usd || 0) + (M.mlUnreal || 0) : null, tot = eq != null && mlEq != null ? eq + mlEq : null;
+  return `<div class="m" style="margin-top: 6px; font-size: 12.5px;"><span class="mut">Total (pD + alt-ML):</span> <span style="font-weight: 500;">${f2(tot)}</span> <span class="mut">= pD ${f2(eq)} + alt-ML ${f2(mlEq)} (two separate virtual books)</span></div>`; })() : ''}
 </div>
 <dl style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 28px; margin: 6px 0 0 auto;">
 ${kpis.map(k => `<div><dt class="k">${k.l}</dt><dd class="m" style="margin: 4px 0 0; font-size: 15px; color: ${k.c};">${k.v}</dd></div>`).join('')}

@@ -200,6 +200,8 @@ def mlalts_view(now_ms: int) -> dict | None:
             for r in rows if r.get("ev") in ("signal", "exit", "nofill", "order_error", "error", "start")][-25:]
     return {"open": _json(MLALTS / "exec_state_testnet.json", []), "events": keep, "closed": len(exits),
             "realized_usd": sum(float(r.get("pnl_usd") or 0) for r in exits),
+            # alt-ML's own virtual book (demo_exec.py ML_VIRTUAL_BALANCE, default 200), separate from pD's $200.
+            "budget": float(os.environ.get("ML_VIRTUAL_BALANCE", "200")),
             "heartbeat_ms": _json(MLALTS / "heartbeat.json", {}).get("ts_ms"), "scores": _json(MLALTS / "last_scores.json", {})}
 
 
