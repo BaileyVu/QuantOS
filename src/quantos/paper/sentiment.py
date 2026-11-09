@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .types import D
 
-MAX_AGE_MS = 30 * 60_000
+MAX_AGE_MS = 75 * 60_000  # sentibot writes hourly at :01; 30 min left the gate off half of every hour (11-09)
 LONG_BLOCK_BELOW = D("-0.05")   # raw news sentiment; a LONG would be blocked below this
 SHORT_BLOCK_ABOVE = D("0.05")
 
