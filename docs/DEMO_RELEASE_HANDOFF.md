@@ -1,124 +1,105 @@
 # QuantOS v6 owner release handoff
 
-Owner-only runbook for PR57, based on PR55 (`788aa97`) and the two capture hooks.
-Preparation ran successfully; no service was installed, started, stopped or changed.
-Launch is blocked until the zero-error/zero-alert soak and exact replay pass.
-Merge PR47 through PR55 in order, then PR57. PR56 remains parked as a draft.
+PR57 is based on PR55 (788aa97), excluding PR56 research. Merge PR47 through PR55
+in order, then PR57. PR56 remains parked. Owner alone merges and deploys.
 
-## Release identity and snapshot
+**Pre-launch acceptance passed on the exact snapshot below:** the fresh-state
+soak ran650.56seconds, exit0, zero journal errors, zero alerts and zero capture
+errors. Both public and authenticated testnet account streams were connected.
+Capture has1,344records, including719runtime inputs,11consumed sentiment inputs,
+one ml1h input and verified start/stop journal snapshots. Replay matched all
+6,414decisions exactly, with complete sentiment/external/exchange context.
+No fills occurred: this is decision-layer evidence, not fill acceptance.
 
-- Release checkout: `/Users/bailey12/Library/Application Support/QuantOS/app-v4/72c8cd71d19ed8f64944f4c7b61874d9a6896491/source`
-- Release full SHA: `72c8cd71d19ed8f64944f4c7b61874d9a6896491`
-- Expected immutable app snapshot: `~/Library/Application Support/QuantOS/app-v4/72c8cd71d19ed8f64944f4c7b61874d9a6896491/source`
-- Verified previous full SHA: `5d8342d4e90613783a93a08a58bbc662906236b4`
-- Previous installed `PYTHONPATH`: `/Users/bailey12/Library/Application Support/QuantOS/app-v4/5d8342d/src`
+The initial650.89-second attempt failed on stale Sentibot input. Its producer
+refreshed naturally; no file, freshness rule or service was changed for the
+successful retry. The passing window does not prove continuous input freshness
+or24-hour health. Retain the earlier4,006-decision proof separately.
 
-The old `5d8342d` path prefix resolves to the full SHA above in local repository
-metadata. The installed plist's Python executable, demo/watchdog settings and
-environment are used as templates; the key file itself is not read.
+Full suite ran once:508passed,4skipped. Later stream/launcher changes passed
+16runtime tests,one separate-client test and6launcher tests. Subsequent commits
+change only documentation/checkpoint, not the tested runtime or scripts.
+Evidence is saved outside Git at
+`/Users/bailey12/Desktop/PythonProject/QuantOS-release-evidence/72c8cd71d19ed8f64944f4c7b61874d9a6896491/`.
+No service or existing demo state was changed.
 
-Verify before an owner deployment:
+## Prepared release
 
-```sh
-REPO="/Users/bailey12/Library/Application Support/QuantOS/app-v4/72c8cd71d19ed8f64944f4c7b61874d9a6896491/source"
-RELEASE_SHA="72c8cd71d19ed8f64944f4c7b61874d9a6896491"
-test "$(git -C "$REPO" rev-parse HEAD)" = "$RELEASE_SHA"
-test -z "$(git -C "$REPO" status --porcelain=v1 --untracked-files=all --ignore-submodules=none)"
-cd "$REPO"
-```
+Tested source: `72c8cd71d19ed8f64944f4c7b61874d9a6896491`.
+The PR51 clean-snapshot function prepared the detached worktree below.
+The narrow launcher prepared the plan and candidate/previous plists outside
+LaunchAgents. Preparation is complete; do not repeat it into existing outputs.
+Review the plan and plists before running the owner-only command.
 
-`scripts/deploy_three.py::clean_snapshot` derives the full SHA from the clean
-checkout and makes a detached worktree under `~/Library/Application Support/QuantOS/app-v4/<SHA>/source`.
-The narrow `scripts/start_demo_nonstop.sh` wrapper is prepare-only by default.
-The following preparation was already completed from the clean workspace; do not repeat it into the existing plan directory:
-
-```sh
-scripts/start_demo_nonstop.sh --plan-dir "$HOME/Library/Application Support/QuantOS/release-plans/demo-nonstop-72c8cd71d19ed8f64944f4c7b61874d9a6896491"
-```
-
-It verifies a clean exact-SHA snapshot, copies the current demo/watchdog plist
-settings, retains their Python executable and environment, changes only
-`PYTHONPATH`/hours, and sets `QUANTOS_ML1H_SIGNALS` to the existing signal file.
-It checks that `signals.json` exists without reading it. The plan and candidate
-plists are written outside LaunchAgents and outside demo state. Review those
-plists and the plan before the owner invokes:
+Confirm Binance Demo has no positions or open orders. The helper additionally
+rejects unresolved local journal/mirror orders and requires the prior run to be
+completed. It archives that completed state intact and starts only demo200 and
+its watchdog. The installed Python/environment are retained; the new run uses
+hours=0 and the existing ml1h input. No alt-ML or producer services are changed.
 
 ```sh
-scripts/start_demo_nonstop.sh --plan-dir "$HOME/Library/Application Support/QuantOS/release-plans/demo-nonstop-72c8cd71d19ed8f64944f4c7b61874d9a6896491" --execute --confirmed-flat
-```
-
-`--confirmed-flat` is an owner attestation that Binance Demo has no positions or
-open orders; the helper does not read the key file or query the exchange. It
-requires the existing `run.json` status to be `completed`, unloads/reloads only
-`com.quantos.v4.demo200` and `com.quantos.v4.demo200.watchdog`, archives the
-completed `v4-demo200` directory under a unique UTC timestamp, and creates the
-new nonstop state. It refuses a non-completed state or a state already owned by
-an engine lock. Both start and rollback also reject unresolved local journal or mirror orders. Do not use `deploy_three.py install-demo200` here: that broad
-installer also starts alt-ML, both Sentibot producers, and the dashboard.
-
-## Sentibot reach shadow
-
-`scripts/prepare_sentibot_shadow.py` only prepares a detached clean source
-snapshot, a new private state directory, and a plist. It explicitly refuses to
-write under `~/Library/LaunchAgents`; it does not install or start the service.
-The shadow service label is `com.quantos.sentibot.reach-shadow`; its only output
-is `reach_shadow.jsonl` in its dedicated `--state-dir`. Keep this state
-separate from Sentibot's producer state. The existing Sentibot producer still
-writes `paper_perp_signals.jsonl`; the shadow collector must not write or
-replace that file.
-
-Preparation below was already completed. Do not rerun it into these existing output paths. The source workspace was clean at the tested SHA:
-
-```sh
-REPO="/Users/bailey12/Desktop/PythonProject/QuantOS-infra-v5"
 QOS="$HOME/Library/Application Support/QuantOS"
-SNAPSHOTS="$QOS/app-v4"
-SHADOW_STATE="$QOS/sentibot-reach-shadow-72c8cd7"
-PLIST_OUT="$QOS/release-plans/demo-nonstop-72c8cd71d19ed8f64944f4c7b61874d9a6896491/com.quantos.sentibot.reach-shadow.plist"
-PINNED_PYTHON="/Users/bailey12/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12"
-cd "$REPO"
-../QuantOS/.venv/bin/python scripts/prepare_sentibot_shadow.py \
-  --repo "$REPO" --snapshots "$SNAPSHOTS" --state-dir "$SHADOW_STATE" \
-  --plist "$PLIST_OUT" --python "$PINNED_PYTHON" --every 900 --cycle-timeout 600
+RELEASE_SHA="72c8cd71d19ed8f64944f4c7b61874d9a6896491"
+RELEASE="$QOS/app-v4/$RELEASE_SHA/source"
+PLAN="$QOS/release-plans/demo-nonstop-$RELEASE_SHA"
+test "$(git -C "$RELEASE" rev-parse HEAD)" = "$RELEASE_SHA" &&
+  test -z "$(git -C "$RELEASE" status --porcelain=v1 --untracked-files=all --ignore-submodules=none)" &&
+  "$RELEASE/scripts/start_demo_nonstop.sh" --plan-dir "$PLAN" --execute --confirmed-flat
 ```
 
-For installation, set `PLIST_OUT` to the prepared path above. Review the emitted plist and snapshot SHA before owner installation. Only then
-may the owner install and start it:
+Use this repository wrapper, not the older Desktop-level start_demo_nonstop.sh
+or broad install-demo200 installer, which touch other services.
+
+## Sentibot shadow
+
+Preparation succeeded against the same snapshot. Its new private state is
+`~/Library/Application Support/QuantOS/sentibot-reach-shadow-72c8cd7`.
+The prepared plist uses the pinned service Python3.12, a 900-second cadence and
+600-second cycle timeout. It writes only reach_shadow.jsonl in that state,
+never paper_perp_signals.jsonl. Review it, then the owner installs/starts it:
 
 ```sh
-install -m 600 "$PLIST_OUT" "$HOME/Library/LaunchAgents/com.quantos.sentibot.reach-shadow.plist"
-launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.quantos.sentibot.reach-shadow.plist"
+QOS="$HOME/Library/Application Support/QuantOS"
+PLAN="$QOS/release-plans/demo-nonstop-72c8cd71d19ed8f64944f4c7b61874d9a6896491"
+TARGET="$HOME/Library/LaunchAgents/com.quantos.sentibot.reach-shadow.plist"
+test ! -e "$TARGET" &&
+  install -m 600 "$PLAN/com.quantos.sentibot.reach-shadow.plist" "$TARGET" &&
+  launchctl bootstrap "gui/$(id -u)" "$TARGET"
 ```
 
-## Quote archive
+## Quote archiver
 
-Owner-provided command (not run):
+The script exists; the log directory did not exist at preparation, so create it
+before running the owner's supplied command:
 
 ```sh
+mkdir -p "$HOME/Desktop/PythonProject/edge_data/quotes_archive"
 nohup /usr/bin/python3 ~/Desktop/PythonProject/edge_data/depth/archive_quotes.py --loop 3600 --keep-days 30 >> ~/Desktop/PythonProject/edge_data/quotes_archive/archive.log 2>&1 &
 ```
 
 ## Rollback
 
-The helper stores the previous demo/watchdog plists in the reviewed plan. With
-the new run still resumable, the owner can restore the exact previous source
-path and those plists without archiving the current state:
+Verified previous source: `5d8342d4e90613783a93a08a58bbc662906236b4`, installed
+at `~/Library/Application Support/QuantOS/app-v4/5d8342d/src`.
+Only while the new run is resumable and the owner has confirmed exchange flatness:
 
 ```sh
-scripts/start_demo_nonstop.sh --rollback --plan-dir "$HOME/Library/Application Support/QuantOS/release-plans/demo-nonstop-72c8cd71d19ed8f64944f4c7b61874d9a6896491" --execute --confirmed-flat
+QOS="$HOME/Library/Application Support/QuantOS"
+RELEASE_SHA="72c8cd71d19ed8f64944f4c7b61874d9a6896491"
+"$QOS/app-v4/$RELEASE_SHA/source/scripts/start_demo_nonstop.sh" \
+  --rollback --plan-dir "$QOS/release-plans/demo-nonstop-$RELEASE_SHA" \
+  --execute --confirmed-flat
 ```
 
-The previous runtime cannot resume a nonstop `deadline_ms: null` state: it
-expects a finite deadline. Rollback therefore saves the current `run.json` in
-the plan directory, changes only `hours` to 72 and `deadline_ms` to 72 hours
-from rollback time, and restores the CLI duration to `--hours 72`, then starts the old snapshot. Journal and capture files
-remain in the same state directory. The helper requires the owner flat
-attestation and an unlocked engine state before this metadata adjustment.
+Rollback stops only the demo/watchdog pair, checks the engine lock and local flat
+state, backs up run.json into the plan, sets hours and the CLI duration to 72
+and deadline_ms to rollback time +72h, then restores the old snapshot/plists.
+The old runtime cannot accept a null nonstop deadline. Journal and capture files
+stay in place; rollback is a 72-hour timed run.
 
-The older workspace-level `/Users/bailey12/Desktop/PythonProject/start_demo_nonstop.sh`
-hard-codes candidate SHA `26a91e5` and checkout
-`~/Desktop/PythonProject/QuantOS-nonstop-26a91e5`. That is source evidence of
-the script’s old candidate only. It fetches a branch, uninstalls multiple
-services, archives `v4-demo200`, changes an alt-ML kill file, and starts the
-legacy installer; it is not the new narrow wrapper and must not be used for
-this release.
+## After launch
+
+Build the per-fill report while capture accumulates. At the first 20 real fills
+or three days, compare exact decisions and each independent modeled fill against
+its real Binance fill within modeled slippage; report error per trade. Shadow
+reconciliation is due at24h and Sentibot reporting at72h. These gates remain open.
