@@ -129,15 +129,18 @@ def stop_service() -> bool:
                                         output=result.stdout, stderr=result.stderr)
 
 
-def build_watchdog_plist(python: Path, state: Path, logdir: Path, pythonpath=None) -> dict:
+def build_watchdog_plist(python: Path, state: Path, logdir: Path, pythonpath=None, execution="paper") -> dict:
     python = Path(os.path.abspath(os.path.expanduser(os.fspath(python))))
     state, logdir = (Path(p).expanduser().resolve() for p in (state, logdir))
+    if execution not in ("paper", "dry-run", "testnet"):
+        raise ValueError("watchdog execution must be paper/dry-run/testnet")
+    args = (["-m", "quantos.paper.health", "watchdog"] if execution == "paper"
+            else ["-m", "quantos.live.watchdog", "--execution", execution])
     return {
         "Label": WATCHDOG_LABEL,
-        "ProgramArguments": [str(python), "-m", "quantos.paper.health", "watchdog",
-                             "--state", str(state)],
+        "ProgramArguments": [str(python), *args, "--state", str(state)],
         **_env(pythonpath),
-        "StartInterval": 60,
+        "StartInterval": 60 if execution == "paper" else 15,
         "RunAtLoad": True,
         "WorkingDirectory": str(state.parent),
         "StandardOutPath": str(logdir / "quantos-v3-watchdog.log"),

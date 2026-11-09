@@ -238,7 +238,34 @@ class SignedClient:
     def close_listen_key(self): return self.request("DELETE", "/fapi/v1/listenKey")
     @property
     def ws_host(self): return WS_HOSTS.get(self.base)
-    def user_trades(self, symbol, start_time=None): return self.request("GET", "/fapi/v1/userTrades", {"symbol": symbol, "startTime": start_time, "limit": 1000})
+    def user_trades(self, symbol, start_time=None, *, order_id=None, from_id=None, limit=1000):
+        if from_id is not None and start_time is not None:
+            raise ValueError("fromId cannot be combined with startTime")
+        return self.request("GET", "/fapi/v1/userTrades", {"symbol": symbol, "startTime": start_time,
+                            "orderId": order_id, "fromId": from_id, "limit": limit})
+
+    def order_trades(self, symbol, order_id, start_time=None, *, page_size=1000, max_pages=10):
+        """Read complete order-specific fills or raise; never silently truncate a full page."""
+        if order_id is None or not 1 <= page_size <= 1000 or max_pages < 1:
+            raise ValueError("invalid order fill query")
+        rows, cursor = {}, None
+        for _ in range(max_pages):
+            page = self.user_trades(symbol, start_time if cursor is None else None,
+                                    order_id=order_id, from_id=cursor, limit=page_size)
+            if not isinstance(page, list): raise ValueError("invalid fill response")
+            for row in page:
+                if str(row.get("orderId")) != str(order_id):
+                    raise ValueError("exchange returned another order's fills")
+                identity = int(row["id"])
+                if identity in rows and rows[identity] != row: raise ValueError("conflicting fill identity")
+                rows[identity] = row
+            if len(page) < page_size:
+                return [rows[k] for k in sorted(rows)]
+            next_id = max(int(r["id"]) for r in page) + 1
+            if cursor is not None and next_id <= cursor:
+                raise ValueError("fill pagination did not advance")
+            cursor = next_id
+        raise ValueError("fill pagination limit reached; settlement incomplete")
     def exchange_info(self): return self.request("GET", "/fapi/v1/exchangeInfo")
     def server_time(self): return self.request("GET", "/fapi/v1/time")
     def set_leverage(self, symbol, leverage): return self.request("POST", "/fapi/v1/leverage", {"symbol": symbol, "leverage": int(leverage)})

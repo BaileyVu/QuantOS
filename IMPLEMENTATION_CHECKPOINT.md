@@ -1,4 +1,105 @@
-## Infrastructure v5 — PR2 implementation checkpoint, 2026-11-07 (LATEST)
+## Infrastructure v5 — PR3 review, 2026-11-07 (LATEST)
+
+Five-hour reset verified:99% remaining at resume, weekly85%, banked1remaining.
+Active branch codex/infra-exchange-protection; prior source0de3d30 + current review
+fixes. Main review corrected terminal zero-fill recovery to durable VOID, idempotent
+paper void, explicit one-way flat confirmation (missing rows are not flat), and
+stable close IDs for kill-path settlement even after a lost mirror write.
+New regressions cover independent watchdog after actual process death, zero-fill
+void, missing position response, kill-path exact fill booking and repeated void.
+Full suite439tests12.500s OK(4existing skips), /tmp/quantos-infra-pr3-review-tests.log;
+additional idempotent-void focused suite recorded in commit preparation. Earlier
+focused command accidentally named nonexistent test_live_kill; import error only,
+corrected by full discovery above. No soak/orders/deploy. Acceptance UNVERIFIED.
+Source rollback: revert the PR3 source and review commits in reverse order.
+Next: publish draft PR3 on resolver base, integrate clean-deploy commits17da410,
+9702f21 as own ordered PR4, then implement PR5. Prior detailed handoff below stands.
+Active agents: existing two lower-cost agents preparing isolated PR7 replay and
+PR8 Sentibot respectively. No live runtime/test processes owned after suite exit.
+
+---
+
+## Infrastructure v5 — quota handoff, 2026-11-07 (historical)
+
+Active worktree `/Users/bailey12/Desktop/PythonProject/QuantOS-infra-v5`, branch
+`codex/infra-exchange-protection`, source commit `0de3d30`. PR3 is LOCAL ONLY,
+not yet published: final adverse-case review remains. All source changes committed.
+Open PRs: contract47; stressed-stop48 draft; resolver49 draft, stacked in order.
+No PR merged/deployed by this task. Original UI worktree remains untouched.
+
+PR3 implemented: durable PENDING intent before entry; exchange reduce-only TP;
+independent demo/testnet watchdog with shared file lock and max-hold/heartbeat/
+clock-jump exits; 15-second watchdog plist wiring (not installed); exact orderId
+settlement via bounded paginated userTrades; existing account stream reused;
+no simulated-book fallback after retries. Entry/exit incompleteness holds new
+entries. Emergency close retains protection until confirmed flat. Durable exit
+order IDs persist even if another leg's flatten fails. Mainnet guards unchanged.
+Local watchdog cannot run during host sleep/network loss; native SL/TP persist,
+time exits resume when host/network return. Do not claim remote max-hold guarantees.
+
+Tests actually run for PR3: 435 current tests in12.353s OK (4existing skips), log
+`/tmp/quantos-infra-pr3-tests.log`. Then final exit-id persistence fix: 64 focused
+tests in0.223s OK. Earlier107focused PASS. Includes real subprocess os._exit(23)
+between entry and stop, restart adoption without duplicate entry, forward/backward
+clock jumps, TP reconciliation, exact-id unrelated-trade exclusion, pagination
+no-progress rejection, persistent settlement failure and retained protection on
+failed close/flatten. Diff whitespace check PASS. Historical legacy1001 PASS
+from PR1 retained; no legacy source changed. No full runtime live-data soak,
+account probe, or demo orders: all operational acceptance remains UNVERIFIED.
+Source rollback for PR3: `git revert 0de3d30` (not run). No deployed rollback needed.
+
+EXACT NEXT STEP after verified reset:
+1. Check usage and this handoff. Finish main PR3 adverse-case review before
+   publishing. Specifically inspect watchdog PENDING entry with terminal zero
+   fill: it should void the paper entry, not synthesize a paper exit; add a
+   regression. Also cover the watchdog acting while main runtime is dead (current
+   process-death test verifies restart adoption), and kill-path real-fill booking.
+   Inspect changed functions only; avoid rereading the repository. Fix actual
+   findings, run affected tests, commit and open draft PR3 stacked on
+   codex/infra-resolver-gaps. No deploy/merge.
+2. PR4 independent branch `codex/infra-clean-snapshots`, worktree
+   `/Users/bailey12/Desktop/PythonProject/QuantOS-infra-deploy`, commits17da410 +
+   9702f21. Main already read clean_snapshot(); full-SHA detached worktree snapshots,
+   dirty source/snapshot refusal, cleanup preserves original error. Agent's actual
+   temporary-git integration suite6PASS plus prior service7PASS; clean worktree.
+   Integrate onto PR3 on new ordered branch, resolve deploy_three.py overlap
+   preserving PR3 watchdog wiring, review remaining diff, relevant tests, own PR4.
+3. PR5 counterfactual logging is next main implementation (NOT started), then PR6.
+   PR6 independent worktree `/Users/bailey12/Desktop/PythonProject/QuantOS-infra-registry`,
+   branch `codex/infra-research-registry`, commits3254755 +97b9efc, clean.
+   Registry/manifests + backtest hash integration + DSR API implemented by lower-cost
+   agent; final main review pending. Tests15PASS under python3.13. Actual ledger
+   import proven once:4309observations,4227distinctvariants; repeatimport0new;
+   global N with historicalCCI81=4308; range_mr familyN111. Do NOT repeat import.
+   Review DSR equation/units/N and manifest integrity; no actual DSR result claimed
+   from ledger mean-bp data. Primary source documented in docs/RESEARCH_REGISTRY.md.
+4. PR7 replay/L2/config cleanup, PR8 Sentibot3day shadow, PR9 TimesFM2.5 remain
+   untouched. Required24h/3day acceptance must be real elapsed runs, never invented.
+
+Delegation verified and used max2lower-cost gpt-6-luna agents. Both now idle.
+Owned active processes: NONE (all unit suites exited; no runtime/soak launched).
+No credentials read, live state/LaunchAgents changed, sealed-data research or
+alt-ML changes. No new dependencies. Passing checks above need not be repeated
+unless a new diff or specific unresolved concern justifies them.
+
+Quota: threshold reached with19%five-hour,87%weekly remaining. Final handoff
+verification:4%five-hour,85%weekly remaining;1banked reset confirmed available.
+Checkpoint commit before this quota-only update:cdb9f69; working tree was clean.
+Five-hour reset
+2026-11-07 22:05:07 Asia/Ho_Chi_Minh (1794063907); weekly reset2026-11-14 17:05:07
+(1794650707). Banked resets consumed1of2, remaining1. Owner manually used first
+only after confirmedweekly100%used. Do not consume another for five-hour limits.
+No redemption tool available; Computer Use expressly blocks Codex settings.
+
+Continuation CONFIRMED ACTIVE: `continue-quantos-infrastructure-v5`, heartbeat
+attached to THIS chat, scheduled22:10 Vietnam daily; first dueNov7 after reset.
+At next allowance threshold UPDATE THIS SAME automation to the newly verified
+reset time, never create duplicates. Stop/delete only on entire-task completion.
+User-facing checkpoint report should distinguish implemented vs accepted/soaked.
+
+---
+
+## Infrastructure v5 — PR2 implementation checkpoint, 2026-11-07 (historical)
 
 Worktree `QuantOS-infra-v5`, branch `codex/infra-resolver-gaps`, source commit
 `3098c63`; PR1 draft https://github.com/BaileyVu/QuantOS/pull/48 is base, contract

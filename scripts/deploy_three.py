@@ -47,7 +47,8 @@ def jobs(resume=False):
         p["Label"] = f"com.quantos.v4.{name}"
         p["EnvironmentVariables"].update(env)
         out[p["Label"]] = p
-        w = build_watchdog_plist(py, state, state / "logs", pythonpath=app)
+        w = build_watchdog_plist(py, state, state / "logs", pythonpath=app, execution=execution)
+        w["EnvironmentVariables"].update(env)
         w["Label"] = f"com.quantos.v4.{name}.watchdog"
         out[w["Label"]] = w
     (SB / "logs").mkdir(parents=True, exist_ok=True)
@@ -156,7 +157,8 @@ def install_demo200(hours=0):
     p = build_plist(py, state, state / "logs", hours, min_quote_volume="5000000", pythonpath=app,
                     extra_args=["--portfolio", "live50", "--execution", "testnet", "--sentiment-file", str(SENTIMENT)])
     p["Label"] = "com.quantos.v4.demo200"; p["EnvironmentVariables"].update(env); plan[p["Label"]] = p
-    w = build_watchdog_plist(py, state, state / "logs", pythonpath=app)
+    w = build_watchdog_plist(py, state, state / "logs", pythonpath=app, execution="testnet")
+    w["EnvironmentVariables"].update(env)
     w["Label"] = "com.quantos.v4.demo200.watchdog"; plan[w["Label"]] = w
     for kind, args in (("spot", []), ("perp", ["--perp"])):
         (SB / "logs").mkdir(parents=True, exist_ok=True)
