@@ -327,6 +327,21 @@ def execute_rollback(plan_dir: str | Path, *, confirmed_flat: bool,
                      loaded_fn=lambda _label: False, bootout_fn=bootout_fn, bootstrap_fn=bootstrap_fn)
 
 
+def _journal_payloads(path: Path) -> list:
+    """Read order payloads without writing. A stopped WAL journal has no -shm file, and a
+    mode=ro open cannot create one ("unable to open database file"); then nothing is
+    writing, so an immutable read of the checkpointed file is exact."""
+    uri = path.resolve().as_uri()
+    try:
+        with sqlite3.connect(uri + "?mode=ro", uri=True) as db:
+            return db.execute("SELECT payload FROM orders").fetchall()
+    except sqlite3.OperationalError as error:
+        if "unable to open" not in str(error) or Path(str(path) + "-wal").exists():
+            raise
+        with sqlite3.connect(uri + "?immutable=1", uri=True) as db:
+            return db.execute("SELECT payload FROM orders").fetchall()
+
+
 def _require_local_flat(state: Path) -> None:
     """Owner attests exchange flatness; also reject unresolved local orders."""
     journals = list(state.glob("journal_*.db"))
@@ -335,11 +350,10 @@ def _require_local_flat(state: Path) -> None:
     for path in journals:
         if path.is_symlink():
             raise ValueError("unsafe journal path")
-        with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as db:
-            for (payload,) in db.execute("SELECT payload FROM orders"):
-                order = json.loads(payload)
-                if order.get("state") not in {"CLOSED", "CANCELED", "EXPIRED", "REJECTED"}:
-                    raise ValueError("local journal has unresolved orders; reconcile before deployment")
+        for (payload,) in _journal_payloads(path):
+            order = json.loads(payload)
+            if order.get("state") not in {"CLOSED", "CANCELED", "EXPIRED", "REJECTED"}:
+                raise ValueError("local journal has unresolved orders; reconcile before deployment")
     mirror_path = state / "mirror.json"
     if mirror_path.exists():
         book = json.loads(mirror_path.read_text())

@@ -6,6 +6,7 @@ import plistlib
 from unittest.mock import patch
 from pathlib import Path
 
+from scripts import demo_nonstop
 from scripts.demo_nonstop import (
     DEMO, LABELS, WATCHDOG, STATE, _validate_template, _require_local_flat,
     apply_two_plists, execute_rollback, execute_start, prepare,
@@ -176,3 +177,28 @@ class DemoNonstopTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StoppedWalJournalTest(unittest.TestCase):
+    def test_flat_check_reads_a_stopped_journal_when_read_only_open_fails(self):
+        import sqlite3 as real
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            db = real.connect(state / "journal_pD.db")
+            db.execute("create table orders(payload)")
+            db.execute("""insert into orders values ('{"state": "CLOSED"}')""")
+            db.commit(); db.close()
+            connect = real.connect
+
+            def macos_like(target, **kw):  # older SQLite cannot open a stopped WAL db with mode=ro
+                if str(target).endswith("?mode=ro"):
+                    raise real.OperationalError("unable to open database file")
+                return connect(target, **kw)
+
+            with mock.patch.object(demo_nonstop.sqlite3, "connect", macos_like):
+                demo_nonstop._require_local_flat(state)
+                db = connect(state / "journal_pD.db")
+                db.execute("""insert into orders values ('{"state": "OPEN"}')"""); db.commit(); db.close()
+                with self.assertRaises(ValueError):
+                    demo_nonstop._require_local_flat(state)
