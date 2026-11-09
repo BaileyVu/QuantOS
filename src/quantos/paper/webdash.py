@@ -20,7 +20,7 @@ from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
 DECISIONS = ("SIGNAL", "APPROVED", "REJECTED_RISK", "FILLED", "PARTIAL", "CLOSED", "CANCELED",
-             "SENTIMENT_SHADOW", "KILL_SWITCH", "LOSS_BREAKER", "EXCHANGE_RECONCILE_FAILED")
+             "SENTIMENT_SHADOW", "SHADOW_ERROR", "KILL_SWITCH", "LOSS_BREAKER", "EXCHANGE_RECONCILE_FAILED")
 
 
 def _json(path: Path, default=None):
@@ -65,6 +65,10 @@ def run_view(name: str, state: Path, now_ms: int, profile: str = "pL") -> dict:
         status = view["status"] = {**status, "engines": [e for e in status["engines"] if e.get("profile") == profile]
                                    or status["engines"][:1]}
     view["profile"] = profile
+    from .shadow import summary as shadow_summary
+    try: view["shadow"] = shadow_summary(state / f"shadow_{profile}.db")
+    except (OSError, sqlite3.Error, ValueError) as error:
+        view["shadow"] = {"available": False, "error": str(error)}
     db_path = state / f"journal_{profile}.db"
     if not db_path.exists():
         return view
