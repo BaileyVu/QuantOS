@@ -200,6 +200,8 @@ def mlalts_view(now_ms: int) -> dict | None:
             for r in rows if r.get("ev") in ("signal", "exit", "nofill", "order_error", "error", "start")][-25:]
     return {"open": _json(MLALTS / "exec_state_testnet.json", []), "events": keep, "closed": len(exits),
             "realized_usd": sum(float(r.get("pnl_usd") or 0) for r in exits),
+            # alt-ML's own virtual book (demo_exec.py ML_VIRTUAL_BALANCE, default 200), separate from pD's $200.
+            "budget": float(os.environ.get("ML_VIRTUAL_BALANCE", "200")),
             "heartbeat_ms": _json(MLALTS / "heartbeat.json", {}).get("ts_ms"), "scores": _json(MLALTS / "last_scores.json", {})}
 
 
@@ -279,7 +281,10 @@ def klines(query: str):
     limit = min(max(int((q.get("limit") or ["96"])[0]), 1), 500)
     if not re.fullmatch(r"[A-Z0-9]{2,20}", symbol) or interval not in ("1m", "5m", "15m", "1h", "4h", "1d"):
         raise ValueError("bad symbol or interval")
-    return _cached_get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}", 15)
+    # Candles from the execution venue's own futures market (Binance Demo when --exchange demo), so the chart, the live
+    # mark and the positions all come from one market; spot candles drifted from the demo futures price.
+    base = getattr(_EXCHANGE.get("client"), "base", None) or "https://fapi.binance.com"
+    return _cached_get(f"{base}/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}", 15)
 
 
 _EXCHANGE = {}  # {"client": SignedClient, "mode": str}; set by --exchange
@@ -297,13 +302,23 @@ def exchange_view():
                       "mark": float(r["markPrice"]), "upnl": float(r["unRealizedProfit"])}
                      for r in client.position_risk() if float(r.get("positionAmt") or 0) != 0]
         acct = client.account()
+        # Open orders as Binance holds them (limit TPs and conditional stops), for every bot on the account.
+        # Best effort: a failure here leaves orders out (null) instead of hiding positions and wallet.
+        try:
+            orders = [{"symbol": o["symbol"], "side": o.get("side"), "type": o.get("type"), "price": float(o.get("price") or 0),
+                       "qty": float(o.get("origQty") or 0), "id": o.get("clientOrderId")} for o in client.open_orders()]
+            orders += [{"symbol": o.get("symbol"), "side": o.get("side"), "type": o.get("orderType"),
+                        "price": float(o.get("triggerPrice") or 0), "qty": float(o.get("quantity") or 0),
+                        "id": o.get("clientAlgoId")} for o in client.open_algo_orders()]
+        except Exception:
+            orders = None
         # QuantOS trades USDC margin, alt-ML trades USDT perps: report both, plus the sum of every position's uPnL.
         assets = {x["asset"]: {"wallet": float(x["walletBalance"]), "upnl": float(x.get("unrealizedProfit") or 0)}
                   for x in acct.get("assets", []) if x.get("asset") in ("USDC", "USDT")}
         main = assets.get("USDC") or {"wallet": float(acct.get("totalWalletBalance") or 0),
                                       "upnl": float(acct.get("totalUnrealizedProfit") or 0)}
         return {"enabled": True, "mode": _EXCHANGE["mode"], "time_ms": int(time.time() * 1000), "positions": positions,
-                "wallet": main["wallet"], "upnl": main["upnl"], "assets": assets,
+                "wallet": main["wallet"], "upnl": main["upnl"], "assets": assets, "orders": orders,
                 # The page streams marks from here (e.g. demo-fstream.binance.com), the venue's own mark feed.
                 "ws_host": getattr(client, "ws_host", None),
                 "total_upnl": round(sum(p["upnl"] for p in positions), 8)}
