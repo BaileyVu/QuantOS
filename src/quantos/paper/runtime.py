@@ -200,16 +200,23 @@ class Runtime:
                  stream=True, sentiment_fail_closed=False):
         if not (hours == 0 or 0 < hours <= 72): raise ValueError("duration must be 0 (until stopped) or 0-72 hours")
         self.state, self.hours, self.market_factory = state, hours, market_factory
+        from .capture import CaptureWriter
+        self.capture = CaptureWriter(state)
         self.shutdown = threading.Event()
         self.messages = queue.Queue(maxsize=1000)
         self.dropped = {}  # kind -> messages dropped on a full queue
         if portfolio not in ("legacy", "live50"): raise ValueError("portfolio must be legacy or live50")
         self.portfolio = portfolio
         self.strategies = live_library() if portfolio == "live50" else library()
+        for strategy in self.strategies:
+            if strategy.strategy_id == "ml1h_pattern":
+                strategy.input_observer = self._capture_input
         # Live WebSocket quotes for the live50 feed; REST polling remains the fallback. Real market only.
         self.stream = (QuoteStream(self._stream_symbols) if stream and portfolio == "live50"
                        and market_factory is PublicMarket else None)
         self.sentiment = SentimentShadow(sentiment_path) if sentiment_path or sentiment_fail_closed else None
+        if self.sentiment is not None:
+            self.sentiment.input_observer = self._capture_input
         self.sentiment_fail_closed = sentiment_fail_closed
         self.notify = notify
         if execution not in ("paper", "dry-run", "testnet"):
@@ -239,6 +246,9 @@ class Runtime:
         if not path: raise ValueError("QUANTOS_KEY_FILE must name the testnet key file")
         return SignedClient(self.execution, load_keys(path))
 
+    def _capture_input(self, source, raw, now_ms):
+        self.capture.input_bytes(source, raw, milliseconds() if now_ms is None else now_ms)
+
     def _stream_symbols(self):
         with self.instrument_lock:
             return set(self.watched_symbols).intersection(self.instruments)
@@ -266,6 +276,8 @@ class Runtime:
             if context is not None:
                 row["context"] = context
             f.write(dumps(row) + "\n")
+        # Separate retention: market pruning must never delete capture evidence.
+        self.capture.record("runtime_input", row, now)
 
     def scanner(self):
         market = self.market_factory()
@@ -473,16 +485,20 @@ class Runtime:
                     j = Journal(self.state / f"journal_{profile}.db", profile,
                                 initial_balance="200" if profile in ("pM10", "pM5", "pD") else "50")
                     journals.append(j)
+                    self.capture.snapshot(j, "start", now)
                     e = PaperEngine(j, {"pL": LivePolicy, "pL5": LiveR5Policy, "pM10": Cap200M10Policy,
-                                         "pM5": Cap200M5Policy, "pD": Demo200Policy}[profile]())
+                                         "pM5": Cap200M5Policy, "pD": Demo200Policy}[profile](),
+                                    fill_observer=self.capture.buffer_fill)
                     e.recover(now); engines.append(e)
                     with j.transaction(): j.event(now, "START" if run["restarts"] == 0 else "RESTART", {"pid": os.getpid()})
                     continue
                 j = Journal(self.state / f"journal_{profile}.db", profile)
                 journals.append(j)
+                self.capture.snapshot(j, "start", now)
                 # pA learns from p1, which takes every approved signal at a fixed 1%.
                 sizer = AdaptiveSizer(j, journals[0]) if profile == "pA" else None
-                e = PaperEngine(j, Policy(risk_fraction=D(fraction)), adaptive=sizer)
+                e = PaperEngine(j, Policy(risk_fraction=D(fraction)), adaptive=sizer,
+                                fill_observer=self.capture.buffer_fill)
                 e.recover(now); engines.append(e)
                 for order in e.active():
                     fields = order["instrument"]
@@ -524,8 +540,9 @@ class Runtime:
                     if level == "recovered": alerter.clear(key, milliseconds())
                     else: alerter.alert(level, key, message, milliseconds())
                 mirror = ExchangeMirror(self._client(), f"q{run['started_ms'] // 1000}", self.state, mirror_alert)
+                mirror.client.observer = lambda row: self.capture.record("exchange_response", row, row["received_ms"])
                 if getattr(mirror.client, "ws_host", None) and mirror.client.mode != "dry-run":
-                    user = UserStream(mirror.client)
+                    user = UserStream(mirror.client, input_observer=lambda row, at: self.capture.record("user_stream", row, at))
                     threading.Thread(target=user.run, args=(self.shutdown,), daemon=True).start()
             last_wall, last_mono = milliseconds(), time.monotonic()
             last_feed, last_status, last_report = 0, 0, 0
@@ -608,18 +625,23 @@ class Runtime:
                     self.record("tick", detail, now)
                     dispatch(engines, "tick", detail, now)
                 if mirror is not None and now - last_mirror >= 2000:
+                    self.capture.flush_fills(engines)
                     last_mirror = now
                     try:
                         from .replay_effects import TraceEngine
                         traced = TraceEngine(engines[0])
                         with engines[0].journal.transaction():
-                            result = mirror.sync(traced, now, user.drain() if user else ())
+                            user_events = user.drain() if user else ()
+                            self.capture.record("exchange_inputs", user_events, now)
+                            result = mirror.sync(traced, now, user_events)
                             if not result.get("ok", True):
                                 engines[0].journal.event(now, "EXCHANGE_RECONCILE_FAILED", result)
                         self.record("exchange", {"profile": engines[0].journal.profile,
                             "effects": traced.events, "exchange_hold": getattr(engines[0], "exchange_hold", False)}, now)
                     except Exception as error:
                         alerter.alert("critical", "mirror", f"exchange mirror error: {error}", now)
+                    self.capture.record("mirror_links", mirror.book, now)
+                self.capture.flush_fills(engines)
                 for e in engines:
                     shadow_call(e, "advance", now, "tick", {"finish": finishing}, now)
                 if (self.state / "KILL").exists() and not killed:
@@ -673,10 +695,12 @@ class Runtime:
                             status = build_status("paper", run, engines, {"ages_s": {**monitor.ages(now), **scan_monitor.ages(now)}, "stale": stale},
                                                   killed, now, recent_events(engines[0].journal),
                                                   recent_events(engines[0].journal, ("FILLED", "PARTIAL", "CLOSED")))
+                        status["capture"] = self.capture.status()
                         write_status(self.state, status)
                     except Exception as error:
                         alerter.alert("warn", "dashboard", f"status write failed: {error}", now)
                     atomic_json(self.state / "status.json", {"mode": "paper", "run": run, "updated_ms": now, "paused": paused,
+                        "capture": self.capture.status(),
                         "feed_age_ms": now-last_feed if last_feed else None,
                         "next_scan_ms": (now//30000+1)*30000,
                         "profiles": {e.journal.profile: {"cash": str(e.journal.cash()), "active": e.active(),
@@ -716,6 +740,20 @@ class Runtime:
                     return 0
         finally:
             self.shutdown.set()
+            self.capture.flush_fills(locals().get("engines", []))
+            ended = milliseconds()
+            for j in journals:
+                self.capture.snapshot(j, "stop", ended)
+            self.capture.record("capture_stop", self.capture.status(), ended)
+            self.capture.close()
+            try:
+                status_path = self.state / "status.json"
+                if status_path.exists():
+                    status = json.loads(status_path.read_text())
+                    status["capture"] = self.capture.status()
+                    atomic_json(status_path, status)
+            except Exception:
+                pass
             for e in locals().get("engines", []):
                 if getattr(e, "shadow", None): e.shadow.close()
             if caffeine is not None:
