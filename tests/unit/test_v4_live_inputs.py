@@ -70,8 +70,10 @@ class SentimentTests(unittest.TestCase):
             self.assertEqual(s.judge(signal(), T)["verdict"], "WOULD_BLOCK")
             self.assertEqual(s.judge(signal(side="SHORT"), T)["verdict"], "WOULD_ALLOW")
             self.assertEqual(s.judge(signal(), T + 4 * HOUR_MS)["verdict"], "UNAVAILABLE")
-            self.assertTrue(s.read(T + 30 * 60_000)["available"])
-            self.assertEqual(s.read(T + 30 * 60_000 + 1)["reason"], "STALE")
+            # sentibot writes hourly: the gate must stay live through a whole cycle plus slack
+            self.assertTrue(s.read(T + 61 * 60_000)["available"])
+            self.assertTrue(s.read(T + 75 * 60_000)["available"])
+            self.assertEqual(s.read(T + 75 * 60_000 + 1)["reason"], "STALE")
             path.write_text(json.dumps({"time": "2026-01-01T00:00:00"}))
             self.assertEqual(s.read(T)["reason"], "UNREADABLE")
 
