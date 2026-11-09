@@ -52,6 +52,22 @@ class ProtectionTests(unittest.TestCase):
         self.m.sync(self.e, 3000)
         self.assertEqual(self.ex.algo, {})
 
+    def test_rejected_take_profit_warns_without_flattening(self):
+        self.e.orders[0]["signal"]["take_profit"] = "90"
+        alerts = []
+        self.m.alert = lambda *a: alerts.append(a)
+        place = self.ex.new_algo_order
+        def reject_tp(p):
+            if p.get("type", p.get("orderType")) == "TAKE_PROFIT_MARKET":
+                raise RuntimeError("-2021 order would immediately trigger")
+            return place(p)
+        self.ex.new_algo_order = reject_tp
+        self.assertTrue(self.m.sync(self.e, 1000)["ok"])
+        self.assertFalse(self.m.kill.active)
+        self.assertEqual(self.m.book["a" * 32]["state"], "OPEN")
+        self.assertEqual({a["orderType"] for a in self.ex.algo.values()}, {"STOP_MARKET"})
+        self.assertTrue(any(a[0] == "warn" and str(a[1]).startswith("tp:") for a in alerts))
+
     def test_unrelated_exit_trade_cannot_pollute_books(self):
         self.m.sync(self.e, 1000)
         self.ex.price = D(1)

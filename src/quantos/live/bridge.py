@@ -185,8 +185,10 @@ class ExchangeMirror:
             self.book[oid].pop("pending_since", None)
             self._save()
             if placed.tp_error:
-                self._halt(f"take-profit protection failed on {ins.symbol}: {placed.tp_error}")
-                return {"skipped": "KILL"}
+                # The leg is protected by its stop and the engine still exits at target, so one rejected
+                # take-profit (e.g. -2021 after a fast fill, or a timeout) must not flatten every position.
+                self.alert("warn", f"tp:{oid}", f"take-profit not placed on {ins.symbol}: {placed.tp_error}; "
+                           "stop protects the leg, engine manages the target")
         for oid, m in list(self.book.items()):
             if m["state"] == "PENDING":
                 self._resolve(engine, oid, m, now_ms)
@@ -324,10 +326,12 @@ class ExchangeMirror:
             if m.get("target") is not None:
                 tp, tp_error = self._guard("tp", lambda: submit(self.client, take_profit_market(
                     m["symbol"], opp, D(m["target"]), filled, client_order_id(self.run_id, oid[:20], "tp"), ins)))
-                if tp_error is not None:
-                    return self._halt(f"take-profit failed on {m['symbol']} after resolved entry: {tp_error}")
-                m["tp_cid"] = tp.get("clientAlgoId") or tp.get("clientOrderId")
-                self._save()
+                if tp_error is not None:  # stop already protects the leg; see the entry path above
+                    self.alert("warn", f"tp:{oid}", f"take-profit not placed on {m['symbol']} after resolved "
+                               f"entry: {tp_error}; stop protects the leg, engine manages the target")
+                else:
+                    m["tp_cid"] = tp.get("clientAlgoId") or tp.get("clientOrderId")
+                    self._save()
             self.alert("recovered", f"entry:{oid}", "")
             return None
         if now_ms - m["pending_since"] > PENDING_KILL_MS:
