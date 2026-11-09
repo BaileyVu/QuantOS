@@ -1,5 +1,5 @@
 # QuantOS finish v6 — 2026-11-09
-Budget70% weekly start;53% left(17points spent), max50 total,wrap22/floor20. Zero resets. Five-hour75% left; reset verified, next Nov9 19:54:40Vietnam. MAX ONE helper(idle). Owner alone merges/deploys/services. v6 prompt Desktop/TIBO_PROMPT_FINISH_v6.md. Do not read archived history or repeat passing checks.
+Budget70% weekly start;47% left(23points spent), max50 total,wrap22/floor20. Zero resets. Five-hour36% left; reset verified, next Nov9 19:54:40Vietnam. MAX ONE helper(idle). Owner alone merges/deploys/services. v6 prompt Desktop/TIBO_PROMPT_FINISH_v6.md. Do not read archived history or repeat passing checks.
 
 PR branches (codex/ prefix):
 47 v4-infra-contract 2c52b60
@@ -18,5 +18,6 @@ Done: gzip passive capture/runtime, consumed sentiment/ml1h bytes, sanitized exc
 Tests: full suite ONCE508PASS4skip before finalstream/launcherchanges. Then runtime16PASS,newstreamclient1PASS,changedlauncher6PASS. Prior4006decision proof retained.
 Snapshot QOS/app-v4/<fullSHA>/source; QOS=~/Library/Application Support/QuantOS. Review plan QOS/release-plans/demo-nonstop-<fullSHA>; Sentibotshadow plist there, isolated state QOS/sentibot-reach-shadow-72c8cd7. Neither service installed/started. Previous snapshot5d8342d4e90613783a93a08a58bbc662906236b4 verified; rollback finite72h metadata required.
 First attempt /private/tmp/quantos-v6-soak-72c8cd7 completed650.89s,exit0,0journalerrors,0fills,1703capture events,0captureerrors. FAILED clean acceptance: stale Sentibot warning then natural recovery08:01UTC. No source/service/input changes.
-ACTIVE: same snapshot fresh-state retry /private/tmp/quantos-v6-soak-72c8cd7-fresh, session84848,pid73846. Retry only because firstfailed; neverrepeatpassingtests. NEXT finish648s, inspect errors/alerts/capture/streams; extract runtime_input payloads and use existing event_replay with final journal snapshot for exactdecisions. Must pass zeroerrors/alerts/captureerrors before launch-ready. Then owner handoff PR47..55then57, exactpreparedsnapshot/launch/Sentibotshadow/quote/rollback. Docs handoff updated with actual paths; no agent services.
+Fresh retry PASS650.56s,exit0,0errors/alerts/captureerrors,1344records,both streamsconnected,0fills. Replay719inputs/22scans/allcontextcomplete:6414/6414decisions EXACT. Prior4006proof retained. Durable evidence ../QuantOS-release-evidence/<fullSHA>/quantos-v6-soak-72c8cd7-fresh; failedattempt beside it. No activeprocesses/helperidle. Code/scripts/tests unchanged from tested72c8cd7; laterdocs only.
+NEXT ownerlaunch: merge47..55then57;56parked. Exact commands docs/DEMO_RELEASE_HANDOFF.md. Preparedplan above. Owneraloneexecutes; never change service/state. No repeats whilewaiting.
 AFTERownerlaunch: fill_report first20fillsOR3days,24hshadow72hSentibot; actualevidence pending. PreservealtML/ml5m,sealed2025+,mainnetguards,costs.

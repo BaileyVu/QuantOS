@@ -4,20 +4,20 @@ PR57 is based on PR55 (788aa97), excluding PR56 research. Merge PR47 through PR5
 in order, then PR57. PR56 remains parked. Owner alone merges and deploys.
 
 **Pre-launch acceptance passed on the exact snapshot below:** the fresh-state
-soak ran650.56seconds, exit0, zero journal errors, zero alerts and zero capture
+soak ran 650.56 seconds, exit 0, zero journal errors, zero alerts and zero capture
 errors. Both public and authenticated testnet account streams were connected.
-Capture has1,344records, including719runtime inputs,11consumed sentiment inputs,
+Capture has 1,344 records, including 719 runtime inputs, 11 consumed sentiment inputs,
 one ml1h input and verified start/stop journal snapshots. Replay matched all
-6,414decisions exactly, with complete sentiment/external/exchange context.
+6,414 decisions exactly, with complete sentiment/external/exchange context.
 No fills occurred: this is decision-layer evidence, not fill acceptance.
 
-The initial650.89-second attempt failed on stale Sentibot input. Its producer
+The initial 650.89-second attempt failed on stale Sentibot input. Its producer
 refreshed naturally; no file, freshness rule or service was changed for the
 successful retry. The passing window does not prove continuous input freshness
-or24-hour health. Retain the earlier4,006-decision proof separately.
+or 24-hour health. Retain the earlier 4,006-decision proof separately.
 
-Full suite ran once:508passed,4skipped. Later stream/launcher changes passed
-16runtime tests,one separate-client test and6launcher tests. Subsequent commits
+Full suite ran once: 508 passed, 4 skipped. Later stream/launcher changes passed
+16 runtime tests,one separate-client test and 6 launcher tests. Subsequent commits
 change only documentation/checkpoint, not the tested runtime or scripts.
 Evidence is saved outside Git at
 `/Users/bailey12/Desktop/PythonProject/QuantOS-release-evidence/72c8cd71d19ed8f64944f4c7b61874d9a6896491/`.
@@ -102,4 +102,4 @@ stay in place; rollback is a 72-hour timed run.
 Build the per-fill report while capture accumulates. At the first 20 real fills
 or three days, compare exact decisions and each independent modeled fill against
 its real Binance fill within modeled slippage; report error per trade. Shadow
-reconciliation is due at24h and Sentibot reporting at72h. These gates remain open.
+reconciliation is due at 24h and Sentibot reporting at 72h. These gates remain open.
