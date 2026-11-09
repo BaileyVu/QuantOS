@@ -1,4 +1,89 @@
-## Infrastructure v5 — third-window resume, 2026-11-08 (LATEST)
+## Infrastructure v5 — PR8 collector review, 2026-11-08 (LATEST)
+
+Resumed after recorded reset; initial usage88%five-hour/52%weekly, one banked
+reset remains. Reused both existing lower-cost agents (no nested agents).
+Active branch codex/infra-sentibot-integration. Integrated44055cf as8fb3736;
+main collector review committed immediately before this checkpoint. Fixed normal
+CLI Jina now=None discard; availability measured after scoring; reject nonfinite/
+naive/future publication dates; correct RFC timezone; exact dynamically enumerated
+USDC margin/quote perpetual universe with explicit fallback; POSIX hard600s
+collection deadline includes DNS/slow reads and escapes broad source catches.
+Cadence900s includes collection duration. Focused30tests0.067s PASS afterfix;
+prior failure was stale fake name expectation exposed by exact universe, fixed
+lookup retains known aliases. git diff --check PASS.
+
+NEXT: integrate sourceagent snapshot/plist preparation commit, review/update README,
+publish PR8 draft; run updated immutable no-order >=10min soak with READ-ONLY
+QUANTOS_ML1H_SIGNALS=/Users/bailey12/Library/Application Support/ml1h/app/signals.json
+(confirmed existing/fresh metadata; prior soak missing env causedcriticalalert).
+Never deploy/restartexistingservices. PR8 three-day owner-deployed acceptance pending.
+PR9 agent preparing variance/alignment/model identity corrections atopfa9febc and
+separate pinned CPUvenv; no data selection authorized on2025+. Main finishintegrate
+and actualmanifestedBUILD experiment planning. Existing historicalpD replay remains
+incomplete; turtle/volsqueezeL2,24hdemo and3dayacceptance NOTPASSED.
+Active owned runtime processes NONE; agents working independent helper/research.
+Latest observedusage79%fivehour/51%weekly; reset1794118625, banked1. Automation
+still08:18Vietnam daily; update SAME at20%threshold afternewreset. No passing
+fullsuite/research/ledgerimport repeats. Prior evidence below retained.
+
+---
+
+## Infrastructure v5 — PR8 review checkpoint, 2026-11-08 (LATEST)
+
+PR7 draft54 published https://github.com/BaileyVu/QuantOS/pull/54 at965168b.
+Active branch codex/infra-sentibot-integration, integrated PR8 agent commits as
+dbc703e,b3ec040,42ba8aa. Main reviewed collector, URL/pinnedDNS/redirect adapter,
+baseline scorer, forward report. Corrected report: use availability timestamps,
+reject t-onlylegacy score captures as unverified; dedup firstverdict per signal,
+anchor atverdictavailability, require horizonquote <=60s late, receipt time includes
+runtime delivery, rejectstale marks, discoverassets from rows. Returns explicitly
+gross/descriptive not P&L; gateCI90bootstrap disclosed iid. Report cannot overwrite
+existing file or writebaseline signal filename. Main changedstale threshold30min,
+rejectnaivetimestamps; optionalpDfailclosed remainsOFFdefault. Tests25 in0.032sPASS,
+diffcheckPASS. PR8 notyetpublished/accepted.
+
+NEXT: receive/sourceagentcollector followup (availability timestamp, dynamicUSDC
+universe, boundedfetches, scorerpin metadata), cherry-pick separatecommit, main
+review and tests. Add immutable Sentibot snapshot/plist preparation forowner;
+neverinstall/restartcurrentservices. Update staleREADME beforePR8publication.
+Noactual3dayshadowrun yet; noforwardreturnresultsclaimed. Agentforwardreport
+original a20a5d5 incorporated via42ba8aa, mainreview fixes in this checkpointcommit.
+
+PR9prepared QuantOS-infra-timesfm, branchcodex/infra-timesfm25, commitfa9febc,
+basea003409. Agent21synthetic testsPASS (TimesFM9+registry12), noinstall/inference/
+download/dataaccess. Mainreadfirst200lines timesfm_experiment.py once; outstanding
+review: EWMA is absolute-returnproxy not variance-basedvolatility, targethorizon
+alignment mustbeexplicit; registryconfig canoverridemodel key; fullmodeladapter/
+pins/docs notyetreviewed. Requirements exactpins timesfm[torch]2.0.2,torch2.7.1,
+numpy1.26.4,huggingface-hub0.28.1,safetensors0.5.3; model2.5revision
+2d1b32066b7f3950c45913d4a3849f3c75cb0312 (925MB notdownloaded). ActualCPUvenv/
+walkforward/L2/baseline comparisons/L3filter remainNOTRUN, noacceptanceclaims.
+
+Latestusage25%five-hour,57%weekly remaining,1bankedreset; noownedruntimeprocesses.
+Currentwindowreset1794100383; nextquota threshold updateSAMEautomation from03:13
+toafterthisnewreset. Do notrepeatpassingtests/import/soak withoutchangedreason.
+
+FINAL QUOTA HANDOFF: threshold19%five-hour,56%weekly left,1banked reset. Source
+commitc5da97a oncodex/infra-sentibot-integration isLOCALONLY,PR8notpublished.
+Fivehourreset2026-11-08 08:13:03Vietnam; SAMEautomationconfirmedupdatedACTIVE to
+08:18Vietnam daily firstNov8, thischat. No extraresetused. Mainimplementationstopped
+atthreshold. Sourceagentfinishing boundedcollector checkpoint; captureitsfinal
+commit/tests below beforehandoff. PR9agentidle. Noownedruntime/testprocessactive.
+
+Sourceagent FINISHED clean44055cf in QuantOS-infra-sentibot. EXACT NEXT STEP:
+review/cherry-pick44055cf onto activebranch (do not re-cherrypick its priorcommits).
+Changes: collection completion timestamps/injectableclock, rejectfuture/nonfinite
+publishtimes, fixedpublicexchangeInfo loader8stimeout/2MBcap; dynamicTRADINGUSDC
+PERPETUAL assets/aliases, roundrobin12Exaqueries/sample, explicitcoveragefields;
+deterministiclexicon scorer name/version/SHA instead of ambientVADER; READMEupdated.
+Agent13focusedtests PASS anddiffcheckPASS (beforemainintegration). No externalfetches.
+Mainmustreview first_seen timing, actualuniversefield semantics and fullcyclebudget:
+Exacap doesNOTboundRSS/Reddit/Jina work. Then25mainreport/stalenesstests integration
+and needed regressions only, snapshot/plisthelper/docs, ownPR8draft. Bothagentsidle.
+
+---
+
+## Infrastructure v5 — third-window resume, 2026-11-08 (historical)
 
 Reset verified:98%five-hour/69%weekly remaining, banked1. PR7 integrated locally
 as2f4e8ca on codex/infra-replay-integration; main review in progress. Runtime merge

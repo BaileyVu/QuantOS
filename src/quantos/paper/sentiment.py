@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .types import D
 
-MAX_AGE_MS = 3 * 3600_000
+MAX_AGE_MS = 30 * 60_000
 LONG_BLOCK_BELOW = D("-0.05")   # raw news sentiment; a LONG would be blocked below this
 SHORT_BLOCK_ABOVE = D("0.05")
 
@@ -38,7 +38,9 @@ class SentimentShadow:
         try:
             row = json.loads(_last_line(self.path) or "null")
             if not isinstance(row, dict): raise ValueError("invalid sentiment record")
-            at = int(datetime.fromisoformat(row["time"]).timestamp() * 1000)
+            parsed = datetime.fromisoformat(row["time"])
+            if parsed.tzinfo is None: raise ValueError("sentiment time needs an explicit timezone")
+            at = int(parsed.timestamp() * 1000)
         except PermissionError:
             return {"available": False, "reason": "PERMISSION_DENIED"}
         except (OSError, ValueError, KeyError, TypeError):
