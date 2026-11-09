@@ -279,7 +279,10 @@ def klines(query: str):
     limit = min(max(int((q.get("limit") or ["96"])[0]), 1), 500)
     if not re.fullmatch(r"[A-Z0-9]{2,20}", symbol) or interval not in ("1m", "5m", "15m", "1h", "4h", "1d"):
         raise ValueError("bad symbol or interval")
-    return _cached_get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}", 15)
+    # Candles from the execution venue's own futures market (Binance Demo when --exchange demo), so the chart, the live
+    # mark and the positions all come from one market; spot candles drifted from the demo futures price.
+    base = getattr(_EXCHANGE.get("client"), "base", None) or "https://fapi.binance.com"
+    return _cached_get(f"{base}/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}", 15)
 
 
 _EXCHANGE = {}  # {"client": SignedClient, "mode": str}; set by --exchange

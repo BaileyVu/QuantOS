@@ -786,7 +786,7 @@ function renderEquity(M) {
   }
   updateHTML($('eqPanel'), `<div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 40px;">
 <div>
-<div class="k">Equity · ${esc(M.run.profile || '')} book</div>
+<div class="k">Equity · ${esc(M.run.profile || '')} book <span class="mut" style="font-size: 11px; text-transform: none; letter-spacing: 0;">· live uPnL: ${esc(M.run.profile || 'pD')} ${sgn(M.unreal)} · alt-ML ${sgn(M.mlUnreal)} · Binance total ${sgn(M.unreal + M.mlUnreal)} ${LIVE.up ? '● LIVE' : '○ POLL'}</span></div>
 <div style="display: flex; align-items: baseline; gap: 12px; margin-top: 6px;"><span class="m" style="font-size: 40px; font-weight: 500; letter-spacing: -0.02em;">${f2(eq)}</span><span class="m mut" style="font-size: 13px;">USD</span></div>
 <div class="m" style="margin-top: 4px; font-size: 12.5px;"><span style="color: ${pc(ch)};">${sgn(ch)} (${ch != null && M.start ? sgn(ch / M.start * 100) : '–'}%)</span><span class="mut"> vs ${f2(M.start)} start · HWM ${f2(hwm)}</span></div>
 </div>
@@ -918,7 +918,11 @@ ${rows.map(([n, v, col]) => `<div style="display: grid; grid-template-columns: 9
 
 // ---------- trades tab ----------
 function chartHtml(p) {
-  const k = KL[p.sym];
+  let k = KL[p.sym];
+  if (k && k.length && p.m != null) {  // the forming candle follows the live mark between 15s candle reloads
+    const last = k[k.length - 1].slice(); last[4] = String(p.m);
+    last[2] = String(Math.max(+last[2], p.m)); last[3] = String(Math.min(+last[3], p.m)); k = k.slice(0, -1).concat([last]);
+  }
   const sideCol = p.side === 'SHORT' ? DN : UP, sideBg = p.side === 'SHORT' ? 'var(--az-tint-25)' : 'var(--az-tint-53)';
   const mark = p.m != null ? p.m : k && k.length ? +k[k.length - 1][4] : null, vs = mark != null && p.e ? (mark / p.e - 1) * 100 * (p.side === 'SHORT' ? -1 : 1) : null;
   let body = `<div class="mut" style="padding: 40px 0; text-align: center;">${k === null ? 'Candles unavailable (Binance unreachable)' : 'Loading candles…'}</div>`, foot = '';
@@ -960,7 +964,7 @@ ${p.e != null ? `<span style="position: absolute; left: 0; top: ${pct(p.e)}; col
 <span class="m" style="font-size: 20px;">${px(mark)}</span>
 <span class="m" style="color: ${pc(vs)};">${vs != null ? sgn(vs) + '% vs entry' : ''}</span>
 <span class="m mut" style="font-size: 12px;">15m · last 24h · Binance · ${esc(p.book)}</span>
-<span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px;" class="m"><span class="live" style="width: 6px; height: 6px; border-radius: 50%; background: var(--az-positive);"></span><span style="color: var(--az-positive);">LIVE</span><span class="mut">updates every 15s</span></span>
+<span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px;" class="m"><span class="live" style="width: 6px; height: 6px; border-radius: 50%; background: ${LIVE.up ? 'var(--az-positive)' : 'var(--az-text-secondary)'};"></span><span style="color: ${LIVE.up ? 'var(--az-positive)' : 'var(--az-text-secondary)'};">${LIVE.up ? 'LIVE' : 'POLL'}</span><span class="mut">${LIVE.up ? 'mark every 1s' : 'mark every 2s'} · candles 15s</span></span>
 </div>
 ${body}${foot}</section>`;
 }
