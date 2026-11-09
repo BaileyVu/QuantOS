@@ -670,7 +670,8 @@ function model() {
     // Prefer the execution account's own mark (what Binance shows) over the paper engine's last mark.
     const xp = EX && EX.positions ? EX.positions.find(r => r.symbol === p.symbol) : null;
     const m = xp ? xp.mark : num(p.last_mark), engUp = e != null && num(p.last_mark) != null ? (num(p.last_mark) - e) * q * dir : 0;
-    const up = e != null && m != null ? (m - e) * q * dir : null;
+    // Binance's own uPnL when it holds the leg, so the number matches the exchange exactly.
+    const up = xp ? xp.upnl : e != null && m != null ? (m - e) * q * dir : null;
     engUnreal += engUp || 0;
     let oid = null; for (const [k, v] of Object.entries(run.mirror || {})) if (v.symbol === p.symbol && v.state === 'OPEN') oid = k;
     const xf = ((X && X[run.name] && X[run.name].fills) || run.fills || []).filter(f => f.order_id === oid && f.kind === 'ENTRY').pop();
@@ -678,11 +679,14 @@ function model() {
   });
   const ml = S.mlalts || null;
   (ml && ml.open || []).forEach(p => {
-    const k = KL[p.sym], m = k && k.length ? +k[k.length - 1][4] : null, q = num(p.qty), e = num(p.entry);
-    const up = q && e != null && m != null ? (m - e) * q : null;
+    // Live mark/uPnL from /api/exchange (2s); 15m candle close only if Binance doesn't list the leg.
+    const xp = EX && EX.positions ? EX.positions.find(r => r.symbol === p.sym) : null;
+    const k = KL[p.sym], m = xp ? xp.mark : k && k.length ? +k[k.length - 1][4] : null, q = num(p.qty), e = num(p.entry);
+    const up = xp ? xp.upnl : q && e != null && m != null ? (m - e) * q : null;
     positions.push({ book: 'alt-ML', sym: p.sym, strat: 'alt-ML 5m', side: 'LONG', q, e, m, up, upPct: up != null && e ? (m / e - 1) * 100 : null, stop: null, tp: null, state: String(p.st || 'open').toUpperCase(), opened: p.t || null, cid: p.sid });
   });
   const unreal = positions.filter(p => p.book !== 'alt-ML').reduce((a, p) => a + (p.up || 0), 0);
+  const mlUnreal = positions.filter(p => p.book === 'alt-ML').reduce((a, p) => a + (p.up || 0), 0);
   const hist = (run.equity_history || []).slice();
   // Re-mark equity with live exchange prices: engine equity minus its own unrealised, plus the live one.
   const equity = num(eng.equity) != null ? num(eng.equity) - engUnreal + unreal : null;
@@ -713,7 +717,7 @@ function model() {
     const age = o.ts_ms ? (now - o.ts_ms) / 60000 : null;
     h1 = { ts: o.ts_ms, thr, top, sigs, stale: age == null || age > 75, fresh: sigs.filter(x => x.generated_ms && now - x.generated_ms < 3600000) };
   }
-  return { run, st, eng, now, positions, unreal, hist, equity, start, strats, ml, mlTop, h1 };
+  return { run, st, eng, now, positions, unreal, mlUnreal, hist, equity, start, strats, ml, mlTop, h1 };
 }
 
 // ---------- header ----------
@@ -771,7 +775,7 @@ ${kpis.map(k => `<div><dt class="k">${k.l}</dt><dd class="m" style="margin: 4px 
 
 function renderAcct(M) {
   const eq = M.equity, sl = M.run.slots || {};
-  const acct = [{ l: 'Cash', v: f2(M.eng.cash), c: 'inherit' }, { l: 'Unrealised', v: sgn(M.unreal), c: pc(M.unreal) }, { l: 'Realised', v: sgn(M.run.realized && M.run.realized.pnl), c: pc(M.run.realized && M.run.realized.pnl) }, { l: 'High-water mark', v: f2(M.eng.high_water), c: 'inherit' }, { l: 'Next margin (bal / 10)', v: eq != null ? (eq / 10).toFixed(2) : '–', c: 'inherit' }, { l: 'Restarts', v: String((M.run.run && M.run.run.restarts) || 0), c: 'inherit' }];
+  const acct = [{ l: 'Cash', v: f2(M.eng.cash), c: 'inherit' }, { l: 'Unrealised (QuantOS)', v: sgn(M.unreal), c: pc(M.unreal) }, { l: 'Unrealised (alt-ML)', v: sgn(M.mlUnreal), c: pc(M.mlUnreal) }, { l: 'Unrealised (all, Binance)', v: sgn(M.unreal + M.mlUnreal), c: pc(M.unreal + M.mlUnreal) }, { l: 'Realised', v: sgn(M.run.realized && M.run.realized.pnl), c: pc(M.run.realized && M.run.realized.pnl) }, { l: 'High-water mark', v: f2(M.eng.high_water), c: 'inherit' }, { l: 'Next margin (bal / 10)', v: eq != null ? (eq / 10).toFixed(2) : '–', c: 'inherit' }, { l: 'Restarts', v: String((M.run.run && M.run.run.restarts) || 0), c: 'inherit' }];
   updateHTML($('acct'), `<h2 class="h">Account · ${esc(M.run.profile || '')}</h2>
 <dl class="m" style="margin: 12px 0 0; display: grid; grid-template-columns: 1fr auto; gap: 9px 12px; font-size: 12.5px;">
 ${acct.map(a => `<dt style="color: var(--az-text-secondary); font-family: var(--az-font-ui);">${a.l}</dt><dd style="margin: 0; color: ${a.c};">${a.v}</dd>`).join('')}
@@ -888,7 +892,7 @@ ${rows.map(([n, v, col]) => `<div style="display: grid; grid-template-columns: 9
 function chartHtml(p) {
   const k = KL[p.sym];
   const sideCol = p.side === 'SHORT' ? DN : UP, sideBg = p.side === 'SHORT' ? 'var(--az-tint-25)' : 'var(--az-tint-53)';
-  const mark = k && k.length ? +k[k.length - 1][4] : p.m, vs = mark != null && p.e ? (mark / p.e - 1) * 100 * (p.side === 'SHORT' ? -1 : 1) : null;
+  const mark = p.m != null ? p.m : k && k.length ? +k[k.length - 1][4] : null, vs = mark != null && p.e ? (mark / p.e - 1) * 100 * (p.side === 'SHORT' ? -1 : 1) : null;
   let body = `<div class="mut" style="padding: 40px 0; text-align: center;">${k === null ? 'Candles unavailable (Binance unreachable)' : 'Loading candles…'}</div>`, foot = '';
   if (k && k.length) {
     const CH = 320, cp = 10, n = k.length, step = 1000 / n, cw = (step * 0.62).toFixed(2);

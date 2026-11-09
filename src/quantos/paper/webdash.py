@@ -297,12 +297,14 @@ def exchange_view():
                       "mark": float(r["markPrice"]), "upnl": float(r["unRealizedProfit"])}
                      for r in client.position_risk() if float(r.get("positionAmt") or 0) != 0]
         acct = client.account()
+        # QuantOS trades USDC margin, alt-ML trades USDT perps: report both, plus the sum of every position's uPnL.
+        assets = {x["asset"]: {"wallet": float(x["walletBalance"]), "upnl": float(x.get("unrealizedProfit") or 0)}
+                  for x in acct.get("assets", []) if x.get("asset") in ("USDC", "USDT")}
+        main = assets.get("USDC") or {"wallet": float(acct.get("totalWalletBalance") or 0),
+                                      "upnl": float(acct.get("totalUnrealizedProfit") or 0)}
         return {"enabled": True, "mode": _EXCHANGE["mode"], "time_ms": int(time.time() * 1000), "positions": positions,
-                # Multi-asset accounts report totals in USDT; the bot trades USDC margin, so show that asset.
-                **next(({"wallet": float(x["walletBalance"]), "upnl": float(x.get("unrealizedProfit") or 0)}
-                        for x in acct.get("assets", []) if x.get("asset") == "USDC"),
-                       {"wallet": float(acct.get("totalWalletBalance") or 0),
-                        "upnl": float(acct.get("totalUnrealizedProfit") or 0)})}
+                "wallet": main["wallet"], "upnl": main["upnl"], "assets": assets,
+                "total_upnl": round(sum(p["upnl"] for p in positions), 8)}
     with _LOCK:
         hit = _CACHE.get("exchange")
     if hit and time.time() - hit[0] < 2:
