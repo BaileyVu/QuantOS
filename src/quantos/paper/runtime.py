@@ -649,7 +649,11 @@ class Runtime:
                             "effects": traced.events, "exchange_hold": getattr(engines[0], "exchange_hold", False)}, now)
                     except Exception as error:
                         alerter.alert("critical", "mirror", f"exchange mirror error: {error}", now)
-                    self.capture.record("mirror_links", mirror.book, now)
+                    # Only on change: the full book was written (with fsync) every 2s and grows all run.
+                    links = dumps(mirror.book)
+                    if links != getattr(self, "_mirror_links", None):
+                        self._mirror_links = links
+                        self.capture.record("mirror_links", mirror.book, now)
                 self.capture.flush_fills(engines)
                 for e in engines:
                     shadow_call(e, "advance", now, "tick", {"finish": finishing}, now)
