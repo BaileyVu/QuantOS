@@ -1,4 +1,20 @@
-## Infrastructure v5 — PR3 review, 2026-11-07 (LATEST)
+## Infrastructure v5 — PR4 integration, 2026-11-07 (LATEST)
+
+PR3 draft50 published: https://github.com/BaileyVu/QuantOS/pull/50,
+source0de3d30 +dae73e8. Final idempotent-void suite23tests0.135s PASS.
+Active branch codex/infra-clean-deploys at42dcc04 (plusb3b6d83), PR4 source
+integrated cleanly from prepared agent commits. Main reviewed clean_snapshot,
+preserved PR3 watchdog execution/environment wiring in all entrypoints. Six real
+git/snapshot tests and seven service tests pass after integration; diffcheckPASS.
+No deploy/script install/restart/LaunchAgent or existing snapshot changes made.
+Soak/deployment rollback UNVERIFIED. Source rollback: revert42dcc04 thenb3b6d83.
+Next: publish own draftPR4 stacked onPR3, branchPR5 counterfactual logger.
+PR7/8 agents still active in separate worktrees; no owned service running.
+Earlier test command named nonexistent test_service; corrected to test_v3_service.
+
+---
+
+## Infrastructure v5 — PR3 review, 2026-11-07 (historical)
 
 Five-hour reset verified:99% remaining at resume, weekly85%, banked1remaining.
 Active branch codex/infra-exchange-protection; prior source0de3d30 + current review
