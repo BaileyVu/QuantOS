@@ -1,0 +1,33 @@
+{
+  "action": "Remain in cash; no strategy allocation recommended",
+  "execution_enabled": false,
+  "frozen_candidate": {
+    "leverage": "1",
+    "members": [
+      {
+        "parameters": {
+          "cutoff_quantile": "0.005",
+          "holding_hours": "24",
+          "stop_fraction": "0.25"
+        },
+        "risk_fraction": "0.04",
+        "strategy_id": "alt_dip_reversal"
+      },
+      {
+        "parameters": {
+          "holding_hours": "48",
+          "stop_fraction": "0.25"
+        },
+        "risk_fraction": "0.04",
+        "strategy_id": "crash_flush_e2"
+      }
+    ],
+    "role": "combined_training_selected_parameters"
+  },
+  "heldout_status": "INVALID_DATA",
+  "paper_launch_authorized": false,
+  "reason": "AXS funding cadence discrepancy invalidates frozen portfolio; valid traded exploratory cells lost money; zero-trade EMA tie is not evidence of an edge",
+  "schema": 1,
+  "status": "NO_VALIDATED_TRADING_CONFIGURATION",
+  "this_is": "Research decision record, not a runtime trading configuration"
+}

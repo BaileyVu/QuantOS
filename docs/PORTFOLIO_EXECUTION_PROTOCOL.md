@@ -1,8 +1,9 @@
 # Portfolio evaluation execution protocol
 
-Status: implementation and data validation in progress. No outcome selection or
-2025+ evaluation has run. This document fixes modeling choices before outcomes;
-it does not itself constitute the final code/data/selection seal.
+These modeling choices were fixed before outcomes. Training and the single
+sealed 2025+ wave are now complete; see [final results](PORTFOLIO_EVAL_20261105.md).
+The frozen portfolio is INVALID_DATA and no trading configuration is supported.
+This protocol is preserved as the description of the evaluated scenario.
 
 ## Data and causal decisions
 
