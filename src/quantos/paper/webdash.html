@@ -427,7 +427,7 @@ body::before { filter: brightness(1.85) saturate(1.28); }
   background: radial-gradient(ellipse,var(--neon-icon-edge) 0%,var(--neon-icon-halo) 35%,transparent 76%);
   filter: blur(4px);
 }
-#views #acct h2.h::before { mask-image: url('/static/aura-zenith/wallet.svg'); }
+#views #acct h2.h::before, #views #acctTab h2.h::before { mask-image: url('/static/aura-zenith/wallet.svg'); }
 #views #newsPanel h2.h::before {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.85' stroke-linecap='round'%3E%3Crect x='3' y='2.5' width='18' height='19' rx='3'/%3E%3Cpath d='M7 7.5h10M7 11.5h10M7 15.5h6'/%3E%3C/svg%3E");
 }
@@ -582,6 +582,11 @@ body::before { filter: brightness(1.85) saturate(1.28); }
 </div>
 
 <!-- Strategies -->
+<!-- Account -->
+<div data-tab="Account">
+<section class="g" id="acctTab" style="padding: 16px 18px;"></section>
+</div>
+
 <div data-tab="Strategies">
 <section class="g">
 <div><h2 class="h">Strategies</h2><span class="mut" id="stSub"></span></div>
@@ -672,6 +677,7 @@ body::before { filter: brightness(1.85) saturate(1.28); }
 const UP = 'var(--az-positive)', DN = 'var(--az-negative)', DIM = 'var(--az-text-secondary)', AMB = 'var(--az-warning)', BLU = 'var(--az-info)', ACC = 'var(--az-chart-base)';
 const NAV = [
   {id: 'overview', label: 'Overview', icon: 'overview', route: '#/overview'},
+  {id: 'account', label: 'Account', icon: 'wallet', route: '#/account'},
   {id: 'strategies', label: 'Strategies', icon: 'strategies', route: '#/strategies'},
   {id: 'trades', label: 'Trades', icon: 'trades', route: '#/trades'},
   {id: 'sentiment', label: 'Sentiment', icon: 'sentiment', route: '#/sentiment'},
@@ -982,6 +988,26 @@ ${Object.entries(sl).map(([n, s]) => `<div class="m slot-segment" data-used="${s
 </div>`);
 }
 
+// Account tab: Binance balances per margin asset (signed REST every 2s via /api/exchange); uPnL re-marked from the
+// venue's markPrice@1s stream when it is fresh, so equity moves in real time.
+const VENUE = { demo: 'Binance Demo', testnet: 'Binance Testnet', live: 'Binance' };
+function renderAccount(M) {
+  const el = $('acctTab'); if (!el) return;
+  if (!EX) { updateHTML(el, '<h2 class="h">Account</h2><div class="mut" style="margin-top: 12px;">Exchange account not connected</div>'); return; }
+  const venue = VENUE[EX.venue || EX.mode] || ('Binance · ' + esc(EX.venue || EX.mode || '')), age = EX.time_ms ? Math.max(0, Date.now() - EX.time_ms) : null;
+  const rows = ['USDC', 'USDT'].map(a => {
+    const x = (EX.assets || {})[a] || { wallet: 0, upnl: 0, available: 0 };
+    const pos = (EX.positions || []).filter(p => p.symbol.endsWith(a)).map(p => exPos(p.symbol) || p);
+    const upnl = pos.length ? pos.reduce((s, p) => s + p.upnl, 0) : x.upnl;
+    return `<tr><td style="font-weight: 600;">${a}</td><td class="mut">${venue}</td><td style="text-align: right;">${f2(x.wallet)}</td><td style="text-align: right; color: ${pc(upnl)};">${sgn(upnl)}</td><td style="text-align: right; font-weight: 600;">${f2(x.wallet + upnl)}</td><td style="text-align: right;">${f2(x.available)}</td><td style="text-align: right;">${pos.length}</td></tr>`;
+  }).join('');
+  const live = EX.stale ? `<span style="color: ${AMB};">○ STALE</span>` : LIVE.up ? `<span style="color: ${UP};">● LIVE</span>` : '<span class="mut">○ POLL 2s</span>';
+  updateHTML(el, `<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;"><h2 class="h">Account · ${venue} <span class="mut" style="font-size: 12px; font-weight: 500;">USDⓈ-M futures</span></h2><span class="m" aria-live="polite" style="font-size: 12px;">${live} <span class="mut">${age != null ? 'balances ' + (age / 1000).toFixed(1) + 's ago' : ''}</span></span></div>
+<div style="margin-top: 12px;"><table class="m">
+<thead><tr><th>Asset</th><th>Venue</th><th style="text-align: right;">Wallet</th><th style="text-align: right;">Unrealised</th><th style="text-align: right;">Equity</th><th style="text-align: right;">Available</th><th style="text-align: right;">Positions</th></tr></thead>
+<tbody>${rows}</tbody></table></div>`);
+}
+
 const stratRow = (s, full) => `<tr><td style="font-weight: 500;">${esc(s.n)}</td><td class="mut">${esc(s.b)}</td>${full ? `<td class="mut">${esc(s.slot)}</td>` : ''}<td><span style="display: inline-flex; align-items: center; gap: 6px; color: ${s.stc};">${dot(s.stc)}${s.st}</span></td><td style="text-align: right;">${s.t}</td><td style="text-align: right; color: ${s.p < -0.005 ? DN : s.p > 0.005 ? UP : DIM};">${f2(s.p)}</td><td class="mut" style="font-family: var(--az-font-ui);">${esc(s.d)}</td>${full ? `<td class="mut">${esc(s.edge)}</td>` : ''}</tr>`;
 
 function renderStrats(M) {
@@ -1264,7 +1290,7 @@ $('srcs').addEventListener('click', e => { const b = e.target.closest('[data-s]'
 function render() {
   if (!S) return;
   let M; try { M = model(); } catch (e) { console.error(e); return; }
-  const parts = [renderHeader, renderEquity, renderAcct, renderStrats, renderAlerts, renderMl1h, renderFunnel, renderShadow, renderTrades, renderCharts, renderSenti, renderLogs];
+  const parts = [renderHeader, renderEquity, renderAcct, renderAccount, renderStrats, renderAlerts, renderMl1h, renderFunnel, renderShadow, renderTrades, renderCharts, renderSenti, renderLogs];
   for (const f of parts) { try { f(M); } catch (e) { console.error(f.name, e); } }
 }
 async function getJSON(u) { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }

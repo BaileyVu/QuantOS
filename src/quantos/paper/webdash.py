@@ -296,7 +296,9 @@ def exchange_view():
         except Exception:
             orders = None
         # QuantOS trades USDC margin, alt-ML trades USDT perps: report both, plus the sum of every position's uPnL.
-        assets = {x["asset"]: {"wallet": float(x["walletBalance"]), "upnl": float(x.get("unrealizedProfit") or 0)}
+        assets = {x["asset"]: {"wallet": float(x["walletBalance"]), "upnl": float(x.get("unrealizedProfit") or 0),
+                               "available": float(x.get("availableBalance") or 0),
+                               "margin": float(x.get("marginBalance") or 0)}
                   for x in acct.get("assets", []) if x.get("asset") in ("USDC", "USDT")}
         main = assets.get("USDC") or {"wallet": float(acct.get("totalWalletBalance") or 0),
                                       "upnl": float(acct.get("totalUnrealizedProfit") or 0)}
@@ -304,6 +306,8 @@ def exchange_view():
                 "wallet": main["wallet"], "upnl": main["upnl"], "assets": assets, "orders": orders,
                 # The page streams marks from here (e.g. demo-fstream.binance.com), the venue's own mark feed.
                 "ws_host": getattr(client, "ws_host", None),
+                # Where the money is: QUANTOS_TESTNET_HOST=demo makes a "testnet" client point at Binance Demo.
+                "venue": "demo" if "demo" in str(getattr(client, "base", "")) else _EXCHANGE["mode"],
                 "total_upnl": round(sum(p["upnl"] for p in positions), 8)}
     with _LOCK:
         hit = _CACHE.get("exchange")
