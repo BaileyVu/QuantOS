@@ -5,6 +5,7 @@ permissions:
 jobs:
   validation:
     runs-on: macos-latest
+    timeout-minutes: 30  # a hung test must not hold the macOS runners for 6h
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
