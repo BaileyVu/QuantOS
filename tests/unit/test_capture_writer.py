@@ -45,6 +45,7 @@ class CaptureTests(unittest.TestCase):
             threads = [threading.Thread(target=writer.record, args=('test', {'i':i}, T)) for i in range(20)]
             for thread in threads: thread.start()
             for thread in threads: thread.join()
+            writer.flush()  # records are buffered (one gzip member per flush)
             rows = records(state)
             self.assertEqual(len(rows), 21)
             self.assertEqual(base64.b64decode(rows[0]['payload']['bytes']), raw)
@@ -55,7 +56,7 @@ class CaptureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             state = Path(folder); (state/'capture').write_text('occupied')
             writer = CaptureWriter(state)
-            writer.record('test', {}, T)
+            writer.record('test', {}, T); writer.flush()
             self.assertEqual(writer.errors, 1)
             self.assertEqual((state/'capture').read_text(), 'occupied')
 
@@ -71,14 +72,14 @@ class CaptureTests(unittest.TestCase):
                     with journal.transaction():
                         engine.trade(Trade('AAVEUSDC',1,T+1000,D('99.99'),D(1000),True),T+1000)
                         writer.flush_fills([engine])
-                        self.assertEqual(records(state), [])
+                        writer.flush(); self.assertEqual(records(state), [])
                         raise RuntimeError('rollback')
                 writer.flush_fills([engine])
-                self.assertEqual(records(state), [])
+                writer.flush(); self.assertEqual(records(state), [])
                 engine.trade(Trade('AAVEUSDC',2,T+2000,D('99.99'),D(1000),True),T+2000)
-                self.assertEqual(records(state), [])
+                writer.flush(); self.assertEqual(records(state), [])
                 writer.flush_fills([engine])
-                self.assertEqual([r['kind'] for r in records(state)], ['model_fill'])
+                writer.flush(); self.assertEqual([r['kind'] for r in records(state)], ['model_fill'])
             finally: journal.close()
 
     def test_snapshot_is_consistent_and_leaves_journal_untouched(self):
@@ -86,7 +87,7 @@ class CaptureTests(unittest.TestCase):
             state=Path(folder); writer=CaptureWriter(state); journal=Journal(state/'journal.db','p1')
             try:
                 with journal.transaction(): journal.event(T,'TEST',{'a':1})
-                writer.snapshot(journal,'start',T)
+                writer.snapshot(journal,'start',T); writer.flush()
                 record=records(state)[0]
                 snapshot=state/'capture'/record['payload']['file']
                 db=sqlite3.connect(snapshot)

@@ -329,7 +329,8 @@ class Runtime:
                     # liquidity floor got no quotes and its CLOSING order never exited (11-11 ADAUSDC).
                     missing = set(self.watched_symbols) - set(instruments) - set(self.instruments)
                     if missing:
-                        listed = market.exchange_info()
+                        try: listed = market.exchange_info()
+                        except Exception: listed = {}  # best effort: never stall the universe refresh
                         instruments.update({s: listed[s] for s in missing
                                             if s in listed and listed[s].status == "TRADING"})
                     next_universe = now+300000
