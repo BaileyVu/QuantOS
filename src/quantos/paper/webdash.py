@@ -296,10 +296,8 @@ def exchange_view():
         except Exception:
             orders = None
         # QuantOS trades USDC margin, alt-ML trades USDT perps: report both, plus the sum of every position's uPnL.
-        # Every asset with a wallet balance (USDC/USDT always), with margin and available balance for the Account panel.
-        assets = {x["asset"]: {"wallet": float(x["walletBalance"]), "upnl": float(x.get("unrealizedProfit") or 0),
-                               "margin": float(x.get("marginBalance") or 0), "available": float(x.get("availableBalance") or 0)}
-                  for x in acct.get("assets", []) if x.get("asset") in ("USDC", "USDT") or float(x.get("walletBalance") or 0) != 0}
+        assets = {x["asset"]: {"wallet": float(x["walletBalance"]), "upnl": float(x.get("unrealizedProfit") or 0)}
+                  for x in acct.get("assets", []) if x.get("asset") in ("USDC", "USDT")}
         main = assets.get("USDC") or {"wallet": float(acct.get("totalWalletBalance") or 0),
                                       "upnl": float(acct.get("totalUnrealizedProfit") or 0)}
         return {"enabled": True, "mode": _EXCHANGE["mode"], "time_ms": int(time.time() * 1000), "positions": positions,

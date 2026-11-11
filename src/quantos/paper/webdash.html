@@ -564,7 +564,6 @@ body::before { filter: brightness(1.85) saturate(1.28); }
 <div data-tab="Overview" class="overview-grid">
 <div id="overviewMain">
 <section class="g" id="eqPanel"></section>
-<section class="g" id="balPanel"></section>
 <section class="g">
 <div><h2 class="h">Strategies</h2><span class="mut" id="ovStSub"></span><button class="btn" type="button" onclick="setTab('Strategies')">Details</button></div>
 <div>
@@ -985,11 +984,6 @@ ${Object.entries(sl).map(([n, s]) => `<div class="m slot-segment" data-used="${s
 
 const stratRow = (s, full) => `<tr><td style="font-weight: 500;">${esc(s.n)}</td><td class="mut">${esc(s.b)}</td>${full ? `<td class="mut">${esc(s.slot)}</td>` : ''}<td><span style="display: inline-flex; align-items: center; gap: 6px; color: ${s.stc};">${dot(s.stc)}${s.st}</span></td><td style="text-align: right;">${s.t}</td><td style="text-align: right; color: ${s.p < -0.005 ? DN : s.p > 0.005 ? UP : DIM};">${f2(s.p)}</td><td class="mut" style="font-family: var(--az-font-ui);">${esc(s.d)}</td>${full ? `<td class="mut">${esc(s.edge)}</td>` : ''}</tr>`;
 
-function renderBal() {
-  const a = EX && EX.assets ? Object.entries(EX.assets) : [];
-  updateHTML($('balPanel'), `<div><h2 class="h">Account</h2><span class="mut">Binance Demo · USDⓈ-M Futures</span></div>` + (a.length ? `<table class="m"><thead><tr><th>Asset</th><th>Wallet</th><th>Unrealised PnL</th><th>Margin balance</th><th>Available</th></tr></thead><tbody>${a.map(([n, x]) => `<tr><td style="font-weight: 500;">${esc(n)}</td><td style="text-align: right;">${f2(x.wallet)}</td><td style="text-align: right; color: ${pc(x.upnl)};">${sgn(x.upnl)}</td><td style="text-align: right;">${f2(x.margin)}</td><td style="text-align: right;">${f2(x.available)}</td></tr>`).join('')}</tbody></table>` : '<div class="mut" style="margin-top: 12px;">exchange balances unavailable</div>'));
-}
-
 function renderStrats(M) {
   const nPd = M.strats.filter(s => s.b !== 'executor').length;
   $('ovStSub').textContent = `${nPd} ${M.run.profile || ''}`;
@@ -1270,7 +1264,7 @@ $('srcs').addEventListener('click', e => { const b = e.target.closest('[data-s]'
 function render() {
   if (!S) return;
   let M; try { M = model(); } catch (e) { console.error(e); return; }
-  const parts = [renderHeader, renderEquity, renderBal, renderAcct, renderStrats, renderAlerts, renderMl1h, renderFunnel, renderShadow, renderTrades, renderCharts, renderSenti, renderLogs];
+  const parts = [renderHeader, renderEquity, renderAcct, renderStrats, renderAlerts, renderMl1h, renderFunnel, renderShadow, renderTrades, renderCharts, renderSenti, renderLogs];
   for (const f of parts) { try { f(M); } catch (e) { console.error(f.name, e); } }
 }
 async function getJSON(u) { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }
