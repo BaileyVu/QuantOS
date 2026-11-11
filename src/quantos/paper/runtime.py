@@ -325,6 +325,14 @@ class Runtime:
                 if abs(offset) > 2000: raise ValueError(f"CLOCK_DRIFT:{offset}")
                 if now >= next_universe:
                     instruments = market.eligible_instruments(self.min_quote_volume)
+                    # After a restart self.instruments starts empty, so a held contract that fell below the
+                    # liquidity floor got no quotes and its CLOSING order never exited (11-11 ADAUSDC).
+                    missing = set(self.watched_symbols) - set(instruments) - set(self.instruments)
+                    if missing:
+                        try: listed = market.exchange_info()
+                        except Exception: listed = {}  # best effort: never stall the universe refresh
+                        instruments.update({s: listed[s] for s in missing
+                                            if s in listed and listed[s].status == "TRADING"})
                     next_universe = now+300000
                 with self.instrument_lock:
                     # Keep held contracts available to their feed even if liquidity eligibility changes.

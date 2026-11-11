@@ -81,9 +81,14 @@ def run_view(name: str, state: Path, now_ms: int, profile: str = "pL") -> dict:
             "SELECT COUNT(*) FROM events WHERE kind='ERROR' AND time_ms>=?", (since,)).fetchone()[0]
         # Fail-closed stale-quote rejections (quiet USDC books) are expected and reported apart from real errors.
         # Equity curve: last observation per 15 minutes over the run (cheap, bounded to ~300 points).
-        view["equity_history"] = [[t, float(e)] for t, e in db.execute(
-            "SELECT MAX(time_ms) AS t, json_extract(payload,'$.equity') FROM events WHERE kind='OBSERVATION' "
-            "GROUP BY time_ms/900000 ORDER BY t DESC LIMIT 300")][::-1]
+        # Incremental: only observations newer than the last poll (index range), merged into 15-min buckets.
+        curve = _EQUITY.setdefault(str(db_path), {"after": -1, "buckets": {}})
+        for t, e in db.execute(
+                "SELECT MAX(time_ms) AS t, json_extract(payload,'$.equity') FROM events WHERE kind='OBSERVATION' "
+                "AND time_ms>? GROUP BY time_ms/900000", (curve["after"],)):
+            curve["buckets"][t // 900000] = [t, float(e)]
+            curve["after"] = max(curve["after"], t)
+        view["equity_history"] = [curve["buckets"][b] for b in sorted(curve["buckets"])[-300:]]
         view["errors_last_15m"], view["stale_quotes_last_15m"] = db.execute(
             "SELECT COALESCE(SUM(payload NOT LIKE '%invalid or stale quote%'),0), "
             "COALESCE(SUM(payload LIKE '%invalid or stale quote%'),0) FROM events WHERE kind='ERROR' AND time_ms>=?",
@@ -151,6 +156,21 @@ HLREVERSE = Path.home() / "Library/Application Support/hl_copy_reverse/state"
 ML1H = Path.home() / "Library/Application Support/ml1h/app"
 
 
+_TTL, _TTL_LOCK, _EQUITY = {}, threading.Lock(), {}
+
+
+def _cached(key, ttl_s, build):
+    """11-11: every 2s poll re-scanned the 144 MB journal and forked launchctl per service (~40% CPU).
+    Share one result per key for ttl_s across polls and tabs."""
+    with _TTL_LOCK:
+        hit = _TTL.get(key)
+        if hit and time.monotonic() - hit[0] < ttl_s:
+            return hit[1]
+        value = build()
+        _TTL[key] = (time.monotonic(), value)
+        return value
+
+
 def services_view() -> list:
     """launchd state per service (read-only `launchctl print`)."""
     out = []
@@ -203,7 +223,7 @@ def snapshot(runs, sentibot) -> dict:
     bots = None if sentibot is None else {
         "perp": sentibot_view(sentibot / "paper_perp_signals.jsonl", now),
         "spot": sentibot_view(sentibot / "paper_signals.jsonl", now)}
-    return {"time_ms": now, "services": services_view(), "runs": [run_view(n, s, now, *p) for n, s, *p in runs],
+    return {"time_ms": now, "services": _cached("services", 30, services_view), "runs": [run_view(n, s, now, *p) for n, s, *p in runs],
             "hlcopy": None, "hlreverse": None, "ml1h": ml1h_view(now),
             "sentibot": bots}
 
@@ -334,7 +354,8 @@ def serve(runs, sentibot, port=8787):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             if self.path.startswith("/api/state"):
-                body, kind = json.dumps(snapshot(runs, sentibot), default=str).encode(), "application/json"
+                body = _cached("state", 5, lambda: json.dumps(snapshot(runs, sentibot), default=str).encode())
+                kind = "application/json"
             elif self.path.startswith("/api/exchange"):
                 body, kind = json.dumps(exchange_view(), default=str).encode(), "application/json"
             elif self.path.startswith("/api/news"):

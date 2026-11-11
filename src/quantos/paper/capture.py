@@ -10,8 +10,13 @@ import os
 from pathlib import Path
 import sqlite3
 import threading
+import time
 
 from .types import dumps
+
+# 11-11: one gzip member + fsync per record (every raw stream message) cost ~1/3 of the bot's CPU.
+# Buffer per day file and write one fast gzip member at most every FLUSH_S seconds or FLUSH_BYTES.
+FLUSH_S, FLUSH_BYTES = 2.0, 1 << 20
 
 
 class CaptureWriter:
@@ -22,6 +27,7 @@ class CaptureWriter:
         self.last_error = None
         self.closed = False
         self.pending_fills = []
+        self.buffer, self.buffered, self.flushed_at = {}, 0, time.monotonic()
 
     def _error(self, exc):
         self.errors += 1
@@ -40,21 +46,32 @@ class CaptureWriter:
                 day = datetime.fromtimestamp(now_ms / 1000, timezone.utc).strftime("%Y-%m-%d")
                 encoded = (dumps({"schema": 1, "kind": kind, "received_ms": now_ms,
                                   "payload": payload}) + "\n").encode("utf-8")
-                self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
-                if self.root.is_symlink():
-                    raise ValueError("capture directory cannot be a symlink")
-                fd = os.open(self.root / f"{day}.jsonl.gz",
-                             os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
-                with os.fdopen(fd, "ab") as raw:
-                    fcntl.flock(raw.fileno(), fcntl.LOCK_EX)
-                    with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as stream:
-                        stream.write(encoded)
-                    raw.flush()
-                    os.fsync(raw.fileno())
-                    fcntl.flock(raw.fileno(), fcntl.LOCK_UN)
+                self.buffer.setdefault(day, []).append(encoded)
+                self.buffered += len(encoded)
+                if self.buffered >= FLUSH_BYTES or time.monotonic() - self.flushed_at >= FLUSH_S:
+                    self.flush()
                 self.events += 1
             except Exception as exc:
                 self._error(exc)
+
+    def flush(self):
+        with self.lock:
+            buffer, self.buffer, self.buffered, self.flushed_at = self.buffer, {}, 0, time.monotonic()
+            for day, rows in buffer.items():
+                try:
+                    self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    if self.root.is_symlink():
+                        raise ValueError("capture directory cannot be a symlink")
+                    fd = os.open(self.root / f"{day}.jsonl.gz",
+                                 os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+                    with os.fdopen(fd, "ab") as raw:
+                        fcntl.flock(raw.fileno(), fcntl.LOCK_EX)
+                        raw.write(gzip.compress(b"".join(rows), compresslevel=1, mtime=0))
+                        raw.flush()
+                        os.fsync(raw.fileno())
+                        fcntl.flock(raw.fileno(), fcntl.LOCK_UN)
+                except Exception as exc:
+                    self._error(exc)
 
     def input_bytes(self, source, raw, now_ms):
         with self.lock:
@@ -127,4 +144,5 @@ class CaptureWriter:
 
     def close(self):
         with self.lock:
+            self.flush()
             self.closed = True

@@ -25,6 +25,8 @@ class Journal:
             CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, time_ms INTEGER NOT NULL,
                 kind TEXT NOT NULL, payload TEXT NOT NULL);
+            -- Dashboard/report reads filter by kind (and time); without this every poll scanned all events.
+            CREATE INDEX IF NOT EXISTS events_kind_time ON events(kind, time_ms);
             CREATE TABLE IF NOT EXISTS signals(id TEXT PRIMARY KEY, time_ms INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS orders(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS fills(id TEXT PRIMARY KEY, order_id TEXT NOT NULL,

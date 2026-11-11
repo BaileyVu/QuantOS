@@ -207,6 +207,21 @@ class ScannerTests(unittest.TestCase):
             self.assertIn("HELDUSDC", engine.maintained)
             self.assertEqual(engine.proposed, [])
 
+    def test_restart_keeps_a_held_symbol_below_the_liquidity_floor(self):
+        clock = FakeClock(400_000)
+        market = ScannerMarket(clock, ["BTCUSDC", "ETHUSDC"])
+        held = replace(INS, symbol="HELDUSDC", base_asset="HELD")
+        market.exchange_info = lambda: {**market.universe, "HELDUSDC": held}
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Runtime(Path(directory), market_factory=lambda: market,
+                              announcement_factory=lambda: AnnouncementStub(clock))
+            runtime.watched_symbols.add("HELDUSDC")  # fresh process: self.instruments is empty
+            runtime.shutdown = StopAfterWaits(clock, waits=2, advance_ms=240_000)
+            with patch("quantos.paper.runtime.milliseconds", side_effect=lambda: clock.now):
+                runtime.scanner()
+            self.assertIn("HELDUSDC", runtime.instruments)
+            self.assertTrue(all("HELDUSDC" in call[0] for call in market.quote_calls))
+
     def test_feed_can_subscribe_to_a_held_symbol_retained_outside_current_universe(self):
         clock = FakeClock(500_000)
         market = ScannerMarket(clock, ["BTCUSDC"])
