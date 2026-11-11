@@ -16,6 +16,20 @@ from .engine import PaperEngine, TERMINAL
 from .journal import Journal
 from .types import D, dumps
 
+# A shadow engine sees every feed batch. Its journal gets an OBSERVATION row per batch (dispatch), and
+# serializing/persisting every engine on every batch made the main loop fall behind the feed once
+# ~50 proposals were open (11-11: 13 MB images, 783 MB shadow db). Observations carry no shadow
+# evidence (summary reads net/notional only), so drop them; persist feed updates at most once a minute
+# unless the trade finished.
+FEED_PERSIST_MS = 60_000
+
+
+def _compact(journal):
+    with journal.transaction():
+        dropped = journal.db.execute("DELETE FROM events WHERE kind='OBSERVATION'").rowcount
+    if dropped and not journal.db.in_transaction:
+        journal.db.execute("VACUUM")  # small in-memory db: keeps the persisted image from creeping
+
 
 class ShadowBook:
     def __init__(self, path, source, now):
@@ -40,7 +54,7 @@ class ShadowBook:
             raise ValueError("shadow policy changed; use a new state directory")
         with self.db:
             self.db.execute("INSERT OR IGNORE INTO metadata VALUES('identity',?)", (identity,))
-        self.engines, self.images = {}, {}
+        self.engines, self.images, self.persisted = {}, {}, {}
         for row in self.db.execute("SELECT * FROM proposals WHERE status='ACTIVE'").fetchall():
             e = self._restore(row)
             e.recover(now)
@@ -63,6 +77,7 @@ class ShadowBook:
     def _restore(self, row):
         e = self._new("200")
         e.journal.db.deserialize(row["image"])
+        _compact(e.journal)
         return e
 
     def propose(self, signal, instrument, quote, now, reason, order_id=None):
@@ -102,6 +117,7 @@ class ShadowBook:
         else: e.journal.close()
 
     def _persist(self, signal_id, e, now):
+        _compact(e.journal)
         orders = e.journal.orders()
         o = orders[0] if orders else None
         status = "ACTIVE" if o and o["state"] not in TERMINAL else ("CLOSED" if o and o["state"] == "CLOSED" else "UNFILLED")
@@ -116,8 +132,11 @@ class ShadowBook:
         if status != "ACTIVE":
             self.engines.pop(signal_id, None)
             self.images.pop(signal_id, None)
+            self.persisted.pop(signal_id, None)
             e.journal.close()
-        else: self.images[signal_id] = image
+        else:
+            self.images[signal_id] = image
+            self.persisted[signal_id] = now
 
     def advance(self, kind, payload, now):
         from .runtime import dispatch
@@ -133,6 +152,9 @@ class ShadowBook:
             elif kind in {"feed", "funding", "tick", "disconnected"}:
                 dispatch([e], kind, payload, now)
             else:
+                continue
+            if (kind == "feed" and e.active()
+                    and now - self.persisted.get(signal_id, 0) < FEED_PERSIST_MS):
                 continue
             self._persist(signal_id, e, now)
 

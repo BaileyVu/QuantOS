@@ -48,6 +48,25 @@ class ShadowTests(unittest.TestCase):
         self.assertEqual(report["groups"][0]["n"], 1)
         self.assertIsNone(report["groups"][0]["ci90_bp"])
 
+    def test_feed_batches_do_not_grow_or_rewrite_open_shadow_images(self):
+        # 11-11: one OBSERVATION row per batch per shadow + a rewrite of every image on every batch
+        # stalled the main loop. Open shadows stay small and persist at most once a minute on feed.
+        self.proposal()
+        self.feed(T+1000, "100", Trade("AAVEUSDC", 1, T+1000, D("99.99"), D(1000), True))
+        e = next(iter(self.book.engines.values()))
+        size = lambda: len(self.book.db.execute("SELECT image FROM proposals").fetchone()[0])
+        updated = lambda: self.book.db.execute("SELECT updated_ms FROM proposals").fetchone()[0]
+        first, stamp = size(), updated()
+        for i in range(2, 200): self.feed(T+i*100, "100")
+        self.assertEqual(e.journal.db.execute("SELECT COUNT(*) FROM events WHERE kind='OBSERVATION'").fetchone()[0], 198)
+        self.assertEqual(updated(), stamp)  # < 60s of feed: no rewrite
+        self.feed(T+62000, "100")
+        self.assertGreater(updated(), stamp)
+        self.assertLessEqual(size(), first + 4096)
+        self.assertEqual(e.journal.db.execute("SELECT COUNT(*) FROM events WHERE kind='OBSERVATION'").fetchone()[0], 0)
+        self.feed(T+63000, "97.9"); self.feed(T+64000, "97.9")  # exit on feed persists at once
+        self.assertEqual(summary(self.path / "shadow_p1.db")["counts"], {"CLOSED": 1})
+
     def test_slot_blocked_virtual_trade_does_not_change_main_books(self):
         self.proposal()
         other = signal(signal_id="blocked")
