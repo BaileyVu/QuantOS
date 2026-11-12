@@ -156,7 +156,7 @@ HLREVERSE = Path.home() / "Library/Application Support/hl_copy_reverse/state"
 ML1H = Path.home() / "Library/Application Support/ml1h/app"
 
 
-_TTL, _TTL_LOCK, _EQUITY = {}, threading.Lock(), {}
+_TTL, _TTL_LOCK, _EQUITY = {}, threading.RLock(), {}  # re-entrant: "state" builds "services"
 
 
 def _cached(key, ttl_s, build):
