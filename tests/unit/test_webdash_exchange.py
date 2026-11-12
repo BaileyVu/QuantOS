@@ -53,3 +53,16 @@ class ExchangeViewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CachedTests(unittest.TestCase):
+    def test_nested_cached_calls_do_not_deadlock(self):
+        # 11-12: "state" built "services" under the same non-reentrant lock and hung the dashboard.
+        import threading
+        from quantos.paper import webdash
+        webdash._TTL.clear()
+        out = []
+        t = threading.Thread(target=lambda: out.append(
+            webdash._cached("outer", 5, lambda: webdash._cached("inner", 5, lambda: 1) + 1)), daemon=True)
+        t.start(); t.join(5)
+        self.assertEqual(out, [2])
