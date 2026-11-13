@@ -97,6 +97,8 @@ def run_view(name: str, state: Path, now_ms: int, profile: str = "pL") -> dict:
             (now_ms - 900_000,)).fetchone()
         row = db.execute("SELECT time_ms,payload FROM events WHERE kind='SELF_CHECK' ORDER BY id DESC LIMIT 1").fetchone()
         view["self_check"] = None if row is None else {"time_ms": row[0], "checks": json.loads(row[1])}
+        if view["self_check"]:
+            live_scorer_checks(view["self_check"], now_ms)
         view["counts"] = dict(db.execute(
             "SELECT kind, COUNT(*) FROM events WHERE kind IN ('SIGNAL','APPROVED','REJECTED_RISK','FILLED','CLOSED') "
             "GROUP BY kind").fetchall())
@@ -157,6 +159,32 @@ SERVICES = (("demo", "com.quantos.v4.demo200"), ("sentibot spot", "com.sentibot.
 HLCOPY = Path.home() / "Library/Application Support/hl_copy/state"
 HLREVERSE = Path.home() / "Library/Application Support/hl_copy_reverse/state"
 ML1H = Path.home() / "Library/Application Support/ml1h/app"
+# Scorer signal files the bot reads (same defaults as its launchd env) and the bot's self-check age limits.
+SCORER_SIGNALS = {
+    "ml1h_pattern": (os.environ.get("QUANTOS_ML1H_SIGNALS") or str(ML1H / "signals.json"), 2 * 3600),
+    "ml5m_alts": (os.environ.get("QUANTOS_ML5M_SIGNALS")
+                  or str(Path.home() / "Library/Application Support/QuantOS/ml5m-scoring/signals.json"), 20 * 60)}
+
+
+def live_scorer_checks(self_check: dict, now_ms: int, scorers: dict | None = None) -> dict:
+    """11-13: the bot re-runs its self-check only hourly (24h once healthy), so a scorer that was late at startup showed
+    'Check failed' for up to an hour after it recovered. Replace the scorer entries with a live signal-file age check;
+    the bot's last verdict stays as c["bot"] (with its time) for reference."""
+    checks = self_check.get("checks") or {}
+    for sid, (path, max_age) in (SCORER_SIGNALS if scorers is None else scorers).items():
+        if sid not in checks:
+            continue
+        try:
+            age_s = max(0.0, now_ms / 1000 - os.stat(path).st_mtime)
+        except OSError:
+            age_s = None
+        ok = age_s is not None and age_s < max_age
+        state = "Missing" if age_s is None else "Scanning" if ok else "Stale"
+        detail = ("signals file missing" if age_s is None else
+                  f"signals updated {int(age_s // 60)} min ago" if ok else f"signals {int(age_s // 60)} min old (limit {max_age // 60})")
+        checks[sid] = {"ok": ok, "level": "ok" if ok else "critical", "state": state, "detail": detail, "live": True,
+                       "bot": checks[sid], "bot_time_ms": self_check.get("time_ms")}
+    return self_check
 
 
 _TTL, _TTL_LOCK, _EQUITY = {}, threading.RLock(), {}  # re-entrant: "state" builds "services"
