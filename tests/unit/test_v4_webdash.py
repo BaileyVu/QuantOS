@@ -34,6 +34,7 @@ class WebdashPortabilityTests(unittest.TestCase):
     def test_snapshot_survives_missing_launchctl(self):
         from unittest import mock
         from quantos.paper import webdash
+        webdash._TTL.clear()  # the 5 s cache may hold a real launchctl result from an earlier test
         with mock.patch.object(webdash.subprocess, "run", side_effect=FileNotFoundError("launchctl")):
             out = webdash.snapshot([], None)
         self.assertEqual({svc["running"] for svc in out["services"]}, {None})
