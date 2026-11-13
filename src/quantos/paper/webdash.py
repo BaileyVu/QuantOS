@@ -376,9 +376,19 @@ def request_close(runs, body: dict) -> tuple[int, dict]:
 
 
 PAGE = (Path(__file__).with_name("webdash.html"))
+# Private strategy notes, kept on the Mac and out of git; the page shows them in each strategy's detail panel.
+LIBRARY = Path("~/Library/Application Support/QuantOS/strategy_library.json").expanduser()
 
 
-def serve(runs, sentibot, port=8787):
+def library_view(path: Path | None = None) -> dict:
+    """/api/library: the local strategy library JSON ({"strategies": {id: {...}}}), or available=false."""
+    data = _json(path or LIBRARY, None)
+    if not isinstance(data, dict) or not isinstance(data.get("strategies"), dict):
+        return {"available": False, "path": str(path or LIBRARY), "strategies": {}}
+    return {"available": True, **data}
+
+
+def serve(runs, sentibot, port=8787, library=None):
     token = secrets.token_urlsafe(24)  # embedded in the page; another site cannot read it, so cannot POST
     allowed = {f"127.0.0.1:{port}", f"localhost:{port}"}
 
@@ -414,6 +424,8 @@ def serve(runs, sentibot, port=8787):
             elif self.path.startswith("/api/news"):
                 from .news import news
                 body, kind = json.dumps(news(), default=str).encode(), "application/json"
+            elif urlparse(self.path).path == "/api/library":
+                body, kind = json.dumps(_cached("library", 10, lambda: library_view(library)), default=str).encode(), "application/json"
             elif self.path.startswith(("/api/klines", "/api/fng", "/api/strategies")):
                 route = urlparse(self.path)
                 try:
@@ -449,6 +461,7 @@ def main(argv=None):
     p.add_argument("--run", action="append", required=True, help="NAME=STATE_DIR")
     p.add_argument("--sentibot", type=Path, help="sentibot app folder")
     p.add_argument("--port", type=int, default=8787)
+    p.add_argument("--library", type=Path, help="local strategy library JSON (default: %s)" % LIBRARY)
     p.add_argument("--exchange", help="MODE=KEY_FILE (e.g. demo=~/.quantos/demo.env): show the account's live "
                                       "Binance positions; read-only signed GETs")
     a = p.parse_args(argv)
@@ -464,7 +477,7 @@ def main(argv=None):
         name, rest = r.split("=", 1)
         path, _, profile = rest.partition("#")
         runs.append((name, Path(path).expanduser(), *([profile] if profile else [])))
-    serve(runs, a.sentibot.expanduser() if a.sentibot else None, a.port)
+    serve(runs, a.sentibot.expanduser() if a.sentibot else None, a.port, a.library.expanduser() if a.library else None)
 
 
 if __name__ == "__main__":

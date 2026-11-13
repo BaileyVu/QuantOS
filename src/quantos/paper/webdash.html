@@ -566,7 +566,7 @@ body::before { filter: brightness(1.85) saturate(1.28); }
 .pos[data-closing="true"]::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 30%, rgba(255,168,122,.14) 50%, transparent 70%); background-size: 220% 100%; animation: shimmer 1.3s linear infinite; }
 @keyframes shimmer { from { background-position: 160% 0; } to { background-position: -60% 0; } }
 .pos-sym { display: flex; align-items: center; gap: 8px; font: 650 17px/1 var(--az-font-heading); letter-spacing: -.02em; }
-.pos-tag { display: inline-flex; align-items: center; height: 21px; padding: 0 9px; border-radius: 999px; font: 600 11px/1 var(--az-mono-font); }
+.pos-tag { white-space: nowrap; flex: none; display: inline-flex; align-items: center; height: 21px; padding: 0 9px; border-radius: 999px; font: 600 11px/1 var(--az-mono-font); }
 .pos-tag.long { color: #04140e; background: linear-gradient(90deg, #18DEAA, #6BF0C8); box-shadow: 0 0 12px rgba(24,222,170,.45); }
 .pos-tag.short { color: #1b0207; background: linear-gradient(90deg, #FF5775, #FF8FA3); box-shadow: 0 0 12px rgba(255,87,117,.45); }
 .pos-meta { margin-top: 6px; font: 400 11.5px/1.35 var(--az-mono-font); color: var(--az-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -646,6 +646,97 @@ kbd { font: 500 10.5px/1 var(--az-mono-font); color: var(--az-lilac); border: 1p
 @media (prefers-reduced-motion: reduce) {
   #eqPanel::after, .rail-puck, .equity-plot .equity-trace, .pos[data-closing="true"]::after { animation: none !important; }
 }
+
+/* ---------- Aura+ motion: living background, entrances, glows (2026-11-13) ---------- */
+#sky { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+body::before { animation: nebula 60s ease-in-out infinite alternate; transform-origin: 60% 40%; }
+@keyframes nebula { from { transform: scale(1.02) translate3d(0, 0, 0); } to { transform: scale(1.09) translate3d(-1.2%, -0.8%, 0); } }
+.enter { animation: cardIn .7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 70ms); }
+@keyframes cardIn { from { opacity: 0; transform: translateY(14px) scale(.985); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+.nav-item { transition: transform .25s cubic-bezier(.2,.8,.2,1), background .2s, color .2s; }
+.nav-item:hover { transform: translateX(3px); }
+.nav-item:hover img { animation: wiggle .5s ease; }
+@keyframes wiggle { 30% { transform: rotate(-10deg) scale(1.1); } 60% { transform: rotate(8deg) scale(1.1); } }
+.nav-item[aria-current="page"] { background-size: 200% 100% !important; animation: navFlow 6s ease-in-out infinite alternate; }
+@keyframes navFlow { from { background-position: 0% 0; } to { background-position: 100% 0; } }
+.live, #newsDot { animation: livePing 1.8s ease-out infinite; }
+@keyframes livePing { 0% { box-shadow: 0 0 0 0 rgba(24,222,170,.6); } 80%, 100% { box-shadow: 0 0 0 8px rgba(24,222,170,0); } }
+#eqEnd { position: fixed; z-index: 3; pointer-events: none; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px #FF36EC, 0 0 16px #FF36EC; opacity: 0; transition: opacity .3s; }
+#eqEnd::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid #FF6EA8; animation: ripple 2s ease-out infinite; }
+@keyframes ripple { from { transform: scale(1); opacity: .9; } to { transform: scale(3.4); opacity: 0; } }
+.equity-plot .equity-trace { animation: traceIn 1.6s cubic-bezier(.2,.8,.2,1) 1, lineGlow 3.2s ease-in-out 1.6s infinite; }
+@keyframes lineGlow { 50% { filter: drop-shadow(0 0 11px rgba(255,54,236,.95)) drop-shadow(0 0 22px rgba(168,116,255,.5)); } }
+.alert-row { animation: cardIn .5s cubic-bezier(.2,.8,.2,1) both; }
+.news-row { animation: slideIn .55s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+.pos-tag { background-size: 200% 100% !important; animation: tagShine 3s linear infinite; }
+.pos-tag.long { background-image: linear-gradient(90deg, #18DEAA, #8AF7D6, #18DEAA) !important; }
+.pos-tag.short { background-image: linear-gradient(90deg, #FF5775, #FFA0B2, #FF5775) !important; }
+@keyframes tagShine { to { background-position: -200% 0; } }
+.brand-mark { animation: orbit 7s ease-in-out infinite; }
+@keyframes orbit { 50% { transform: translateY(-3px) rotate(-6deg); filter: drop-shadow(0 0 14px var(--az-rose)) drop-shadow(0 0 30px var(--az-glow-violet)); } }
+.fng-card circle { transition: cx 1.2s cubic-bezier(.2,.8,.2,1), cy 1.2s cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion: reduce) {
+  body::before, .enter, .nav-item[aria-current="page"], .live, #newsDot, #eqEnd::after, .equity-plot .equity-trace, .alert-row, .news-row, .pos-tag, .brand-mark { animation: none !important; }
+  #sky { display: none; }
+}
+
+/* ---------- mobile dock: floating glass tab bar (≤600px) ---------- */
+#dock { display: none; }
+@media (max-width: 600px) {
+  #dock { position: fixed; z-index: 40; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(6, 1fr); padding: 6px; border-radius: 24px; background: rgba(8,6,24,.82); border: 1px solid rgba(225,122,231,.45); box-shadow: 0 14px 40px -10px #000, 0 0 26px rgba(229,71,212,.3), inset 0 1px 0 rgba(255,225,239,.18); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+  .dock-pill { position: absolute; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 12px) / 6); border-radius: 18px; background: linear-gradient(110deg, rgba(255,168,122,.35), rgba(229,71,212,.35), rgba(168,116,255,.4)); box-shadow: inset 0 0 0 1px rgba(255,110,168,.6), 0 0 18px rgba(255,110,168,.45); transform: translateX(calc(var(--at, 0) * 100%)); transition: transform .45s cubic-bezier(.3,1.4,.4,1); }
+  .dock-item { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 0 5px; border-radius: 18px; color: var(--az-secondary); text-decoration: none; font: 600 10px/1 var(--az-ui-font); letter-spacing: .01em; -webkit-tap-highlight-color: transparent; transition: color .2s, transform .15s; }
+  .dock-item:active { transform: scale(.9); }
+  .dock-item img { width: 21px; height: 21px; filter: brightness(0) invert(.75); transition: transform .35s cubic-bezier(.3,1.6,.4,1), filter .2s; }
+  .dock-item[aria-current="page"] { color: #fff; }
+  .dock-item[aria-current="page"] img { filter: brightness(0) invert(1) drop-shadow(0 0 6px #ff5fa4); transform: translateY(-2px) scale(1.12); }
+  .dock-badge { position: absolute; top: 2px; right: calc(50% - 20px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--az-gradient); color: #fff; font: 700 9.5px/16px var(--az-mono-font); text-align: center; box-shadow: 0 0 10px rgba(255,110,168,.7); }
+  #menuToggle { display: none !important; }
+  #views { padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
+  #island { top: 10px; }
+}
+
+/* ---------- detail drawer + clickable everything ---------- */
+button.ghost-link { background: transparent; cursor: pointer; font: inherit; font-size: 12px; }
+[data-open] { cursor: pointer; }
+tr[data-open] { transition: background .15s; }
+tr[data-open]:hover td { background: rgba(255,110,168,.07); }
+tr[data-open]:hover td:first-child { box-shadow: inset 3px 0 0 #FF6EA8; }
+.pos[data-open]:active { transform: scale(.995); }
+.click-tile { border-radius: 10px; transition: background .2s, transform .15s; }
+.click-tile:hover { background: rgba(255,110,168,.08); }
+.click-tile:active { transform: scale(.97); }
+#drawer { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+#drawer .scrim { position: absolute; inset: 0; background: rgba(3,2,12,.5); backdrop-filter: blur(4px); opacity: 0; transition: opacity .3s; }
+#drawer .panel { position: absolute; top: 12px; right: 12px; bottom: 12px; width: min(560px, calc(100vw - 24px)); display: flex; flex-direction: column; border-radius: 26px; background: rgba(7,5,22,.97); border: 1px solid rgba(225,122,231,.55); box-shadow: 0 30px 80px -20px #000, 0 0 40px rgba(229,71,212,.3); transform: translateX(calc(100% + 24px)); transition: transform .45s cubic-bezier(.2,.9,.2,1); overflow: hidden; }
+#drawer.open { pointer-events: auto; } #drawer.open .scrim { opacity: 1; } #drawer.open .panel { transform: none; }
+.dr-head { display: flex; align-items: flex-start; gap: 12px; padding: 20px 22px 14px; border-bottom: 1px solid rgba(190,132,231,.25); background: radial-gradient(ellipse 260px 120px at 0 0, rgba(255,110,168,.18), transparent), radial-gradient(ellipse 220px 120px at 100% 0, rgba(168,116,255,.16), transparent); }
+.dr-head h3 { margin: 0; font: 650 21px/1.15 var(--az-font-heading); letter-spacing: -.02em; }
+.dr-head .sub { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+.dr-x { margin-left: auto; width: 34px; height: 34px; flex: none; border-radius: 50%; border: 1px solid rgba(190,132,231,.4); background: rgba(255,255,255,.04); color: var(--az-primary); cursor: pointer; font-size: 15px; transition: transform .2s, background .2s; }
+.dr-x:hover { transform: rotate(90deg); background: rgba(255,110,168,.15); }
+.dr-body { flex: 1; overflow: auto; padding: 16px 22px 28px; display: flex; flex-direction: column; gap: 14px; overscroll-behavior: contain; }
+.dr-body > * { animation: cardIn .5s cubic-bezier(.2,.8,.2,1) both; }
+.dr-body > *:nth-child(2) { animation-delay: 50ms; } .dr-body > *:nth-child(3) { animation-delay: 100ms; } .dr-body > *:nth-child(4) { animation-delay: 150ms; } .dr-body > *:nth-child(5) { animation-delay: 200ms; } .dr-body > *:nth-child(n+6) { animation-delay: 250ms; }
+.dr-sec { padding: 14px 16px; border-radius: 18px; background: rgba(255,255,255,.035); border: 1px solid rgba(190,132,231,.2); }
+.dr-sec h4 { margin: 0 0 9px; font: 600 11px/1 var(--az-mono-font); letter-spacing: .08em; text-transform: uppercase; background: var(--az-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.dr-sec p { margin: 0; color: var(--az-secondary); font-size: 13px; line-height: 1.55; }
+.dr-sec ul { margin: 0; padding-left: 18px; color: var(--az-secondary); font-size: 13px; line-height: 1.6; }
+.dr-sec ul li::marker { color: #FF6EA8; }
+.dr-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.dr-stat { padding: 11px 12px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid rgba(190,132,231,.2); }
+.dr-stat span { display: block; font: 500 10px/1 var(--az-mono-font); letter-spacing: .07em; text-transform: uppercase; color: var(--az-muted); }
+.dr-stat b { display: block; margin-top: 7px; font: 500 17px/1 var(--az-mono-font); }
+.dr-kv { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; margin: 0; font-size: 12.5px; }
+.dr-kv dt { color: var(--az-muted); } .dr-kv dd { margin: 0; text-align: right; font-family: var(--az-mono-font); }
+.dr-pill { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font: 600 11px/1 var(--az-mono-font); background: rgba(255,255,255,.07); color: var(--az-secondary); }
+.dr-pill.up { background: rgba(24,222,170,.14); color: #6BF0C8; } .dr-pill.dn { background: rgba(255,87,117,.14); color: #FF8FA3; } .dr-pill.acc { background: rgba(255,110,168,.16); color: #FF9CC6; }
+.dr-empty { color: var(--az-muted); font-size: 12.5px; }
+.dr-table { width: 100%; border-collapse: collapse; font: 12px/1.3 var(--az-mono-font); }
+.dr-table td { padding: 7px 4px; border-top: 1px solid rgba(255,255,255,.05); }
+@media (max-width: 600px) { #drawer .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: 86vh; transform: translateY(105%); } .dr-stats { grid-template-columns: repeat(2, 1fr); } }
+@media (prefers-reduced-motion: reduce) { #drawer .panel, .dr-body > * { transition: none; animation: none; } }
 </style>
 </head>
 <body>
@@ -687,9 +778,9 @@ kbd { font: 500 10.5px/1 var(--az-mono-font); color: var(--az-lilac); border: 1p
 </section>
 </div>
 <aside id="overviewSide">
-<section class="g" id="acct"></section>
-<div data-fng></div>
-<section class="g" id="alerts"></section>
+<section class="g" id="acct" data-open="tab:Account" title="Open Account"></section>
+<div data-fng data-open="tab:Sentiment" title="Open Sentiment"></div>
+<section class="g" id="alerts" data-open="tab:Logs" title="Open Logs"></section>
 </aside>
 </div>
 
@@ -784,6 +875,13 @@ kbd { font: 500 10.5px/1 var(--az-mono-font); color: var(--az-lilac); border: 1p
   </div>
 </main>
 </div>
+<nav id="dock" aria-label="Quick navigation"></nav>
+<div id="drawer" aria-hidden="true"><div class="scrim" data-drclose></div>
+  <aside class="panel" role="dialog" aria-modal="true" aria-labelledby="drTitle">
+    <header class="dr-head"><div style="min-width: 0;"><h3 id="drTitle"></h3><div class="sub" id="drSub"></div></div><button class="dr-x" type="button" data-drclose aria-label="Close panel">✕</button></header>
+    <div class="dr-body" id="drBody"></div>
+  </aside></div>
+<canvas id="sky" aria-hidden="true"></canvas><div id="eqEnd" aria-hidden="true"></div>
 <div id="island" aria-live="polite"></div>
 <canvas id="confetti" aria-hidden="true"></canvas>
 <div id="eqLine" aria-hidden="true"></div><div id="eqDot" aria-hidden="true"></div><div id="eqTip" aria-hidden="true"></div>
@@ -814,7 +912,7 @@ const NAV = [
 const TABS = NAV.map(n => n.label);
 const SITE = { 'CoinDesk': ['https://www.coindesk.com/', 'CD', 'var(--az-tint-33)', 'var(--az-warning)'], 'Cointelegraph': ['https://cointelegraph.com/', 'CT', 'var(--az-tint-43)', 'var(--az-text-secondary)'], 'Watcher Guru': ['https://t.me/s/WatcherGuru', 'WG', 'var(--az-tint-7)', 'var(--az-info)'] };
 // Backtest edge per strategy (research notes, not live data).
-const EDGE = { alt_dip_reversal: '+2.5% / trade', crash_flush_e2: '+2.9% / trade', tsmom_4h: 'near miss', ml5m_alts: '5m GBM', ml1h_pattern: '1h LightGBM' };
+const EDGE = { alt_dip_reversal: '+2.5% / episode', crash_flush_e2: '+2.9% / episode', tsmom_4h: 'failed held-out', ml5m_alts: '5m GBM', ml1h_pattern: '1h LightGBM' };
 const SLOT = { crash_flush_e2: 'crash', alt_dip_reversal: 'event', delist_short_e17: 'event', tsmom_4h: 'trend', turtle_55: 'trend', vol_squeeze_breakout: 'trend', ml5m_alts: 'trend' };
 const STOP_CMD = 'cd ~/Desktop/PythonProject/QuantOS-mainnet-ready && ../QuantOS/.venv/bin/python scripts/deploy_three.py uninstall';
 
@@ -1093,7 +1191,7 @@ function renderEquity(M) {
 <div class="m" style="margin-top: 4px; font-size: 12.5px;"><span style="color: ${pc(ch)};">${sgn(ch)} (${ch != null && M.start ? sgn(ch / M.start * 100) : '–'}%)</span><span class="mut"> vs ${f2(M.start)} start · HWM ${f2(hwm)}</span></div>
 </div>
 <dl style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 28px; margin: 6px 0 0 auto;">
-${kpis.map(k => `<div><dt class="k">${k.l}</dt><dd class="m" style="margin: 4px 0 0; font-size: 15px; color: ${k.c};">${k.v}</dd></div>`).join('')}
+${kpis.map(k => `<div class="click-tile" data-open="tab:${k.l === 'Fills' || k.l === 'Fees' ? 'Trades' : 'Account'}"><dt class="k">${k.l}</dt><dd class="m" style="margin: 4px 0 0; font-size: 15px; color: ${k.c};">${k.v}</dd></div>`).join('')}
 </dl>
 </div>
 <div style="display: flex; gap: 8px; margin-top: 18px;">
@@ -1136,7 +1234,7 @@ function renderAccount(M) {
 <tbody>${rows}</tbody></table></div>`);
 }
 
-const stratRow = (s, full) => `<tr><td style="font-weight: 500;">${esc(s.n)}</td><td class="mut">${esc(s.b)}</td>${full ? `<td class="mut">${esc(s.slot)}</td>` : ''}<td><span style="display: inline-flex; align-items: center; gap: 6px; color: ${s.stc};">${dot(s.stc)}${s.st}</span></td><td style="text-align: right;">${s.t}</td><td style="text-align: right; color: ${s.p < -0.005 ? DN : s.p > 0.005 ? UP : DIM};">${f2(s.p)}</td><td class="mut" style="font-family: var(--az-font-ui);">${esc(s.d)}</td>${full ? `<td class="mut">${esc(s.edge)}</td>` : ''}</tr>`;
+const stratRow = (s, full) => `<tr data-open="strat:${esc(s.n)}" tabindex="0" title="Open ${esc(s.n)} details"><td style="font-weight: 500;">${esc(s.n)}</td><td class="mut">${esc(s.b)}</td>${full ? `<td class="mut">${esc(s.slot)}</td>` : ''}<td><span style="display: inline-flex; align-items: center; gap: 6px; color: ${s.stc};">${dot(s.stc)}${s.st}</span></td><td style="text-align: right;">${s.t}</td><td style="text-align: right; color: ${s.p < -0.005 ? DN : s.p > 0.005 ? UP : DIM};">${f2(s.p)}</td><td class="mut" style="font-family: var(--az-font-ui);">${esc(s.d)}</td>${full ? `<td class="mut">${esc(s.edge)}</td>` : ''}</tr>`;
 
 function renderStrats(M) {
   const nPd = M.strats.filter(s => s.b !== 'executor').length;
@@ -1287,7 +1385,7 @@ function renderCharts(M) {
 
 function renderTrades(M) {
   const empty = (cols, t) => `<tr><td colspan="${cols}" class="mut" style="font-family: var(--az-font-ui);">${t}</td></tr>`;
-  updateHTML($('positions'), M.positions.map(p => `<tr><td><span style="font-family: var(--az-font-ui); font-weight: 500;">${esc(p.sym)}</span> <span class="mut" style="font-size: 12px;">${esc(String(p.strat || '').replace(/_reversal$|_e\d+$/, '').replace(/_/g, ' '))}</span></td><td style="color: ${p.side === 'SHORT' ? DN : UP};">${p.side === 'SHORT' ? 'Short' : 'Long'}</td><td style="text-align: right;">${p.q != null ? p.q.toFixed(1) : '–'}</td><td style="text-align: right;">${p.q != null && p.m != null ? (p.q * p.m).toFixed(2) : '–'}</td><td style="text-align: right;">${px(p.e)}</td><td style="text-align: right;">${px(p.m)}</td><td style="text-align: right; color: ${pc(p.up)};">${sgn(p.up)} (${p.upPct != null ? sgn(p.upPct) : '–'}%)</td><td class="mut">${p.opened ? md(p.opened) + ' ' + hm(p.opened) + ' · ' + dur(M.now - p.opened) : '–'}</td><td><span class="pill" style="color: var(--az-info); background: var(--az-tint-6);">${esc(p.state || '')}</span></td><td>${closeBtn(p, true)}</td></tr>`).join('') || empty(10, 'No open positions'));
+  updateHTML($('positions'), M.positions.map(p => `<tr${p.id ? ` data-open="pos:${esc(p.id)}" tabindex="0"` : ''}><td><span style="font-family: var(--az-font-ui); font-weight: 500;">${esc(p.sym)}</span> <span class="mut" style="font-size: 12px;">${esc(String(p.strat || '').replace(/_reversal$|_e\d+$/, '').replace(/_/g, ' '))}</span></td><td style="color: ${p.side === 'SHORT' ? DN : UP};">${p.side === 'SHORT' ? 'Short' : 'Long'}</td><td style="text-align: right;">${p.q != null ? p.q.toFixed(1) : '–'}</td><td style="text-align: right;">${p.q != null && p.m != null ? (p.q * p.m).toFixed(2) : '–'}</td><td style="text-align: right;">${px(p.e)}</td><td style="text-align: right;">${px(p.m)}</td><td style="text-align: right; color: ${pc(p.up)};">${sgn(p.up)} (${p.upPct != null ? sgn(p.upPct) : '–'}%)</td><td class="mut">${p.opened ? md(p.opened) + ' ' + hm(p.opened) + ' · ' + dur(M.now - p.opened) : '–'}</td><td><span class="pill" style="color: var(--az-info); background: var(--az-tint-6);">${esc(p.state || '')}</span></td><td>${closeBtn(p, true)}</td></tr>`).join('') || empty(10, 'No open positions'));
   const orders = M.positions.filter(p => p.stop != null);
   const xo = EX && EX.orders;  // Binance's own open orders (every bot), with live distance from the mark
   if (xo) updateHTML($('orders'), xo.map(o => { const p = M.positions.find(x => x.sym === o.symbol), m = p && p.m;
@@ -1295,7 +1393,7 @@ function renderTrades(M) {
     return `<tr><td style="font-family: var(--az-font-ui); font-weight: 500;">${esc(o.symbol)}${p ? ` <span class="mut" style="font-size: 12px;">${esc(p.book)}</span>` : ''}</td><td>${kind}</td><td style="color: ${o.side === 'BUY' ? UP : DN};">${o.side === 'BUY' ? 'Buy' : 'Sell'}</td><td style="text-align: right;">${o.qty ? o.qty.toFixed(1) : '–'}</td><td style="text-align: right;">${px(o.price)}</td><td style="text-align: right;" class="mut">${m ? sgn((o.price / m - 1) * 100, 2) + '%' : '–'}</td><td class="mut">${o.id ? esc(String(o.id)) : '–'}</td></tr>`; }).join('') || empty(7, 'No open orders'));
   else updateHTML($('orders'), orders.map(p => `<tr><td style="font-family: var(--az-font-ui); font-weight: 500;">${esc(p.sym)}</td><td>Stop</td><td style="color: ${p.side === 'SHORT' ? UP : DN};">${p.side === 'SHORT' ? 'Buy' : 'Sell'}</td><td style="text-align: right;">${p.q != null ? p.q.toFixed(1) : '–'}</td><td style="text-align: right;">${px(p.stop)}</td><td style="text-align: right;" class="mut">${p.m ? sgn((p.stop / p.m - 1) * 100, 1) + '%' : '–'}</td><td class="mut">${p.cid ? esc(String(p.cid)) : '–'}</td></tr>`).join('') || empty(7, 'No open orders'));
   const run = M.run, ex = X && X[run.name], fills = (ex && ex.fills) || run.fills || [];
-  updateHTML($('fills'), fills.map(f => { const entry = f.kind === 'ENTRY', q = num(f.quantity); return `<tr><td class="mut">${md(f.time_ms)} ${hms(f.time_ms)}</td><td style="font-family: var(--az-font-ui); font-weight: 500;">${esc(f.symbol || '–')}</td><td style="color: ${DIM};">${entry ? 'Entry' : esc(String(f.kind || '').charAt(0) + String(f.kind || '').slice(1).toLowerCase())} ${q != null ? q.toFixed(1) : ''}</td><td style="text-align: right;">${px(f.price)}</td><td style="text-align: right;" class="mut">${num(f.fee) != null ? num(f.fee).toFixed(4) : '–'}</td></tr>`; }).join('') || empty(5, 'No fills yet'));
+  updateHTML($('fills'), fills.map(f => { const entry = f.kind === 'ENTRY', q = num(f.quantity); return `<tr${f.strategy ? ` data-open="strat:${esc(f.strategy)}" tabindex="0"` : ''}><td class="mut">${md(f.time_ms)} ${hms(f.time_ms)}</td><td style="font-family: var(--az-font-ui); font-weight: 500;">${esc(f.symbol || '–')}</td><td style="color: ${DIM};">${entry ? 'Entry' : esc(String(f.kind || '').charAt(0) + String(f.kind || '').slice(1).toLowerCase())} ${q != null ? q.toFixed(1) : ''}</td><td style="text-align: right;">${px(f.price)}</td><td style="text-align: right;" class="mut">${num(f.fee) != null ? num(f.fee).toFixed(4) : '–'}</td></tr>`; }).join('') || empty(5, 'No fills yet'));
   $('fillNote').textContent = `${fills.length} fill${fills.length === 1 ? '' : 's'} since start.`;
 }
 
@@ -1367,7 +1465,7 @@ function renderLogs(M) {
   for (const e of ev) { const p = rows[rows.length - 1]; if (p && p.k === e.k && p.s === e.s && p.y === e.y && p.side === e.side && p.r === e.r) { p.n++; p.t0 = e.t; } else rows.push({ ...e, n: 1, t0: e.t }); }
   const kc = k => /FILL|CLOSED|ML_EXIT/.test(k) ? BLU : /SHADOW|REJECT|NOFILL/.test(k) ? AMB : /KILL|BREAKER|FAILED|ERROR/.test(k) ? DN : /APPROVED|SIGNAL/.test(k) ? BLU : DIM;
   $('logSub').textContent = `${ev.length} events · ${rows.length} rows · newest first`;
-  updateHTML($('log'), rows.map(e => `<tr><td class="mut">${md(e.t)} ${hms(e.t)}${e.n > 1 ? ` <span style="color: var(--az-tint-45);">← ${hms(e.t0)}</span>` : ''}</td><td style="color: ${kc(e.k)};">${esc(e.k)}${e.n > 1 ? ` <span class="pill" style="color: var(--az-tint-46); background: var(--az-tint-42); padding: 0 6px;">×${e.n}</span>` : ''}</td><td class="mut">${esc(e.s || '–')}</td><td style="font-family: var(--az-font-ui); font-weight: 500;">${esc(e.y || '–')}</td><td>${esc(e.side || '')}</td><td class="mut">${esc(e.r)}</td></tr>`).join('') || '<tr><td colspan="6" class="mut">No events</td></tr>');
+  updateHTML($('log'), rows.map(e => `<tr${e.s ? ` data-open="strat:${esc(e.s)}" tabindex="0"` : ''}><td class="mut">${md(e.t)} ${hms(e.t)}${e.n > 1 ? ` <span style="color: var(--az-tint-45);">← ${hms(e.t0)}</span>` : ''}</td><td style="color: ${kc(e.k)};">${esc(e.k)}${e.n > 1 ? ` <span class="pill" style="color: var(--az-tint-46); background: var(--az-tint-42); padding: 0 6px;">×${e.n}</span>` : ''}</td><td class="mut">${esc(e.s || '–')}</td><td style="font-family: var(--az-font-ui); font-weight: 500;">${esc(e.y || '–')}</td><td>${esc(e.side || '')}</td><td class="mut">${esc(e.r)}</td></tr>`).join('') || '<tr><td colspan="6" class="mut">No events</td></tr>');
 }
 
 // ---------- news ----------
@@ -1486,7 +1584,7 @@ function closeBtn(p, small) {
 }
 function posCard(p, M) {
   const closing = CLOSING.has(p.id) || p.state === 'CLOSING', stopDist = p.stop != null && p.m ? Math.abs(p.m - p.stop) / p.m * 100 : null;
-  return `<article class="pos" data-side="${esc(p.side)}" data-closing="${closing}">
+  return `<article class="pos"${p.id ? ` data-open="pos:${esc(p.id)}" tabindex="0"` : ''} data-side="${esc(p.side)}" data-closing="${closing}">
 <div><div class="pos-sym">${esc(String(p.sym).replace(/(USDT|USDC)$/, ''))}<span class="pos-tag ${p.side === 'SHORT' ? 'short' : 'long'}">${p.side === 'SHORT' ? 'SHORT' : 'LONG'} ${p.q != null ? +p.q.toFixed(4) : ''}</span></div>
 <div class="pos-meta">${esc(sname(p.strat))}${p.opened ? ' · ' + dur(M.now - p.opened) : ''}</div>
 <div class="pos-meta">${px(p.e)} → <b data-flash="m-${esc(p.sym)}" data-v="${p.m != null ? p.m : ''}">${px(p.m)}</b></div></div>
@@ -1595,6 +1693,137 @@ document.addEventListener('keydown', e => {
   if (e.key === '/') { e.preventDefault(); palOpen(); }
 });
 
+
+// ---------- Aura+ motion ----------
+// Starfield: slow-drifting, twinkling stars with the odd shooting star. ~30 fps, pauses when the tab is hidden.
+(function sky() {
+  if (reduced()) return;
+  const cv = $('sky'), g = cv.getContext('2d'); let W, H, stars = [], shoot = null, last = 0;
+  const size = () => { const d = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight; cv.width = W * d; cv.height = H * d; g.setTransform(d, 0, 0, d, 0, 0);
+    stars = Array.from({ length: Math.round(W * H / 9000) }, () => ({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.3 + .2, s: Math.random() * .12 + .02, p: Math.random() * 6.28, c: Math.random() < .2 ? '255,168,214' : Math.random() < .3 ? '190,170,255' : '255,255,255' })); };
+  size(); addEventListener('resize', size);
+  (function frame(t) {
+    requestAnimationFrame(frame);
+    if (document.hidden || t - last < 33) return; last = t;
+    g.clearRect(0, 0, W, H);
+    for (const s of stars) { s.x -= s.s; if (s.x < -2) s.x = W + 2; const a = .35 + .65 * Math.abs(Math.sin(t / 1400 + s.p)); g.fillStyle = `rgba(${s.c},${a * .85})`; g.beginPath(); g.arc(s.x, s.y, s.r, 0, 6.28); g.fill(); }
+    if (!shoot && Math.random() < .004) shoot = { x: Math.random() * W * .7 + W * .3, y: Math.random() * H * .4, l: 0 };
+    if (shoot) { shoot.l += 1; const x = shoot.x - shoot.l * 9, y = shoot.y + shoot.l * 4, gr = g.createLinearGradient(x, y, x + 90, y - 40);
+      gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(1, 'rgba(255,110,168,0)'); g.strokeStyle = gr; g.lineWidth = 1.6; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 90, y - 40); g.stroke();
+      if (shoot.l > 40) shoot = null; }
+  })(0);
+})();
+// Cards ease in (staggered) on load and on every view switch.
+function enterCards() {
+  if (reduced()) return;
+  const view = document.querySelector(`[data-tab="${tab}"]`); if (!view) return;
+  view.querySelectorAll('.g').forEach((el, i) => { el.style.setProperty('--i', i); el.classList.remove('enter'); void el.offsetWidth; el.classList.add('enter'); setTimeout(() => el.classList.remove('enter'), 800 + i * 70); });
+}
+window.addEventListener('hashchange', () => setTimeout(enterCards, 0));
+// Big numbers count up on first load.
+let counted = false;
+function countUp() {
+  if (counted || reduced()) return; counted = true;
+  document.querySelectorAll('.eq-big, #acct dd, #eqPanel dd').forEach(el => {
+    const txt = el.textContent, m = txt.match(/-?\d[\d,]*\.?\d*/); if (!m) return;
+    const end = parseFloat(m[0].replace(/,/g, '')), dec = (m[0].split('.')[1] || '').length, t0 = performance.now();
+    (function step(t) { const k = Math.min(1, (t - t0) / 1100), e = 1 - Math.pow(1 - k, 3);
+      if (el.textContent.includes(m[0]) || k < 1) el.textContent = txt.replace(m[0], (end * e).toFixed(dec)); if (k < 1) requestAnimationFrame(step); else el.textContent = txt; })(t0);
+  });
+}
+// Pulsing dot at the live end of the equity line.
+function placeEqEnd() {
+  const svg = document.querySelector('[data-tab]:not([hidden]) .equity-plot'), path = svg && svg.querySelector('.equity-trace'), dot = $('eqEnd');
+  if (!path || !path.getTotalLength()) { dot.style.opacity = 0; return; }
+  const r = svg.getBoundingClientRect(), pt = path.getPointAtLength(path.getTotalLength()), vb = svg.viewBox.baseVal;
+  Object.assign(dot.style, { left: r.left + pt.x / vb.width * r.width + 'px', top: r.top + pt.y / vb.height * r.height + 'px', opacity: 1 });
+}
+addEventListener('scroll', placeEqEnd, true); addEventListener('resize', placeEqEnd);
+
+
+// Mobile dock: the same NAV, as a floating tab bar with a sliding gradient pill.
+(function dock() {
+  const d = $('dock'); d.append(node('span', 'dock-pill'));
+  NAV.map(n => { const a = node('a', 'dock-item'); a.href = n.route; a.dataset.t = n.label;
+    const img = node('img'); img.src = '/static/aura-zenith/' + n.icon + '.svg'; img.alt = ''; a.append(img, node('span', '', n.label)); return a; }).forEach(a => d.append(a));
+  d.addEventListener('click', e => { const a = e.target.closest('[data-t]'); if (a) { e.preventDefault(); if (navigator.vibrate) navigator.vibrate(8); setTab(a.dataset.t); } });
+})();
+function syncDock(M) {
+  const i = NAV.findIndex(n => n.label === tab); $('dock').style.setProperty('--at', Math.max(0, i));
+  $('dock').querySelectorAll('[data-t]').forEach(a => {
+    if (a.dataset.t === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    if (a.dataset.t === 'Trades') { let b = a.querySelector('.dock-badge'); const n = M ? M.positions.length : 0;
+      if (n && !b) { b = node('span', 'dock-badge'); a.append(b); } if (b) { if (n) b.textContent = n; else b.remove(); } }
+  });
+}
+window.addEventListener('hashchange', () => syncDock(null));
+
+
+// ---------- detail drawer: click a strategy, position, fill or log row ----------
+let LIB = null, DRAWER = null;  // DRAWER = {kind, id}; re-rendered live while open
+async function loadLibrary() { try { LIB = await getJSON('/api/library'); } catch (e) { LIB = { available: false, strategies: {} }; } if (DRAWER) drawRender(); }
+const list = a => Array.isArray(a) && a.length ? `<ul>${a.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="dr-empty">Not in the library yet.</p>';
+const sec = (t, inner) => `<section class="dr-sec"><h4>${t}</h4>${inner}</section>`;
+function openDrawer(kind, id) {
+  DRAWER = { kind, id }; drawRender();
+  $('drawer').classList.add('open'); $('drawer').setAttribute('aria-hidden', 'false');
+  setTimeout(() => $('drawer').querySelector('.dr-x').focus(), 60);
+  if (kind === 'pos') { const p = findPos(id); if (p && KL[p.sym] === undefined) getJSON(`/api/klines?symbol=${encodeURIComponent(p.sym)}&interval=15m&limit=96`).then(k => { KL[p.sym] = k; drawRender(); }).catch(() => { KL[p.sym] = null; drawRender(); }); }
+}
+function closeDrawer() { DRAWER = null; $('drawer').classList.remove('open'); $('drawer').setAttribute('aria-hidden', 'true'); }
+function drawRender() {
+  if (!DRAWER || !S) return;
+  let M; try { M = model(); } catch (e) { return; }
+  const out = DRAWER.kind === 'strat' ? stratDrawer(M, DRAWER.id) : posDrawer(M, DRAWER.id);
+  if (!out) { closeDrawer(); return; }
+  updateHTML($('drTitle'), out.title); updateHTML($('drSub'), out.sub); updateHTML($('drBody'), out.body);
+}
+function stratDrawer(M, id) {
+  const s = M.strats.find(x => x.n === id) || { n: id, st: '–', t: 0, p: 0, d: '' }, L = (LIB && LIB.strategies && LIB.strategies[id]) || null;
+  const ex = X && X[M.run.name], agg = (ex && ex.strategies && ex.strategies[id]) || {}, fills = ((ex && ex.fills) || []).filter(f => f.strategy === id).slice(0, 12);
+  const open = M.positions.filter(p => p.strat === id);
+  const stc = s.st === 'In position' ? 'acc' : s.st === 'Scanning' ? 'up' : s.st === 'Check failed' ? 'dn' : '';
+  const sub = `<span class="dr-pill ${stc}">${esc(s.st)}</span>${L ? `<span class="dr-pill">${esc(L.family || '')}</span><span class="dr-pill">${esc(L.direction || '')}</span><span class="dr-pill">${esc(L.timeframe || '')}</span>` : ''}<span class="dr-pill">slot ${esc(SLOT[id] || (L && L.slot) || '–')}</span>`;
+  let body = `<div class="dr-stats"><div class="dr-stat"><span>Trades</span><b>${agg.entries || 0}</b></div><div class="dr-stat"><span>Realised</span><b style="color: ${pc(agg.pnl)};">${sgn(agg.pnl || 0)}</b></div><div class="dr-stat"><span>Open uPnL</span><b style="color: ${pc(open.reduce((a, p) => a + (p.up || 0), 0))};">${sgn(open.reduce((a, p) => a + (p.up || 0), 0))}</b></div><div class="dr-stat"><span>Fees</span><b>${f2(agg.fees || 0)}</b></div></div>`;
+  if (open.length) body += sec('Open now', `<div class="pos-list">${open.map(p => posCard(p, M)).join('')}</div>`);
+  if (L) {
+    body += sec('The idea', `<p>${esc(L.summary || '')}</p>${L.universe ? `<p style="margin-top: 8px;"><b style="color: var(--az-primary);">Coins:</b> ${esc(L.universe)}</p>` : ''}`);
+    body += sec('Entry', list(L.entry)) + sec('Exit', list(L.exit));
+    body += sec('Sizing & gates', `<p>${esc(L.sizing || '')}</p>${L.gates && L.gates.length ? list(L.gates) : ''}`);
+    const ev = L.evidence || {};
+    body += sec('Evidence', `<dl class="dr-kv"><dt>Backtest</dt><dd>${esc(ev.backtest || '–')}</dd><dt>Trades</dt><dd>${esc(ev.trades || '–')}</dd></dl>${ev.notes ? `<p style="margin-top: 8px;">${esc(ev.notes)}</p>` : ''}`);
+    body += sec('Risks', list(L.risks));
+  } else {
+    body += sec('Strategy notes', `<p class="dr-empty">${LIB && LIB.available ? 'This strategy is not in your library file yet.' : `Library file not found on this Mac (${esc((LIB && LIB.path) || 'strategy_library.json')}).`}</p>`);
+  }
+  if (id === 'ml1h_pattern' && M.h1) body += sec('1h-ML scores now', M.h1.top.slice(0, 6).map(x => `<div class="dr-kv" style="grid-template-columns: 1fr auto;"><dt>${esc(short(x.sym))} ${esc(x.side)}</dt><dd>${x.v.toFixed(3)}</dd></div>`).join(''));
+  body += sec('Self-check', `<p>${s.d ? esc(s.d) : 'No self-check yet.'}</p>`);
+  body += sec('Recent fills', fills.length ? `<table class="dr-table">${fills.map(f => `<tr><td class="mut">${md(f.time_ms)} ${hm(f.time_ms)}</td><td>${esc(short(f.symbol))}</td><td>${esc(String(f.kind || '').toLowerCase())}</td><td style="text-align: right;">${px(f.price)}</td><td style="text-align: right; color: ${pc(f.pnl)};">${f.kind === 'ENTRY' ? '' : sgn(f.pnl, 3)}</td></tr>`).join('')}</table>` : '<p class="dr-empty">No fills yet.</p>');
+  return { title: esc((L && L.name) || sname(id)), sub, body };
+}
+function posDrawer(M, id) {
+  const p = M.positions.find(x => x.id === id); if (!p) return null;
+  const sub = `<span class="pos-tag ${p.side === 'SHORT' ? 'short' : 'long'}">${p.side} ${+p.q.toFixed(4)}</span><span class="dr-pill">${esc(sname(p.strat))}</span><span class="dr-pill">${p.opened ? 'open ' + dur(M.now - p.opened) : esc(p.state || '')}</span>`;
+  const risk = p.stop != null && p.e != null ? Math.abs(p.e - p.stop) * p.q : null;
+  let body = `<div class="dr-stats"><div class="dr-stat"><span>uPnL</span><b style="color: ${pc(p.up)};">${sgn(p.up)}</b></div><div class="dr-stat"><span>Return</span><b style="color: ${pc(p.upPct)};">${p.upPct != null ? sgn(p.upPct) + '%' : '–'}</b></div><div class="dr-stat"><span>Risk to stop</span><b>${risk != null ? f2(risk) : '–'}</b></div><div class="dr-stat"><span>Notional</span><b>${p.m != null ? (p.q * p.m).toFixed(2) : '–'}</b></div></div>`;
+  body += `<section class="dr-sec">${rail(p)}</section>`;
+  body += `<section class="dr-sec" style="padding: 12px;">${typeof chartHtml === 'function' ? chartHtml(p).replace(/<section class="g"[^>]*>/, '<div>').replace(/<\/section>\s*$/, '</div>') : ''}</section>`;
+  body += sec('Levels', `<dl class="dr-kv"><dt>Entry</dt><dd>${px(p.e)}</dd><dt>Mark</dt><dd>${px(p.m)}</dd><dt>Stop</dt><dd style="color: #FF8FA3;">${px(p.stop)}</dd><dt>Take-profit</dt><dd style="color: #6BF0C8;">${px(p.tp)}</dd><dt>Stop order</dt><dd class="mut">${esc(p.cid || '–')}</dd></dl>`);
+  body += `<div style="display: flex; align-items: center; gap: 12px; justify-content: space-between;"><button class="ghost-link" type="button" data-open="strat:${esc(p.strat)}">About ${esc(sname(p.strat))} →</button>${closeBtn(p, false)}</div>`;
+  return { title: esc(short(p.sym)), sub, body };
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-close], a[href^="http"], button:not([data-open])')) return;
+  const t = e.target.closest('[data-open]'); if (!t) return;
+  const [kind, ...rest] = t.dataset.open.split(':'), id = rest.join(':');
+  if (kind === 'tab') { closeDrawer(); setTab(id); } else openDrawer(kind, id);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && DRAWER) { closeDrawer(); return; }
+  const t = e.target.closest && e.target.closest('[data-open]'); if (t && (e.key === 'Enter' || e.key === ' ') && !e.target.closest('button')) { e.preventDefault(); t.click(); }
+});
+
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-drclose]')) closeDrawer(); });
 // ---------- polling ----------
 function render() {
   if (!S) return;
@@ -1602,6 +1831,10 @@ function render() {
   const parts = [renderHeader, renderEquity, renderPositions, renderAcct, renderAccount, renderStrats, renderAlerts, renderMl1h, renderFunnel, renderShadow, renderTrades, renderCharts, renderSenti, renderLogs];
   for (const f of parts) { try { f(M); } catch (e) { console.error(f.name, e); } }
   flashNumbers();
+  placeEqEnd();
+  syncDock(M);
+  drawRender();
+  if (!counted) { enterCards(); countUp(); }
 }
 async function getJSON(u) { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }
 async function loadState() {
@@ -1623,7 +1856,7 @@ async function loadKlines() {
 routeHash(); renderFng();
 loadState().then(() => { if (tab === 'Trades') loadKlines(); loadExtra(); });
 loadExchange();
-loadNews(); loadFng();
+loadNews(); loadFng(); loadLibrary();
 setInterval(() => { if ($('utcClock')) $('utcClock').textContent = hms(Date.now()) + ' UTC'; }, 1000);
 setInterval(loadState, 2000);
 setInterval(loadExchange, 2000);
