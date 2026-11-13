@@ -1,7 +1,8 @@
 """Local live dashboard: `python -m quantos.paper.webdash --run NAME=STATE ... [--sentibot APP_DIR] [--port 8787]`.
 
 Serves http://127.0.0.1:PORT/ and /api/state (localhost only). Reads each run's status.json, heartbeat, alerts and its journal
-(SQLite read-only) plus sentibot's latest perp line. No writes. Network only for the cached proxies: /api/news,
+(SQLite read-only) plus sentibot's latest perp line. One write: POST /api/close drops a close request file in
+the run's state dir (the bot itself closes the position and cancels its stop/TP). Network only for the cached proxies: /api/news,
 /api/klines (Binance, 15 s) and /api/fng (alternative.me, 10 min).
 """
 from __future__ import annotations
@@ -12,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import sqlite3
 import subprocess
 import threading
@@ -347,11 +349,62 @@ def fng():
     return _cached_get("https://api.alternative.me/fng/?limit=8", 600)
 
 
+def request_close(runs, body: dict) -> tuple[int, dict]:
+    """Queue a manual close for the bot: validate the position is open in that run, then write
+    STATE/close_requests/<random>.json atomically. Never calls the exchange."""
+    name, order_id = body.get("run"), body.get("order_id")
+    if not isinstance(name, str) or not isinstance(order_id, str) or not 0 < len(order_id) <= 128:
+        return 400, {"error": "run and order_id required"}
+    match = [r for r in runs if r[0] == name]
+    if not match:
+        return 404, {"error": "unknown run"}
+    _, state, *rest = match[0]
+    profile = rest[0] if rest else "pL"
+    status = _json(state / "dashboard" / "status.json", {})
+    engines = [e for e in status.get("engines", []) if e.get("profile") == profile]
+    open_pos = {p.get("id"): p for e in engines for p in e.get("open_positions", [])}
+    if order_id not in open_pos:
+        return 409, {"error": "position is not open (already closed or closing)"}
+    if open_pos[order_id].get("state") == "CLOSING":
+        return 409, {"error": "position is already closing"}
+    folder = state / "close_requests"
+    folder.mkdir(exist_ok=True)
+    tmp = folder / f".{secrets.token_hex(8)}.tmp"
+    tmp.write_text(json.dumps({"profile": profile, "order_id": order_id, "requested_ms": int(time.time() * 1000)}))
+    os.replace(tmp, folder / f"{int(time.time() * 1000)}-{secrets.token_hex(4)}.json")
+    return 202, {"ok": True, "symbol": open_pos[order_id].get("symbol"), "order_id": order_id}
+
+
 PAGE = (Path(__file__).with_name("webdash.html"))
 
 
 def serve(runs, sentibot, port=8787):
+    token = secrets.token_urlsafe(24)  # embedded in the page; another site cannot read it, so cannot POST
+    allowed = {f"127.0.0.1:{port}", f"localhost:{port}"}
+
     class Handler(BaseHTTPRequestHandler):
+        def _send(self, code, data):
+            body = json.dumps(data).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json"); self.send_header("Cache-Control", "no-store")
+            self.end_headers(); self.wfile.write(body)
+
+        def do_POST(self):
+            if urlparse(self.path).path != "/api/close":
+                self.send_error(404); return
+            origin = self.headers.get("Origin")
+            if self.headers.get("Host") not in allowed or (origin and urlparse(origin).netloc not in allowed):
+                self._send(403, {"error": "forbidden origin"}); return
+            if not secrets.compare_digest(self.headers.get("X-QuantOS-Token", ""), token):
+                self._send(403, {"error": "bad token; reload the page"}); return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = json.loads(self.rfile.read(min(length, 4096)) or b"{}")
+                if not isinstance(body, dict): raise ValueError
+            except ValueError:
+                self._send(400, {"error": "bad json"}); return
+            self._send(*request_close(runs, body))
+
         def do_GET(self):
             if self.path.startswith("/api/state"):
                 body = _cached("state", 5, lambda: json.dumps(snapshot(runs, sentibot), default=str).encode())
@@ -370,7 +423,7 @@ def serve(runs, sentibot, port=8787):
                     self.send_error(502 if isinstance(e, OSError) else 400, str(e)); return
                 body, kind = json.dumps(data, default=str).encode(), "application/json"
             elif self.path in ("/", "/index.html"):
-                body, kind = PAGE.read_bytes(), "text/html; charset=utf-8"
+                body, kind = PAGE.read_bytes().replace(b"__QOS_TOKEN__", token.encode()), "text/html; charset=utf-8"
             elif urlparse(self.path).path.startswith("/static/aura-zenith/"):
                 # Dashboard-owned assets only; no arbitrary paths or state access.
                 asset = urlparse(self.path).path.removeprefix("/static/aura-zenith/")
