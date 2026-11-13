@@ -31,7 +31,7 @@ def _engine_view(e, now_ms):
     positions = []
     for o in e.active():
         s = o["signal"]
-        positions.append({"symbol": s["symbol"], "side": s["side"],
+        positions.append({"id": o.get("id"), "symbol": s["symbol"], "side": s["side"],
                           "strategy_id": s.get("strategy_id"), "stop_loss": s.get("stop_loss"),
                           "take_profit": s.get("take_profit"), "filled": o.get("filled"),
                           "average": o.get("average"), "state": o.get("state"),

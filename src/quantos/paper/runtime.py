@@ -179,6 +179,8 @@ def dispatch(engines, kind, payload, now, *, strategies=(), active_seconds=0, se
         for e in engines:
             if "manual_pause" in payload: e.manual_pause = bool(payload["manual_pause"])
             if payload.get("kill"): e.kill(now)
+            if payload.get("manual_close") and e.journal.profile == payload.get("profile"):
+                e.manual_close(payload["manual_close"], now)
     else:
         raise ValueError(f"unknown input kind: {kind}")
     return False
@@ -276,6 +278,33 @@ class Runtime:
             self.dropped[kind] = self.dropped.get(kind, 0) + 1
             return False
         return True
+
+    def _manual_closes(self, engines, alerter, now):
+        """Apply Close requests the dashboard dropped in STATE/close_requests/ (one JSON file each:
+        {"profile", "order_id"}). Recorded as a control input so replay closes the same order."""
+        folder = self.state / "close_requests"
+        try:
+            files = sorted(folder.glob("*.json"))
+        except OSError:
+            return
+        for path in files:
+            try:
+                req = json.loads(path.read_text())
+                profile, order_id = str(req["profile"]), str(req["order_id"])
+            except (OSError, ValueError, KeyError, TypeError):
+                req = None
+            try: path.unlink()
+            except OSError: pass
+            if req is None:
+                continue
+            targets = [e for e in engines if e.journal.profile == profile]
+            if not targets:
+                continue
+            self.record("control", {"manual_close": order_id, "profile": profile}, now)
+            symbol = targets[0].manual_close(order_id, now)
+            if symbol:
+                alerter.alert("warn", f"manual_close:{order_id}", f"manual close requested on {symbol} "
+                              "(dashboard); closing with its stop/TP orders, excluded from edge stats", now)
 
     def record(self, kind, payload, now, active_seconds=0, *, context=None):
         folder = self.state / "market"
@@ -682,6 +711,7 @@ class Runtime:
                     for e in engines: e.kill(now)
                     alerter.alert("critical", "kill_switch", "KILL file present: entries paused, positions closing", now)
                 if now-last_status >= STATUS_EVERY_MS:
+                    self._manual_closes(engines, alerter, now)
                     paused = (self.state / "PAUSE").exists()
                     if any(getattr(e, "manual_pause", False) != paused for e in engines):
                         self.record("control", {"manual_pause": paused}, now)

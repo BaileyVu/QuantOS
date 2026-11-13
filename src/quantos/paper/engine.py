@@ -506,6 +506,28 @@ class PaperEngine:
                     return True
         return False
 
+    def manual_close(self, order_id, now_ms):
+        """Owner pressed Close on the dashboard: close this open position through the normal exit path.
+
+        The mirror then sends a reduce-only close, confirms flat and cancels the leg's stop and take-profit.
+        The trade is tagged exclude_from_edge so a discretionary exit never counts as strategy evidence.
+        Returns the symbol closed, or None when the order is unknown, unfilled or already closing."""
+        with self.journal.transaction():
+            for o in self.active():
+                if o["id"] != order_id or o["state"] == "CLOSING":
+                    continue
+                if D(o["filled"]) <= 0:  # resting entry with no fill yet: cancel it instead
+                    o.update(state="CANCELED", remaining="0", stop_active=False, target_active=False,
+                             exclude_from_edge=True)
+                    self.journal.save(o)
+                    self.journal.event(now_ms, "CANCELED", {"id": o["id"], "reason": "MANUAL_CLOSE"})
+                    return o["signal"]["symbol"]
+                o["exclude_from_edge"] = True
+                self._closing(o, now_ms, "MANUAL_CLOSE")
+                self.journal.save(o)
+                return o["signal"]["symbol"]
+        return None
+
     def check_realised_risk(self, order_id, now_ms, price, quantity, entry_fee=None):
         """Real exchange fills must remain within 1.2x the approved risk budget.
 

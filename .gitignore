@@ -33,3 +33,6 @@ logs/
 *.log
 /.paper-state/
 !/.env.example
+
+# Private strategy notes live on the Mac only (dashboard reads ~/Library/Application Support/QuantOS/strategy_library.json)
+strategy_library.json
