@@ -82,6 +82,11 @@ def strategy_slot(strategy_id: str) -> str:
     return "event" if strategy_id in EVENT_STRATEGIES else "trend"
 
 
+def policy_slot(policy, strategy_id: str) -> str:
+    """Slot family under a policy: its own slot_map overrides the default mapping."""
+    return dict(getattr(policy, "slot_map", ())).get(strategy_id) or strategy_slot(strategy_id)
+
+
 @dataclass(frozen=True)
 class LivePolicy(Policy):
     """$50 USDC run: reserved event slots, minimum-notional bump, tighter breakers.
@@ -100,6 +105,7 @@ class LivePolicy(Policy):
 
     max_positions = 3
     slots = (("crash", 1), ("event", 1), ("trend", 1))
+    slots_shared = False  # True: per-family caps under one shared max_positions cap
     limit_entries = False  # live50 polls no trade prints, so a LIMIT entry could never be filled honestly
     risk_headroom = D("0.9")
     enabled_strategies = frozenset({"crash_flush_e2", "alt_dip_reversal", "delist_short_e17",
@@ -109,7 +115,10 @@ class LivePolicy(Policy):
         super().__post_init__()
         if not 0 < self.bump_max_risk <= D(".05") or not self.risk_fraction <= self.portfolio_risk_fraction <= D(".05"):
             raise ValueError("hard ceiling: bump or portfolio risk")
-        if sum(n for _, n in self.slots) != self.max_positions:
+        total = sum(n for _, n in self.slots)
+        # Exclusive slots add up to max_positions; shared caps (pD) may over-subscribe it, never under.
+        if (total < self.max_positions if self.slots_shared else total != self.max_positions) or any(
+                not 0 < n <= self.max_positions for _, n in self.slots):
             raise ValueError("slots must add up to max_positions")
 
 
@@ -159,16 +168,30 @@ class Cap200M5Policy(Cap200M10Policy):
 
 @dataclass(frozen=True)
 class Demo200Policy(Cap200M10Policy):
-    """Owner's combined demo run (2026-11-02): $200, margin = realized balance / 10 (~$20, so 3 trades <= ~$60),
-    leverage <= 5x, at most 3 positions across all strategies,
-    all rules enabled, looser breakers, full top-of-book depth, and the sentiment gate on trend rules."""
-    leverage: Decimal = D("5")
+    """Owner's combined demo run (2026-11-02; sizing/slots 2026-11-13): $200, all rules enabled, looser breakers,
+    full top-of-book depth, and the sentiment gate on trend rules.
+
+    Slots: one shared cap of 6 concurrent positions (pending entries included), per family trend<=3,
+    event<=2, crash<=2, alt/ML<=3; one position per symbol.
+    Sizing (risk_sizing): risk = 1.5% of current equity, quantity = risk / per-unit stop loss (stop distance
+    plus fees and slippage, so the stop never loses more than the risk). Leverage = smallest whole number
+    keeping margin <= equity/15, at most 10x and with liquidation >= 2x the stop distance; if none fits,
+    the position shrinks (risk only ever falls). Below the exchange minimum -> skip. Open risk <= 9% of equity."""
+    leverage: Decimal = D("10")
+    risk_fraction: Decimal = D(".015")
+    margin_cap_fraction: Decimal = D(1) / D(15)
+    total_risk_cap: Decimal = D(".09")
     daily_loss: Decimal = D(".15")
     drawdown: Decimal = D(".35")
     portfolio_risk_fraction: Decimal = D(".05")
     depth_fraction: Decimal = D("5")  # 11-03: $100 5x entries kept cancelling on 1x top-of-book; a market order walks the book
 
-    leverage_ceiling = "5"
+    risk_sizing = True
+    max_positions = 6
+    slots_shared = True
+    slots = (("trend", 3), ("event", 2), ("crash", 2), ("alt", 3))
+    slot_map = (("alt_dip_reversal", "alt"), ("ml5m_alts", "alt"))
+    leverage_ceiling = "10"
     daily_loss_ceiling = ".15"
     drawdown_ceiling = ".35"
     sentiment_gate = frozenset({"tsmom_4h", "turtle_55", "vol_squeeze_breakout"})
@@ -177,9 +200,17 @@ class Demo200Policy(Cap200M10Policy):
     loss_streak_pause = (("ml1h_pattern", 5),)
     enabled_strategies = Cap200M10Policy.enabled_strategies | {"ml5m_alts"}
 
+    def __post_init__(self):
+        super().__post_init__()
+        if not 0 < self.margin_cap_fraction <= D(".5") or not self.risk_fraction <= self.total_risk_cap <= D(".24"):
+            raise ValueError("hard ceiling: margin cap or total risk cap")
+
 
 def portfolio_risk_caps(policy: Policy) -> tuple[Decimal, Decimal]:
     """Frozen same-direction and total fractions; independent of signal order."""
+    total = getattr(policy, "total_risk_cap", None)
+    if total is not None:  # one explicit cap on all open risk (pD: 9%); same-direction can use all of it
+        return total, total
     base = getattr(policy, "portfolio_risk_fraction", D(0)) or policy.risk_fraction
     return min(2 * base, D(".16")), min(3 * base, D(".24"))
 
@@ -252,8 +283,8 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
         return reject("STRATEGY_DISABLED")
     slots = dict(getattr(policy, "slots", ()))
     if slots:
-        slot = strategy_slot(signal.strategy_id)
-        if sum(strategy_slot(s) == slot for s in account.open_strategies) >= slots.get(slot, 0):
+        slot = policy_slot(policy, signal.strategy_id)
+        if sum(policy_slot(policy, s) == slot for s in account.open_strategies) >= slots.get(slot, 0):
             return reject(f"SLOT_FULL_{slot.upper()}")
     if account.active_orders < 0:
         return reject("INVALID_EXPOSURE")
@@ -369,13 +400,18 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
                                    account.equity - account.margin_used))
     # Live profiles size below the budget so a small adverse move between signal and fill stays inside
     # it; the engine's fill-time check caps at the full budget (requested_risk).
-    margin_rule = getattr(policy, "margin_per_trade", None)
+    risk_sized = getattr(policy, "risk_sizing", False)
+    margin_rule = None if risk_sized else getattr(policy, "margin_per_trade", None)
     balance = account.cash if account.cash > 0 else account.equity
-    bounds = {"risk": min(balance * margin_rule * safe / max_entry, max(D(0), risk_room) / unit_loss) if margin_rule else
+    margin_cap = account.equity * policy.margin_cap_fraction if risk_sized else D(0)
+    bounds = {"risk": budget / unit_loss if risk_sized else
+              min(balance * margin_rule * safe / max_entry, max(D(0), risk_room) / unit_loss) if margin_rule else
               budget * getattr(policy, "risk_headroom", D(1)) / unit_loss,
               "gross_notional": max(D(0), account.equity * policy.gross_fraction - account.gross_notional) / (max_entry * (1 + entry_fee)),
               "margin": margin_capacity / (max_entry / safe + costs),
               "exchange_max": min(instrument.max_qty, instrument.market_max_qty)}
+    if risk_sized:  # margin <= equity/15 at the highest leverage the liquidation rule allows: shrink, never lever up
+        bounds["margin_cap"] = margin_cap * safe / max_entry
     binding = min(bounds, key=bounds.get)
     step = quantity_step(instrument)
     quantity = floor_step(bounds[binding], step)
@@ -402,7 +438,10 @@ def evaluate(signal: Signal, instrument: Instrument, quote: Quote,
                          else account.equity * policy.margin_fraction)
     if leverage_capacity <= 0:
         return reject("INSUFFICIENT_MARGIN")
-    leverage = safe if margin_rule else min(safe, max(D(1), D(ceil(notional / leverage_capacity))))
+    if risk_sized:  # smallest whole leverage keeping margin within equity/15; <= safe by the margin_cap bound
+        leverage = min(safe, max(D(1), D(ceil(quantity * max_entry / margin_cap))))
+    else:
+        leverage = safe if margin_rule else min(safe, max(D(1), D(ceil(notional / leverage_capacity))))
     if margin_rule:  # the stop sets the loss; give the fill-time check the usual 10% room over it
         budget = quantity * unit_loss / D("0.9")
     return Decision(True, "NET_RR_NOT_APPLICABLE" if no_target else "APPROVED",

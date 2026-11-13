@@ -328,6 +328,7 @@ class Runtime:
         announcements = self.announcement_factory()
         instruments, cache = {}, {}
         next_universe = next_announcements = next_cutoff = 0
+        stale_seen = set()  # article ids already reported stale: the same old page re-polls every 30s
         live = self.portfolio == "live50"
         oi = OpenInterestCache(market, sorted(MAJORS)) if live else None
         cutoff = (None, None)
@@ -392,6 +393,9 @@ class Runtime:
                         poll = announcements.poll(instruments)
                         events = poll.events
                         for diagnostic in poll.diagnostics:
+                            if diagnostic.status == "SKIPPED_STALE_RELEASE":
+                                if diagnostic.article_id in stale_seen: continue
+                                stale_seen.add(diagnostic.article_id)
                             self.emit("diagnostic", asdict(diagnostic))
                         next_announcements = milliseconds()+30000
                     except Exception as error:

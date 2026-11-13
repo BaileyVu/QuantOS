@@ -151,8 +151,22 @@ def step(model, history, state, now):
     signals = [{"symbol": symbol[:-4] + "USDC", "side": "LONG", "score": value}
                for symbol, value in sorted(scores.items(), key=lambda item: -item[1])
                if symbol[:-4] + "USDC" in USDC_TWINS and thr is not None and value >= thr]
-    atomic_json(state / "signals.json", {"bar_close_ms": opened + BAR - 1, "thr": thr, "signals": signals})
-    print(f"bar_close_ms={opened + BAR - 1} scored={len(scores)} signals={len(signals)}", flush=True)
+    summary = bar_summary(scores, thr)
+    atomic_json(state / "signals.json", {"bar_close_ms": opened + BAR - 1, "thr": thr, "signals": signals,
+                                         "max_score": summary["max_score"], "max_symbol": summary["max_symbol"]})
+    print(f"bar_close_ms={opened + BAR - 1} scored={len(scores)} signals={len(signals)} {summary['line']}", flush=True)
+
+
+def bar_summary(scores, thr):
+    """Per-bar max score among tradeable USDC twins (and over all scored coins) vs the threshold. Log only."""
+    def best(items):
+        return max(items, key=lambda item: item[1], default=(None, None))
+    symbol, top = best((s[:-4] + "USDC", v) for s, v in scores.items() if s[:-4] + "USDC" in USDC_TWINS)
+    any_symbol, any_top = best(scores.items())
+    fmt = lambda v: "na" if v is None else f"{v:.3f}"
+    gap = "na" if top is None or thr is None else f"{top - thr:+.3f}"
+    return {"max_score": top, "max_symbol": symbol,
+            "line": f"thr={fmt(thr)} max={fmt(top)}@{symbol} gap={gap} max_all={fmt(any_top)}@{any_symbol}"}
 
 
 def main():
