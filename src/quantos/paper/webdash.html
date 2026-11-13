@@ -913,6 +913,7 @@ const TABS = NAV.map(n => n.label);
 const SITE = { 'CoinDesk': ['https://www.coindesk.com/', 'CD', 'var(--az-tint-33)', 'var(--az-warning)'], 'Cointelegraph': ['https://cointelegraph.com/', 'CT', 'var(--az-tint-43)', 'var(--az-text-secondary)'], 'Watcher Guru': ['https://t.me/s/WatcherGuru', 'WG', 'var(--az-tint-7)', 'var(--az-info)'] };
 // Backtest edge per strategy (research notes, not live data).
 const EDGE = { alt_dip_reversal: '+2.5% / episode', crash_flush_e2: '+2.9% / episode', tsmom_4h: 'failed held-out', ml5m_alts: '5m GBM', ml1h_pattern: '1h LightGBM' };
+const BAD_ST = new Set(['Check failed', 'Stale', 'Missing']);  // scorer badges are live file-age checks (webdash.live_scorer_checks)
 const SLOT = { crash_flush_e2: 'crash', alt_dip_reversal: 'event', delist_short_e17: 'event', tsmom_4h: 'trend', turtle_55: 'trend', vol_squeeze_breakout: 'trend', ml5m_alts: 'trend' };
 const STOP_CMD = 'cd ~/Desktop/PythonProject/QuantOS-mainnet-ready && ../QuantOS/.venv/bin/python scripts/deploy_three.py uninstall';
 
@@ -1132,8 +1133,9 @@ function model() {
   const strats = [...new Set([...Object.keys(checks), ...Object.keys(per)])].map(id => {
     const c = checks[id] || {}, inPos = positions.some(p => p.strat === id), a = per[id] || {};
     const pnl = (a.pnl || 0) + positions.filter(p => p.strat === id).reduce((s, p) => s + (p.up || 0), 0);
-    const stt = inPos ? 'In position' : c.ok === false ? 'Check failed' : eng.paused ? 'Paused' : 'Scanning';
-    return { n: id, b: run.profile || 'pD', slot: SLOT[id] || '–', st: stt, stc: inPos ? BLU : stt === 'Scanning' ? UP : stt === 'Check failed' ? DN : DIM, t: a.entries || 0, p: pnl, d: c.detail || '', edge: EDGE[id] || '–' };
+    const stt = inPos ? 'In position' : c.ok === false ? (c.state || 'Check failed') : eng.paused ? 'Paused' : 'Scanning';
+    const bot = c.bot && c.bot.ok === false && c.ok ? ` · bot check ${new Date(c.bot_time_ms).toISOString().slice(11, 16)}Z: ${c.bot.detail || 'failed'}` : '';
+    return { n: id, b: run.profile || 'pD', slot: SLOT[id] || '–', st: stt, stc: inPos ? BLU : stt === 'Scanning' ? UP : BAD_ST.has(stt) ? DN : DIM, t: a.entries || 0, p: pnl, d: (c.detail || '') + bot, edge: EDGE[id] || '–' };
   });
   let h1 = null;
   if (S.ml1h) {
@@ -1240,7 +1242,7 @@ function renderStrats(M) {
   const nPd = M.strats.filter(s => s.b !== 'executor').length;
   $('ovStSub').textContent = `${nPd} ${M.run.profile || ''}`;
   updateHTML($('ovStrats'), M.strats.slice().sort((a, b) => b.t - a.t || Math.abs(b.p) - Math.abs(a.p)).slice(0, 5).map(s => stratRow(s, false)).join(''));
-  const running = M.strats.filter(s => s.st !== 'Check failed' && s.st !== 'Paused').length;
+  const running = M.strats.filter(s => !BAD_ST.has(s.st) && s.st !== 'Paused').length;
   $('stSub').textContent = `${running} running · ${Object.keys(M.run.slots || {}).length} slots shared · margin = balance / 10`;
   updateHTML($('stStrats'), M.strats.map(s => stratRow(s, true)).join(''));
 }
@@ -1782,7 +1784,7 @@ function stratDrawer(M, id) {
   const s = M.strats.find(x => x.n === id) || { n: id, st: '–', t: 0, p: 0, d: '' }, L = (LIB && LIB.strategies && LIB.strategies[id]) || null;
   const ex = X && X[M.run.name], agg = (ex && ex.strategies && ex.strategies[id]) || {}, fills = ((ex && ex.fills) || []).filter(f => f.strategy === id).slice(0, 12);
   const open = M.positions.filter(p => p.strat === id);
-  const stc = s.st === 'In position' ? 'acc' : s.st === 'Scanning' ? 'up' : s.st === 'Check failed' ? 'dn' : '';
+  const stc = s.st === 'In position' ? 'acc' : s.st === 'Scanning' ? 'up' : BAD_ST.has(s.st) ? 'dn' : '';
   const sub = `<span class="dr-pill ${stc}">${esc(s.st)}</span>${L ? `<span class="dr-pill">${esc(L.family || '')}</span><span class="dr-pill">${esc(L.direction || '')}</span><span class="dr-pill">${esc(L.timeframe || '')}</span>` : ''}<span class="dr-pill">slot ${esc(SLOT[id] || (L && L.slot) || '–')}</span>`;
   let body = `<div class="dr-stats"><div class="dr-stat"><span>Trades</span><b>${agg.entries || 0}</b></div><div class="dr-stat"><span>Realised</span><b style="color: ${pc(agg.pnl)};">${sgn(agg.pnl || 0)}</b></div><div class="dr-stat"><span>Open uPnL</span><b style="color: ${pc(open.reduce((a, p) => a + (p.up || 0), 0))};">${sgn(open.reduce((a, p) => a + (p.up || 0), 0))}</b></div><div class="dr-stat"><span>Fees</span><b>${f2(agg.fees || 0)}</b></div></div>`;
   if (open.length) body += sec('Open now', `<div class="pos-list">${open.map(p => posCard(p, M)).join('')}</div>`);
