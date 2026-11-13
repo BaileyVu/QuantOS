@@ -114,5 +114,17 @@ class WebdashCloseEndpoint(unittest.TestCase):
         self.assertEqual(post({"X-QuantOS-Token": token, "Origin": f"http://127.0.0.1:{port}"}), 202)
 
 
+class LibraryEndpoint(unittest.TestCase):
+    def test_reads_local_file_or_reports_missing(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "lib.json"
+            self.assertFalse(webdash.library_view(path)["available"])
+            path.write_text(json.dumps({"strategies": {"crash_flush_e2": {"name": "Crash"}}}))
+            out = webdash.library_view(path)
+            self.assertTrue(out["available"]); self.assertEqual(out["strategies"]["crash_flush_e2"]["name"], "Crash")
+            path.write_text("not json")
+            self.assertFalse(webdash.library_view(path)["available"])
+
+
 if __name__ == "__main__":
     unittest.main()
