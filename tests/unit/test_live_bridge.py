@@ -504,3 +504,22 @@ class SharedAccountTests(unittest.TestCase):
         self.assertEqual(ex.pos["NEARUSDT"], D("-10"))
         self.assertIn("mlalts-sl", ex.algo)
         self.assertTrue(m.flat_confirmed)
+
+
+class SetupOrderTests(MirrorTests):
+    """pD sizes each trade for a specific leverage on ISOLATED margin: both are set per symbol before entry."""
+    def test_isolated_and_leverage_set_before_entry(self):
+        calls = []
+
+        class Recording(FakeExchange):
+            def set_margin_type(self, s, m): calls.append(("margin", s, m))
+            def set_leverage(self, s, lev): calls.append(("leverage", s, str(lev))); super().set_leverage(s, lev)
+            def new_order(self, p):
+                calls.append(("order", p["symbol"], p.get("reduceOnly", False))); return super().new_order(p)
+
+        ex, e = Recording(), Engine()
+        o = order(); o["decision"] = {"leverage": "7"}
+        e.orders = [o]
+        self.assertTrue(self.mirror(ex).sync(e, 1)["ok"])
+        self.assertEqual(calls[:3], [("margin", "SOLUSDC", "ISOLATED"), ("leverage", "SOLUSDC", "7"),
+                                     ("order", "SOLUSDC", False)])

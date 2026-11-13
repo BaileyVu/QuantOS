@@ -112,7 +112,35 @@ class AnnouncementStub:
         return AnnouncementPoll((), (diagnostic,))
 
 
+class StaleAnnouncementStub(AnnouncementStub):
+    def poll(self, instruments):
+        self.calls.append((self.clock.now, tuple(instruments)))
+        return AnnouncementPoll((), (AnnouncementDiagnostic(
+            "SKIPPED_STALE_RELEASE", 1, self.clock.now, "old-article", "Binance Will Delist OLD on 2026-10-28", ""),))
+
+
+class EveryWaitAdvances(StopAfterWaits):
+    def wait(self, _timeout=None):
+        self.clock.now += self.advance_ms
+        return super().wait(_timeout)
+
+
 class ScannerTests(unittest.TestCase):
+    def test_stale_article_reported_once_not_every_poll(self):
+        clock = FakeClock(400_000)
+        market = ScannerMarket(clock, ["BTCUSDC"])
+        announcements = StaleAnnouncementStub(clock)
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Runtime(Path(directory), market_factory=lambda: market,
+                              announcement_factory=lambda: announcements)
+            runtime.shutdown = EveryWaitAdvances(clock, waits=4, advance_ms=31_000)
+            with patch("quantos.paper.runtime.milliseconds", side_effect=lambda: clock.now):
+                runtime.scanner()
+            self.assertGreaterEqual(len(announcements.calls), 3)
+            stale = [p for kind, p in self.messages(runtime)
+                     if kind == "diagnostic" and p.get("status") == "SKIPPED_STALE_RELEASE"]
+            self.assertEqual(len(stale), 1)
+
     def test_shutdown_does_not_drain_queued_universe_requests(self):
         clock=FakeClock()
         market=ScannerMarket(clock,[f'COIN{i}USDC' for i in range(20)])

@@ -123,11 +123,12 @@ def run_view(name: str, state: Path, now_ms: int, profile: str = "pL") -> dict:
         view["feed"] = feed
         closed = db.execute("SELECT COALESCE(SUM(CAST(pnl AS REAL)),0), COALESCE(SUM(CAST(fee AS REAL)),0) FROM fills").fetchone()
         view["realized"] = {"pnl": closed[0], "fees": closed[1]}
-        from .risk import LivePolicy, strategy_slot
+        from .risk import Demo200Policy, LivePolicy, policy_slot
+        slot_policy = Demo200Policy if profile == "pD" else LivePolicy
         used = {}
         for pos in view["status"].get("engines", [{}])[0].get("open_positions", []):
-            slot = strategy_slot(pos.get("strategy_id") or ""); used[slot] = used.get(slot, 0) + 1
-        view["slots"] = {slot: {"used": used.get(slot, 0), "max": n} for slot, n in LivePolicy.slots}
+            slot = policy_slot(slot_policy, pos.get("strategy_id") or ""); used[slot] = used.get(slot, 0) + 1
+        view["slots"] = {slot: {"used": used.get(slot, 0), "max": n} for slot, n in slot_policy.slots}
         view["fills"] = [{"time_ms": t, "kind": k, "order_id": o, "quantity": q, "price": pr, "fee": f, "pnl": pn}
                          for t, k, o, q, pr, f, pn in db.execute(
                              "SELECT time_ms,kind,order_id,quantity,price,fee,pnl FROM fills ORDER BY time_ms DESC LIMIT 30")]

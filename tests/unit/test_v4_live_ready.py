@@ -204,23 +204,23 @@ class R5ScopeTests(unittest.TestCase):
 
 
 class Demo200Tests(unittest.TestCase):
-    """Combined demo profile: balance/10 margin, leverage up to 5x on tight stops."""
+    """Combined demo profile: 1.5% risk sizing, margin <= equity/15, leverage <= 10x (test_pd_slots_sizing)."""
     def decide(self, cash, s=None):
         from quantos.paper.risk import Demo200Policy
         a = replace(Account(D(cash), D(cash), D(200)), cash=D(cash))
         return evaluate(s or event(), INS, quote(), a, Demo200Policy(), T)
 
-    def test_tight_stop_uses_up_to_5x(self):
+    def test_tight_stop_uses_up_to_10x(self):
         tsmom = signal(strategy_id="tsmom_4h", strategy_version="1.0.0", entry_type="MARKET",
                        take_profit=None, maximum_hold_seconds=259200, stop_loss=D("98.32"))
         d = self.decide(200, s=tsmom)
         self.assertTrue(d.approved, d)
-        self.assertLessEqual(d.leverage, 5); self.assertGreater(d.leverage, 3)
-        self.assertLessEqual(d.margin, D("20.00"))
+        self.assertLessEqual(d.leverage, 10); self.assertGreater(d.leverage, 5)
+        self.assertLessEqual(d.margin, D(200) / 15)
 
     def test_leverage_ceiling_still_enforced(self):
         from quantos.paper.risk import Demo200Policy
-        with self.assertRaises(ValueError): Demo200Policy(leverage=D("6"))
+        with self.assertRaises(ValueError): Demo200Policy(leverage=D("11"))
 
 
 class LossStreakPauseTests(unittest.TestCase):

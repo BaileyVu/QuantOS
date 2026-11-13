@@ -81,3 +81,12 @@ class Ml5mAltsTests(unittest.TestCase):
         snapshot = replace(snapshot, at_ms=next_candle.close_ms + 1)
         dispatch([engine], "scan", [snapshot], snapshot.at_ms)
         self.assertEqual(journal.orders()[0]["close_reason"], "SOFT_STOP_5M")
+
+
+class ScoreSummaryTests(unittest.TestCase):
+    def test_bar_summary_reports_tradeable_max_and_gap(self):
+        from quantos.paper.ml5m_scoring.__main__ import bar_summary
+        s = bar_summary({"SOLUSDT": 0.41, "ETHUSDT": 0.2, "XYZUSDT": 0.7}, 0.561)
+        self.assertEqual((s["max_score"], s["max_symbol"]), (0.41, "SOLUSDC"))
+        self.assertEqual(s["line"], "thr=0.561 max=0.410@SOLUSDC gap=-0.151 max_all=0.700@XYZUSDT")
+        self.assertEqual(bar_summary({}, None)["line"], "thr=na max=na@None gap=na max_all=na@None")
